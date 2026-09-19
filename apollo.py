@@ -99,6 +99,7 @@ import webview  # noqa: E402  - must follow the env var above
 import assistant  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
+import presence  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -152,11 +153,6 @@ PEEK_HOTKEY = "ctrl+`"
 # Windows - before Apollo opens the full display by itself, screensaver style.
 # The very next keypress or mouse movement sends it back to the orb.
 AFK_SECONDS = 40 * 60
-
-# After CTRL+` opens the display by hand, Apollo waits for the machine to
-# go quiet for this long before it starts watching for input to close it again.
-# Without the grace period the chord's own keystrokes would close it instantly.
-PEEK_ARM_SECONDS = 1.5
 
 # Extended window styles. pywebview's `focus=False` already sets NOACTIVATE;
 # the rest are ours. See Overlay for why TRANSPARENT and LAYERED come as a pair.
@@ -619,9 +615,8 @@ class Apollo:
         self.voice = None          # the Gemini Live session, once connected
         self.listen_toggle = None  # ...and the CTRL+1 watcher over it
         self.turn_busy = False     # listening, thinking, or speaking
-        self.peek_open = False     # you pressed CTRL+`
-        self.peek_armed = False    # ...and have since let go of the keyboard
-        self.afk_open = False      # the machine has been left alone
+        self.presence = presence.Presence(AFK_SECONDS)
+        self.last_status = None    # the phase the overlay last acted on
         self.window = webview.create_window(
             "Apollo",
             INDEX,
@@ -759,9 +754,7 @@ class Apollo:
         method to decide when a turn starts. It decides between the ambient
         overlay and the full display, and that is all.
         """
-        if self.peek_open or self.afk_open:
-            return Overlay.FULL
-        return Overlay.ORB
+        return Overlay.FULL if self.presence.full else Overlay.ORB
 
     def apply_mode(self):
         """Swap between the overlay and the full display.
@@ -808,13 +801,14 @@ class Apollo:
 
     def on_status(self, state):
         """A phase change from the backend: listening, thinking, speaking, idle."""
-        if state == assistant.LISTENING and self.orb is not None:
-            # A fresh turn starting. Whatever answer is still on screen
-            # belongs to the turn that just ended, so it starts collapsing
-            # now; the first words of this one cancel that and reopen it.
-            self.orb.clear_content()
-        if state == assistant.IDLE and self.orb is not None:
-            self.orb.clear_content(after=self.LINGER)
+        # Only a change of phase touches the words on screen (see
+        # `presence.content_action`): a fresh turn clears the last answer
+        # at once, settling back after one lets it linger, and a repeat of
+        # the same phase does nothing at all.
+        delay = presence.content_action(self.last_status, state, self.LINGER)
+        self.last_status = state
+        if delay is not None and self.orb is not None:
+            self.orb.clear_content(after=delay)
         self.turn_busy = state in WebReporter.ENGAGED
         if self.orb is not None:
             self.orb.set_active(self.turn_busy)
@@ -857,10 +851,9 @@ class Apollo:
         """CTRL+`: open the full display by hand, or put it away."""
         if getattr(self, "ui", None) is None:
             return   # the page is not up yet; nothing to open
-        self.peek_open = not self.peek_open
-        # Opening it is itself a keystroke, so do not start watching for input
-        # to close it again until the keyboard has gone quiet.
-        self.peek_armed = False
+        # Stays open until the chord is pressed again - using the machine in
+        # between no longer closes it (see `presence.Presence`).
+        self.presence.toggle_peek()
         self.apply_mode()
 
     def check_presence(self, idle):
@@ -869,27 +862,7 @@ class Apollo:
         `idle` is seconds since the last input anywhere in Windows, so this
         follows you rather than following Apollo's own window.
         """
-        changed = False
-
-        # Away from the machine: open by itself, close the moment you touch it.
-        if not self.peek_open:
-            afk = idle >= AFK_SECONDS
-            if afk != self.afk_open:
-                self.afk_open = afk
-                changed = True
-
-        # A hand-opened display closes on your next keypress or mouse move,
-        # once you have actually let go of the chord that opened it.
-        if self.peek_open:
-            if not self.peek_armed:
-                if idle >= PEEK_ARM_SECONDS:
-                    self.peek_armed = True
-            elif idle < PEEK_ARM_SECONDS / 2:
-                self.peek_open = False
-                self.peek_armed = False
-                changed = True
-
-        if changed:
+        if self.presence.check(idle):
             self.apply_mode()
 
     def check_overlay_alive(self):

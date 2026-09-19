@@ -24,3 +24,6 @@ desktop.ini
 # Local runtime state
 reminders.json
 .thumbnail
+
+# Plan execution scratch
+.superpowers/
