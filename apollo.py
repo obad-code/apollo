@@ -519,6 +519,7 @@ class WebReporter:
         self.on_partial = on_partial
         self.alive = True
         self.quiet = True   # until the backend has finished waking up
+        self._last = None   # the last (state, quiet) forwarded - see `status`
 
     def _call(self, fn, *args):
         if not self.alive:
@@ -531,6 +532,17 @@ class WebReporter:
             self.alive = False
 
     def status(self, state):
+        # The run loop may report the same phase many times a second - in
+        # always-listening it used to report LISTENING after every 250ms
+        # poll - and every forward costs a page call, a chime and a wipe of
+        # the overlay. A phase is an event only when it changes. Quiet is
+        # part of the key: the page saw "Waking" while quiet, so the first
+        # real IDLE after it is news even if IDLE was the last state.
+        key = (state, self.quiet)
+        if key == self._last:
+            return
+        self._last = key
+
         # Being busy is not a size any more: every phase of a turn happens in
         # the resting overlay, which grows itself to fit whatever it is
         # showing (see Apollo.on_status and orb.Orb).
