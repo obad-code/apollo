@@ -237,7 +237,7 @@ class LiveSession:
     def __init__(self, on_audio=None, on_text=None, api_key=None,
                  auto_vad=False, on_user_text=None, tools=None,
                  on_tool_call=None, on_heard=None, on_activity=None,
-                 on_user_turn=None, models=None):
+                 on_user_turn=None, on_usage=None, models=None):
         self._on_audio = on_audio
         self._on_text = on_text
         self._on_user_text = on_user_text
@@ -288,6 +288,7 @@ class LiveSession:
         self._on_heard = on_heard
         self._on_activity = on_activity
         self._on_user_turn = on_user_turn
+        self._on_usage = on_usage
         self._models = tuple(models or MODELS)
         self.model = None               # whichever of `_models` connected
         self._epoch = 0                 # bumped by discard_reply; see _tool_allowed
@@ -775,6 +776,10 @@ class LiveSession:
                     self._cancelled.update(withdrawn.ids or [])
                     continue
 
+                meta = getattr(response, "usage_metadata", None)
+                if meta is not None:
+                    self._note_usage(meta)
+
                 content = response.server_content
                 if content is None:
                     continue
@@ -818,6 +823,16 @@ class LiveSession:
                     log.debug("interrupted: generation abandoned")
                 if content.turn_complete:
                     self._finish_turn()
+
+    def _note_usage(self, meta):
+        """Tokens as the server reports them, for the day's ledger."""
+        if self._on_usage is None:
+            return
+        try:
+            self._on_usage(int(getattr(meta, "prompt_token_count", 0) or 0),
+                           int(getattr(meta, "response_token_count", 0) or 0))
+        except Exception:
+            pass          # a ledger must never cost a turn
 
     def _note_heard(self, text):
         """Your own words, as the model transcribes them - both modes now."""

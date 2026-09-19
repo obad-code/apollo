@@ -42,6 +42,7 @@ import gemini_live
 import overlay_content
 import router
 import tools
+import usage
 
 
 def load_env(path=None):
@@ -715,14 +716,30 @@ def _send(request, stream=False):
     global use_fallbacks
 
     try:
-        return _call(request, use_fallbacks, stream)
+        response = _call(request, use_fallbacks, stream)
+        _note_usage(response)
+        return response
     except anthropic.BadRequestError as e:
         # Only retry if the beta itself was rejected. Retrying on any 400 masks
         # real request errors behind a second, identical-looking failure.
         if not use_fallbacks or not is_fallback_beta_error(e):
             raise
         use_fallbacks = False  # beta not enabled on this account; carry on without it
-        return _call(request, False, stream)
+        response = _call(request, False, stream)
+        _note_usage(response)
+        return response
+
+
+def _note_usage(response):
+    """Add one Claude response to the day's ledger. Never raises."""
+    try:
+        counts = getattr(response, "usage", None)
+        if counts is not None:
+            usage.record("claude", CLAUDE_MODEL,
+                         prompt=getattr(counts, "input_tokens", 0),
+                         response=getattr(counts, "output_tokens", 0))
+    except Exception:
+        pass
 
 
 def _text_of(response):
@@ -1489,6 +1506,8 @@ class Voice:
                 on_user_text=self.on_user_text, on_text=self.on_reply,
                 on_heard=self.on_heard, on_user_turn=tools.new_user_turn,
                 on_activity=self._activity, on_tool_call=self.run_tool,
+                on_usage=lambda prompt, reply: usage.record(
+                    "gemini", gemini_live.MODEL, prompt=prompt, response=reply),
                 tools=tools.gemini_declarations() if self.run_tool else None)
             try:
                 live.start()
