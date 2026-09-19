@@ -100,6 +100,8 @@ import assistant  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
 import presence  # noqa: E402
+import reminders  # noqa: E402
+import turnview  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -510,13 +512,15 @@ class WebReporter:
     ENGAGED = {assistant.LISTENING, assistant.THINKING, assistant.SPEAKING}
 
     def __init__(self, window, overlay, on_status, on_turn, on_level,
-                 on_partial):
+                 on_partial, on_visual=None, on_activity=None):
         self.window = window
         self.overlay = overlay
         self.on_status = on_status
         self.on_turn = on_turn
         self.on_level = on_level
         self.on_partial = on_partial
+        self.on_visual = on_visual
+        self.on_activity = on_activity
         self.alive = True
         self.quiet = True   # until the backend has finished waking up
         self._last = None   # the last (state, quiet) forwarded - see `status`
@@ -575,6 +579,17 @@ class WebReporter:
         """
         self.on_partial(text)
 
+    def visual(self, visual):
+        """A chart or cards from a tool. Native overlay only, like `partial`."""
+        if self.on_visual is not None and visual:
+            self.on_visual(visual)
+
+    def activity(self, text):
+        """What Apollo is doing right now, in a few words ("fetching NVDA")."""
+        if self.on_activity is not None and text:
+            self.on_activity(text)
+        self._call("note", text)
+
     def note(self, text):
         self._call("note", text)
 
@@ -629,6 +644,7 @@ class Apollo:
         self.turn_busy = False     # listening, thinking, or speaking
         self.presence = presence.Presence(AFK_SECONDS)
         self.last_status = None    # the phase the overlay last acted on
+        self.view = turnview.TurnView()   # what this turn adds up to on screen
         self.window = webview.create_window(
             "Apollo",
             INDEX,
@@ -728,7 +744,9 @@ class Apollo:
         self.ui = WebReporter(self.window, self.overlay,
                               on_status=self.on_status, on_turn=self.on_turn,
                               on_level=self.on_level,
-                              on_partial=self.on_partial)
+                              on_partial=self.on_partial,
+                              on_visual=self.on_visual,
+                              on_activity=self.on_activity)
         threading.Thread(target=self.worker, daemon=True).start()
 
     def on_closed(self):
@@ -819,6 +837,8 @@ class Apollo:
         # the same phase does nothing at all.
         delay = presence.content_action(self.last_status, state, self.LINGER)
         self.last_status = state
+        if delay == 0.0:
+            self.view.reset()          # a fresh turn: nothing carries over
         if delay is not None and self.orb is not None:
             self.orb.clear_content(after=delay)
         self.turn_busy = state in WebReporter.ENGAGED
@@ -834,30 +854,43 @@ class Apollo:
         if self.turn_busy and self.overlay.mode == Overlay.ORB and self.orb is not None:
             self.orb.raise_above()
 
+    def _render(self, frame):
+        """Put a turn frame from `self.view` on the overlay."""
+        if self.orb is None:
+            return
+        role, text, visual = frame
+        if text or visual:
+            self.orb.set_content(role, text, visual)
+
     def on_turn(self, speaker, text, visual=None):
         """A line of the transcript arrived: yours, or Apollo's reply.
 
-        Yours replaces the running transcription with what Whisper finally
-        settled on, which is usually the same line with the punctuation fixed.
-        Apollo's replaces it outright, in amber, with whatever chart or cards
-        the reply came with.
+        Both now stream - yours from Gemini's transcript while you talk, the
+        reply as it is spoken - and `turnview.TurnView` decides what they add
+        up to: your final line never wipes an answer already up, and a chart
+        a tool drew stays with the answer as it grows.
         """
-        if self.orb is None or not text:
+        if not text:
             return
         if speaker == "You":
-            self.orb.set_content(overlay_content.USER, text)
+            self._render(self.view.heard(text, final=True))
         else:
-            self.orb.set_content(overlay_content.APOLLO, text, visual)
+            if visual:
+                self.view.show(visual)
+            self._render(self.view.replied(text))
 
     def on_partial(self, text):
-        """Words heard so far, while you are still holding the key.
+        """Your words so far, while you are still talking."""
+        if text:
+            self._render(self.view.heard(text))
 
-        Arrives every three quarters of a second from the running
-        transcription, each time as the whole sentence rather than as an
-        extra clause - see `assistant.record_while_held`.
-        """
-        if self.orb is not None and text:
-            self.orb.set_content(overlay_content.USER, text)
+    def on_visual(self, visual):
+        """A chart or cards a tool drew for this turn."""
+        self._render(self.view.show(visual))
+
+    def on_activity(self, text):
+        """What Apollo is doing ("fetching NVDA"). Shown by the new overlay (P5)."""
+        self.view.doing(text)
 
     def toggle_peek(self):
         """CTRL+`: open the full display by hand, or put it away."""
@@ -927,8 +960,8 @@ class Apollo:
             ui.fatal(str(e))
             return
 
-        ui.note(f"Loading Whisper ({assistant.WHISPER_SIZE})... "
-                "first run downloads the model.")
+        # The backup transcriber loads behind everything else - Gemini's own
+        # transcript is the one in use - so it no longer holds up waking.
         whisper = assistant.load_whisper()
 
         # Before the greeting, so the first-run voice download shows a note
@@ -943,7 +976,11 @@ class Apollo:
         # arrived at.
         self.voice = assistant.Voice(
             ui, on_level=self.on_level,
-            on_user_text=assistant.agent_interrupt(ui))
+            on_user_text=assistant.agent_interrupt(ui),
+            on_heard=ui.partial,
+            on_reply=lambda text: ui.turn("Apollo", text),
+            on_activity=ui.activity,
+            run_tool=assistant.tool_runner(ui))
         self.voice.open(auto_vad=False)
 
         # CTRL+1. A thread of its own so it answers during a turn as well as
@@ -952,6 +989,12 @@ class Apollo:
         self.listen_toggle = assistant.ListenToggle(
             on_toggle=self.on_listen_toggle, stop=self.stopping.is_set)
         self.listen_toggle.start()
+
+        # Reminders you set by voice come back in Apollo's voice, and wait for
+        # any turn in progress to finish first (see assistant.TURN_GATE).
+        reminders.start_watcher(
+            lambda reminder, late: assistant.fire_reminder(ui, self.voice, reminder, late),
+            assistant.TURN_GATE, self.stopping.is_set)
 
         # Say hello, so you know the mic is live before you ever press a key.
         assistant.greet(ui)

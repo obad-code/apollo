@@ -40,8 +40,8 @@ from faster_whisper import WhisperModel
 import agents
 import gemini_live
 import overlay_content
-import pc_control
 import router
+import tools
 
 
 def load_env(path=None):
@@ -85,7 +85,7 @@ except ImportError:
 HOTKEY = "ctrl+alt"         # hold this to talk
 LISTEN_TOGGLE = "ctrl+1"    # ...or press this once to stop having to hold it
 SAMPLE_RATE = 16000         # what Whisper expects
-WHISPER_SIZE = "base.en"    # tiny.en < base.en < small.en (bigger = slower, better)
+WHISPER_SIZE = "small"      # multilingual (Arabic + English); a backup now - see WhisperBackup
 CLAUDE_MODEL = "claude-opus-5"
 VOICE_RATE = 185            # words per minute for the spoken reply
 MIN_SECONDS = 0.4           # ignore accidental taps shorter than this
@@ -144,7 +144,7 @@ SYSTEM_PROMPT = (
     "Control+Alt to talk, and you appear as a small overlay at the top of "
     "their screen. Treat questions about your microphone, your hotkey or your "
     "own setup as questions about this PC - never ask which app or service "
-    "you are.\n\n"
+    "you are. Reply in the language the user spoke - Arabic or English.\n\n"
     "Be accurate about what is local and what is not, because they may be "
     "deciding what is safe to say near you. Their microphone audio never "
     "leaves the machine: recording and transcription both happen on this PC. "
@@ -193,13 +193,12 @@ SYSTEM_PROMPT = (
     "answer it and stop talking. Aim for about forty words, and never pad a "
     "sentence to carry more - if a full answer truly needs more room, give "
     "the short answer first and let them ask for the rest.\n\n"
-    "You can control the PC with the control_pc tool: it launches "
-    "applications and opens files or folders. Whenever the user's request "
-    "is really a command - 'open Chrome', 'launch Spotify', 'open my "
-    "resume', 'open the Downloads folder', and the like - call the tool "
-    "instead of just talking about it. Once the tool result comes back, "
-    "confirm out loud in one short sentence what happened ('Opening "
-    "Chrome.'), or say briefly that it failed if it did.\n\n"
+    "You can act on this PC through your tools - open and close apps, "
+    "websites, files and folders, control media, volume and windows, type "
+    "text, press keys, set reminders, and look up live market data. Whenever "
+    "the request is really a command, call the tool instead of talking about "
+    "it, then confirm in one short sentence what happened, or say briefly "
+    "that it failed.\n\n"
     "You can also search the web. Use web_search whenever the answer "
     "depends on current information - news, prices, scores, releases, "
     "anything that changes - rather than guessing from memory. For a "
@@ -257,35 +256,10 @@ RESEARCH_SYSTEM = (
     "a clear summary of what you found and how confident it is."
 )
 
-TOOLS = [
-    {
-        "name": "control_pc",
-        "description": (
-            "Launch an application, or open a specific file or folder on "
-            "the user's Windows PC. Use this for any request to open, "
-            "launch, start, or run something, instead of only describing "
-            "it in words."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "enum": ["open_app", "open_file", "open_folder"],
-                    "description": "What kind of thing to open.",
-                },
-                "target": {
-                    "type": "string",
-                    "description": (
-                        "The app name (e.g. 'Chrome', 'Spotify', "
-                        "'Notepad'), or the file/folder name or path, "
-                        "exactly as the user said it."
-                    ),
-                },
-            },
-            "required": ["action", "target"],
-        },
-    },
+# Apollo's own tools come from the shared registry (`tools.py`), so Claude
+# and Gemini can do exactly the same things. Deep research and web search
+# are Claude's alone.
+TOOLS = tools.claude_tools() + [
     {
         "name": "deep_research",
         "description": (
@@ -644,39 +618,26 @@ class LiveCapture:
         return np.concatenate(self.frames, axis=0).flatten()
 
 
-def capture_turn(live, capture, on_partial=None, whisper=None):
-    """Hold-to-talk over the live session. Returns the audio Whisper should read.
+def capture_turn(live, capture):
+    """Hold-to-talk over the live session. Returns the audio, kept as a backup.
 
     The audio is already on its way to Gemini by the time this returns - that
-    is the point of the fast path, and why there is no send step here. What
-    this adds is the local copy: the same blocks, kept so the turn can be
-    transcribed and routed once you let go.
+    is the point of the fast path, and why there is no send step here. Your
+    words appear on screen as you say them through the session's own
+    transcript (`on_heard`), which streams while the chord is held; the local
+    copy of the audio is only for `WhisperBackup`, should that transcript
+    never arrive.
     """
     capture.start()
     live.begin_turn()
-
-    done = threading.Event()
-    listener = _follow_along(capture.frames, done, whisper, on_partial)
-    if listener is not None:
-        listener.start()
-
     try:
         while talk_held():
             time.sleep(0.03)
     finally:
-        done.set()
-        # Stop forwarding before anything else: Gemini decides you have
-        # finished talking by hearing you stop, so every block sent after the
-        # key is up delays its reply by exactly that much.
+        # Stop forwarding before anything else: every block sent after the
+        # key is up delays the reply by exactly that much.
         live.end_turn()
         audio = capture.stop()
-
-    if listener is not None:
-        # Brief: the pass in flight is finishing on audio that is already a
-        # prefix of what the final transcription will see, so waiting for it
-        # only avoids two Whisper passes overlapping on one CPU.
-        listener.join(timeout=2.0)
-
     return audio
 
 
@@ -690,7 +651,7 @@ def transcribe(whisper, audio, final=True):
     """
     with _whisper_lock:
         segments, _info = whisper.transcribe(
-            audio, language="en", vad_filter=final,
+            audio, language=None, vad_filter=final,
             beam_size=5 if final else 1,
         )
         return " ".join(segment.text.strip() for segment in segments).strip()
@@ -801,8 +762,9 @@ def _run_tool(block, ui):
     try:
         if block.name == "deep_research":
             return deep_research(args.get("question", ""), ui)
-        if block.name == "control_pc":
-            return pc_control.execute(args.get("action"), args.get("target"))
+        if block.name in tools.REGISTRY:
+            return json.dumps(tools.run(block.name, args, tools.Context(
+                show=getattr(ui, "visual", None), activity=getattr(ui, "activity", None))))
         return f"Failed: unknown tool '{block.name}'."
     except Exception as e:
         return f"Failed: {type(e).__name__}: {e}"
@@ -1344,6 +1306,13 @@ class ConsolePrinter:
     def level(self, value):
         """Live mic loudness, 0-1. The console has nothing to do with it."""
 
+    def visual(self, visual):
+        """A chart or cards from a tool - the console can only say so."""
+        print(f"  [visual] {', '.join(sorted((visual or {}).keys()))}")
+
+    def activity(self, text):
+        print(f"  ... {text}")
+
 
 def check_api():
     """Validate the key, workspace header and model name before we start.
@@ -1368,9 +1337,40 @@ def check_api():
         raise RuntimeError(api_error_detail(e))
 
 
+class WhisperBackup:
+    """Whisper, loaded in the background, for the rare turn Gemini missed.
+
+    Gemini's own transcript is Apollo's transcript now (it streams while you
+    hold the chord, and it understands Arabic). Whisper stays as the backup
+    for a turn where that transcript never arrives, so it must not delay
+    startup: the model loads on a thread of its own, the first run
+    downloading it, and a transcription asked for before it is ready waits
+    up to 20 s and then returns nothing.
+    """
+
+    def __init__(self, size=None):
+        self._model = None
+        self._ready = threading.Event()
+        threading.Thread(target=self._load, args=(size or WHISPER_SIZE,),
+                         daemon=True, name="whisper-load").start()
+
+    def _load(self, size):
+        try:
+            self._model = WhisperModel(size, device="cpu", compute_type="int8")
+        except Exception:
+            self._model = None
+        finally:
+            self._ready.set()
+
+    def transcribe(self, audio, **kw):
+        if not self._ready.wait(timeout=20) or self._model is None:
+            return iter(()), None
+        return self._model.transcribe(audio, **kw)
+
+
 def load_whisper():
-    """Load the local speech-to-text model. First call downloads it."""
-    return WhisperModel(WHISPER_SIZE, device="cpu", compute_type="int8")
+    """The backup transcriber. Returns at once; the model loads behind it."""
+    return WhisperBackup()
 
 
 def greet(ui):
@@ -1402,10 +1402,15 @@ class Voice:
     or the other rather than half of each.
     """
 
-    def __init__(self, ui, on_level=None, on_user_text=None):
+    def __init__(self, ui, on_level=None, on_user_text=None, on_heard=None,
+                 on_reply=None, on_activity=None, run_tool=None):
         self.ui = ui
         self.on_level = on_level
         self.on_user_text = on_user_text
+        self.on_heard = on_heard          # your words, live, as Gemini hears them
+        self.on_reply = on_reply          # Apollo's words, live, as it speaks them
+        self.on_activity = on_activity    # "opening Chrome", "searching the web"
+        self.run_tool = run_tool          # (name, args) -> result dict
         self.live = None
         self.capture = None
         self._lock = threading.Lock()
@@ -1456,9 +1461,12 @@ class Voice:
             # transcribing - but the orb should still bloom when you speak.
             capture.metering = auto_vad
 
-            live = gemini_live.LiveSession(on_audio=capture.feed,
-                                           auto_vad=auto_vad,
-                                           on_user_text=self.on_user_text)
+            live = gemini_live.LiveSession(
+                on_audio=capture.feed, auto_vad=auto_vad,
+                on_user_text=self.on_user_text, on_text=self.on_reply,
+                on_heard=self.on_heard, on_user_turn=tools.new_user_turn,
+                on_activity=self._activity, on_tool_call=self.run_tool,
+                tools=tools.gemini_declarations() if self.run_tool else None)
             try:
                 live.start()
             except RuntimeError as e:
@@ -1469,12 +1477,69 @@ class Voice:
             self.live, self.capture = live, capture
             return True
 
+    def _activity(self, kind, detail):
+        if self.on_activity is None:
+            return
+        words = tools.TOOL_LABELS.get(detail) if kind == "tool" else ACTIVITY_WORDS.get(kind)
+        try:
+            self.on_activity(words or detail)
+        except Exception:
+            pass
+
     def close(self):
         """Shut the session down. Safe to call twice, and from any thread."""
         with self._lock:
             if self.live is not None:
                 self.live.close()
             self.live, self.capture = None, None
+
+
+# One lock for "a turn is in progress". The run loop holds it for every turn,
+# and the reminder watcher takes it before speaking, so a reminder waits for
+# your sentence to finish instead of talking over it.
+TURN_GATE = threading.Lock()
+
+# What the overlay says while a model-side search runs.
+ACTIVITY_WORDS = {"search": "searching the web"}
+
+
+def tool_runner(ui):
+    """Build the callable Gemini's tool calls go through."""
+    def run(name, args):
+        ctx = tools.Context(show=getattr(ui, "visual", None),
+                            activity=getattr(ui, "activity", None))
+        return tools.run(name, args, ctx)
+    return run
+
+
+def announce(ui, voice, instruction, fallback):
+    """Say something nobody asked for, in Apollo's own voice if it can.
+
+    Gemini is prompted with an instruction and speaks the result, so a
+    reminder sounds like every other answer and is in the language you last
+    used. With no live session the fallback line goes to the local voices.
+    """
+    live = voice.live if voice is not None else None
+    held = LISTENING if (voice is not None and voice.auto_vad) else IDLE
+    ui.status(SPEAKING)
+    try:
+        if live is not None and live.prompt(instruction):
+            live.wait_for_audio(timeout=10)
+            live.wait_until_quiet()
+        else:
+            ui.turn("Apollo", fallback)
+            speak(fallback)
+    finally:
+        ui.status(held)
+
+
+def fire_reminder(ui, voice, reminder, late):
+    """The reminder watcher's callback: say the reminder, now."""
+    text = reminder.get("text", "")
+    instruction = (f"A reminder the user set is due now: \"{text}\". Tell them in "
+                   f"one short sentence, in the language they last spoke"
+                   + (", and say it's a little late." if late else "."))
+    announce(ui, voice, instruction, f"Reminder: {text}")
 
 
 def answer_with_agent(name, said, ui):
@@ -1531,9 +1596,7 @@ def push_to_talk_turn(ui, whisper, voice):
     live = voice.live
     ui.status(LISTENING)
     if live is not None:
-        audio = capture_turn(live, voice.capture,
-                             on_partial=getattr(ui, "partial", None),
-                             whisper=whisper)
+        audio = capture_turn(live, voice.capture)
     else:
         audio = record_while_held(HOTKEY, on_level=ui.level,
                                   on_partial=getattr(ui, "partial", None),
@@ -1547,7 +1610,11 @@ def push_to_talk_turn(ui, whisper, voice):
         return
 
     ui.status(THINKING)
-    said = transcribe(whisper, audio)
+    # Gemini's transcript first: it streamed while you spoke and settles about
+    # a third of a second after you let go. Whisper only if it never came.
+    said = live.heard_text() if live is not None else ""
+    if not said and whisper is not None:
+        said = transcribe(whisper, audio)
 
     if not said:
         if live is not None:
@@ -1700,7 +1767,8 @@ def run_loop(ui, whisper, stop=None, esc_quits=False, voice=None, toggle=None):
             # Reports its own transitions. It used to be followed by an
             # unconditional LISTENING after every 250ms poll, which chimed
             # the page four times a second and wiped every answer.
-            always_listening_turn(ui, voice)
+            with TURN_GATE:
+                always_listening_turn(ui, voice)
             continue
 
         # Push-to-talk. Nothing happens until the chord goes down.
@@ -1709,7 +1777,8 @@ def run_loop(ui, whisper, stop=None, esc_quits=False, voice=None, toggle=None):
             continue
 
         try:
-            push_to_talk_turn(ui, whisper, voice)
+            with TURN_GATE:
+                push_to_talk_turn(ui, whisper, voice)
         finally:
             ui.status(IDLE)
 
@@ -1723,13 +1792,14 @@ def main():
         sys.exit(f"\n  {e}")
     print(" ok.")
 
-    print(f"Loading Whisper ({WHISPER_SIZE})... first run downloads the model.")
-    whisper = load_whisper()
+    whisper = load_whisper()     # a background load; nothing waits for it
 
     load_voice(ui)
 
     print("Connecting to Gemini Live...")
-    voice = Voice(ui, on_level=ui.level, on_user_text=agent_interrupt(ui))
+    voice = Voice(ui, on_level=ui.level, on_user_text=agent_interrupt(ui),
+                  on_heard=ui.partial, on_reply=lambda text: None,
+                  on_activity=ui.activity, run_tool=tool_runner(ui))
     # Push-to-talk is the state Apollo starts in, always. Always-listening is
     # something you turn on, not something you arrive to.
     voice.open(auto_vad=False)
@@ -1738,6 +1808,10 @@ def main():
         on_toggle=lambda on: ui.note(f"[{LISTEN_TOGGLE.upper()}] always-listening "
                                      f"{'ON' if on else 'OFF'}"))
     toggle.start()
+
+    import reminders
+    reminders.start_watcher(lambda r, late: fire_reminder(ui, voice, r, late),
+                            TURN_GATE, lambda: False)
 
     print(f"\nReady. Hold [{HOTKEY.upper()}] and speak. Release to send.")
     print(f"[{LISTEN_TOGGLE.upper()}] toggles always-listening. ESC quits.\n")
