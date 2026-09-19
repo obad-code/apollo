@@ -38,6 +38,7 @@ CQ = "26"              # NVENC constant quality; lower is better and bigger
 MAXRATE = "10M"
 GOP = FPS              # a keyframe a second, so any second can start a clip
 SLACK = 5              # seconds kept beyond SECONDS, so a save is never short
+STALE_AFTER = 5        # a buffer older than this is not "just now" any more
 FOLDER_NAME = "Apollo's Clips"
 
 
@@ -444,6 +445,15 @@ def _save(buffer, seconds, folder_path):
         return {"ok": False, "error": "There's nothing recorded yet."}
 
     now = time.monotonic()
+    # Capture can stop without raising - a display mode change, a device lost.
+    # The packets would still be there, minutes old, and a clip of them shows
+    # whatever was on screen back then as if it had just happened.
+    age = now - packets[-1][1]
+    if age > STALE_AFTER:
+        return {"ok": False,
+                "error": f"The screen recorder stopped {int(age)} seconds ago, so "
+                         f"there's nothing recent to clip."}
+
     start = now - seconds
     chosen = window([item for item, _ in packets], start)
     if not chosen:

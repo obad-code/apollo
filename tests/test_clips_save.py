@@ -148,3 +148,20 @@ def test_a_clip_starting_at_a_later_keyframe_still_plays(tmp_path):
     frames = sum(1 for _ in back.decode(video=0))
     back.close()
     assert frames > 30
+
+
+def test_stale_buffer_is_refused(tmp_path):
+    """If capture stopped quietly, the newest frame is minutes old - saving it
+    would hand back footage of whatever was on screen back then."""
+    buffer = clips.ReplayBuffer(seconds=60)
+    now = 5000.0
+    for i in range(30):
+        buffer.video.add((b"x", i, i == 0, now + i / 30.0), now + i / 30.0)
+    real = clips.time.monotonic
+    clips.time.monotonic = lambda: now + 30.0        # half a minute later
+    try:
+        result = buffer.save(seconds=10, folder_path=str(tmp_path))
+    finally:
+        clips.time.monotonic = real
+    assert result["ok"] is False
+    assert "stopped" in result["error"].lower() or "stale" in result["error"].lower()
