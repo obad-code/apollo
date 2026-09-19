@@ -97,10 +97,12 @@ os.environ.setdefault(
 import webview  # noqa: E402  - must follow the env var above
 
 import assistant  # noqa: E402
+import clips  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
 import presence  # noqa: E402
 import reminders  # noqa: E402
+import tools  # noqa: E402
 import turnview  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -438,9 +440,11 @@ class Tray:
     main thread's loop, and a NotifyIcon only pumps on the thread that made it.
     """
 
-    def __init__(self, on_quit):
+    def __init__(self, on_quit, on_toggle_clips=None):
         self.on_quit = on_quit
+        self.on_toggle_clips = on_toggle_clips
         self.icon = None
+        self.clips_item = None
         self.ready = threading.Event()
         threading.Thread(target=self._run, daemon=True).start()
         self.ready.wait(timeout=5)
@@ -458,6 +462,12 @@ class Tray:
             quit_item.Click += lambda s, e: self._quit()
             menu.Items.Add(WF.ToolStripLabel("Apollo - hold Ctrl+Alt to talk"))
             menu.Items.Add(WF.ToolStripSeparator())
+            if self.on_toggle_clips is not None:
+                # The replay buffer records the screen into memory whenever
+                # Apollo runs, so it is worth being able to see and stop it.
+                self.clips_item = WF.ToolStripMenuItem("Pause replay buffer")
+                self.clips_item.Click += lambda s, e: self._toggle_clips()
+                menu.Items.Add(self.clips_item)
             menu.Items.Add(quit_item)
 
             self.icon = WF.NotifyIcon()
@@ -484,6 +494,13 @@ class Tray:
         g.FillEllipse(D.SolidBrush(D.Color.FromArgb(220, 20, 10, 0)), 10, 10, 12, 12)
         g.Dispose()
         return D.Icon.FromHandle(bmp.GetHicon())
+
+    def _toggle_clips(self):
+        try:
+            recording = self.on_toggle_clips()
+            self.clips_item.Text = "Pause replay buffer" if recording else "Resume replay buffer"
+        except Exception:
+            pass          # the tray must never take Apollo down
 
     def _quit(self):
         self.close()
@@ -653,6 +670,7 @@ class Apollo:
         self.watcher = None
         self.orb = None
         self.voice = None          # the Gemini Live session, once connected
+        self.clips = None          # the replay buffer, once recording
         self.listen_toggle = None  # ...and the CTRL+1 watcher over it
         self.turn_busy = False     # listening, thinking, or speaking
         self.presence = presence.Presence(AFK_SECONDS)
@@ -679,6 +697,16 @@ class Apollo:
 
     # -- lifecycle ----------------------------------------------------------
 
+    def toggle_clips(self):
+        """Tray: stop or restart the replay buffer. True if it is recording."""
+        if self.clips is None:
+            return False
+        if self.clips.running:
+            self.clips.stop()
+            return False
+        self.clips.start()
+        return True
+
     def on_shown(self):
         """Only the tray. The window is deliberately left completely alone.
 
@@ -690,7 +718,7 @@ class Apollo:
         start and Apollo is a process with nothing on screen. Everything to do
         with this window therefore waits for `on_loaded`.
         """
-        self.tray = Tray(on_quit=self.quit)
+        self.tray = Tray(on_quit=self.quit, on_toggle_clips=self.toggle_clips)
 
     def start_orb(self):
         """Bring up the native orb, positioned where `Overlay.rect_for` puts it.
@@ -776,6 +804,8 @@ class Apollo:
             return
         self.stopping.set()
         self.close_live()
+        if self.clips is not None:
+            self.clips.stop()
         if self.orb:
             self.orb.close()
         if self.tray:
@@ -995,6 +1025,13 @@ class Apollo:
             on_activity=ui.activity,
             run_tool=assistant.tool_runner(ui))
         self.voice.open(auto_vad=False)
+
+        # The replay buffer: the last minute of the screen, in memory only, so
+        # "clip that" has something to save. Nothing reaches the disk until
+        # you ask. A machine that cannot record says so once and Apollo
+        # carries on without clips.
+        self.clips = clips.ReplayBuffer().start()
+        tools.set_clip_buffer(self.clips)
 
         # CTRL+1. A thread of its own so it answers during a turn as well as
         # between them; `run_loop` reads its flag and does the actual

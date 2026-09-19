@@ -1614,6 +1614,37 @@ def agent_interrupt(ui):
     return heard
 
 
+def retry_after_drop(ui, voice, said):
+    """The session died mid-turn. Reconnect and ask again, in your words.
+
+    Measured: the Live API sometimes closes a session with "1011 Internal
+    error occurred" exactly when the model goes to call a tool. The audio of
+    your turn is gone with the socket - but Apollo has its own transcript of
+    you, so the question can be put again as text rather than leaving you
+    talking to something that has quietly died.
+    """
+    if not said:
+        return ""
+    ui.note("Voice dropped mid-answer; reconnecting and asking again.")
+    reply = ""
+    if voice.open(auto_vad=False):
+        live = voice.live
+        if live is not None and live.prompt(said):
+            live.wait_for_audio(timeout=10)
+            live.wait_until_quiet()
+            reply = live.reply_text()
+    if reply:
+        return reply
+
+    # Twice in a row means the service is refusing this turn, not that the
+    # socket blinked. Say so in the local voice: silence would leave you
+    # waiting on an assistant that is never going to answer.
+    apology = "The voice service dropped that one. Say it again."
+    ui.turn("Apollo", apology)
+    speak(apology)
+    return ""
+
+
 def push_to_talk_turn(ui, whisper, voice):
     """One CTRL+ALT turn, from key down to the answer being spoken."""
     live = voice.live
@@ -1669,6 +1700,8 @@ def push_to_talk_turn(ui, whisper, voice):
         if not live.wait_for_reply():
             ui.note("Gemini Live didn't finish that reply in time.")
         spoken = live.reply_text()
+        if not spoken and not live.alive:
+            spoken = retry_after_drop(ui, voice, said)
         if spoken:
             ui.turn("Apollo", spoken)
         return
@@ -1835,6 +1868,12 @@ def main():
     import reminders
     reminders.start_watcher(lambda r, late: fire_reminder(ui, voice, r, late),
                             TURN_GATE, lambda: False)
+
+    import clips
+    buffer = clips.ReplayBuffer().start()
+    tools.set_clip_buffer(buffer)
+    print(f"Replay buffer: last {clips.SECONDS}s of the screen, in memory. "
+          f"Clips go to {clips.folder()}")
 
     print(f"\nReady. Hold [{HOTKEY.upper()}] and speak. Release to send.")
     print(f"[{LISTEN_TOGGLE.upper()}] toggles always-listening. ESC quits.\n")

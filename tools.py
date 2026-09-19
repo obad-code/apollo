@@ -414,3 +414,37 @@ def _open_tradingview(ctx, symbol):
     symbol = market.resolve(symbol)
     exchange = market.quote(symbol)["exchange"]
     return pc_control.open_url(market.tradingview_url(symbol, exchange))
+
+
+_CLIP_BUFFER = None
+
+
+def set_clip_buffer(buffer):
+    """Apollo hands its replay buffer here once it is running."""
+    global _CLIP_BUFFER
+    _CLIP_BUFFER = buffer
+
+
+# Measured against the Live API on 2026-09-20, and the reason this description
+# reads so plainly: with "Save what just happened on screen ... Use for 'clip
+# that', 'save the last minute', 'record that'." the server closed the whole
+# session with "1011 Internal error occurred" the moment the model went to call
+# it - every time, in any language, with the tool declared alone or with the
+# others. The same tool, the same prompts and the same argument types work with
+# the wording below. See probes/probe_tool_description.py.
+@_tool("save_clip", "saving the clip",
+       "Save the last N seconds of the screen to a video file. N is the seconds "
+       "argument, 60 if the user does not say.",
+       _obj({"seconds": {"type": "integer",
+                         "description": "How far back to save, 5-60 (default 60)"}}))
+def _save_clip(ctx, seconds=60):
+    if _CLIP_BUFFER is None:
+        return {"ok": False, "error": "The screen recorder isn't running, so there's "
+                                      "nothing to clip."}
+    ctx.activity("saving the clip")
+    result = _CLIP_BUFFER.save(max(5, min(60, int(seconds))))
+    if result.get("ok"):
+        ctx.show(overlay_content.clean_visual({"cards": [
+            {"label": "Clip", "value": f"{result['seconds']:.0f}s saved"},
+            {"label": "Size", "value": f"{result['megabytes']:.0f} MB"}]}))
+    return result
