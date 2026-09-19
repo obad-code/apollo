@@ -201,9 +201,7 @@ two ways:
   screensaver. The very next keypress or mouse movement sends it straight back
   to the overlay.
 - **On demand, with `` Ctrl+` ``.** It stays open until you press the chord
-  again, or until you start using the machine — whichever comes first. (It
-  waits for the keyboard to go quiet for a moment first, so the chord's own
-  keystrokes do not close it immediately.)
+  again — typing and moving the mouse in between do not close it.
 
 A conversation can happen while it is open, and it stays open for it: LYLA and
 the panels step aside while there is an answer on screen, then come back.
@@ -346,12 +344,6 @@ window with `UpdateLayeredWindow` — the one path on Windows that gives true
 per-pixel alpha. Round where it is round, invisible everywhere else, soft glow
 edges, click-through by construction. The page window is simply hidden while
 Apollo is at rest.
-
-**Why not a true wallpaper?** Reparenting into Explorer's `WorkerW` — the
-Wallpaper Engine approach — puts Apollo *behind* every window, so you could
-talk to it but never see the answer unless your desktop happened to be bare.
-It is also fragile: the `WorkerW` handle dies whenever Explorer restarts, and
-WebView2 composites unreliably outside the normal window hierarchy.
 
 **Why not a true wallpaper?** Reparenting into Explorer's `WorkerW` — the
 Wallpaper Engine approach — puts Apollo *behind* every window, so you could
@@ -544,7 +536,6 @@ And the overlay's own knobs, at the top of `apollo.py`:
 |---|---|---|
 | `AFK_SECONDS` | `2400` (40 min) | How long the machine must go untouched before the full display opens by itself. |
 | `PEEK_HOTKEY` | `ctrl+`` ` | Opens/closes the full display. Shares no key with the talk chord, so expanding never records a fragment of a turn. |
-| `PEEK_ARM_SECONDS` | `1.5` | Grace period after a manual open, before input starts closing it again. |
 | `ORB_PX` | `190` | The mesh's own box. The overlay grows downward from the top of it; the mesh itself always sits in a square of exactly this size. |
 | `ORB_REVEAL` | `0.25` | How much of the mesh stays below the top edge; the rest hangs off-screen. |
 | `ALPHA` | `orb 225, full 250` | Window translucency, 0–255, for the page window. The overlay itself has real per-pixel alpha and does not use it. |

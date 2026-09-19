@@ -454,7 +454,7 @@ class Tray:
             menu = WF.ContextMenuStrip()
             quit_item = WF.ToolStripMenuItem("Quit Apollo")
             quit_item.Click += lambda s, e: self._quit()
-            menu.Items.Add(WF.ToolStripLabel("Apollo - hold Ctrl+Space to talk"))
+            menu.Items.Add(WF.ToolStripLabel("Apollo - hold Ctrl+Alt to talk"))
             menu.Items.Add(WF.ToolStripSeparator())
             menu.Items.Add(quit_item)
 
