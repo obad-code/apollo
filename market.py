@@ -60,6 +60,8 @@ TV_EXCHANGE = {"NMS": "NASDAQ", "NGM": "NASDAQ", "NCM": "NASDAQ", "NAS": "NASDAQ
 class MarketError(Exception):
     """A market lookup failed. The message is written to be spoken."""
 
+    speakable = True    # tools.run passes the message through as-is
+
 
 _cache = {}
 _lock = threading.Lock()

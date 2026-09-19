@@ -204,5 +204,206 @@ def run(name, args=None, ctx=None):
     try:
         return _as_result(tool.handler(ctx, **clean))
     except Exception as e:  # noqa: BLE001 - a tool must never take a turn down
+        if getattr(e, "speakable", False):          # already a sentence
+            return {"ok": False, "error": str(e)}
         log.exception("tool %s failed", name)
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+# --- the tools ---------------------------------------------------------------
+#
+# Descriptions are written for the model: when to call the tool, not how it is
+# built. Imports are here, below the registry, so the registry itself stays
+# importable (and testable) without Windows or the network.
+
+import market  # noqa: E402
+import overlay_content  # noqa: E402
+import pc_control  # noqa: E402
+import reminders  # noqa: E402
+
+
+def _obj(props, required=()):
+    return {"type": "object", "properties": props, "required": list(required)}
+
+
+def _str(description):
+    return {"type": "string", "description": description}
+
+
+def _enum(values, description):
+    return {"type": "string", "enum": list(values), "description": description}
+
+
+TOOL_LABELS = {}
+
+
+def _tool(name, label, description, parameters, confirm=False):
+    def wrap(fn):
+        TOOL_LABELS[name] = label
+        register(Tool(name, description, parameters, fn, confirm))
+        return fn
+    return wrap
+
+
+@_tool("open_app", "opening",
+       "Open an application on the user's PC by name (Chrome, Spotify, Discord, Steam, "
+       "VS Code, Notepad...). Switches to it if it is already open.",
+       _obj({"name": _str("The app's name as the user said it")}, ["name"]))
+def _open_app(ctx, name):
+    ctx.activity(f"opening {name}")
+    return pc_control.open_app(name)
+
+
+@_tool("close_app", "closing",
+       "Close an application's windows by name. The app still asks about unsaved work.",
+       _obj({"name": _str("The app's name")}, ["name"]))
+def _close_app(ctx, name):
+    return pc_control.close_app(name)
+
+
+@_tool("open_website", "opening",
+       "Open a website in the user's browser: a site name (YouTube, Gmail, Reddit), a "
+       "domain, a full URL, or a phrase to search Google for.",
+       _obj({"site": _str("Site name, domain, URL or search phrase")}, ["site"]))
+def _open_website(ctx, site):
+    return pc_control.open_url(site)
+
+
+@_tool("open_path", "opening",
+       "Open a file or folder: a full path, a standard folder (Desktop, Downloads, "
+       "Documents...) or a name to search for in the user's folders.",
+       _obj({"target": _str("Path or name"), "kind": _enum(["file", "folder"], "What it is")},
+            ["target", "kind"]))
+def _open_path(ctx, target, kind):
+    return pc_control.open_path(target, want_folder=(kind == "folder"))
+
+
+@_tool("media", "media",
+       "Control whatever is playing (Spotify, YouTube...): play or pause, next, previous, stop.",
+       _obj({"action": _enum(pc_control.MEDIA, "What to do")}, ["action"]))
+def _media(ctx, action):
+    return pc_control.media(action)
+
+
+@_tool("volume", "volume",
+       "Read or change the PC's volume. level is 0-100 for set, or the step for up/down "
+       "(default 10).",
+       _obj({"action": _enum(["get", "set", "up", "down", "mute", "unmute"], "What to do"),
+             "level": {"type": "integer", "description": "0-100"}}, ["action"]))
+def _volume(ctx, action, level=None):
+    return pc_control.volume(action, level)
+
+
+@_tool("window", "arranging windows",
+       "Minimize, maximize, restore, close, focus or snap a window. With no app it acts "
+       "on the window in front. show_desktop minimizes everything.",
+       _obj({"action": _enum(["minimize", "maximize", "restore", "close", "focus",
+                              "snap_left", "snap_right", "show_desktop"], "What to do"),
+             "app": _str("Which app's window (optional)")}, ["action"]))
+def _window(ctx, action, app=None):
+    return pc_control.window(action, app)
+
+
+@_tool("type_text", "typing",
+       "Type text into the window the user is working in, exactly as given.",
+       _obj({"text": _str("The text to type")}, ["text"]))
+def _type_text(ctx, text):
+    return pc_control.type_text(text)
+
+
+@_tool("press_keys", "pressing keys",
+       "Press a key or shortcut in the window in front, like 'ctrl+t', 'alt+tab', 'f5', "
+       "'win+e', 'ctrl+shift+esc'.",
+       _obj({"keys": _str("Keys joined with +")}, ["keys"]))
+def _press_keys(ctx, keys):
+    return pc_control.press_keys(keys)
+
+
+@_tool("lock_pc", "locking", "Lock the PC (the user signs back in with their PIN).", _obj({}))
+def _lock_pc(ctx):
+    return pc_control.lock_pc()
+
+
+@_tool("system_power", "power",
+       "Sleep, restart, shut down or sign out - or cancel a pending restart/shutdown. "
+       "Always ask the user to confirm first; call with confirmed=true only after they "
+       "say yes.",
+       _obj({"action": _enum(["sleep", "restart", "shutdown", "sign_out", "cancel"],
+                             "What to do")}, ["action"]), confirm=True)
+def _system_power(ctx, action):
+    return pc_control.system_power(action)
+
+
+@_tool("set_reminder", "setting a reminder",
+       "Set a reminder. Give in_minutes for 'in 20 minutes', or when as an ISO 8601 "
+       "local time like 2026-09-20T09:00:00 for a clock time.",
+       _obj({"text": _str("What to remind them of"),
+             "in_minutes": {"type": "number", "description": "Minutes from now"},
+             "when": _str("ISO 8601 local time")}, ["text"]))
+def _set_reminder(ctx, text, in_minutes=None, when=None):
+    return reminders.add(text, when=when, in_minutes=in_minutes)
+
+
+@_tool("list_reminders", "checking reminders", "List the reminders still waiting.", _obj({}))
+def _list_reminders(ctx):
+    return reminders.describe_pending()
+
+
+@_tool("cancel_reminder", "cancelling a reminder",
+       "Cancel a reminder by words from its text, its number, or 'all'.",
+       _obj({"which": _str("Words from the reminder, its id, or 'all'")}, ["which"]))
+def _cancel_reminder(ctx, which):
+    return reminders.cancel(which)
+
+
+def _summary(data):
+    return {k: data[k] for k in ("symbol", "name", "price", "change", "change_pct", "currency")}
+
+
+@_tool("stock_quote", "fetching prices",
+       "Live price and today's change for one or more stocks, indices, crypto or "
+       "commodities (tickers or names: NVDA, Apple, S&P 500, bitcoin, gold). Shows them "
+       "on screen. Speak only the numbers this returns.",
+       _obj({"symbols": {"type": "array", "items": {"type": "string"},
+                         "description": "Tickers or names"}}, ["symbols"]))
+def _stock_quote(ctx, symbols):
+    quotes = []
+    for raw in symbols[:6]:
+        symbol = market.resolve(raw)
+        ctx.activity(f"fetching {symbol}")
+        quotes.append(market.quote(symbol))
+    if len(quotes) == 1:
+        ctx.show(market.visual_for(quotes[0], "1d"))
+    else:
+        ctx.show(overlay_content.clean_visual({"cards": [
+            {"label": q["symbol"], "value": f"{market.fmt_price(q['price'])} {q['change_pct']:+.1f}%"}
+            for q in quotes]}))
+    return {"quotes": [_summary(q) for q in quotes],
+            "market": market.market_status()["label"]}
+
+
+@_tool("show_stock_chart", "charting",
+       "Draw a price chart on screen for a stock, index, crypto or commodity over a "
+       "period, and get its numbers. Use for 'show me', 'chart', 'how has X done'.",
+       _obj({"symbol": _str("Ticker or name"),
+             "period": _enum(list(market.PERIODS), "How far back (default 5d)")}, ["symbol"]))
+def _show_stock_chart(ctx, symbol, period="5d"):
+    symbol = market.resolve(symbol)
+    ctx.activity(f"charting {symbol}")
+    data = market.history(symbol, period)
+    ctx.show(market.visual_for(data, period))
+    closes = [c for _, c in data["points"]] or [data["price"]]
+    return {"symbol": symbol, "name": data["name"], "period": period,
+            "last": data["price"], "currency": data["currency"],
+            "change_pct_over_period": round(data["change_pct"], 2),
+            "high": max(closes), "low": min(closes)}
+
+
+@_tool("open_tradingview", "opening TradingView",
+       "Open the full interactive TradingView chart for a symbol in the browser. Only when "
+       "the user asks for TradingView.",
+       _obj({"symbol": _str("Ticker or name")}, ["symbol"]))
+def _open_tradingview(ctx, symbol):
+    symbol = market.resolve(symbol)
+    exchange = market.quote(symbol)["exchange"]
+    return pc_control.open_url(market.tradingview_url(symbol, exchange))
