@@ -222,6 +222,8 @@ def run(name, args=None, ctx=None):
 # built. Imports are here, below the registry, so the registry itself stays
 # importable (and testable) without Windows or the network.
 
+import briefing  # noqa: E402
+import feeds  # noqa: E402
 import market  # noqa: E402
 import overlay_content  # noqa: E402
 import pc_control  # noqa: E402
@@ -448,3 +450,57 @@ def _save_clip(ctx, seconds=60):
             {"label": "Clip", "value": f"{result['seconds']:.0f}s saved"},
             {"label": "Size", "value": f"{result['megabytes']:.0f} MB"}]}))
     return result
+
+
+@_tool("get_news", "reading the news",
+       "Headlines on a topic the user follows (gaming, marvel, movies, markets) or any "
+       "phrase. Speak only what this returns.",
+       _obj({"topic": _str("Topic or search phrase"),
+             "limit": {"type": "integer", "description": "How many, 1-8 (default 4)"}},
+            ["topic"]))
+def _get_news(ctx, topic, limit=4):
+    ctx.activity(f"reading {topic} news")
+    items = feeds.headlines(topic, limit=max(1, min(8, int(limit))))
+    if not items:
+        return {"ok": False, "error": f"No headlines came back for {topic}."}
+    return {"ok": True, "topic": topic,
+            "headlines": [{k: item[k] for k in ("title", "source", "age")} for item in items]}
+
+
+@_tool("get_posts", "checking posts",
+       "Donald Trump's recent Truth Social posts, market-moving ones first. Use when the "
+       "user asks what he posted or said.",
+       _obj({"hours": {"type": "integer", "description": "How far back, 1-72 (default 24)"}}))
+def _get_posts(ctx, hours=24):
+    ctx.activity("checking posts")
+    items = feeds.posts(hours=max(1, min(72, int(hours))), limit=5)
+    if not items:
+        return {"ok": False, "error": "Nothing has been posted in that window."}
+    return {"ok": True, "posts": [{"text": p["text"][:400], "age": p["age"],
+                                   "market_moving": p["market"]} for p in items]}
+
+
+@_tool("daily_briefing", "putting the briefing together",
+       "The user's daily recap: date, Riyadh weather, their watchlist, headlines on what "
+       "they follow, recent posts, reminders. Use for 'brief me', 'what did I miss', "
+       "'catch me up'.",
+       _obj({}))
+def _daily_briefing(ctx):
+    ctx.activity("putting the briefing together")
+    payload = briefing.compose()
+    ctx.show(overlay_content.clean_visual({"cards": _briefing_cards(payload)}))
+    return {"ok": True, "brief": briefing.spoken(payload)}
+
+
+def _briefing_cards(payload):
+    cards = []
+    sky = payload.get("weather") or {}
+    if sky:
+        cards.append({"label": "Riyadh", "value": f"{sky.get('temp')}C {sky.get('text', '')}"[:14]})
+    for quote in (payload.get("market") or {}).get("indices", [])[:2]:
+        cards.append({"label": quote["symbol"].lstrip("^"),
+                      "value": f"{quote['change_pct']:+.1f}%"})
+    posts = payload.get("posts") or []
+    if posts:
+        cards.append({"label": "Posts", "value": f"{len(posts)} new"})
+    return cards
