@@ -48,11 +48,14 @@ Three things together fix it, and all three are needed:
 """
 
 import asyncio
+import json
 import logging
 import os
 import queue
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 import sounddevice as sd
 from google import genai
@@ -81,7 +84,14 @@ _DISCARD = object()
 # sends 24 kHz and expects 16 kHz, and getting either wrong sounds like a
 # chipmunk rather than like an error.
 
-MODEL = "gemini-2.5-flash-native-audio-preview-09-2025"
+# Measured 2026-09-19 (probes/probe_live_models.py): the "latest" alias passes
+# every check Apollo needs and is the quickest to first audio; the September
+# preview is the proven fallback. gemini-3.8-live exists but this key has no
+# quota for it. APOLLO_GEMINI_MODEL puts another model at the front.
+MODELS = tuple(filter(None, (os.environ.get("APOLLO_GEMINI_MODEL"),
+                             "gemini-2.5-flash-native-audio-latest",
+                             "gemini-2.5-flash-native-audio-preview-09-2025")))
+MODEL = MODELS[0]
 VOICE = "Puck"
 INPUT_RATE = 16000       # what we send
 OUTPUT_RATE = 24000      # what Gemini sends back
@@ -97,18 +107,41 @@ REPLY_TIMEOUT = 60       # ...and for one spoken answer to finish
 # - that one describes the Whisper-and-Claude pipeline, which is not the
 # pipeline this reply is travelling down.
 SYSTEM_INSTRUCTION = (
-    "You are Apollo, a voice assistant running on the user's own Windows PC. "
-    "You are speaking aloud, so keep it to one or two sentences unless they "
-    "ask for detail. Never use markdown, bullet points or emoji. "
-    "Your character is optimistic, game for a challenge, and firm: lead with "
-    "the move rather than the difficulty, answer straight, and skip the "
-    "hedging. Not cheerfulness, not bluster, not curtness - and above all not "
-    "longer. If you do not know something, say so and say how you would find "
-    "out."
+    "You are Apollo, a voice assistant running on the user's own Windows PC, "
+    "answering out loud.\n\n"
+    "Language: reply in the language the user just spoke. If they speak Arabic, "
+    "answer in Arabic in their dialect (they are Saudi); if English, in English. "
+    "Keep numbers as digits.\n\n"
+    "Length: one or two sentences unless they ask for detail. No markdown, lists "
+    "or emoji. Never read out a URL.\n\n"
+    "Character: optimistic, game for a challenge, firm - lead with the move, "
+    "answer straight, skip the hedging. Not cheerful filler, not bluster, not "
+    "curt, and never longer.\n\n"
+    "Doing things: you control this PC through your tools. When the user asks "
+    "you to do something - open or close an app or website, play or skip music, "
+    "change the volume, move or switch windows, type text, press keys, set a "
+    "reminder - call the tool instead of describing it, then confirm in a few "
+    "words. If a tool reports a failure, say so plainly.\n\n"
+    "Live information: for anything current - prices, news, scores, weather, "
+    "what someone posted - use Google Search or your market tools; never answer "
+    "from memory. For a stock, index, crypto or commodity call show_stock_chart "
+    "or stock_quote (they draw it on screen) and speak only the numbers they "
+    "return. Open TradingView only when asked.\n\n"
+    "Safety: sleep, restart, shut down and sign out need the user's explicit yes. "
+    "Ask first; call system_power with confirmed=true only after they say yes.\n\n"
+    "About the user: they follow Apple, Microsoft, Nvidia, Tesla, Amazon, "
+    "Alphabet and Meta, the S&P 500 and Nasdaq, and care about Marvel, GTA 6, "
+    "PlayStation, gaming and movies. They live in Riyadh."
 )
 
 
-def _config(auto_vad=False):
+def system_instruction(now=None):
+    """The instruction plus the date and time, fixed when a session opens."""
+    now = now or datetime.now()
+    return SYSTEM_INSTRUCTION + f"\n\nRight now it is {now:%A %d %B %Y, %H:%M} in Riyadh."
+
+
+def _config(auto_vad=False, tools=None, instruction=None):
     """The session settings. `auto_vad` picks which of the two modes this is.
 
     Push-to-talk (`auto_vad=False`, the default) tells the model when you are
@@ -123,10 +156,12 @@ def _config(auto_vad=False):
     Always-listening (`auto_vad=True`) is the case that failure mode does not
     apply to: nothing ever cuts the stream, so there is always trailing
     silence for the detector to hear, and there is no key press to take the
-    cue from anyway. Detection is the model's job here, and it is told what it
-    heard you say (`input_audio_transcription`) because with no key defining
-    the turn, that transcript is the only way Apollo knows you spoke at all -
-    and the only way it can tell an agent's name from ordinary conversation.
+    cue from anyway. Detection is the model's job here.
+
+    Both modes ask for `input_audio_transcription`: the model's transcript of
+    you is Apollo's transcript now. It streams while you are still talking, so
+    it is the live line on screen, and it is what agent names are routed on -
+    in Arabic as well as English, which the local Whisper could not do.
     """
     detection = types.AutomaticActivityDetection(disabled=not auto_vad)
     return types.LiveConnectConfig(
@@ -139,16 +174,20 @@ def _config(auto_vad=False):
         realtime_input_config=types.RealtimeInputConfig(
             automatic_activity_detection=detection,
         ),
-        input_audio_transcription=(
-            types.AudioTranscriptionConfig() if auto_vad else None
-        ),
+        # Your words, transcribed by the model, in both modes: this is Apollo's
+        # transcript of you now - the live line on screen and the agent-name
+        # routing - and unlike the local Whisper it had, it understands Arabic.
+        input_audio_transcription=types.AudioTranscriptionConfig(),
+        # Apollo's tools, and Google Search for anything current.
+        tools=([types.Tool(function_declarations=list(tools))] if tools else [])
+              + [types.Tool(google_search=types.GoogleSearch())],
         # No thinking pass. This is the voice of the assistant now - every
         # spoken turn comes through here - and what it has to be is quick.
         # Measured over three turns each: 5.50s to first word with it, 4.36s
         # without. Anything that wants deliberation is an agent's job, and an
         # agent is summoned by name rather than guessed at (see `agents`).
         thinking_config=types.ThinkingConfig(thinking_budget=0),
-        system_instruction=SYSTEM_INSTRUCTION,
+        system_instruction=instruction or system_instruction(),
         # Gemini's own words, in text, alongside the audio. Nothing is
         # synthesised from this - the audio is the reply - but the overlay has
         # a transcript line to draw, and without this the fast path would
@@ -196,7 +235,9 @@ class LiveSession:
     """
 
     def __init__(self, on_audio=None, on_text=None, api_key=None,
-                 auto_vad=False, on_user_text=None):
+                 auto_vad=False, on_user_text=None, tools=None,
+                 on_tool_call=None, on_heard=None, on_activity=None,
+                 on_user_turn=None, models=None):
         self._on_audio = on_audio
         self._on_text = on_text
         self._on_user_text = on_user_text
@@ -241,6 +282,20 @@ class LiveSession:
         self._stop = None       # asyncio.Event, set by close()
         self._turn_over = None  # asyncio.Event, set on turn_complete
 
+        # Tools, and the live transcript of you. See `_dispatch_tool`.
+        self._tools = list(tools or [])
+        self._on_tool_call = on_tool_call
+        self._on_heard = on_heard
+        self._on_activity = on_activity
+        self._on_user_turn = on_user_turn
+        self._models = tuple(models or MODELS)
+        self.model = None               # whichever of `_models` connected
+        self._epoch = 0                 # bumped by discard_reply; see _tool_allowed
+        self._cancelled = set()         # tool call ids the server withdrew
+        self._last_heard = 0.0          # when the last transcript fragment landed
+        self._prompted = False          # the turn in flight was Apollo's own idea
+        self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="apollo-tool")
+
     # -- lifecycle ----------------------------------------------------------
 
     def start(self, timeout=CONNECT_TIMEOUT):
@@ -273,7 +328,7 @@ class LiveSession:
             # where your sentences begin and end.
             self._mic_open.set()
 
-        log.info("connected: model=%s voice=%s mode=%s", MODEL, VOICE,
+        log.info("connected: model=%s voice=%s mode=%s", self.model, VOICE,
                  "always-listening" if self.auto_vad else "push-to-talk")
         return self
 
@@ -295,6 +350,7 @@ class LiveSession:
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=5.0)
         self._reply_done.set()
+        self._pool.shutdown(wait=False, cancel_futures=True)
 
     @property
     def alive(self):
@@ -325,6 +381,14 @@ class LiveSession:
         self._play_open.clear()
         self._reply_done.clear()
         self._reply = []
+        self._heard = []
+        self._last_heard = 0.0
+        self._prompted = False
+        if self._on_user_turn is not None:
+            try:
+                self._on_user_turn()
+            except Exception:
+                pass
         self._drain(self._play_q)
         loop = self._loop
         if loop is not None and not loop.is_closed():
@@ -361,8 +425,9 @@ class LiveSession:
             pass
 
     def allow_reply(self):
-        """This turn is Gemini's. Let the audio through to the speakers."""
+        """This turn is Gemini's. Let the audio - and its words - through."""
         self._play_open.set()
+        self._emit_reply()
 
     def discard_reply(self):
         """This turn belongs to an agent. Throw away whatever Gemini says back.
@@ -380,6 +445,7 @@ class LiveSession:
         is ordered against `end_turn`, and the `_DISCARD` marker decides from
         `_in_flight` whether there is anything left to swallow.
         """
+        self._epoch += 1            # cancels any tool call still waiting on the gate
         self._armed = False
         self._play_open.clear()
         self._drain(self._play_q)
@@ -451,6 +517,67 @@ class LiveSession:
             except (asyncio.QueueEmpty, AttributeError):
                 return
 
+    TOOL_GATE_TIMEOUT = 20.0
+
+    def _dispatch_tool(self, call):
+        """Run one tool call off the event loop, and answer it.
+
+        In push-to-talk the model may call a tool before Apollo has read your
+        transcript and decided the turn is Gemini's at all - "hey LYLA, open
+        Chrome" must not open Chrome twice. So a call waits for the playback
+        gate (`allow_reply`) and is cancelled if `discard_reply` comes first.
+        """
+        epoch = self._epoch
+        name, args = call.name, dict(call.args or {})
+
+        def work():
+            if not self._tool_allowed(epoch):
+                result = {"ok": False, "error": "Cancelled: this turn was handed to someone else."}
+            elif self._on_tool_call is None:
+                result = {"ok": False, "error": "No tools are available."}
+            else:
+                self._activity("tool", name)
+                try:
+                    result = self._on_tool_call(name, args)
+                except Exception as e:  # noqa: BLE001
+                    result = {"ok": False, "error": f"{type(e).__name__}: {e}"}
+            if call.id in self._cancelled:
+                return
+            self._reply_tool(call, result)
+
+        self._pool.submit(work)
+
+    def _tool_allowed(self, epoch):
+        deadline = time.monotonic() + self.TOOL_GATE_TIMEOUT
+        while not self._closing.is_set():
+            if self._epoch != epoch:
+                return False
+            if self._play_open.is_set():
+                return True
+            if time.monotonic() > deadline:
+                return False
+            time.sleep(0.02)
+        return False
+
+    def _reply_tool(self, call, result):
+        loop, session = self._loop, self._session
+        if loop is None or loop.is_closed() or session is None:
+            return
+        payload = json.loads(json.dumps(result, default=str))
+        response = types.FunctionResponse(id=call.id, name=call.name, response=payload)
+        try:
+            asyncio.run_coroutine_threadsafe(
+                session.send_tool_response(function_responses=[response]), loop)
+        except RuntimeError:
+            pass
+
+    def _activity(self, kind, detail=""):
+        if self._on_activity is not None:
+            try:
+                self._on_activity(kind, detail)
+            except Exception:
+                pass
+
     # -- the private event loop ---------------------------------------------
 
     def _run(self):
@@ -489,39 +616,46 @@ class LiveSession:
     async def _main(self):
         self._out_q = asyncio.Queue(maxsize=50)
         self._play_q = asyncio.Queue()
-        # A thread queue, not an asyncio one: the reader is `next_turn`, called
-        # from `run_loop` on an ordinary thread.
         self._turns = queue.Queue()
         self._stop = asyncio.Event()
         self._turn_over = asyncio.Event()
 
         client = genai.Client(api_key=self._api_key)
+        last_error = None
+        for model in self._models:
+            connected = False
+            try:
+                async with client.aio.live.connect(
+                        model=model, config=_config(self.auto_vad, self._tools)) as session:
+                    connected = True
+                    self.model = model
+                    await self._serve(session)
+                return
+            except Exception as e:  # noqa: BLE001
+                if connected:
+                    raise
+                last_error = e
+                log.warning("model %s unavailable: %s", model, e)
+        raise last_error or RuntimeError("no Gemini Live model is available")
+
+    async def _serve(self, session):
         tasks = []
         try:
-            async with client.aio.live.connect(
-                    model=MODEL, config=_config(self.auto_vad)) as session:
-                self._session = session
-                self._open_streams()
-                self._ready.set()
-
-                tasks = [
-                    asyncio.create_task(self._send_loop(), name="gemini-send"),
-                    asyncio.create_task(self._receive_loop(), name="gemini-recv"),
-                    asyncio.create_task(self._play_loop(), name="gemini-play"),
-                ]
-                done, _pending = await asyncio.wait(
-                    [asyncio.create_task(self._stop.wait()), *tasks],
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                # Surface a task that died on its own rather than exiting as
-                # if this were a normal shutdown.
-                for task in done:
-                    if task in tasks and task.exception() is not None:
-                        raise task.exception()
+            self._session = session
+            self._open_streams()
+            self._ready.set()
+            tasks = [
+                asyncio.create_task(self._send_loop(), name="gemini-send"),
+                asyncio.create_task(self._receive_loop(), name="gemini-recv"),
+                asyncio.create_task(self._play_loop(), name="gemini-play"),
+            ]
+            done, _pending = await asyncio.wait(
+                [asyncio.create_task(self._stop.wait()), *tasks],
+                return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                if task in tasks and task.exception() is not None:
+                    raise task.exception()
         finally:
-            # Order matters, and this is the order (module docstring, 1-3):
-            # stop the callbacks, then stop the coroutines, then close the
-            # devices - all of it while the loop is still running.
             self._closing.set()
             self._mic_open.clear()
             for task in tasks:
@@ -632,6 +766,15 @@ class LiveSession:
                         self._play_q.put_nowait(data)
                     continue
 
+                if response.tool_call is not None:
+                    for call in response.tool_call.function_calls or []:
+                        self._dispatch_tool(call)
+                    continue
+                withdrawn = getattr(response, "tool_call_cancellation", None)
+                if withdrawn is not None:
+                    self._cancelled.update(withdrawn.ids or [])
+                    continue
+
                 content = response.server_content
                 if content is None:
                     continue
@@ -640,16 +783,19 @@ class LiveSession:
                 if heard is not None and heard.text:
                     self._note_heard(heard.text)
 
+                # Google Search runs as code on the model's side; seeing it is
+                # the only sign a search is under way, so the overlay can say so.
+                turn = getattr(content, "model_turn", None)
+                if turn is not None and any(getattr(p, "executable_code", None)
+                                            for p in (turn.parts or [])):
+                    self._activity("search", "")
+
                 transcript = getattr(content, "output_transcription", None)
                 if transcript is not None and transcript.text:
                     self._false_start = False   # a new generation is running
                 if transcript is not None and transcript.text and not self._discarded:
                     self._reply.append(transcript.text)
-                    if self._on_text:
-                        try:
-                            self._on_text(transcript.text)
-                        except Exception:
-                            pass
+                    self._emit_reply()
 
                 if content.interrupted:
                     # The model answers eagerly - in always-listening it will
@@ -674,23 +820,82 @@ class LiveSession:
                     self._finish_turn()
 
     def _note_heard(self, text):
-        """Your own words, as the model transcribes them. Always-listening only.
-
-        Two jobs. It is the only signal that a turn has begun at all when no
-        key defines one - and it is the last chance to take the turn away from
-        Gemini, because `_on_user_text` is where an agent's name is spotted
-        and answering it is somebody else's job. Both have to happen while the
-        reply is still being composed; by `turn_complete` it has been spoken.
-        """
+        """Your own words, as the model transcribes them - both modes now."""
+        first = not self._heard
         self._heard.append(text)
+        self._last_heard = time.monotonic()
         self._in_flight = True
-        if self._on_user_text is None or self._discarded:
+        if first and self.auto_vad and self._on_user_turn is not None:
+            try:
+                self._on_user_turn()
+            except Exception:
+                pass
+        if self._on_heard is not None:
+            try:
+                self._on_heard("".join(self._heard).strip())
+            except Exception:
+                pass
+        if not self.auto_vad or self._on_user_text is None or self._discarded:
             return
         try:
             if self._on_user_text("".join(self._heard).strip()):
                 self.discard_reply()
         except Exception:
             pass          # a routing hiccup must not derail the conversation
+
+    def heard_text(self, settle=0.35, timeout=1.5):
+        """Push-to-talk: your words, once the transcript has stopped arriving.
+
+        Measured: fragments stream while the chord is held, and the last one
+        lands about 0.2 s after release - so this waits for `settle` seconds
+        of quiet (or `timeout`) and returns the whole sentence, or "" if the
+        model heard nothing.
+        """
+        start = time.monotonic()
+        while True:
+            now = time.monotonic()
+            if self._heard and now - max(self._last_heard, start) >= settle:
+                break
+            if now - start >= timeout:
+                break
+            time.sleep(0.03)
+        return "".join(self._heard).strip()
+
+    def _emit_reply(self):
+        if (self._on_text is not None and self._play_open.is_set()
+                and not self._discarded and self._reply):
+            try:
+                self._on_text(self.reply_text())
+            except Exception:
+                pass
+
+    def prompt(self, text):
+        """Have Apollo say something nobody asked for - a reminder, the briefing."""
+        loop, session = self._loop, self._session
+        if loop is None or loop.is_closed() or session is None or self._closing.is_set():
+            return False
+        self._play_open.set()
+        self._reply = []
+        self._prompted = True
+        content = types.Content(role="user", parts=[types.Part(text=text)])
+        try:
+            asyncio.run_coroutine_threadsafe(
+                session.send_client_content(turns=content, turn_complete=True),
+                loop).result(timeout=5)
+            return True
+        except Exception as e:  # noqa: BLE001
+            log.warning("prompt failed: %s", e)
+            self._prompted = False
+            return False
+
+    def wait_for_audio(self, timeout=10):
+        """Block until reply audio has started playing. True if it did."""
+        deadline = time.monotonic() + timeout
+        while not self.playing and not self._closing.is_set():
+            if time.monotonic() > deadline:
+                return False
+            time.sleep(0.03)
+        return self.playing
 
     def _finish_turn(self):
         """A turn is over: hand it to the caller and reset for the next one."""
@@ -722,7 +927,11 @@ class LiveSession:
             self._heard, self._reply = [], []
             log.debug("turn done: discarded=%s said=%r reply=%r",
                       discarded, said[:40], reply[:40])
-            if self._turns is not None and (said or reply):
+            # A turn Apollo started itself (`prompt`) with nobody speaking is
+            # already on screen and in the air; the caller that prompted it
+            # waits for it, so it is not queued as if you had said something.
+            prompted, self._prompted = self._prompted, False
+            if self._turns is not None and (said or reply) and not (prompted and not said):
                 self._turns.put((said, "" if discarded else reply))
 
     async def _play_loop(self):
