@@ -190,14 +190,22 @@ BRIDGE = r"""
       Thinking: 'thinking', Speaking: 'response', Error: 'idle'
     };
     const phase = map[state] || 'idle';
+    // Tracked on the instance, not read back from state: React batches
+    // setState, so two statuses in a row would both still see the old phase.
+    // A repeated status is not a new turn - only the change chimes.
+    const changed = phase !== this._phase;
+    this._phase = phase;
     if (phase === 'listening') {
-      this.sfx('hud');
+      if (changed) this.sfx('hud');
       this.setState({ phase, scene: null, transcript: '', answerText: '' });
     } else if (phase === 'thinking') {
-      this.playHeard();
+      // No chime here. Thinking is entered before the audio has been
+      // transcribed, so chiming on it means chiming at silence - at a cough,
+      // at a chord pressed by accident. The "heard you" sound belongs to the
+      // moment there is actually a transcript, which is applyTurn('You').
       this.setState({ phase });
     } else if (phase === 'response') {
-      this.playReveal();
+      if (changed) this.playReveal();
       this.setState({ phase });
     } else {
       this.setState({ phase });
@@ -205,7 +213,7 @@ BRIDGE = r"""
   }
 
   applyTurn(speaker, text) {
-    if (speaker === 'You') this.setState({ transcript: text });
+    if (speaker === 'You') { this.playHeard(); this.setState({ transcript: text }); }
     else this.setState({ answerText: text });
   }
 
@@ -443,7 +451,7 @@ def build(design_path):
     p.re_sub(r"(@keyframes ap-hint-pulse \{[^}]*\} 50% \{ )opacity:1; ",
              r"\1", "hint pulse keyframe 50%")
     p.sub("Click the core to speak, click again to ask",
-          "Hold Ctrl+Space to talk", 1, "hint copy")
+          "Hold Ctrl+Alt to talk", 1, "hint copy")
 
     # drawRing writes the wordmark's opacity imperatively on every frame, which
     # overrides the binding outright. Gate it on the same expanded/resting test
@@ -500,8 +508,9 @@ def build(design_path):
       if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) { e.preventDefault(); this.toggleResearch(); }
     };""",
           """    this.onKey = (e) => {
-      // Ctrl+Space is a global Windows hook in assistant.py. If the page also
-      // listened for it, a focused overlay would fire the turn twice.
+      // The talk chord (Ctrl+Alt, held) is a global Windows hook in
+      // assistant.py. If the page also listened for it, a focused overlay
+      // would fire the turn twice.
       if (e.key === 'Escape') this.dismiss();
     };""",
           1, "demo keybindings removed")

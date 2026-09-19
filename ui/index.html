@@ -3183,8 +3183,13 @@ class Component extends DCLogic {
       Thinking: 'thinking', Speaking: 'response', Error: 'idle'
     };
     const phase = map[state] || 'idle';
+    // Tracked on the instance, not read back from state: React batches
+    // setState, so two statuses in a row would both still see the old phase.
+    // A repeated status is not a new turn - only the change chimes.
+    const changed = phase !== this._phase;
+    this._phase = phase;
     if (phase === 'listening') {
-      this.sfx('hud');
+      if (changed) this.sfx('hud');
       this.setState({ phase, scene: null, transcript: '', answerText: '' });
     } else if (phase === 'thinking') {
       // No chime here. Thinking is entered before the audio has been
@@ -3193,7 +3198,7 @@ class Component extends DCLogic {
       // moment there is actually a transcript, which is applyTurn('You').
       this.setState({ phase });
     } else if (phase === 'response') {
-      this.playReveal();
+      if (changed) this.playReveal();
       this.setState({ phase });
     } else {
       this.setState({ phase });
