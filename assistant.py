@@ -38,6 +38,7 @@ import sounddevice as sd
 from faster_whisper import WhisperModel
 
 import agents
+import briefing
 import gemini_live
 import overlay_content
 import router
@@ -1573,6 +1574,21 @@ def announce(ui, voice, instruction, fallback):
             speak(fallback)
     finally:
         ui.status(held)
+
+
+def brief_now(ui, voice):
+    """Say the day's recap, in Apollo's voice and your language.
+
+    The facts are gathered here; the words are Gemini's (see
+    `briefing.spoken`), because a briefing written in Python always sounds
+    like a form letter and never matches the language you last used.
+    """
+    payload = briefing.compose()
+    visual = overlay_content.clean_visual({"cards": tools._briefing_cards(payload)})
+    if visual is not None and hasattr(ui, "visual"):
+        ui.visual(visual)
+    announce(ui, voice, briefing.spoken(payload),
+             "Here is your briefing. The data services are not answering right now.")
 
 
 def fire_reminder(ui, voice, reminder, late):

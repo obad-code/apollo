@@ -97,7 +97,9 @@ os.environ.setdefault(
 import webview  # noqa: E402  - must follow the env var above
 
 import assistant  # noqa: E402
+import briefing  # noqa: E402
 import clips  # noqa: E402
+import dataservice  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
 import presence  # noqa: E402
@@ -620,6 +622,10 @@ class WebReporter:
         """
         self.on_turn("Apollo", text, None)
 
+    def data(self, snapshot):
+        """The world, for the full display. Only worth sending while it is up."""
+        self._call("data", snapshot)
+
     def note(self, text):
         self._call("note", text)
 
@@ -671,6 +677,9 @@ class Apollo:
         self.orb = None
         self.voice = None          # the Gemini Live session, once connected
         self.clips = None          # the replay buffer, once recording
+        self.data = None           # the world, refreshed on a timer
+        self.schedule = briefing.Schedule()   # has today's recap happened?
+        self.briefing_thread = None
         self.listen_toggle = None  # ...and the CTRL+1 watcher over it
         self.turn_busy = False     # listening, thinking, or speaking
         self.presence = presence.Presence(AFK_SECONDS)
@@ -806,6 +815,8 @@ class Apollo:
         self.close_live()
         if self.clips is not None:
             self.clips.stop()
+        if self.data is not None:
+            self.data.stop()
         if self.orb:
             self.orb.close()
         if self.tray:
@@ -944,6 +955,40 @@ class Apollo:
         self.presence.toggle_peek()
         self.apply_mode()
 
+    def on_data(self, snapshot):
+        """A fresh world snapshot. The page only wants it while it is visible."""
+        ui = getattr(self, "ui", None)
+        if ui is not None and ui.alive and self.overlay.mode == Overlay.FULL:
+            ui.data(snapshot)
+
+    def morning(self):
+        """The day's first recap: open the display, say it, put it away."""
+        opened = not self.presence.full
+        if opened:
+            self.presence.toggle_peek()
+            self.apply_mode()
+        try:
+            assistant.brief_now(self.ui, self.voice)
+        except Exception:
+            pass          # a failed briefing must not take the day with it
+        finally:
+            if opened and self.presence.peek_open:
+                self.presence.toggle_peek()
+                self.apply_mode()
+
+    def check_briefing(self, idle):
+        """Once a day, the first time you are actually at the machine."""
+        ui = getattr(self, "ui", None)
+        if (ui is None or ui.quiet or self.turn_busy or self.voice is None
+                or self.briefing_thread is not None and self.briefing_thread.is_alive()):
+            return
+        if not self.schedule.due(idle_seconds=idle):
+            return
+        self.schedule.done()
+        self.briefing_thread = threading.Thread(target=self.morning, daemon=True,
+                                                name="apollo-briefing")
+        self.briefing_thread.start()
+
     def check_presence(self, idle):
         """Open the display when you are away; put it away when you come back.
 
@@ -952,6 +997,7 @@ class Apollo:
         """
         if self.presence.check(idle):
             self.apply_mode()
+        self.check_briefing(idle)
 
     def check_overlay_alive(self):
         """Keep the window the shape it is supposed to be.
@@ -1032,6 +1078,11 @@ class Apollo:
         # carries on without clips.
         self.clips = clips.ReplayBuffer().start()
         tools.set_clip_buffer(self.clips)
+
+        # Everything the display and the briefing read - prices, headlines,
+        # posts, weather, the machine - refreshed on a timer rather than
+        # inside a turn, where it would be latency you could hear.
+        self.data = dataservice.DataService(on_snapshot=self.on_data).start()
 
         # CTRL+1. A thread of its own so it answers during a turn as well as
         # between them; `run_loop` reads its flag and does the actual
