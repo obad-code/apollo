@@ -376,7 +376,22 @@ for both). Apollo does the thing first and then confirms it in a few words.
 | *"How's Nvidia doing?"*, *"chart Tesla for a month"* | Live prices from Yahoo Finance; a chart and readouts appear under the mesh, and Apollo speaks only the numbers the feed returned. |
 | *"Open it in TradingView"* | Opens the full interactive TradingView chart for that symbol. |
 | *"Lock the PC"* | Locks at once. **Sleep, restart, shut down and sign out** always ask first, and only a "yes" in your *next* turn goes through - the model cannot approve its own request. Restart and shutdown wait 10 s; *"cancel the shutdown"* stops them. |
+| *"Clip that"*, *"save the last minute"* | Writes the last 60 s of screen and system audio to `Videos\Apollo's Clips`. |
 | Anything current | Gemini uses Google Search rather than answering from memory. |
+
+**Clips.** Apollo keeps the last 60 seconds of your screen in memory, all the
+time it is running, and *"clip that"* (or *"save the last minute"*, or the same
+in Arabic) writes it to `Videos\Apollo's Clips` as an MP4 with the system audio
+- what the speakers were playing, never your microphone.
+
+Nothing is ever written until you ask: the buffer is RAM only, about 96 MB for
+those sixty seconds, and it costs roughly two thirds of one core (6% of this
+machine) at 1080p30. The tray menu has a **Pause replay buffer** switch.
+
+> It records with `gdigrab`. The GPU's own capture (`ddagrab`) is faster and
+> nearly free, but when it fails to start it hangs inside FFmpeg *holding the
+> GIL*, which freezes every thread in Apollo - so it is opt-in only, with
+> `APOLLO_CAPTURE=ddagrab`, on a machine where it has been proven.
 
 **Language.** Apollo answers in the language you spoke - Arabic (in a Saudi
 dialect) or English - because what you say is transcribed by Gemini itself,
@@ -419,6 +434,7 @@ The only thing left is your API key.
 | `tools.py` | Every tool Apollo has, declared once for both Gemini and Claude, and the only place tool errors are caught. Also the confirmation rule for power actions. |
 | `pc_control.py` | The Windows side of the tools: apps, sites, files, keyboard, media, volume, windows, power. Talks to Windows, never to a model. |
 | `market.py` | Live prices, history, NYSE hours and TradingView links, from Yahoo Finance's public feed. |
+| `clips.py` | The replay buffer: the last minute of the screen and system audio, in memory, and the MP4 a save writes. |
 | `turnview.py` | What the overlay shows for the turn in progress, as your words, the reply and any chart arrive from different threads. |
 | `presence.py` | When the full display is open (Ctrl+` is sticky; away-from-keyboard closes on input), and what a phase change does to the overlay. |
 | `reminders.py` | Reminder storage and the watcher that fires them. |
