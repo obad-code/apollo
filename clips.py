@@ -204,8 +204,12 @@ def _open_encoder(width, height):
     encoder.gop_size = GOP
     # No global-header flag on purpose: the mp4 muxer builds the header from
     # the in-band SPS/PPS, and with the flag set the file does not decode.
+    # No B-frames. They would buy a few percent of size and cost exactly what
+    # a replay buffer cannot afford: packets leaving the encoder out of order,
+    # so a tail cut at a keyframe hands the muxer decreasing timestamps.
     encoder.options = {"preset": "p4", "tune": "hq", "rc": "vbr", "cq": CQ,
-                       "b": MAXRATE, "maxrate": MAXRATE, "bufsize": MAXRATE}
+                       "b": MAXRATE, "maxrate": MAXRATE, "bufsize": MAXRATE,
+                       "bf": "0"}
     encoder.open()
     return encoder
 
@@ -216,7 +220,10 @@ class ReplayBuffer:
     def __init__(self, seconds=SECONDS):
         self.seconds = seconds
         self.video = Ring(seconds)
+        self.audio = None
         self.frames = 0
+        self.saved_today = 0
+        self.last_saved = None
         self.error = None
         self.source_name = None
         self.started_at = None
@@ -232,6 +239,7 @@ class ReplayBuffer:
             return self
         self._stopping.clear()
         self.error = None
+        self.audio = AudioRing(self.seconds).start()
         self._thread = threading.Thread(target=self._run, daemon=True, name="clips")
         self._thread.start()
         return self
@@ -240,6 +248,13 @@ class ReplayBuffer:
         self._stopping.set()
         if self._thread is not None:
             self._thread.join(timeout)
+        if self.audio is not None:
+            self.audio.stop()
+            self.audio = None
+
+    def save(self, seconds=SECONDS, folder_path=None):
+        """Write the last `seconds` to an MP4. Never raises."""
+        return _save(self, seconds, folder_path)
 
     def _run(self):
         source = encoder = None
@@ -273,4 +288,189 @@ class ReplayBuffer:
                 "frames": self.frames,
                 "fps": round(self.frames / (time.monotonic() - self.started_at), 1)
                         if self.started_at else 0.0,
+                "saved_today": self.saved_today,
+                "sound": self.audio is not None and self.audio.error is None,
                 "error": self.error}
+
+
+AUDIO_CHUNK = 1024
+
+
+class AudioRing:
+    """System audio, as WASAPI loopback, in the same shape as the video ring.
+
+    This is what the speakers are playing, not the microphone: a clip carries
+    the game, the video, the call - never the room. It is optional; if the
+    loopback cannot be opened the clip is saved without sound.
+    """
+
+    def __init__(self, seconds=SECONDS):
+        self.ring = Ring(seconds)
+        self.rate = 48000
+        self.channels = 2
+        self.error = None
+        self._audio = None
+        self._stream = None
+
+    def start(self):
+        try:
+            import pyaudiowpatch as pyaudio
+            self._audio = pyaudio.PyAudio()
+            wasapi = self._audio.get_host_api_info_by_type(pyaudio.paWASAPI)
+            speakers = self._audio.get_device_info_by_index(wasapi["defaultOutputDevice"])
+            device = next(info for info in self._audio.get_loopback_device_info_generator()
+                          if speakers["name"] in info["name"])
+            self.rate = int(device["defaultSampleRate"])
+            self.channels = int(device["maxInputChannels"])
+
+            def feed(data, _count, _time, _status):
+                # PyAudio wants a (data, flag) pair back; returning the flag
+                # alone raises a bare SystemError out of the callback thread.
+                self.ring.add(data, time.monotonic())
+                return (None, pyaudio.paContinue)
+
+            self._stream = self._audio.open(
+                format=pyaudio.paInt16, channels=self.channels, rate=self.rate,
+                input=True, frames_per_buffer=AUDIO_CHUNK,
+                input_device_index=device["index"], stream_callback=feed)
+            self._stream.start_stream()
+        except Exception as e:  # noqa: BLE001 - a clip without sound beats no clip
+            self.error = f"{e}"
+            log.info("no system audio for clips: %s", e)
+        return self
+
+    def stop(self):
+        for closer in (getattr(self._stream, "stop_stream", None),
+                       getattr(self._stream, "close", None),
+                       getattr(self._audio, "terminate", None)):
+            try:
+                if closer:
+                    closer()
+            except Exception:
+                pass
+        self._stream = self._audio = None
+
+
+def audio_slice(chunks, start, end, rate, channels):
+    """The chunks stamped inside [start, end], in order.
+
+    A chunk is stamped when it arrived, so it holds the ~21 ms *before* its
+    stamp: taking only those stamped inside the window can start the sound a
+    chunk late, never a chunk early, so it cannot run ahead of the picture.
+    """
+    return [(payload, when) for payload, when in chunks if start <= when <= end]
+
+
+def audio_track(chunks, start, end, rate, channels):
+    """One continuous PCM track for [start, end], silence where nothing came.
+
+    WASAPI loopback delivers nothing at all while the speakers are silent, so
+    the captured chunks are not a continuous recording - they are the noisy
+    parts, with gaps. Concatenating them would pull every sound to the front
+    of the clip and out of sync with the picture; each chunk is placed where
+    it actually happened instead, and the gaps stay quiet.
+    """
+    import numpy as np
+
+    taken = audio_slice(chunks, start, end, rate, channels)
+    if not taken:
+        return b""
+    total = max(1, int(round((end - start) * rate)))
+    track = np.zeros((total, channels), dtype=np.int16)
+    for payload, when in taken:
+        block = np.frombuffer(payload, dtype=np.int16)
+        usable = (len(block) // channels) * channels
+        block = block[:usable].reshape(-1, channels)
+        # The stamp is the END of the chunk: it holds the audio just before it.
+        offset = int(round((when - start) * rate)) - len(block)
+        offset = max(0, min(total - 1, offset))
+        room = min(len(block), total - offset)
+        if room > 0:
+            track[offset:offset + room] = block[:room]
+    return track.tobytes()
+
+
+def _write(path, packets, pcm, rate, channels):
+    """Mux the clip. Video packets are copied as they are; audio is encoded."""
+    # The file is written as "<name>.mp4.part" and renamed on success, so the
+    # format cannot be inferred from the extension - it is named here.
+    output = av.open(path, "w", format="mp4")
+    try:
+        video = output.add_mux_stream("h264", rate=FPS, width=WIDTH, height=HEIGHT,
+                                      time_base=fractions.Fraction(1, FPS))
+        audio = None
+        if pcm:
+            audio = output.add_stream("aac", rate=rate,
+                                      layout="stereo" if channels == 2 else "mono")
+            audio.bit_rate = 160000
+
+        base = packets[0][1]
+        for payload, pts, keyframe, _when in packets:
+            packet = av.Packet(payload)
+            packet.stream = video
+            packet.pts = packet.dts = pts - base
+            # In the encoder's own units. Without this the mp4 muxer reads
+            # them in its 1/15360 base: a clip then claims to be 0.05 s long
+            # and plays at several thousand frames a second.
+            packet.time_base = fractions.Fraction(1, FPS)
+            if keyframe:
+                packet.is_keyframe = True
+            output.mux(packet)
+
+        if audio is not None:
+            import numpy as np
+            samples = np.frombuffer(pcm, dtype=np.int16)
+            usable = (len(samples) // channels) * channels
+            samples = samples[:usable].reshape(-1, channels)
+            size = audio.codec_context.frame_size or 1024
+            for start in range(0, max(0, len(samples) - size), size):
+                block = samples[start:start + size].reshape(1, -1).copy()
+                frame = av.AudioFrame.from_ndarray(
+                    block, format="s16", layout="stereo" if channels == 2 else "mono")
+                frame.sample_rate = rate
+                frame.pts = start
+                frame.time_base = fractions.Fraction(1, rate)
+                output.mux(audio.encode(frame))
+            output.mux(audio.encode(None))
+    finally:
+        output.close()
+
+
+def _save(buffer, seconds, folder_path):
+    if buffer.error:
+        return {"ok": False, "error": f"The screen recorder isn't running: {buffer.error}"}
+    packets = buffer.video.stamped()
+    if not packets:
+        return {"ok": False, "error": "There's nothing recorded yet."}
+
+    now = time.monotonic()
+    start = now - seconds
+    chosen = window([item for item, _ in packets], start)
+    if not chosen:
+        return {"ok": False, "error": "That clip has no complete frame in it yet."}
+
+    span = chosen[-1][3] - chosen[0][3]
+    pcm = b""
+    rate, channels = 48000, 2
+    if buffer.audio is not None and buffer.audio.error is None:
+        rate, channels = buffer.audio.rate, buffer.audio.channels
+        pcm = audio_track(buffer.audio.ring.stamped(), chosen[0][3], chosen[-1][3], rate, channels)
+
+    path = clip_path(folder_path=folder_path)
+    temporary = path + ".part"
+    try:
+        _write(temporary, chosen, pcm, rate, channels)
+        os.replace(temporary, path)
+    except Exception as e:  # noqa: BLE001
+        try:
+            os.remove(temporary)
+        except OSError:
+            pass
+        return {"ok": False, "error": f"The clip couldn't be written: {e}"}
+
+    buffer.saved_today += 1
+    buffer.last_saved = path
+    return {"ok": True, "path": path, "folder": os.path.dirname(path),
+            "seconds": round(span, 1),
+            "megabytes": round(os.path.getsize(path) / 1e6, 1),
+            "sound": bool(pcm)}
