@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apollo</title>
+<style>
+  /* Lifted verbatim from the Apollo design export's <helmet> block. */
+  html, body { margin:0; padding:0; background:#000; overflow:hidden; height:100%; }
+  body { font-family: -apple-system, "SF Pro Display", "SF Pro Text", BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#8E82FF; text-decoration:none; }
+  a:hover { color:#B9B1FF; }
+  @keyframes ap-rise { from { opacity:0; transform:translateY(14px) scale(0.985); filter:blur(6px); } to { opacity:1; transform:none; filter:blur(0); } }
+  @keyframes ap-fade { from { opacity:0; } to { opacity:1; } }
+  @keyframes ap-nebula-a { 0%,100% { opacity:.42; transform:translate3d(0,0,0) scale(1); } 50% { opacity:.68; transform:translate3d(3%,-2%,0) scale(1.12); } }
+  @keyframes ap-nebula-b { 0%,100% { opacity:.3; transform:translate3d(0,0,0) scale(1.06); } 50% { opacity:.86; transform:translate3d(-4%,3%,0) scale(1); } }
+  @keyframes ap-dot { 0%,100% { opacity:.35; } 50% { opacity:1; } }
+
+  /* Added: the mirror of ap-rise, so a turn can fade back out after its hold. */
+  @keyframes ap-sink { from { opacity:1; transform:none; filter:blur(0); } to { opacity:0; transform:translateY(-10px) scale(0.99); filter:blur(5px); } }
+
+  ::selection { background:rgba(142,130,255,0.35); }
+</style>
+</head>
+<body>
+
+<div id="backdrop" style="position:fixed; inset:0; background:#000; color:#fff; overflow:hidden; cursor:default;">
+
+  <div style="position:absolute; left:-18%; bottom:-24%; width:70%; height:78%; pointer-events:none; background:radial-gradient(closest-side, rgba(96,74,255,0.5), rgba(96,74,255,0.16) 45%, transparent 72%); filter:blur(70px); animation:ap-nebula-a 34s ease-in-out infinite;"></div>
+  <div style="position:absolute; left:-6%; bottom:-14%; width:44%; height:48%; pointer-events:none; background:radial-gradient(closest-side, rgba(56,224,168,0.34), rgba(56,224,168,0.1) 48%, transparent 74%); filter:blur(80px); animation:ap-nebula-b 41s ease-in-out infinite; mix-blend-mode:screen;"></div>
+
+  <canvas id="stars" style="position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none;"></canvas>
+
+  <div id="chrome" style="position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:flex-start; padding:34px 44px; pointer-events:none; opacity:0; transition:opacity 700ms cubic-bezier(.4,0,.2,1);">
+    <div style="display:flex; flex-direction:column; gap:4px;">
+      <div id="clock" style="font-size:34px; font-weight:250; letter-spacing:-0.02em; color:#fff; font-variant-numeric:tabular-nums;"></div>
+      <div id="dateLine" style="font-size:13px; font-weight:400; letter-spacing:0.01em; color:#fff; opacity:.9;"></div>
+    </div>
+    <div style="display:flex; align-items:center; gap:9px; padding:9px 15px; border-radius:100px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); backdrop-filter:blur(24px) saturate(160%); -webkit-backdrop-filter:blur(24px) saturate(160%);">
+      <span id="statusDot" style="width:7px; height:7px; border-radius:50%; background:#8E82FF; box-shadow:0 0 10px #8E82FF; animation:ap-dot 3.4s ease-in-out infinite; display:block; transition:background 400ms ease, box-shadow 400ms ease;"></span>
+      <span id="statusLabel" style="font-size:12.5px; font-weight:500; letter-spacing:0.03em; color:#fff;">Waking</span>
+    </div>
+  </div>
+
+  <div id="stage" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:104px 40px 132px; box-sizing:border-box; transition:padding 700ms cubic-bezier(.4,0,.2,1);">
+    <div id="col" style="display:flex; flex-direction:column; align-items:center; gap:22px; width:100%; zoom:1;">
+
+      <div id="coreFrame" style="position:relative; flex:0 0 auto; width:min(600px, 64vh); height:min(600px, 64vh); display:grid; place-items:center; transition:width 800ms cubic-bezier(.4,0,.2,1), height 800ms cubic-bezier(.4,0,.2,1);">
+        <canvas id="ring" style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:100%; height:100%; display:block; pointer-events:none;"></canvas>
+        <div id="word" style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; font-size:13px; font-weight:400; letter-spacing:0.22em; text-indent:0.22em; white-space:nowrap; color:#fff; text-shadow:0 0 22px rgba(255,255,255,0.45);">APOLLO</div>
+      </div>
+
+      <div style="flex:0 0 auto; width:100%; display:flex; flex-direction:column; align-items:center; gap:22px;">
+
+        <div id="question" style="display:none; font-size:26px; font-weight:300; letter-spacing:-0.015em; color:#fff; text-align:center; text-wrap:pretty; max-width:760px;"></div>
+
+        <div id="thinking" style="display:none; font-size:14px; font-weight:450; letter-spacing:0.06em; text-transform:uppercase; color:#fff; opacity:.88; animation:ap-fade 400ms ease both;">Thinking</div>
+
+        <div id="answer" style="display:none; font-size:30px; font-weight:300; letter-spacing:-0.02em; color:#fff; text-align:center; text-wrap:pretty; max-width:820px;"></div>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="hint" style="position:absolute; bottom:26px; left:0; right:0; text-align:center; pointer-events:none; font-size:12.5px; font-weight:450; letter-spacing:0.04em; color:#fff; opacity:0.72; transition:opacity 900ms ease;">Hold CTRL+SPACE to talk</div>
+
+  <div id="note" style="position:absolute; bottom:24px; left:44px; max-width:46vw; font-size:12px; font-weight:450; line-height:1.55; letter-spacing:0.01em; color:#fff; opacity:0; white-space:pre-wrap; transition:opacity 600ms ease; pointer-events:none; text-shadow:0 1px 12px rgba(0,0,0,0.8);"></div>
+
+</div>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+
+/* The design's palette, one entry per state assistant.py reports. */
+const STATES = {
+  Idle:      { label: "Apollo online", dot: "#38E0A8" },
+  Listening: { label: "Listening",     dot: "#EDE9DE" },
+  Thinking:  { label: "Working",       dot: "#8E82FF" },
+  Speaking:  { label: "Speaking",      dot: "#FFFFFF" },
+  Waking:    { label: "Waking",        dot: "#8E82FF" },
+  Error:     { label: "Error",         dot: "#FF6B5E" },
+};
+
+const PHASES = {
+  Idle: "idle", Listening: "listening", Thinking: "thinking",
+  Speaking: "speaking", Waking: "waking", Error: "error",
+};
+
+/* How long a question and its answer stay up before fading out. */
+const HOLD_MS = 6000;
+
+class ApolloCore {
+  constructor() {
+    this.starCanvas = $("stars");
+    this.ringCanvas = $("ring");
+    this.word = $("word");
+    this.col = $("col");
+    this.opts = { coreSize: 216, ringColor: "#EDE9DE", starDensity: 2 };
+
+    this.phase = "waking";
+    this.env = 0;
+    this.wordGate = 1;
+    this.edge = false;
+    this.textShown = false;
+    this.fit = 1;
+    this.holdTimer = null;
+    this.noteTimer = null;
+    this.fitTimers = [];
+  }
+
+  start() {
+    this.initStars();
+    window.addEventListener("resize", () => { this.initStars(); this.measureFit(); });
+    window.addEventListener("mousemove", (e) => {
+      const h = window.innerHeight;
+      const near = e.clientY < 110 || e.clientY > h - 110;
+      if (near !== this.edge) { this.edge = near; this.applyChrome(); }
+    });
+    this.tickClock();
+    setInterval(() => this.tickClock(), 1000);
+    this.applyChrome();
+    this.applyLayout();
+    this.raf = requestAnimationFrame(this.loop);
+  }
+
+  /* --- what Python reports ---------------------------------------------- */
+
+  setPhase(state) {
+    this.phase = PHASES[state] || "idle";
+
+    const s = STATES[state] || STATES.Idle;
+    $("statusLabel").textContent = s.label;
+    $("statusDot").style.background = s.dot;
+    $("statusDot").style.boxShadow = "0 0 10px " + s.dot;
+
+    show($("thinking"), this.phase === "thinking");
+    this.applyChrome();
+    this.applyLayout();
+  }
+
+  /* A question, then an answer. Each fades in on arrival; the pair fades
+     out together once the answer has had its hold. */
+  turn(speaker, text) {
+    clearTimeout(this.holdTimer);
+
+    if (speaker === "You") {
+      fadeIn($("question"), text, 620);
+      hide($("answer"));
+    } else {
+      fadeIn($("answer"), text, 700);
+      this.holdTimer = setTimeout(() => this.clearTurn(), HOLD_MS);
+    }
+
+    this.textShown = true;
+    this.applyLayout();
+  }
+
+  clearTurn() {
+    clearTimeout(this.holdTimer);
+
+    const done = () => {
+      hide($("question"));
+      hide($("answer"));
+      this.textShown = false;
+      this.applyLayout();
+    };
+
+    const live = [$("question"), $("answer")].filter((el) => el.style.display !== "none");
+    if (!live.length) return done();
+
+    live.forEach((el) => { el.style.animation = "ap-sink 620ms cubic-bezier(.4,0,.2,1) both"; });
+    setTimeout(done, 620);
+  }
+
+  /* Whisper's loading line, and any API error worth reading. */
+  note(text, sticky) {
+    clearTimeout(this.noteTimer);
+    const el = $("note");
+    el.textContent = text;
+    el.style.opacity = "0.72";
+    if (!sticky) this.noteTimer = setTimeout(() => { el.style.opacity = "0"; }, 6000);
+  }
+
+  /* --- derived layout, mirroring the design's renderVals() --------------- */
+
+  applyChrome() {
+    const busy = this.phase !== "idle";
+    $("chrome").style.opacity = (busy || this.edge) ? "1" : "0";
+    $("hint").style.opacity = (busy || this.edge) ? "0" : "0.72";
+  }
+
+  applyLayout() {
+    const frame = this.textShown ? "min(196px, 21vh)"
+      : (this.phase === "listening" || this.phase === "thinking" || this.phase === "speaking")
+        ? "min(360px, 38vh)"
+        : "min(600px, 64vh)";
+    $("coreFrame").style.width = frame;
+    $("coreFrame").style.height = frame;
+    $("stage").style.padding = this.textShown ? "40px 40px 30px" : "104px 40px 132px";
+    this.measureFit();
+  }
+
+  /* A long answer gets scaled to fit rather than clipped. */
+  measureFit() {
+    this.fitTimers.forEach(clearTimeout);
+    this.fitTimers = [0, 90, 280, 700].map((d) => setTimeout(() => this.doFit(), d));
+  }
+
+  doFit() {
+    const el = this.col, p = el && el.parentElement;
+    if (!p) return;
+    const cs = getComputedStyle(p);
+    const avail = p.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const nat = el.scrollHeight;
+    const s = nat > 4 ? Math.max(0.45, Math.min(1, avail / nat)) : 1;
+    if (Math.abs(s - this.fit) > 0.01) { this.fit = s; el.style.zoom = s; }
+  }
+
+  tickClock() {
+    const now = new Date();
+    $("clock").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    $("dateLine").textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  }
+
+  /* The ring's activation envelope: full while listening, alive but calmer
+     while speaking, barely lit while thinking, dark at rest. The design only
+     had listening and idle; the middle two are this app's states. */
+  envTarget() {
+    if (this.phase === "listening") return 1;
+    if (this.phase === "speaking") return 0.62;
+    if (this.phase === "thinking") return 0.28;
+    return 0;
+  }
+
+  initStars() {
+    const c = this.starCanvas;
+    if (!c) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = window.innerWidth, h = window.innerHeight;
+    c.width = w * dpr; c.height = h * dpr;
+    this.sctx = c.getContext('2d');
+    this.sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.sw = w; this.sh = h;
+    const density = this.opts.starDensity ?? 1;
+    const n = Math.round((w * h) / 2600 * density);
+    this.stars = Array.from({ length: n }, () => {
+      const depth = Math.random();
+      return {
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: 0.25 + Math.pow(Math.random(), 2.4) * 1.45,
+        base: 0.22 + Math.random() * 0.62,
+        rate: 0.00035 + Math.random() * 0.0016,
+        ph: Math.random() * Math.PI * 2,
+        vx: (0.0016 + depth * 0.006) * (Math.random() < 0.5 ? -1 : 1),
+        vy: (0.0008 + depth * 0.0035) * (Math.random() < 0.5 ? -1 : 1),
+        warm: Math.random() < 0.14
+      };
+    });
+  }
+
+  loop = (t) => {
+    this.raf = requestAnimationFrame(this.loop);
+    this.drawStars(t);
+    this.drawRing(t);
+  };
+
+  drawStars(t) {
+    const ctx = this.sctx;
+    if (!ctx || !this.stars) return;
+    const w = this.sw, h = this.sh;
+    ctx.clearRect(0, 0, w, h);
+    for (const s of this.stars) {
+      s.x += s.vx; s.y += s.vy;
+      if (s.x < -2) s.x = w + 2; else if (s.x > w + 2) s.x = -2;
+      if (s.y < -2) s.y = h + 2; else if (s.y > h + 2) s.y = -2;
+      const tw = 0.55 + 0.45 * Math.sin(t * s.rate + s.ph);
+      const a = Math.min(1, s.base * tw + 0.04);
+      ctx.beginPath();
+      ctx.fillStyle = s.warm
+        ? 'rgba(198,206,255,' + a.toFixed(3) + ')'
+        : 'rgba(255,255,255,' + a.toFixed(3) + ')';
+      ctx.arc(s.x, s.y, s.r, 0, 6.2832);
+      ctx.fill();
+      if (s.r > 1.15) {
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(255,255,255,' + (a * 0.1).toFixed(3) + ')';
+        ctx.arc(s.x, s.y, s.r * 3.2, 0, 6.2832);
+        ctx.fill();
+      }
+    }
+  }
+
+  drawRing(t) {
+    const c = this.ringCanvas;
+    if (!c) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const size = 600;
+    if (c.width !== size * dpr) { c.width = size * dpr; c.height = size * dpr; }
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+
+    const cx = size / 2, cy = size / 2;
+    const coreR = (this.opts.coreSize ?? 216) / 2;
+    const R = coreR + 13;
+    const inner = coreR + 14;
+    const outer = Math.min(size / 2 - 10, coreR + 175);
+    const target = this.envTarget();
+    this.env += (target - this.env) * 0.045;
+    const env = this.env < 0.001 ? 0 : this.env;
+
+    const breath = 0.34 + 0.3 * (0.5 + 0.5 * Math.sin(t * 0.00175));
+    const intensity = breath * (1 - env) + (0.92 + 0.08 * Math.sin(t * 0.004)) * env;
+    const ring = this.opts.ringColor ?? '#EDE9DE';
+    const rgb = this.hexRgb(ring);
+
+    // The wordmark yields to the nucleus as the core activates, and gets out
+    // of the way entirely once the core has shrunk to make room for a turn.
+    this.wordGate += ((this.textShown ? 0 : 1) - this.wordGate) * 0.08;
+    if (this.word) {
+      const wa = Math.max(0, 1 - env * 1.6) * this.wordGate;
+      this.word.style.opacity = wa.toFixed(3);
+    }
+    if (!this.nodes) this.initNodes(cx, cy, inner, outer);
+    const N = this.nodes.length;
+    const P = [];
+
+    for (let i = 0; i < N; i++) {
+      const n = this.nodes[i];
+      n.x += n.vx; n.y += n.vy;
+      let dx = n.x - cx, dy = n.y - cy;
+      let d = Math.hypot(dx, dy) || 1;
+      if (d < inner || d > outer) {
+        const nx = dx / d, ny = dy / d;
+        const dot = n.vx * nx + n.vy * ny;
+        n.vx -= 2 * dot * nx; n.vy -= 2 * dot * ny;
+        const clamp = Math.min(outer, Math.max(inner, d));
+        n.x = cx + nx * clamp; n.y = cy + ny * clamp;
+        dx = n.x - cx; dy = n.y - cy; d = clamp;
+      }
+      // ordered formation while listening: three counter-rotating layers
+      const layer = i % 3;
+      const per = Math.ceil(N / 3);
+      const dir = layer === 1 ? -1 : 1;
+      const th = (Math.floor(i / 3) / per) * 6.2832 + dir * t * (0.00030 + layer * 0.00007) + layer * 0.4;
+      const wob =
+        Math.sin(th * 3 + t * 0.0016) * 0.5 +
+        Math.sin(th * 5 - t * 0.0021) * 0.32 +
+        Math.sin(th * 8 + t * 0.0013) * 0.2;
+      const tr = R + layer * 78 + wob * 11 * env;
+      const tx = cx + Math.cos(th) * tr, ty = cy + Math.sin(th) * tr;
+      const e = env * env * (3 - 2 * env);
+      P.push({ x: n.x * (1 - e) + tx * e, y: n.y * (1 - e) + ty * e, r: n.r, ph: n.ph, th: th, tr: tr, layer: layer });
+    }
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // dendrite trunks out of the soma
+    for (let i = 0; i < N; i += 2) {
+      const p = P[i];
+      const dx = p.x - cx, dy = p.y - cy;
+      const d = Math.hypot(dx, dy) || 1;
+      const nx = dx / d, ny = dy / d;
+      const bend = Math.sin(t * 0.0007 + p.ph) * (10 + 14 * (1 - env));
+      const a = ((0.16 + 0.12 * Math.sin(t * 0.0019 + p.ph)) * (1 - 0.35 * env) + 0.06) * env;
+      if (a < 0.012) continue;
+      ctx.beginPath();
+      ctx.lineWidth = 0.8 + 0.9 * a * 3;
+      ctx.strokeStyle = 'rgba(243,240,231,' + a.toFixed(3) + ')';
+      ctx.shadowBlur = 12; ctx.shadowColor = 'rgba(' + rgb + ',0.8)';
+      ctx.moveTo(cx + nx * coreR * 0.34, cy + ny * coreR * 0.34);
+      ctx.quadraticCurveTo(cx + nx * d * 0.6 - ny * bend, cy + ny * d * 0.6 + nx * bend, p.x, p.y);
+      ctx.stroke();
+    }
+
+    // dendritic filaments: nearest-neighbour web when idle, sequential ring when listening
+    ctx.shadowColor = 'rgba(' + rgb + ',0.85)';
+    for (let i = 0; i < N; i++) {
+      for (let j = i + 1; j < N; j++) {
+        const a = P[i], b = P[j];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const web = dist < 96 ? (1 - dist / 96) : 0;
+        const seq = (j - i === 3) ? 0.8 : (j - i === 1 ? 0.16 : 0);
+        const alpha = (web * 0.5 * (1 - env) + seq * 0.72 * env) * env;
+        if (alpha < 0.02) continue;
+        ctx.beginPath();
+        ctx.lineWidth = 0.7 + 1.1 * alpha;
+        ctx.strokeStyle = 'rgba(238,234,222,' + alpha.toFixed(3) + ')';
+        ctx.shadowBlur = 10 + 14 * intensity;
+        let s0 = a.th, s1 = b.th;
+        if (s1 < s0) s1 += 6.2832;
+        const arcable = seq === 0.8 && env > 0.4 && (s1 - s0) < 1.6;
+        if (arcable) {
+          const rr = (a.tr + b.tr) / 2 * env + (Math.hypot(a.x - cx, a.y - cy) + Math.hypot(b.x - cx, b.y - cy)) / 2 * (1 - env);
+          ctx.arc(cx, cy, rr, s0, s1);
+        } else {
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+        }
+        ctx.stroke();
+        // synaptic pulse travelling the filament
+        if (alpha > 0.3) {
+          const k = ((t * 0.00022 + i * 0.13 + j * 0.07) % 1);
+          ctx.beginPath();
+          ctx.fillStyle = 'rgba(255,255,255,' + (alpha * 0.9).toFixed(3) + ')';
+          ctx.shadowBlur = 12;
+          ctx.arc(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k, 1.15, 0, 6.2832);
+          ctx.fill();
+        }
+      }
+    }
+
+    // somas
+    for (let i = 0; i < N; i++) {
+      const p = P[i];
+      const fl = 0.55 + 0.45 * Math.sin(t * 0.0022 + p.ph);
+      const a = ((0.4 + 0.5 * fl) * (0.55 + 0.45 * env) + 0.18) * env;
+      if (a < 0.012) continue;
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(255,255,255,' + Math.min(1, a).toFixed(3) + ')';
+      ctx.shadowBlur = 14 + 16 * intensity; ctx.shadowColor = 'rgba(' + rgb + ',0.95)';
+      ctx.arc(p.x, p.y, p.r * (1 + 0.25 * env), 0, 6.2832);
+      ctx.fill();
+    }
+
+    // halo binding the network to the core
+    for (let l = 0; l < 3; l++) {
+      ctx.beginPath();
+      ctx.lineWidth = l === 0 ? 14 : 8;
+      const la = (l === 0 ? (0.035 + 0.07 * intensity) * env : 0.05 * intensity * env);
+      if (la < 0.004) continue;
+      ctx.strokeStyle = 'rgba(' + rgb + ',' + la.toFixed(3) + ')';
+      ctx.shadowBlur = 44; ctx.shadowColor = 'rgba(' + rgb + ',0.5)';
+      ctx.arc(cx, cy, R + l * 78, 0, 6.2832);
+      ctx.stroke();
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.globalCompositeOperation = 'source-over';
+
+    // the void the soma sits in
+    const lens = ctx.createRadialGradient(cx, cy, coreR * 0.4, cx, cy, coreR * 0.78);
+    lens.addColorStop(0, 'rgba(0,0,0,1)');
+    lens.addColorStop(0.78, 'rgba(0,0,0,1)');
+    lens.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.arc(cx, cy, coreR * 0.78, 0, 6.2832);
+    ctx.fillStyle = lens;
+    ctx.fill();
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // idle: halo ring, sweep arc and tick dial
+    const idle = 1 - env;
+    if (idle > 0.004) {
+      const rM = coreR * 0.70;
+      const pulse = 0.82 + 0.18 * Math.sin(t * 0.0016);
+      const bands = [[coreR * 0.20, 0.085], [coreR * 0.085, 0.30], [2.4, 0.95]];
+      for (let b = 0; b < bands.length; b++) {
+        ctx.beginPath();
+        ctx.lineWidth = bands[b][0];
+        ctx.strokeStyle = 'rgba(' + rgb + ',' + (bands[b][1] * pulse * idle).toFixed(3) + ')';
+        ctx.shadowBlur = 46 - b * 12; ctx.shadowColor = 'rgba(' + rgb + ',' + (0.85 * idle).toFixed(3) + ')';
+        ctx.arc(cx, cy, rM, 0, 6.2832);
+        ctx.stroke();
+      }
+      // outer hairline with a travelling bright sweep
+      const rO = coreR * 0.86;
+      ctx.beginPath();
+      ctx.lineWidth = 1.1;
+      ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.22 * idle).toFixed(3) + ')';
+      ctx.shadowBlur = 10;
+      ctx.arc(cx, cy, rO, 0, 6.2832);
+      ctx.stroke();
+      const sw = t * 0.00035;
+      ctx.beginPath();
+      ctx.lineWidth = 2.6;
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.8 * idle).toFixed(3) + ')';
+      ctx.shadowBlur = 22; ctx.shadowColor = 'rgba(' + rgb + ',' + (0.9 * idle).toFixed(3) + ')';
+      ctx.arc(cx, cy, rO, sw, sw + 0.95);
+      ctx.stroke();
+      // tick dial
+      const rT = coreR * 1.03;
+      const spin = -t * 0.00012;
+      ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(' + rgb + ',0.8)';
+      for (let k = 0; k < 48; k++) {
+        const ang = spin + (k / 48) * 6.2832;
+        const major = k % 6 === 0;
+        const fl = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 0.0021 + k * 0.7));
+        const ta = (major ? 0.55 : 0.3) * fl * idle;
+        const ca = Math.cos(ang), sa = Math.sin(ang);
+        if (major) {
+          ctx.beginPath();
+          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = 'rgba(' + rgb + ',' + ta.toFixed(3) + ')';
+          ctx.moveTo(cx + ca * rT, cy + sa * rT);
+          ctx.lineTo(cx + ca * (rT + coreR * 0.055), cy + sa * (rT + coreR * 0.055));
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.fillStyle = 'rgba(' + rgb + ',' + ta.toFixed(3) + ')';
+          ctx.arc(cx + ca * rT, cy + sa * rT, 1.15, 0, 6.2832);
+          ctx.fill();
+        }
+      }
+    }
+
+    // soma: pulsing nucleus light
+    const period = env > 0.5 ? 1100 : 3400;
+    const beat = 0.5 + 0.5 * Math.sin((t / period) * 6.2832);
+    const somaR = coreR * (0.2 + 0.045 * beat);
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 0.72);
+    glow.addColorStop(0, 'rgba(255,255,255,' + ((0.9 + 0.1 * beat) * env).toFixed(3) + ')');
+    glow.addColorStop(0.24, 'rgba(255,255,255,' + ((0.5 + 0.3 * beat) * env).toFixed(3) + ')');
+    glow.addColorStop(0.55, 'rgba(255,255,255,' + ((0.16 + 0.16 * beat) * env).toFixed(3) + ')');
+    glow.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath();
+    ctx.arc(cx, cy, coreR * 0.72, 0, 6.2832);
+    ctx.fillStyle = glow;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(255,255,255,' + env.toFixed(3) + ')';
+    ctx.shadowBlur = 26 + 18 * beat; ctx.shadowColor = 'rgba(255,255,255,' + (0.95 * env).toFixed(3) + ')';
+    ctx.arc(cx, cy, somaR, 0, 6.2832);
+    ctx.fill();
+
+    // action potential travelling outward
+    const wave = ((t % period) / period);
+    const wr = coreR * 0.3 + wave * (outer - coreR * 0.3);
+    ctx.beginPath();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(238,234,222,' + (0.3 * env * (1 - wave) * (1 - wave)).toFixed(3) + ')';
+    ctx.shadowBlur = 18; ctx.shadowColor = 'rgba(' + rgb + ',0.7)';
+    ctx.arc(cx, cy, wr, 0, 6.2832);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  initNodes(cx, cy, inner, outer) {
+    const N = 38;
+    this.nodes = Array.from({ length: N }, () => {
+      const a = Math.random() * 6.2832;
+      const rr = inner + Math.random() * (outer - inner);
+      const sp = 0.12 + Math.random() * 0.26;
+      const dir = Math.random() * 6.2832;
+      return {
+        x: cx + Math.cos(a) * rr,
+        y: cy + Math.sin(a) * rr,
+        vx: Math.cos(dir) * sp,
+        vy: Math.sin(dir) * sp,
+        r: 1 + Math.pow(Math.random(), 1.8) * 1.9,
+        ph: Math.random() * 6.2832
+      };
+    });
+  }
+
+  hexRgb(hex) {
+    const h = String(hex).replace('#', '');
+    const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(',');
+  }
+}
+
+/* --- DOM helpers ------------------------------------------------------- */
+
+function show(el, on) { el.style.display = on ? "" : "none"; }
+function hide(el) { el.style.display = "none"; el.style.animation = "none"; }
+
+function fadeIn(el, text, ms) {
+  el.textContent = text;
+  el.style.display = "";
+  el.style.animation = "none";
+  void el.offsetWidth;                    // reflow, so the animation restarts
+  el.style.animation = "ap-rise " + ms + "ms cubic-bezier(.2,.7,.2,1) both";
+}
+
+/* --- the surface apollo.py drives -------------------------------------- */
+
+const core = new ApolloCore();
+
+window.apollo = {
+  status: (state) => core.setPhase(state),
+  turn: (speaker, text) => core.turn(speaker, text),
+  note: (text) => core.note(text, false),
+  fatal: (text) => { core.setPhase("Error"); core.note(text, true); },
+};
+
+core.start();
+</script>
+</body>
+</html>

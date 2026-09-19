@@ -1,0 +1,767 @@
+# Voice Assistant
+
+Hold `Ctrl+Alt` and speak — or press `Ctrl+1` once and just talk. Your voice
+streams to Gemini Live and Apollo answers out loud in Puck's voice.
+
+```
+  [Ctrl+Alt held]  ->  mic  ->  Gemini Live (audio in, audio out)  ->  Puck
+   or always-on            \
+                            `->  Whisper (local)  ->  was an agent called by name?
+                                                          |
+                                             LYLA / ATLAS / ECHO / NOVA /
+                                             THE WORKSHOP / OPTIMO / HERMES
+                                                          |
+                                          Claude API  ->  Fish Audio (cloud)
+                                                          |
+                                            open apps / search the web
+```
+
+**One assistant, one voice.** Everything you say — chat, a quick command, a
+question about your own code — is answered by Gemini in Puck's voice. Claude
+still has the tools, but it belongs to the seven agents now and answers only
+when you call one by name. See [One voice, and the door Claude is behind](#one-voice-and-the-door-claude-is-behind).
+
+Your *audio* goes to Google while you speak, and an agent's reply text goes to
+Anthropic and to Fish Audio. Whisper still runs locally.
+
+It does more than answer questions. Ask it to open Chrome and it opens Chrome;
+ask it something about this week and it searches the web; ask it to *research*
+something and it goes away and reads a dozen sources first. See
+[What it can do](#what-it-can-do).
+
+---
+
+## Step 1 — Get an Anthropic API key
+
+You need a key from the **Anthropic Console**. This is a separate thing from a
+Claude.ai chat subscription; a Pro/Max plan does *not* include API credit.
+
+1. Go to <https://console.anthropic.com> and sign up (or log in).
+2. Add credit under **Billing**. The minimum is $5, and it does not expire.
+   That is a lot of voice assistant — see the cost note at the bottom.
+3. Go to **Settings -> API keys**: <https://console.anthropic.com/settings/keys>
+4. Click **Create Key**, name it something like `voice-assistant`, and copy it.
+   It looks like `sk-ant-api03-...`.
+
+   **Copy it now.** The console will never show you the full key again. If you
+   lose it, just delete that key and make a new one — no harm done.
+
+## Step 2 — Save the key so the app can find it
+
+In PowerShell:
+
+```powershell
+setx ANTHROPIC_API_KEY "sk-ant-api03-paste-your-key-here"
+```
+
+Then **close that terminal and open a new one**. `setx` only affects terminals
+opened *after* it runs, which trips up almost everyone the first time.
+
+Verify it took:
+
+```powershell
+$env:ANTHROPIC_API_KEY.Substring(0,14)
+```
+
+You should see `sk-ant-api03-a` or similar. If you get an error, the variable
+isn't set in this terminal — check that you opened a new one.
+
+> The key lives in your Windows user environment, not in this folder, so it
+> won't get committed to git or copied around by accident.
+
+## Step 2b — Set your workspace ID (identity-linked keys only)
+
+**Your key needs this.** Identity-linked API keys must state which workspace
+each request acts in, otherwise every call fails with a 400:
+
+```
+anthropic-workspace-id is required when authenticating with an
+identity-linked API key
+```
+
+1. Go to <https://console.anthropic.com/settings/workspaces>
+2. Open your workspace. The ID is in the address bar — it looks like
+   `wrkspc_01AbCdEf...`
+3. Set it, then open a new terminal:
+
+```powershell
+setx ANTHROPIC_WORKSPACE_ID "wrkspc_01AbCdEf..."
+```
+
+The app reads this and sends it as the `anthropic-workspace-id` header on every
+request. If your key is a plain (non-identity-linked) one, leave this unset and
+the header is simply omitted.
+
+## Step 3 — Run it
+
+Double-click `start.bat`. Apollo starts once and then stays running: there is
+no window to open and close, and nothing appears in the taskbar.
+
+```powershell
+.\.venv\Scripts\python.exe apollo.py    # same thing, with a console to watch
+```
+
+To have it start with Windows, double-click `install-startup.bat` once. It
+drops a shortcut in your Startup folder that launches Apollo silently at
+sign-in, and starts it immediately. `uninstall-startup.bat` undoes it.
+
+### What you see
+
+Apollo has two windows, and it is only ever as big as what it needs to show.
+
+| Shape | When | Covers |
+|---|---|---|
+| **Overlay** | at rest, and for a whole conversation | a mesh at the top edge (~1% of the screen), growing downward only as far as the answer needs |
+| **Full** | you have been away ~40 min, or you pressed `` Ctrl+` `` | the whole work area |
+
+At rest it is just the mesh: a small constellation of glowing amber points,
+turning slowly, hanging off the very top edge of the screen with only its
+bottom quarter in view. It is genuinely transparent — your wallpaper and
+desktop icons show through it and through its glow, because it is drawn with
+real per-pixel alpha rather than being an HTML page in a rectangle (see
+[below](#why-the-overlay-is-not-html)). It never takes focus either, so your caret
+stays where you left it, and clicks pass straight through.
+
+Hold `Ctrl+Alt` from **any** application, say *"What's the tallest mountain in
+Japan?"*, release. Everything that follows happens **in that same overlay,
+underneath that same mesh**, which never moves a pixel:
+
+- **While you talk**, your words appear under the mesh as you say them, in a
+  dim grey-blue — cooler than Apollo's own amber, so a transcript is never
+  mistaken for an answer. They type themselves on as Whisper gets further
+  through the sentence, with a caret blinking at the end, and the overlay
+  grows down a line to hold them. Stop without saying anything and it shrinks
+  straight back.
+- **While it thinks**, nothing is added: the mesh switches to its listening
+  pattern and your line stays put. A whole deep-research pass, which is mostly
+  you waiting on searches, puts up no box at all — there is nothing to read
+  yet.
+- **When the answer comes**, it replaces your words in amber, and the overlay
+  grows downward by **exactly** as much as that particular answer needs. A
+  one-word reply barely moves it. A long one wraps to a few lines. An answer
+  that rests on real numbers brings a sparkline with it, sized to the data; an
+  answer that is really two to six figures brings small cards instead, the
+  same thin-amber-on-dark ones the full display uses.
+- **A few seconds after it stops speaking**, it collapses back to the bare
+  mesh, fading as it goes.
+
+There is no panel, no border and no background behind any of it at any point.
+The words, the chart and the cards sit directly on your desktop the way the
+mesh does, and the top edge never moves — every bit of growth is downward, and
+it is eased rather than jumped.
+
+```
+      /\/\                   resting - the mesh alone
+       |   Ctrl+Alt (hold)
+       v
+      /\/\                   listening - your words type in underneath,
+    your words                 grey-blue, caret blinking
+       |
+       v
+      /\/\                   thinking - nothing added, no box
+    your words
+       |
+       v   the reply arrives
+      /\/\                   speaking - the answer in amber, and only if
+    the answer                 the answer really contains data:
+    [ sparkline ]              a sparkline sized to the series,
+    [card] [card]              or a row of small cards
+       |
+       v   ~4s after it stops
+      /\/\                   back to resting
+```
+
+**Where a chart comes from.** Not from guessing at the prose. Apollo may append
+one machine-readable line to a reply, which is stripped off before the reply is
+spoken or displayed and parsed into a chart or cards (`overlay_content.py`).
+Most answers carry no such line and render as text alone. Every number in one
+has to be a number Apollo actually has, from a search result or from you — the
+system prompt is explicit that inventing a series to make a chart appear is
+worse than showing no chart, and in practice it will tell you it could not pin
+the figures down rather than draw them.
+
+You never have to switch windows, click into Apollo, or bring anything to the
+front. The hotkey is a global Windows hook, so it fires wherever you are.
+
+> Two caveats worth knowing. `Ctrl+Alt` is not swallowed — it also reaches
+> whatever app you are in. That is why it is tested *exclusively* (see the
+> hotkey note above): the moment a third key joins it, it is that app's chord
+> and not Apollo's. And Windows does not deliver hotkeys to a normal program
+> from an elevated window, so it will not fire over Task Manager or an admin
+> terminal.
+
+### The full display
+
+The full display is where the design actually lives — LYLA and her
+environments, the telemetry panels, the process ladder, the starfield. It opens
+two ways:
+
+- **By itself, when you are away.** After **40 minutes** with no keyboard or
+  mouse input anywhere in Windows, Apollo opens the full display like a
+  screensaver. The very next keypress or mouse movement sends it straight back
+  to the overlay.
+- **On demand, with `` Ctrl+` ``.** It stays open until you press the chord
+  again, or until you start using the machine — whichever comes first. (It
+  waits for the keyboard to go quiet for a moment first, so the chord's own
+  keystrokes do not close it immediately.)
+
+A conversation can happen while it is open, and it stays open for it: LYLA and
+the panels step aside while there is an answer on screen, then come back.
+
+### Hotkeys
+
+| Chord | Does |
+|---|---|
+| `Ctrl+Alt` (hold) | Talk. Hold, speak, release. |
+| `Ctrl+1` (press) | Toggle always-listening — talk without holding anything. |
+| `` Ctrl+` `` | Open or close the full display. |
+| `Ctrl+Alt+Shift+Q` | Quit Apollo. |
+
+> **How the chords are tested, and why it matters.** `keyboard.is_pressed`
+> only tests that the named keys are *down*; it never checks that others are
+> up. With `Ctrl+Alt` as the talk chord that would mean every chord containing
+> it — `Ctrl+Alt+Shift+Q`, and every `Ctrl+Alt+<letter>` belonging to whatever
+> app you are using — started a recording. So the talk chord is tested
+> **exclusively** by `assistant.talk_held`: both halves down, and nothing else
+> down at all. Pressing `Ctrl+Alt+<key>` still opens a recording for the few
+> milliseconds before the third key lands, but that clip is far under
+> `MIN_SECONDS` and is discarded.
+>
+> The global chords do not use the `keyboard` library at all. Measured here:
+> `keyboard.is_pressed("ctrl+`")` returns `False` for the entire time both
+> keys are genuinely held — it resolves the backtick to scan code 41 and its
+> hook never matches — so the chord silently never fired. `apollo.chord_down`
+> reads `GetAsyncKeyState` directly instead, which reported both keys
+> correctly at the same instant.
+>
+> `` Ctrl+` `` was chosen for expand because it shares no key with the talk
+> chord, so opening the display never records a fragment of a turn.
+>
+> On a non-US layout where **AltGr** types characters, AltGr *is* `Ctrl+Alt` —
+> so on those layouts the talk chord will fire while you type. Change `HOTKEY`
+> and `talk_held` in `assistant.py` if that is you.
+>
+> `Ctrl+1` is the number row's 1, not the numpad's, so typing figures never
+> trips it. It is a press rather than a hold, and it is read by the same
+> `GetAsyncKeyState` polling as the others (`assistant.ListenToggle`) for the
+> same reason: `keyboard.add_hotkey` callbacks do not fire on this machine.
+
+### Always-listening
+
+Press `Ctrl+1` and Apollo stops waiting for the chord: the microphone streams
+continuously and **Gemini decides where your sentences end**, so you just
+talk. Press it again and everything goes back to `Ctrl+Alt` hold-to-talk.
+Push-to-talk is always what Apollo launches in — always-listening is something
+you turn on, never something you arrive to.
+
+The two modes are genuinely different sessions, not a flag, and the reason is
+worth knowing before you change anything here. Who detects the end of your
+sentence is fixed when the session connects:
+
+- **Push-to-talk** must *not* use the model's voice activity detection.
+  Releasing the chord cuts the audio off mid-word with no trailing silence to
+  score, so the detector never fires and the turn hangs with **no reply and no
+  error**. The chord is unambiguous, so Apollo sends `activity_start` /
+  `activity_end` instead.
+- **Always-listening** must use it. Nothing cuts the stream, so there is
+  always silence to hear — and there is no key to take the cue from anyway.
+
+So toggling reconnects, which takes about a second. That is also what
+guarantees there is never more than one microphone path open: there is one
+session, and it is in one mode.
+
+While always-listening is on the orb holds its *listening* state rather than
+blooming for one turn, which is the cue that the microphone is not waiting on
+a key.
+
+### Stopping it
+
+Right-click the **Apollo** tray icon and choose *Quit Apollo*, or press
+`Ctrl+Alt+Shift+Q`. `ESC` deliberately does **not** quit: Apollo runs for days
+behind whatever you are using, and a global `ESC` would mean that dismissing
+any unrelated dialog silently killed your assistant.
+
+Running `start.bat` twice is harmless — Apollo holds a single-instance lock, so
+the second copy sees the first and exits rather than grabbing the microphone a
+second time.
+
+**Console version.** The overlay is optional — `assistant.py` still runs on its
+own with the same behaviour, printing instead of drawing (and there `ESC` does
+quit, because it is the foreground app):
+
+```powershell
+.\.venv\Scripts\python.exe assistant.py
+```
+
+---
+
+## How the window works
+
+Apollo is two always-on-top, non-focusable windows, and only one of them is on
+screen at a time: the native overlay (`orb.py`), which is what you see for a
+whole conversation, and the page window, which is only ever the full display.
+Both are frameless, and the same extended window styles keep them out of your
+way:
+
+| Style | Effect |
+|---|---|
+| `WS_EX_TRANSPARENT` + `WS_EX_LAYERED` | Clicks fall through. Both are needed — `TRANSPARENT` alone does not stop a WebView2 window hit-testing. |
+| `WS_EX_TOOLWINDOW` | No taskbar button, no Alt+Tab entry. |
+| `WS_EX_NOACTIVATE` | Never takes focus, so your caret stays where it was. |
+
+The full display is translucent via
+`SetLayeredWindowAttributes(..., LWA_ALPHA)` — see `ALPHA` in `apollo.py`. The
+overlay does not use it: it has real per-pixel alpha instead, which is the
+whole reason it exists.
+
+### Why the overlay is not HTML
+
+The overlay is drawn natively, in `orb.py`, and the full display is the HTML
+design. That split exists because **a WebView2 window cannot be given
+per-pixel transparency here**, which was measured rather than assumed:
+
+| Attempt | Result |
+|---|---|
+| pywebview `transparent=True` | **broken** — assigns `DefaultBackgroundColor` to pywebview's own `EdgeChrome` wrapper, a plain Python object, so it never reaches WebView2 |
+| Setting it on the real control | no help — it already reports alpha 0; the WinForms host behind it is what paints |
+| Form `BackColor` | works, and is used — black instead of the default near-white `#F0F0F0` |
+| `LWA_ALPHA` | **works** — real, uniform translucency; this is what the full display uses |
+| `LWA_COLORKEY` / `TransparencyKey` | ignored — the page reaches the screen through DirectComposition, never through the layered surface a key would act on |
+| `DwmExtendFrameIntoClientArea(-1)` | no effect |
+| `SetWindowCompositionAttribute` (blur / acrylic) | no effect |
+| `WS_EX_NOREDIRECTIONBITMAP` | rejected — creation-only, and pywebview owns window creation |
+| `SetWindowRgn` circle | clips, but the backdrop still paints: a grey square survives around the circle |
+
+That last row was the visible bug: a black circle sitting on a grey tile.
+
+It is also why an answer is drawn by `orb.py` rather than by the page. A reply
+used to square the overlay off into a 460×300 panel and hand over to the page
+to fill it — but that window can only ever be an opaque rectangle here, and a
+rectangle arriving on your desktop is exactly what an ambient overlay should
+not do. Text, sparkline and cards are all GDI+ on the layered surface now, so
+an answer floats on the desktop the same way the mesh does.
+
+So the orb is drawn with GDI+ into a 32-bit ARGB bitmap and handed to a layered
+window with `UpdateLayeredWindow` — the one path on Windows that gives true
+per-pixel alpha. Round where it is round, invisible everywhere else, soft glow
+edges, click-through by construction. The page window is simply hidden while
+Apollo is at rest.
+
+**Why not a true wallpaper?** Reparenting into Explorer's `WorkerW` — the
+Wallpaper Engine approach — puts Apollo *behind* every window, so you could
+talk to it but never see the answer unless your desktop happened to be bare.
+It is also fragile: the `WorkerW` handle dies whenever Explorer restarts, and
+WebView2 composites unreliably outside the normal window hierarchy.
+
+**Why not a true wallpaper?** Reparenting into Explorer's `WorkerW` — the
+Wallpaper Engine approach — puts Apollo *behind* every window, so you could
+talk to it but never see the answer unless your desktop happened to be bare.
+It is also fragile: the `WorkerW` handle dies whenever Explorer restarts, and
+WebView2 composites unreliably outside the normal window hierarchy.
+
+---
+
+## What it can do
+
+Three things beyond conversation. You don't switch modes or say a magic word —
+Claude decides from what you asked, using tool calling.
+
+**Open things on your PC.** *"Open Chrome."* *"Open Spotify."* *"Open my
+downloads folder."* *"Open the readme."* Apollo says what it's doing —
+"Opening Chrome" — and does it.
+
+Known apps (Chrome, Spotify, Notepad, Word, VS Code, and a couple of dozen
+more) are launched by name. Anything else falls back to a `PATH` lookup and
+then a search of your Start Menu shortcuts, so most installed software works
+without being listed. Files and folders are found by exact path if you give
+one, otherwise by searching Desktop, Documents, Downloads, Pictures, Music and
+Videos. Standard folders resolve by name, so *"open Desktop"* opens your
+Desktop and not something that merely has "Desktop" in its name.
+
+If it can't find what you asked for it says so rather than opening something
+random.
+
+**Search the web.** Anything that depends on current information — news,
+prices, scores, releases — is searched rather than answered from memory. This
+runs on Anthropic's servers, so there's no search API key to set up. Sources
+are named out loud the way a person would ("according to Reuters"); URLs are
+never read aloud, because hearing a URL spoken is miserable.
+
+**Research properly.** Say *"research..."*, *"dig deeper"*, or *"look properly
+into..."* and it runs a much heavier pass: around a dozen searches, fetching
+the important sources in full rather than skimming search snippets, and
+cross-referencing at least two independent sources for any contested or
+numeric claim. It tells you when sources disagree or when it couldn't confirm
+something, instead of papering over it.
+
+This takes a minute or two, so Apollo warns you out loud before it goes quiet,
+and the overlay shows each search as it runs. The research happens in a
+conversation of its own, so a long session doesn't drag all that source
+material behind it — only the finished answer comes back. **It also costs
+meaningfully more than a normal question** — see [Cost](#cost).
+
+---
+
+## What's already been done for you
+
+- Virtual environment created at `.venv` with all dependencies installed
+- Verified your mic works (`Microphone (picun G2)`) and two TTS voices exist
+- Whisper `base.en` model downloaded and cached, so the first run is fast
+- VoiceBox running on `127.0.0.1:17493` with the `Apollo George` voice profile,
+  and Piper `en_US-lessac-medium` in `voices/` as the fallback
+
+The only thing left is your API key.
+
+---
+
+## Files
+
+| File | What it is |
+|---|---|
+| `assistant.py` | The engine: hotkey, mic, Whisper, routing, Claude, tools, TTS. Runs standalone in the console. |
+| `gemini_live.py` | Apollo's voice. Owns the only microphone Apollo opens and streams it to Gemini's native-audio model, which answers in the Puck voice as audio rather than as text to be synthesised. Holds both listening modes. |
+| `router.py` | Which backend answers this turn. One question: was an agent called by name? Everything else is conversation. |
+| `agents.py` | The seven agents, and the only module that touches `ask_claude`. Placeholders for now — the boundary exists before they do, on purpose. |
+| `pc_control.py` | The Windows half of the `control_pc` tool — launching apps, finding files and folders. Talks to Windows, never to Claude. |
+| `apollo.py` | The overlay host. Owns the window shapes, the tray icon, the presence watcher and the single-instance lock, and drives the page from `assistant`. |
+| `orb.py` | The overlay itself, drawn natively into a layered window so it can be genuinely transparent: the mesh, and the words, sparkline and cards that grow downward under it. |
+| `overlay_content.py` | What an answer actually contains and how tall that makes the overlay — reply parsing and layout, with no drawing code in it. |
+| `ui/index.html` | The front end. **Generated — do not edit by hand.** |
+| `build_ui.py` | Builds `ui/index.html` from the Claude Design export. Re-run it whenever a new design lands. |
+| `ADD A CITY.dc.html` | The design source, as exported from the canvas. This is the file to edit or replace. |
+| `start.bat` | Double-click launcher. Runs `pythonw.exe`, so there is no console window. |
+| `install-startup.bat` | Adds Apollo to Windows startup. `uninstall-startup.bat` removes it. |
+| `voices/` | The downloaded Piper *fallback* voice (~63MB). Only used when VoiceBox is down. Delete it and it re-downloads. |
+| `.venv/` | The virtual environment |
+
+### One voice, and the door Claude is behind
+
+**Everything you say to Apollo is answered by Gemini Live in Puck's voice.**
+Chat, a quick command, a question about your own code, a hard one — all of it,
+in both listening modes. Your voice is already streaming to Gemini while you
+are still speaking, and the reply comes back as audio. Nothing is synthesised:
+the model *is* the voice, which is why it is fast.
+
+This used to be a keyword match — words like *refactor* or *architecture* sent
+a turn to Claude instead. It worked, and it was the wrong idea, for a reason
+that has nothing to do with how good the word list was. The two backends speak
+in **different voices** (Puck for Gemini, Fish or VoiceBox for Claude), so the
+rule was not choosing a model, it was choosing which of two people answered
+you, based on whether your sentence happened to contain a technical word. Ask
+about your weekend, get one voice; ask about your code, get another. No amount
+of tuning fixes that, so it is gone.
+
+Claude has not gone anywhere — it still has the tools (web search,
+`control_pc`, deep research). It is reached by **summoning an agent by name**:
+
+    LYLA · ATLAS · ECHO · NOVA · THE WORKSHOP · OPTIMO · HERMES
+
+Say *"Hey LYLA, …"* or *"ask ATLAS to …"* and that turn goes to the agent,
+which answers in the Fish/VoiceBox voice. Anything else is conversation. Four
+of those names are ordinary English words, so a name only counts as a summons
+when it is used to *address* someone — at the start of what you said, or after
+a word like *hey*, *ok* or *ask*. "The echo in this room is terrible" is
+conversation; "Echo, play that back" is not.
+
+None of the seven are built yet. `agents.py` is the boundary they will be
+built behind, and for now `agents.handle` passes the request to Claude and
+says which agent was asked for. The rule that matters, and the one to keep
+when they land: **`ask_claude` is called from `agents.py` and nowhere else.**
+
+Every turn logs where it went and why:
+
+```
+  [apollo.router] -> GEMINI LIVE  "refactor this class"          (conversation)
+  [apollo.router] -> AGENT LYLA   "hey LYLA take a look at this" (LYLA summoned by name)
+```
+
+In always-listening, a summons has to interrupt: Gemini starts answering
+before you have finished the sentence, so `agents.detect` runs on the words as
+they arrive and stands it down mid-reply.
+
+Gemini Live owns the microphone for the whole session rather than opening one
+per turn, and Whisper reads along from the same blocks (`assistant.LiveCapture`)
+— one device, two readers. Without a `GEMINI_API_KEY` Apollo has no voice and
+says so; it does not quietly answer in Claude's instead, because that
+substitution is the thing this design removes.
+
+The split is deliberate: `assistant.py` reports what it's doing to a small
+"reporter" object (`status` / `turn` / `note` / `fatal`) instead of printing.
+The console uses `ConsolePrinter`; the overlay uses `WebReporter`, which
+marshals every call into the page as a one-line `window.apollo.*()` call.
+Anything slow — the mic, Whisper, the API call, TTS — runs on a worker thread,
+and that thread only starts once the page has loaded, so there is always
+something on the other end to report to.
+
+### Changing the design
+
+`ui/index.html` is generated, so edits to it are lost on the next build. Edit
+the `.dc.html` design instead, then:
+
+```powershell
+.\.venv\Scripts\python.exe build_ui.py "ADD A CITY.dc.html"
+```
+
+`build_ui.py` adds React, swaps the canvas's self-answering demo for the real
+backend bridge, wraps the composition in the overlay transform, and applies the
+app-level polish pass (easing curves, contrast floors, long-answer type scale).
+Every edit asserts its own hit count, so a design that has drifted far enough
+to break an assumption fails loudly at build time instead of rendering wrong at
+runtime.
+
+Tools follow the same principle. `assistant.py` owns the conversation with
+Claude and decides nothing about Windows; `pc_control.py` owns Windows and
+knows nothing about Claude. Between them sits one small dispatcher
+(`_run_tool`) that turns a tool call into a string to hand back. Adding a
+capability means writing a schema in `TOOLS` and a handler — nothing else in
+the loop changes. Web search is the exception that proves it: it runs on
+Anthropic's servers, so there's no handler at all, just a declaration.
+
+---
+
+## Tweaking it
+
+All the knobs are at the top of `assistant.py`:
+
+| Setting | Default | Notes |
+|---|---|---|
+| `HOTKEY` | `ctrl+alt` | Held to talk. Tested exclusively by `assistant.talk_held`, so chords that merely *contain* it (`ctrl+alt+shift+q`) do not fire it. |
+| `WHISPER_SIZE` | `base.en` | `tiny.en` is faster, `small.en` is more accurate. Downloads on first use. |
+| `FISH_VOICE` | `a4c68282...` | The spoken voice: a Fish Audio voice model id. Defaults to a bright, energetic British female voice. See below. |
+| `FISH_BACKEND` | `s1` | Fish's synthesis model. `speech-1.6` is cheaper and a little rougher. |
+| `VOICEBOX_PROFILE` | `Apollo Emma` | The **offline** voice, used when Fish is unreachable or out of credit. Matched by name against VoiceBox's `GET /profiles`. |
+| `VOICEBOX_URL` | `http://127.0.0.1:17493` | Where VoiceBox listens. Loopback only; nothing leaves the machine. |
+| `VOICEBOX_ENGINE` | `kokoro` | VoiceBox's synthesis engine. `kokoro` is the CPU-friendly one, and the only one with British presets. |
+| `PIPER_VOICE` | `en_GB-jenny_dioco-medium` | The fallback voice, used only when VoiceBox is unreachable. British female. Downloads on first use. |
+| `VOICE_RATE` | `185` | Words per minute — **Piper and SAPI only**. `POST /generate` has no speed parameter, so it does not affect VoiceBox. |
+| `CLAUDE_MODEL` | `claude-opus-5` | `claude-sonnet-5` is ~2.5x cheaper and still very good for chat. |
+| `SYSTEM_PROMPT` | ~40 words, optimistic + firm | Sets Apollo's character (optimistic, game for a challenge, firm) with explicit guards against that becoming cheerfulness, bluster, curtness, or longer answers; caps replies at three sentences and about forty words with no paragraph breaks; tells Apollo what it is, so it stops asking which app its own voice belongs to; and tells Claude when to reach for a tool. Measured effect: mean reply 53 → 42 words. |
+| `RESEARCH_SEARCHES` | `12` | How many searches a deep-research pass may run. The main cost lever — see below. |
+
+And the overlay's own knobs, at the top of `apollo.py`:
+
+| Setting | Default | Notes |
+|---|---|---|
+| `AFK_SECONDS` | `2400` (40 min) | How long the machine must go untouched before the full display opens by itself. |
+| `PEEK_HOTKEY` | `ctrl+`` ` | Opens/closes the full display. Shares no key with the talk chord, so expanding never records a fragment of a turn. |
+| `PEEK_ARM_SECONDS` | `1.5` | Grace period after a manual open, before input starts closing it again. |
+| `ORB_PX` | `190` | The mesh's own box. The overlay grows downward from the top of it; the mesh itself always sits in a square of exactly this size. |
+| `ORB_REVEAL` | `0.25` | How much of the mesh stays below the top edge; the rest hangs off-screen. |
+| `ALPHA` | `orb 225, full 250` | Window translucency, 0–255, for the page window. The overlay itself has real per-pixel alpha and does not use it. |
+| `LINGER` | `4.0` | Seconds an answer stays up after Apollo stops speaking, before it collapses. |
+| `QUIT_HOTKEY` | `ctrl+alt+shift+q` | |
+
+**Changing the voice.** Set `VOICEBOX_PROFILE` to the *name* of any profile in
+VoiceBox — it is resolved to an id against `GET /profiles` at startup, so
+rebuilding a profile doesn't break the setting. Apollo is female on every rung
+of the chain; these five female Kokoro presets exist as profiles already:
+
+| Profile | Kokoro voice | Sounds like |
+|---|---|---|
+| `Apollo Emma` | `bf_emma` | Warm RP, British. **The default.** |
+| `Apollo Isabella` | `bf_isabella` | British too, poised and a little cooler |
+| `Apollo Bella` | `af_bella` | American, the brightest and most expressive |
+| `Apollo Nova` | `af_nova` | American, crisp and clipped |
+| `Apollo Heart` | `af_heart` | American, warm and steady |
+
+Auditions are in `voicebox_samples/` — `f1`–`f5` are the female five in the
+order above (`f4` is the default), and `1`–`4` are the older British male
+profiles, which still exist if you want to go back. The female profiles use a
+lighter effects chain than the male ones: a 120 Hz high-pass, a gentle
+compressor and +4 dB, with no 3.5 kHz low-pass — that band-pass is what made
+the male voices sound like a radio, and it strips exactly the brightness an
+optimistic voice lives on. To add more, make a profile in the VoiceBox UI —
+`GET /profiles/presets/kokoro` lists every preset voice — and put its name in
+`VOICEBOX_PROFILE`.
+
+**The voice falls back three times.** At startup `load_voice()` tries each
+engine in quality order and stops at the first that answers:
+
+| | Engine | Where | Cost | Fails over when |
+|---|---|---|---|---|
+| 1 | **Fish Audio** (British female) | Cloud | Per use | No key, bad key, no API credit, no internet |
+| 2 | **VoiceBox** (Apollo Emma) | Local | Free | Server down, profile renamed or missing |
+| 3 | **Piper** (`en_GB-jenny_dioco-medium`) | Local | Free | Package missing, model file corrupt |
+| 4 | **Windows SAPI** (Zira) | Local | Free | Never — it is the floor |
+
+Whichever wins is named in the overlay at startup, and a rejected engine says
+why. If an engine dies *mid-session* — Fish hits a 402 as the credit runs dry,
+VoiceBox is closed — that one line is spoken by the next engine down and the
+preferred one is retried on the following turn, since the usual causes are
+transient. Nothing in this chain can stop Apollo from starting or leave a reply
+unspoken.
+
+**Changing the cloud voice.** `FISH_VOICE` is a voice model id from
+[fish.audio](https://fish.audio). Search for alternatives with:
+
+```
+curl -H "Authorization: Bearer $FISH_API_KEY" \n     "https://api.fish.audio/model?title=<name>&page_size=30&language=en"
+```
+
+The default is `a4c68282850b4568bc92749fa2c16815` — a British female voice
+tagged *energetic, cheerful, enthusiastic, bright, friendly, expressive*, with
+~4.8k generations behind it. Two other English female ones worth hearing:
+`e107ce68d2a64e928c3a674781ce9d56` (American, crisp and professional) and
+`be321b0d1e0c4558b62001d77a0ab69f` (American, warmer and more conversational).
+Look up any id directly with `GET https://api.fish.audio/model/<id>` to check
+its title and tags before switching.
+
+**Secrets.** `FISH_API_KEY` lives in `.env`, which `.gitignore` excludes. A
+real Windows environment variable of the same name overrides the file, so you
+can point a single session at a different key without editing anything.
+`assistant.load_env()` reads the file at import — no `python-dotenv` needed.
+
+Piper's own knobs still apply on that fallback path: set `PIPER_VOICE` to any
+name from the [Piper voice list](https://huggingface.co/rhasspy/piper-voices)
+and delete `voices/` so it re-downloads. `en_GB-alba-medium` is a Scottish
+female voice, `en_US-lessac-medium` an American one (still in `voices/` from
+before the switch).
+
+**Effort and latency.** There are two effort settings now, deliberately
+different:
+
+- Conversation runs at `effort: "low"` (in `ask_claude`), which keeps replies
+  fast. That's the right trade for chat.
+- Deep research runs at `RESEARCH_EFFORT = "high"`, because thoroughness is the
+  entire point of it.
+
+Raising the conversational one to `"high"` makes every ordinary question
+slower and dearer, so change that one only if you want it to reason harder on
+everything.
+
+---
+
+## Troubleshooting
+
+**"ANTHROPIC_API_KEY is not set"** — you didn't open a new terminal after
+`setx`. See Step 2.
+
+**"Your API key was rejected"** — the key is wrong or was deleted. Also check
+you have credit in the console; a valid key with a $0 balance fails too.
+
+**Any API error** — the app now prints the API's actual message, error type and
+`request_id`, not just the status code. Two you might hit:
+
+- `anthropic-workspace-id is required...` → see Step 2b.
+- `anthropic-workspace-id header must be a valid workspace ID` → the ID is set
+  but wrong. Re-copy it from the workspace URL; it starts with `wrkspc_`.
+
+The app checks API access at startup with a free request, so configuration
+problems show up immediately instead of after you've spoken.
+
+**The hotkey does nothing** — `Ctrl+Alt` is held by some remapping tools, and on
+a non-US layout AltGr reports as Ctrl+Alt, so typing an accented character can
+open a recording. Change `HOTKEY` to something like `ctrl+alt+j`. Also note
+that Windows can't deliver keystrokes to a normal program from windows running
+as Administrator unless the assistant is also running as Administrator.
+
+**It transcribes the wrong words** — bump `WHISPER_SIZE` to `small.en`. Also
+check Windows is using your headset mic and not a webcam or the Steam virtual
+mic: **Settings -> System -> Sound -> Input**.
+
+**No sound comes out** — check the output device in the same Sound settings.
+The reply still appears in the transcript, so you can tell whether the failure
+is in TTS or earlier in the chain.
+
+**It hears the tail end of nothing / cuts you off** — the recording runs
+exactly as long as the key is held. Hold it a beat longer than you think you
+need.
+
+**It sounds robotic again** — you have fallen all the way to SAPI, meaning
+neither VoiceBox nor Piper loaded. The window notes why when it happens. Check
+that VoiceBox is running (`curl http://127.0.0.1:17493/health` should say
+`healthy`) and that a profile named `Apollo George` still exists; if Piper is
+the problem instead, the voice download was probably interrupted, so delete
+`voices/` and restart.
+
+**It sounds American again** — VoiceBox is down and Piper took over. Same
+check as above; the overlay note at startup says which voice won.
+
+**It won't open an app you have installed** — it tries the known-apps list,
+then `PATH`, then your Start Menu shortcuts. Something installed with no Start
+Menu entry and no `PATH` entry can't be found by name. Add it to `KNOWN_APPS`
+in `pc_control.py`, or say the full path instead.
+
+**It opened the wrong file** — name matching prefers an exact name, then falls
+back to a partial one, searching Desktop, Documents, Downloads, Pictures, Music
+and Videos three levels deep. If two files have similar names, give it the full
+path.
+
+**It answers from memory instead of searching** — say so explicitly ("search
+for...", "look up..."). Claude decides when to search, and it's conservative
+about it. If it never searches at all, check whether web search is enabled for
+your organisation in the Console.
+
+---
+
+## Cost
+
+At Opus 5 rates ($5 per million input tokens, $25 per million output), the
+three things it does cost very different amounts. **Deep research is the one to
+watch.**
+
+| What | Roughly | Why |
+|---|---|---|
+| A spoken question | well under a cent | ~700 tokens of prompt and tool definitions, plus your question and a short answer |
+| Opening an app | the same | It's one ordinary turn that happens to call a tool |
+| A question that searches | a bit more, plus per-search fees | Search results land in the context, and web searches are billed separately from tokens |
+| **Deep research** | **dollars per handful, not cents** | A dozen searches, several full pages pulled into context, `effort: "high"`, and up to 16K output — all in one command |
+
+Those are estimates, not measurements. The per-turn figure is derived from the
+prompt's character count rather than a real token count; Anthropic publishes
+current web-search pricing at <https://claude.com/pricing>. Measure your own
+usage before trusting any of it.
+
+Four things to know:
+
+- **Deep research is easy to trigger by accident.** "Look into that for me"
+  is enough. If it's costing more than you'd like, drop `RESEARCH_SEARCHES`
+  from `12`, or lower `RESEARCH_EFFORT` from `"high"` to `"medium"`.
+- The conversation history grows for as long as the app runs, so a very long
+  session gets gradually more expensive per question. Restarting the app clears
+  it. Research passes are *not* kept in that history — they run in their own
+  conversation precisely so a dozen fetched pages don't ride along on every
+  later question. (If history growth becomes a real problem, the fix is
+  server-side compaction — ask and I'll wire it in.)
+- Whisper is local and free, so listening costs nothing no matter how much you
+  talk. **Speech is no longer free**: Fish Audio bills per use, and Fish meters
+  API credit separately from the platform credit you buy on fish.audio — a
+  paid-up website account can still leave the API at zero. Check it with
+  `GET /wallet/self/api-credit`. If it empties, Apollo drops to VoiceBox and
+  keeps working, so the failure mode is a worse voice, not a dead assistant.
+- **Privacy changed with Fish.** Your microphone audio still never leaves the
+  PC — recording and transcription are both local. What leaves is text: your
+  transcribed words go to the Claude API, and the text of each reply goes to
+  Fish Audio to be spoken. For a fully local setup, clear `FISH_API_KEY` and
+  Apollo falls back to VoiceBox on its own.
+- Switching `CLAUDE_MODEL` to `claude-sonnet-5` cuts the cost by about 60% and
+  you likely won't notice a difference for everyday questions.
+
+You can watch actual spend at <https://console.anthropic.com/settings/usage>.
+Setting a spend limit under **Billing** is a good idea while you're
+experimenting — and more so now that one sentence can kick off a dozen
+searches.
+
+---
+
+## Where to take it next
+
+Done so far: **tools** (opening apps, files and folders), **web search and
+deep research**, and **better TTS** (VoiceBox over its local REST API, with
+Piper and then SAPI as fallbacks).
+
+Reasonable next steps, roughly by effort:
+
+- **Streaming replies** so it starts speaking before Claude finishes writing.
+  This is the biggest remaining win on how fast it *feels*: right now the whole
+  answer is written, then synthesised, then played. VoiceBox has a
+  `POST /generate/stream` endpoint, so the speaking half is half-built.
+- **A wake word** ("Hey Apollo") instead of a hotkey, via `openwakeword`.
+  Runs locally, so it costs nothing to try.
+- **Interrupting it** — right now `speak()` blocks until the sentence finishes
+  and there's no way to cut it off mid-answer. Worth having once replies get
+  longer.
+- **More tools** — control your music, read your calendar, take a note. The
+  tool plumbing is already there; each new one is a schema in `TOOLS` and a
+  handler in `_run_tool`.
+- **Run it on startup** minimized to the tray, so it's always available.

@@ -1,0 +1,1050 @@
+"""Apollo: an always-on voice assistant that lives on your desktop.
+
+Apollo starts once and stays running. At rest it is a mesh of glowing points
+hanging off the top edge of the screen, centre. It stays exactly there for a
+whole turn: your words appear under it as you say them, then the answer
+replaces them, and the overlay grows downward to hold whatever that answer
+turns out to be - a couple of lines, a chart, a row of readouts - with no
+panel and no background behind any of it. It grows to the whole screen only
+when you have been away from the machine for a while, or when you ask for it
+with CTRL+`. The talk hotkey is a global Windows hook, so it fires from
+inside any application without Apollo ever taking focus.
+
+    start.bat                                 (silent, no console)
+    install-startup.bat                       (also launch it at sign-in)
+    .\\.venv\\Scripts\\python.exe apollo.py    (console, for debugging)
+
+Quit from the tray icon, or with CTRL+ALT+SHIFT+Q.
+
+What this window can and cannot do about transparency
+----------------------------------------------------
+WebView2 itself is transparent here - its DefaultBackgroundColor is already
+alpha 0. What shows through it is the WinForms host, and pywebview never gives
+that host a colour: `transparent=True` assigns `DefaultBackgroundColor` to
+pywebview's own `EdgeChrome` wrapper, a plain Python object, so the value lands
+on a dead attribute and the form keeps the system Control colour (#F0F0F0).
+That near-white square around the orb is the form, not the page.
+
+Measured, on this machine, against a known window underneath:
+
+  * form BackColor            works  - black instead of near-white
+  * SetLayeredWindowAttributes
+      LWA_ALPHA               works  - real, uniform translucency
+      LWA_COLORKEY            ignored - the page's pixels reach the screen
+                                        through DirectComposition, never
+                                        through the layered surface
+  * Form.TransparencyKey      ignored, for the same reason
+  * DwmExtendFrameIntoClientArea(-1)  no effect
+  * SetWindowCompositionAttribute (blur / acrylic / transparent gradient)
+                              no effect
+  * WS_EX_NOREDIRECTIONBITMAP rejected - it is creation-only, and pywebview
+                              owns window creation
+  * SetWindowRgn              clips the form, but the backdrop still paints,
+                              so a faint square survives around the circle
+
+So per-pixel transparency - a genuinely round orb with nothing behind it - is
+not reachable while the orb is an HTML page in this host. What is reachable is
+a black ground and uniform translucency, which is what the panel and the full
+display use. The orb itself does not settle for that: it is drawn natively, in
+`orb.py`, into a layered window with `UpdateLayeredWindow` - the one path that
+gives real per-pixel alpha.
+
+One more finding worth keeping, because it cost real debugging time: building
+that layered window's surface via .NET's `Bitmap.GetHbitmap(Color)` is NOT
+reliable for this. It is undocumented behaviour, not a hard failure - it
+sometimes hands `UpdateLayeredWindow` a surface with the wrong alpha and no
+error anywhere to show for it, which reads as "the orb randomly stops
+rendering." `orb.py` instead builds the bitmap directly on a `CreateDIBSection`
+buffer (`Format32bppPArgb`, matching `AC_SRC_ALPHA`'s premultiplied
+expectation) and draws GDI+ straight into that memory - no conversion step
+left to be unreliable.
+
+Apollo therefore never covers anything it is not actively using: the window is
+only as big as what it needs to show, and covering the screen happens only in
+the two states where covering the screen is the entire point.
+
+Why not a true wallpaper
+------------------------
+Reparenting into Explorer's WorkerW, the way Wallpaper Engine does, puts Apollo
+*behind* every window, so it could never be read at the moment you talk to it.
+The WorkerW handle also dies whenever Explorer restarts, and WebView2
+composites unreliably outside the normal window hierarchy.
+"""
+
+import ctypes
+import json
+import os
+import sys
+import threading
+import time
+import traceback
+
+import win32api
+import win32con
+import win32event
+import win32gui
+import winerror
+
+# WebView2 reads this on startup. Without it the page's AudioContext stays
+# suspended forever: the overlay is deliberately never focused, so it never
+# receives the user gesture the autoplay policy is waiting for, and every
+# interface sound would be silently dropped.
+os.environ.setdefault(
+    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+    "--autoplay-policy=no-user-gesture-required",
+)
+
+import webview  # noqa: E402  - must follow the env var above
+
+import assistant  # noqa: E402
+import orb as orb_module  # noqa: E402
+import overlay_content  # noqa: E402
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+INDEX = os.path.join(HERE, "ui", "index.html")
+
+STARTING = "Waking"          # shown while the API check and model load run
+MUTEX_NAME = "Local\\ApolloVoiceAssistantSingleton"
+
+# How big Apollo is at rest. The overlay is centred on the TOP-CENTRE of the
+# work area; the full display is the whole work area.
+ORB_PX = 190                 # the mesh's own box, drawn by orb.py. The resting
+                             # window is this square; once there is something
+                             # to show, the native layer grows its own window
+                             # downward from this one's top edge and the mesh
+                             # stays in a box of exactly this size at the top.
+# The resting orb does not sit on the screen - it hangs off the top edge, and
+# only this fraction of the CONSTELLATION stays in view: the bottom arc of it
+# coming down out of the edge, which is the whole point of the resting state -
+# present, not in the way. Measured against the pattern rather than the window
+# because the two are not the same size: the ring of points only reaches
+# `Orb.CONSTELLATION_R` of the box, so revealing a quarter of the window would
+# reveal barely a sixth of the figure. The window really is positioned at a
+# negative Y; UpdateLayeredWindow composites the off-screen part away without
+# complaint, so no clipping region is needed.
+ORB_REVEAL = 0.25
+
+# Per-shape window translucency, 0-255. This is the one transparency mechanism
+# that actually works on a WebView2 window (see the module docstring). Only
+# the full display is a page window now - an answer is drawn by the native
+# layer, under the mesh, on no background at all.
+ALPHA = {"orb": 225, "full": 250}
+
+# Global chords. The talk chord is CTRL+ALT, held (see `assistant.talk_held`,
+# which tests it exclusively so these two do not fire it on their way past).
+# Expand is CTRL+` deliberately: it shares no keys with the talk chord, so
+# opening the display never records a fragment of a turn.
+# Chords are spelled as Windows virtual-key codes and tested with
+# GetAsyncKeyState, not with `keyboard.is_pressed`. Measured on this machine:
+# `keyboard.is_pressed("ctrl+`")` returns False the whole time both keys are
+# genuinely held down - `parse_hotkey` resolves the backtick to scan code 41
+# and the library's hook never matches it - so the chord silently never fired.
+# GetAsyncKeyState reported both keys correctly at the same moment, and it is
+# what the talk chord already relies on.
+VK_CTRL, VK_ALT, VK_SHIFT = 0x11, 0x12, 0x10
+QUIT_CHORD = (VK_CTRL, VK_ALT, VK_SHIFT, 0x51)   # Q
+PEEK_CHORD = (VK_CTRL, 0xC0)                     # VK_OEM_3, the backtick key
+QUIT_HOTKEY = "ctrl+alt+shift+q"                 # for messages and the README
+PEEK_HOTKEY = "ctrl+`"
+
+# How long the machine must go untouched - no key, no mouse, anywhere in
+# Windows - before Apollo opens the full display by itself, screensaver style.
+# The very next keypress or mouse movement sends it back to the orb.
+AFK_SECONDS = 40 * 60
+
+# After CTRL+` opens the display by hand, Apollo waits for the machine to
+# go quiet for this long before it starts watching for input to close it again.
+# Without the grace period the chord's own keystrokes would close it instantly.
+PEEK_ARM_SECONDS = 1.5
+
+# Extended window styles. pywebview's `focus=False` already sets NOACTIVATE;
+# the rest are ours. See Overlay for why TRANSPARENT and LAYERED come as a pair.
+GWL_EXSTYLE = -20
+LWA_ALPHA = 0x00000002
+WS_EX_TRANSPARENT = 0x00000020   # clicks fall through to whatever is beneath
+WS_EX_TOOLWINDOW = 0x00000080    # keep out of the taskbar and Alt+Tab
+WS_EX_LAYERED = 0x00080000
+WS_EX_NOACTIVATE = 0x08000000
+WS_EX_APPWINDOW = 0x00040000
+
+
+def single_instance():
+    """Return a held mutex, or None if Apollo is already running.
+
+    Worth guarding: once Apollo is in the Startup folder it is easy to also
+    double-click start.bat, and two copies means two global hooks on the same
+    hotkey, two microphone captures and two voices answering at once.
+    """
+    handle = win32event.CreateMutex(None, False, MUTEX_NAME)
+    if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
+        return None
+    return handle
+
+
+class Overlay:
+    """The window's Win32 side: how big it is, and where.
+
+    Two shapes now. ORB is the resting overlay - the native layer's mesh and
+    whatever it has grown to show underneath it - and it is the only one
+    Apollo wears while you are working; this page window is not even on
+    screen for it. FULL is the whole work area, for the AFK display and for
+    CTRL+`.
+
+    There used to be a third, PANEL: a reply squared the orb off into a
+    rectangle and the page drew the answer inside it. It is gone because the
+    page window cannot be anything but an opaque rectangle here (see the
+    module docstring), and an answer arriving as a box is exactly what the
+    overlay is meant not to do. Replies are drawn by `orb.py` instead, as
+    text on the desktop under the mesh, so there is no panel to put up.
+    """
+
+    ORB, FULL = "orb", "full"
+
+    PASSIVE = (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE
+               | WS_EX_LAYERED | WS_EX_TRANSPARENT)
+
+    def __init__(self):
+        self.hwnd = None
+        self.mode = None
+
+    # -- attaching ----------------------------------------------------------
+
+    def attach(self, tries=20, gap=0.25):
+        """Find our window and turn it into a desktop overlay.
+
+        Retried, and with the re-show in a `finally`, because the `shown` event
+        can fire before the native window is findable and the style change has
+        to hide the window to take effect. Lose between those two points and
+        Apollo is left running with its window hidden forever: no orb, no
+        error, no way in. Far harder to notice than failing to start at all.
+        """
+        for _ in range(tries):
+            self.hwnd = win32gui.FindWindow(None, "Apollo")
+            if self.hwnd:
+                break
+            time.sleep(gap)
+        else:
+            return False
+
+        # TOOLWINDOW only takes properly while the window is hidden, and the
+        # re-show must not activate - that would steal focus from whatever you
+        # were typing in at the time.
+        try:
+            win32gui.ShowWindow(self.hwnd, win32con.SW_HIDE)
+            style = win32gui.GetWindowLong(self.hwnd, GWL_EXSTYLE)
+            style |= self.PASSIVE
+            style &= ~WS_EX_APPWINDOW
+            win32gui.SetWindowLong(self.hwnd, GWL_EXSTYLE, style)
+        finally:
+            win32gui.ShowWindow(self.hwnd, win32con.SW_SHOWNOACTIVATE)
+
+        # Deliberately does NOT pick a mode. The resting mode hides this
+        # window, and a hidden WebView2 never finishes navigating - so hiding
+        # it here would mean the `loaded` event never fires and nothing that
+        # depends on it (the orb, the backend) ever starts. Shape is chosen by
+        # `Apollo.apply_mode` once the page is up.
+        return True
+
+    def verify(self):
+        """Confirm the window is the shape its mode wants.
+
+        At rest "correct" means hidden, because the native orb has the screen
+        instead - so an invisible window is the pass condition, not a failure.
+        """
+        if not self.hwnd:
+            return False
+        if self.mode is None:
+            return True          # nothing has claimed a shape yet
+        visible = win32gui.IsWindowVisible(self.hwnd)
+        if self.mode == self.ORB:
+            return not visible
+        if not visible:
+            return False
+        left, top, right, bottom = win32gui.GetWindowRect(self.hwnd)
+        want = self.rect_for(self.mode or self.FULL)
+        return (abs((right - left) - (want[2] - want[0])) < 8
+                and abs((bottom - top) - (want[3] - want[1])) < 8)
+
+    # -- geometry -----------------------------------------------------------
+
+    @staticmethod
+    def work_area():
+        monitor = win32api.MonitorFromPoint((0, 0), win32con.MONITOR_DEFAULTTOPRIMARY)
+        return win32api.GetMonitorInfo(monitor)["Work"]
+
+    def box_for(self, mode):
+        """`rect_for` as (x, y, w, h), which is what the native layer wants."""
+        left, top, right, bottom = self.rect_for(mode)
+        return (left, top, right - left, bottom - top)
+
+    def rect_for(self, mode):
+        """Where this mode's window goes, in real device pixels.
+
+        Straight off the monitor rect rather than through pywebview's sizing,
+        which would raise the question of which pixels the numbers were in. The
+        work area rather than the full bounds, so a topmost window never sits
+        on top of the taskbar.
+
+        For the orb this is the *resting* box only. Once there are words under
+        the mesh the native layer grows its own window downward from this
+        one's top edge, and that top edge is the thing it never moves.
+        """
+        left, top, right, bottom = self.work_area()
+        if mode == self.FULL:
+            return left, top, right, bottom
+        cx = (left + right) // 2
+        w = h = ORB_PX
+        y0 = top - self.orb_overhang()
+        x0 = cx - w // 2
+        return (x0, y0, x0 + w, y0 + h)
+
+    @staticmethod
+    def orb_overhang():
+        """How far above the top edge the resting orb's window starts.
+
+        Worked back from the constellation so `ORB_REVEAL` means what it says.
+        The pattern is a ring of radius `r` about the box's centre; leaving
+        `ORB_REVEAL` of its height showing puts that centre at `r * (2f - 1)`
+        relative to the edge, and the window's own top is half a box above
+        that. At the default quarter the centre lands half a radius above the
+        edge, so the bottom arc - two or three points and the chords between
+        them - is what hangs into view.
+        """
+        r = ORB_PX * orb_module.Orb.CONSTELLATION_R
+        centre = r * (2.0 * ORB_REVEAL - 1.0)
+        return int(round(ORB_PX / 2.0 - centre))
+
+    def show_page(self, mode):
+        """Put the page window on screen at the size `mode` wants.
+
+        The page only ever shows as the full display. Everything else - the
+        resting mesh, your words as you say them, and the answer - is drawn by
+        `orb.py` on a layered window with real per-pixel alpha, because a
+        WebView2 window cannot be made round or see-through here.
+        """
+        if not self.hwnd:
+            return
+        if mode == self.ORB:
+            self.hide_page()
+            return
+        left, top, right, bottom = self.rect_for(mode)
+        win32gui.SetWindowPos(
+            self.hwnd, win32con.HWND_TOPMOST,
+            left, top, right - left, bottom - top,
+            win32con.SWP_NOACTIVATE | win32con.SWP_SHOWWINDOW,
+        )
+        win32gui.ShowWindow(self.hwnd, win32con.SW_SHOWNOACTIVATE)
+        self.set_alpha(ALPHA.get(mode, 255))
+
+    def hide_page(self):
+        if self.hwnd:
+            win32gui.ShowWindow(self.hwnd, win32con.SW_HIDE)
+
+    def set_alpha(self, alpha):
+        """Make the whole window translucent.
+
+        LWA_ALPHA is the only transparency that survives WebView2's
+        DirectComposition path - a colour key set here is simply ignored,
+        because the page's pixels never pass through the layered surface the
+        key would be applied to. Uniform, so it dims Apollo's own art as well
+        as its ground; the values in ALPHA are picked with that in mind.
+        """
+        if not self.hwnd:
+            return
+        ctypes.windll.user32.SetLayeredWindowAttributes(
+            self.hwnd, 0, max(0, min(255, int(alpha))), LWA_ALPHA)
+
+    def raise_above(self):
+        """Reassert topmost, without taking focus.
+
+        Another topmost window (a full-screen player, an installer) can end up
+        over Apollo. Re-pinning when a turn starts means the answer is visible
+        when it matters, and never fights for z-order the rest of the time.
+        """
+        if not self.hwnd:
+            return
+        win32gui.SetWindowPos(
+            self.hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
+            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE,
+        )
+
+
+def idle_seconds():
+    """How long since the last keyboard or mouse input anywhere in Windows.
+
+    GetLastInputInfo is system-wide and does not care which application has
+    focus, which is exactly the question "has the user walked away" asks.
+    """
+    class LastInput(ctypes.Structure):
+        _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+
+    info = LastInput()
+    info.cbSize = ctypes.sizeof(LastInput)
+    if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+        return 0.0
+    return (ctypes.windll.kernel32.GetTickCount() - info.dwTime) / 1000.0
+
+
+def chord_down(chord):
+    """True while every key in `chord` is held. See the note by PEEK_CHORD."""
+    for vk in chord:
+        if not ctypes.windll.user32.GetAsyncKeyState(vk) & 0x8000:
+            return False
+    return True
+
+
+class Watcher(threading.Thread):
+    """Owns the global chords, and decides when Apollo has been left alone.
+
+    A thread of its own rather than a check inside `run_loop`, because that
+    loop is busy for the whole of a turn - recording, transcribing, waiting on
+    the API, speaking - and a chord that only answered between turns would feel
+    broken during the twenty seconds it matters most.
+
+    Chords are polled rather than registered with `keyboard.add_hotkey`: the
+    callback form does not fire at all on this machine. They are polled
+    through `chord_down` rather than `keyboard.is_pressed`, which does not see
+    every key - see the note by PEEK_CHORD.
+    """
+
+    def __init__(self, app):
+        super().__init__(daemon=True)
+        self.app = app
+
+    def run(self):
+        held = {"peek": False, "quit": False}
+        while not self.app.stopping.is_set():
+            # Quit is checked first and wins: it contains the peek chord's
+            # CTRL, and on the way to CTRL+ALT+SHIFT+Q you should not get a
+            # full display you did not ask for.
+            for name, chord, fn in (("quit", QUIT_CHORD, self.app.quit),
+                                    ("peek", PEEK_CHORD, self.app.toggle_peek)):
+                down = chord_down(chord)
+                if down and not held[name]:    # act on the press, not the hold
+                    held[name] = True
+                    fn()
+                    break
+                if not down:
+                    held[name] = False
+
+            self.app.check_presence(idle_seconds())
+            self.app.check_overlay_alive()
+            time.sleep(0.04)
+
+
+class Tray:
+    """A notification-area icon, because the overlay has no chrome to quit from.
+
+    Runs its own WinForms message loop on its own thread. pywebview owns the
+    main thread's loop, and a NotifyIcon only pumps on the thread that made it.
+    """
+
+    def __init__(self, on_quit):
+        self.on_quit = on_quit
+        self.icon = None
+        self.ready = threading.Event()
+        threading.Thread(target=self._run, daemon=True).start()
+        self.ready.wait(timeout=5)
+
+    def _run(self):
+        try:
+            import clr
+            clr.AddReference("System.Windows.Forms")
+            clr.AddReference("System.Drawing")
+            import System.Drawing as D
+            import System.Windows.Forms as WF
+
+            menu = WF.ContextMenuStrip()
+            quit_item = WF.ToolStripMenuItem("Quit Apollo")
+            quit_item.Click += lambda s, e: self._quit()
+            menu.Items.Add(WF.ToolStripLabel("Apollo - hold Ctrl+Space to talk"))
+            menu.Items.Add(WF.ToolStripSeparator())
+            menu.Items.Add(quit_item)
+
+            self.icon = WF.NotifyIcon()
+            self.icon.Icon = self._make_icon(D)
+            self.icon.Text = "Apollo"
+            self.icon.ContextMenuStrip = menu
+            self.icon.Visible = True
+
+            self.context = WF.ApplicationContext()
+            self.ready.set()
+            WF.Application.Run(self.context)
+        except Exception:
+            # A missing tray icon is survivable - the quit hotkey still works.
+            self.ready.set()
+
+    def _make_icon(self, D):
+        """Draw the core as a 32px amber ring rather than ship an .ico file."""
+        bmp = D.Bitmap(32, 32)
+        g = D.Graphics.FromImage(bmp)
+        g.SmoothingMode = D.Drawing2D.SmoothingMode.AntiAlias
+        g.Clear(D.Color.Transparent)
+        pen = D.Pen(D.Color.FromArgb(255, 255, 176, 0), 3.0)
+        g.DrawEllipse(pen, 4, 4, 23, 23)
+        g.FillEllipse(D.SolidBrush(D.Color.FromArgb(220, 20, 10, 0)), 10, 10, 12, 12)
+        g.Dispose()
+        return D.Icon.FromHandle(bmp.GetHicon())
+
+    def _quit(self):
+        self.close()
+        self.on_quit()
+
+    def close(self):
+        try:
+            if self.icon:
+                self.icon.Visible = False
+                self.icon.Dispose()
+            self.context.ExitThread()
+        except Exception:
+            pass
+
+
+class WebReporter:
+    """The reporter `assistant.run_loop` writes to, backed by the page.
+
+    Every call marshals into the web view as a one-line JS expression. The
+    worker thread owns this object; `evaluate_js` is safe to call from it once
+    the document has loaded, which is why the worker only starts on `loaded`.
+    """
+
+    # Phases where Apollo is busy talking with you, whether or not there is
+    # anything to show for it yet.
+    ENGAGED = {assistant.LISTENING, assistant.THINKING, assistant.SPEAKING}
+
+    def __init__(self, window, overlay, on_status, on_turn, on_level,
+                 on_partial):
+        self.window = window
+        self.overlay = overlay
+        self.on_status = on_status
+        self.on_turn = on_turn
+        self.on_level = on_level
+        self.on_partial = on_partial
+        self.alive = True
+        self.quiet = True   # until the backend has finished waking up
+
+    def _call(self, fn, *args):
+        if not self.alive:
+            return
+        payload = ", ".join(json.dumps(a) for a in args)
+        try:
+            self.window.evaluate_js(f"window.apollo.{fn}({payload})")
+        except Exception:
+            # The window went away mid-turn. Nothing left to report to.
+            self.alive = False
+
+    def status(self, state):
+        # Being busy is not a size any more: every phase of a turn happens in
+        # the resting overlay, which grows itself to fit whatever it is
+        # showing (see Apollo.on_status and orb.Orb).
+        self.on_status(state)
+
+        if self.quiet:
+            # Startup runs at sign-in, and it ends by speaking a greeting. A
+            # full-screen takeover every time you log in is the opposite of an
+            # ambient assistant, so while waking up the overlay stays a corner
+            # orb whatever the backend reports. Notes still come through.
+            self._call("status", STARTING)
+            return
+
+        if state in self.ENGAGED:
+            self.overlay.raise_above()
+        self._call("status", state)
+
+    def turn(self, speaker, text, visual=None):
+        # The design labels the assistant's side of the conversation "Apollo",
+        # but the reporter protocol keys off "You" vs. anything else.
+        self.on_turn(speaker, text, visual)
+        self._call("turn", speaker, text)
+
+    def partial(self, text):
+        """Words heard so far, mid-sentence.
+
+        Native layer only, like `level` and for the same reason: this fires
+        while you are still talking, and the page is not on screen to receive
+        it anyway unless the full display happens to be open.
+        """
+        self.on_partial(text)
+
+    def note(self, text):
+        self._call("note", text)
+
+    def fatal(self, text):
+        self._call("fatal", text)
+
+    def level(self, value):
+        """Live mic loudness, 0-1, straight from the recording thread.
+
+        Deliberately never reaches the page: this arrives every audio block,
+        and an `evaluate_js` per block would queue faster than WebView2 could
+        drain it. It goes to the native orb, which is a float assignment.
+        """
+        self.on_level(value)
+
+    def mode(self, name):
+        self._call("mode", name)
+
+
+class Api:
+    """What the page can call back into. Just the one thing it needs.
+
+    Keep every attribute here private except the methods themselves. pywebview
+    builds the JS bridge by walking `dir()` over this object and recursing into
+    any attribute that is not callable, so holding the app would hand it the
+    whole graph - app, window, and the entire WinForms/WebView2 tree behind
+    `window.native`. It probes that tree off the UI thread, and every COM
+    property that objects to being read from there gets logged to stderr -
+    hundreds of lines of "maximum recursion depth exceeded" and
+    E_NOINTERFACE before the window even opens. A leading underscore is
+    what keeps it out.
+    """
+
+    def __init__(self, quit):
+        self._quit = quit
+
+    def quit(self):
+        self._quit()
+
+
+class Apollo:
+    def __init__(self):
+        self.stopping = threading.Event()
+        self.overlay = Overlay()
+        self.tray = None
+        # The two reasons Apollo becomes the full display. A turn is no longer
+        # one of them: answering happens in the overlay itself now.
+        self.watcher = None
+        self.orb = None
+        self.voice = None          # the Gemini Live session, once connected
+        self.listen_toggle = None  # ...and the CTRL+1 watcher over it
+        self.turn_busy = False     # listening, thinking, or speaking
+        self.peek_open = False     # you pressed CTRL+`
+        self.peek_armed = False    # ...and have since let go of the keyboard
+        self.afk_open = False      # the machine has been left alone
+        self.window = webview.create_window(
+            "Apollo",
+            INDEX,
+            width=1280,
+            height=800,
+            resizable=False,
+            frameless=True,
+            easy_drag=False,      # the overlay is not something you drag
+            shadow=False,
+            focus=False,          # sets WS_EX_NOACTIVATE: never steal focus
+            on_top=True,
+            transparent=True,
+            background_color="#000000",
+            js_api=Api(self.quit),
+        )
+        self.window.events.shown += self.on_shown
+        self.window.events.loaded += self.on_loaded
+        self.window.events.closed += self.on_closed
+
+    # -- lifecycle ----------------------------------------------------------
+
+    def on_shown(self):
+        """Only the tray. The window is deliberately left completely alone.
+
+        pywebview shows a transparent window, hides it again, and re-shows it
+        on the Navigating event. Touching the window here lands in the middle
+        of that dance: `attach` hides the window to apply WS_EX_TOOLWINDOW, and
+        if pywebview's Hide follows ours the window stays hidden, never
+        navigates, and `loaded` never fires - so the orb and the backend never
+        start and Apollo is a process with nothing on screen. Everything to do
+        with this window therefore waits for `on_loaded`.
+        """
+        self.tray = Tray(on_quit=self.quit)
+
+    def start_orb(self):
+        """Bring up the native orb, positioned where `Overlay.rect_for` puts it.
+
+        Read through `self.overlay` rather than recomputing the position here,
+        so there is exactly one place that decides where the orb sits.
+        """
+        if self.orb is not None:
+            return
+        x, y, w, _h = self.overlay.box_for(Overlay.ORB)
+        self.orb = orb_module.Orb(size=w, position=(x, y))
+        self.orb.start_on(self.window.native)
+
+    def start_watcher(self):
+        """Start the chord/presence watcher once, from whichever event got here
+        first. `shown` is the natural place, but it is exactly the event whose
+        timing cannot be relied on - and the watcher carries the watchdog that
+        repairs a window left hidden, so it must not depend on that timing."""
+        if getattr(self, "watcher", None) is None:
+            self.watcher = Watcher(self)
+            self.watcher.start()
+
+    def blacken_form(self):
+        """Paint the WinForms host black instead of the default Control grey.
+
+        pywebview skips setting `BackColor` entirely when `transparent=True`,
+        so the form keeps the system Control colour - a near-white #F0F0F0 -
+        and that is what shows through wherever the page draws nothing. It is
+        the light square that appears around the orb. Black is not
+        transparency, but it is the difference between a pale tile on your
+        wallpaper and something you have to look for.
+        """
+        try:
+            import clr
+            clr.AddReference("System.Drawing")
+            import System.Drawing as D
+            from System import Action
+
+            form = self.window.native
+            form.Invoke(Action(lambda: setattr(form, "BackColor", D.Color.Black)))
+        except Exception:
+            pass   # cosmetic only; never worth failing startup over
+
+    def on_loaded(self):
+        """The page is up, so it can be talked to. Start the backend.
+
+        This, not `shown`, is where the geometry is made to stick. For a
+        transparent window pywebview shows the form, hides it again, and
+        re-shows it on the Navigating event - and that re-show restores the
+        form's own stale WinForms Bounds, undoing anything `shown` did. By the
+        time the document has loaded that dance is over, so an attach here
+        holds. The watcher re-checks anyway, because the ordering is pywebview's
+        to change, not ours.
+        """
+        self.blacken_form()
+        self.start_orb()
+        if not self.overlay.attach(tries=8, gap=0.15):
+            # Without the Win32 side this is a plain window sitting on top of
+            # everything - worse than not starting.
+            self.ui_fatal_startup("Could not attach the overlay window.")
+            return
+        self.apply_mode()
+        self.start_watcher()
+        self.ui = WebReporter(self.window, self.overlay,
+                              on_status=self.on_status, on_turn=self.on_turn,
+                              on_level=self.on_level,
+                              on_partial=self.on_partial)
+        threading.Thread(target=self.worker, daemon=True).start()
+
+    def on_closed(self):
+        self.stopping.set()
+        self.close_live()
+        if getattr(self, "ui", None):
+            self.ui.alive = False
+
+    def ui_fatal_startup(self, message):
+        die(message)
+
+    def quit(self):
+        if self.stopping.is_set():
+            return
+        self.stopping.set()
+        self.close_live()
+        if self.orb:
+            self.orb.close()
+        if self.tray:
+            self.tray.close()
+        try:
+            self.window.destroy()
+        except Exception:
+            pass
+
+    # -- how big Apollo is, and why ------------------------------------------
+
+    def desired_mode(self):
+        """The one place that decides which window Apollo is.
+
+        Only two answers left, and a turn is not one of them. Listening,
+        thinking and answering all happen in the resting overlay now: the mesh
+        stays exactly where it is and the native layer grows downward under it
+        to hold your words and then the reply, so there is nothing for this
+        method to decide when a turn starts. It decides between the ambient
+        overlay and the full display, and that is all.
+        """
+        if self.peek_open or self.afk_open:
+            return Overlay.FULL
+        return Overlay.ORB
+
+    def apply_mode(self):
+        """Swap between the overlay and the full display.
+
+        A cut, not an animation: the full display is a different thing
+        arriving rather than the overlay growing, and the growing is now the
+        overlay's own business (see `orb.Orb._advance_box`). Exactly one of
+        the two windows is on screen at any moment.
+        """
+        mode = self.desired_mode()
+        if mode == self.overlay.mode:
+            return
+        self.overlay.mode = mode
+        orb = self.orb
+
+        ui = getattr(self, "ui", None)
+        if ui is not None and ui.alive:
+            ui.mode(mode)
+
+        if orb is None:                   # no native layer yet: just cut
+            self.overlay.show_page(mode)
+            return
+
+        if mode == Overlay.ORB:
+            # Back from the full display, which had the whole screen: the
+            # overlay starts again from its resting footprint, with nothing
+            # under the mesh.
+            orb.place(self.overlay.box_for(Overlay.ORB))
+            orb.set_visible(True)
+            self.overlay.hide_page()
+        else:
+            orb.set_visible(False)
+            self.overlay.show_page(mode)
+
+    def on_level(self, value):
+        """Mic loudness while you are speaking. Called from the audio thread."""
+        if self.orb is not None:
+            self.orb.set_level(value)
+
+    # How long an answer stays up once Apollo has stopped speaking. Long
+    # enough to finish reading a figure you only half caught, short enough
+    # that the desktop is your own again by the time you have looked away.
+    LINGER = 4.0
+
+    def on_status(self, state):
+        """A phase change from the backend: listening, thinking, speaking, idle."""
+        if state == assistant.LISTENING and self.orb is not None:
+            # A fresh turn starting. Whatever answer is still on screen
+            # belongs to the turn that just ended, so it starts collapsing
+            # now; the first words of this one cancel that and reopen it.
+            self.orb.clear_content()
+        if state == assistant.IDLE and self.orb is not None:
+            self.orb.clear_content(after=self.LINGER)
+        self.turn_busy = state in WebReporter.ENGAGED
+        if self.orb is not None:
+            self.orb.set_active(self.turn_busy)
+        self.apply_mode()
+
+        # The ring can lose topmost status to any other window that asserts
+        # it after ours did - that cost real debugging time to track down
+        # (see the module docstring) - and it can happen mid-conversation, not
+        # only on a mode change apply_mode() would already catch. Reassert
+        # whenever a turn is actively under way.
+        if self.turn_busy and self.overlay.mode == Overlay.ORB and self.orb is not None:
+            self.orb.raise_above()
+
+    def on_turn(self, speaker, text, visual=None):
+        """A line of the transcript arrived: yours, or Apollo's reply.
+
+        Yours replaces the running transcription with what Whisper finally
+        settled on, which is usually the same line with the punctuation fixed.
+        Apollo's replaces it outright, in amber, with whatever chart or cards
+        the reply came with.
+        """
+        if self.orb is None or not text:
+            return
+        if speaker == "You":
+            self.orb.set_content(overlay_content.USER, text)
+        else:
+            self.orb.set_content(overlay_content.APOLLO, text, visual)
+
+    def on_partial(self, text):
+        """Words heard so far, while you are still holding the key.
+
+        Arrives every three quarters of a second from the running
+        transcription, each time as the whole sentence rather than as an
+        extra clause - see `assistant.record_while_held`.
+        """
+        if self.orb is not None and text:
+            self.orb.set_content(overlay_content.USER, text)
+
+    def toggle_peek(self):
+        """CTRL+`: open the full display by hand, or put it away."""
+        if getattr(self, "ui", None) is None:
+            return   # the page is not up yet; nothing to open
+        self.peek_open = not self.peek_open
+        # Opening it is itself a keystroke, so do not start watching for input
+        # to close it again until the keyboard has gone quiet.
+        self.peek_armed = False
+        self.apply_mode()
+
+    def check_presence(self, idle):
+        """Open the display when you are away; put it away when you come back.
+
+        `idle` is seconds since the last input anywhere in Windows, so this
+        follows you rather than following Apollo's own window.
+        """
+        changed = False
+
+        # Away from the machine: open by itself, close the moment you touch it.
+        if not self.peek_open:
+            afk = idle >= AFK_SECONDS
+            if afk != self.afk_open:
+                self.afk_open = afk
+                changed = True
+
+        # A hand-opened display closes on your next keypress or mouse move,
+        # once you have actually let go of the chord that opened it.
+        if self.peek_open:
+            if not self.peek_armed:
+                if idle >= PEEK_ARM_SECONDS:
+                    self.peek_armed = True
+            elif idle < PEEK_ARM_SECONDS / 2:
+                self.peek_open = False
+                self.peek_armed = False
+                changed = True
+
+        if changed:
+            self.apply_mode()
+
+    def check_overlay_alive(self):
+        """Keep the window the shape it is supposed to be.
+
+        Both a startup repair and a running watchdog: pywebview can re-show the
+        form with its own bounds after we have sized it, and nothing else would
+        notice.
+        """
+        now = time.monotonic()
+        if now - getattr(self, "_last_check", 0) < 2:
+            return
+        self._last_check = now
+        # Nothing to wait for any more: the overlay resizing itself to fit an
+        # answer is not a disagreement between the two windows, because at
+        # rest the page window is supposed to be hidden whatever size the
+        # native layer has grown to.
+        #
+        # Every couple of seconds is often enough to catch the orb's Z-order
+        # being stolen without it ever costing a visibly missed frame - see
+        # `Orb.raise_above` for why this can happen even with no mode change.
+        if self.orb is not None and self.overlay.mode == Overlay.ORB:
+            self.orb.raise_above()
+        if self.overlay.hwnd and self.overlay.verify():
+            return
+        # Two seconds rather than something lazier because this is also what
+        # repairs a startup where pywebview's show/hide/re-show dance landed
+        # after our geometry did. It is two Win32 calls; it can afford to run
+        # often, and a window left the wrong size is very visible.
+        self.overlay.attach(tries=2, gap=0.1)
+        self.apply_mode()
+
+    # -- the backend, off the UI thread -------------------------------------
+
+    def worker(self):
+        # pyttsx3 drives SAPI through COM, which has to be initialised per
+        # thread. On the main thread that happens for us; here it doesn't.
+        try:
+            import comtypes
+            comtypes.CoInitialize()
+        except Exception:
+            pass  # not fatal - only matters if the TTS driver needs it
+
+        ui = self.ui
+        ui.status(STARTING)
+
+        try:
+            assistant.check_api()
+        except RuntimeError as e:
+            ui.fatal(str(e))
+            return
+
+        ui.note(f"Loading Whisper ({assistant.WHISPER_SIZE})... "
+                "first run downloads the model.")
+        whisper = assistant.load_whisper()
+
+        # Before the greeting, so the first-run voice download shows a note
+        # instead of silently stalling it.
+        assistant.load_voice(ui)
+
+        # Apollo's voice. Connected before the greeting so that its microphone
+        # stream is the one that is open by the time you can press the chord -
+        # it owns the device for the life of the session, and the local
+        # fallback recorder must never be holding it at the same time.
+        # Push-to-talk, always: always-listening is turned on with CTRL+1, not
+        # arrived at.
+        self.voice = assistant.Voice(
+            ui, on_level=self.on_level,
+            on_user_text=assistant.agent_interrupt(ui))
+        self.voice.open(auto_vad=False)
+
+        # CTRL+1. A thread of its own so it answers during a turn as well as
+        # between them; `run_loop` reads its flag and does the actual
+        # switching, so a mode change never lands mid-sentence.
+        self.listen_toggle = assistant.ListenToggle(
+            on_toggle=self.on_listen_toggle, stop=self.stopping.is_set)
+        self.listen_toggle.start()
+
+        # Say hello, so you know the mic is live before you ever press a key.
+        assistant.greet(ui)
+
+        # Waking is over: from here a turn is allowed to take the screen.
+        ui.quiet = False
+        ui.status(assistant.IDLE)
+
+        # Quitting is the Hotkeys thread's job, so that it answers during a
+        # turn as well as between them.
+        try:
+            assistant.run_loop(ui, whisper, stop=self.stopping.is_set,
+                               voice=self.voice, toggle=self.listen_toggle)
+        finally:
+            self.close_live()
+        self.quit()
+
+    def on_listen_toggle(self, listening):
+        """CTRL+1 was pressed. Report it; `run_loop` does the switching.
+
+        Deliberately does nothing but tell you: the session is replaced to
+        change mode, and doing that from the hotkey thread would tear the
+        microphone out from under a turn that is still running.
+        """
+        ui = getattr(self, "ui", None)
+        if ui is not None and ui.alive:
+            ui.note("Always-listening ON" if listening else "Always-listening OFF")
+
+    def close_live(self):
+        """Shut the Gemini session down, once, from whichever path got here.
+
+        Both `quit` and the end of `worker` call this, because either can come
+        first: the tray quits while a turn is in flight, or the loop stops on
+        its own. It has to happen while the session's event loop is still
+        running - see the shutdown note in `gemini_live` - so it cannot be
+        left to interpreter teardown.
+
+        `Voice` is itself idempotent and locked, which is what makes calling
+        this from two threads safe: the toggle may be replacing the session at
+        the very moment the tray quits.
+        """
+        voice = getattr(self, "voice", None)
+        if voice is not None:
+            voice.close()
+
+
+def die(message):
+    """Report a failure that happens before there is a page to report it on.
+
+    Launched via pythonw.exe there is no console, so stderr goes nowhere and a
+    plain SystemExit would exit silently. 0x10 is MB_ICONERROR.
+    """
+    ctypes.windll.user32.MessageBoxW(None, message, "Apollo", 0x10)
+    raise SystemExit(message)
+
+
+def main():
+    if not os.path.exists(INDEX):
+        die("Missing front end: " + INDEX + "\n\nRun: python build_ui.py")
+
+    lock = single_instance()
+    if lock is None:
+        # Silent on purpose: the usual cause is launching it by hand when the
+        # Startup copy is already resident, and a dialog for that is noise.
+        sys.exit(0)
+
+    Apollo()
+    # http_server serves ui/ over localhost instead of file://, which is what
+    # lets the page fetch() its own sound effects and load the Melete face.
+    webview.start(http_server=True)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception:
+        # Nothing is watching stderr under pythonw.exe, so a crash would
+        # otherwise just make the window vanish with no explanation.
+        die(traceback.format_exc())

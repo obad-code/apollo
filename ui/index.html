@@ -1,0 +1,3314 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script>
+window.__apErrs = [];
+window.addEventListener('error', (e) => {
+  window.__apErrs.push(String(e.message) + ' @ ' + (e.filename || '?') + ':' + e.lineno);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  window.__apErrs.push('unhandled rejection: ' + String(e.reason));
+});
+</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@200;300;400;500;600&display=swap">
+<style>
+  @font-face { font-family:"Melete"; src:url("fonts/Melete-Medium.otf") format("opentype"); font-weight:500; font-display:swap; }
+  html, body { margin:0; padding:0; background:#000; overflow:hidden; height:100%; }
+  body { font-family:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; -webkit-font-smoothing:antialiased; text-shadow:0 0 7px rgba(255,150,0,0.55); }
+  a { color:#FFB000; text-decoration:none; }
+  a:hover { color:#FFD48A; }
+  @keyframes ap-field-a {
+    0%   { transform:translate3d(0,0,0) scale(1); opacity:.78; }
+    25%  { transform:translate3d(16%,7%,0) scale(1.16); opacity:1; }
+    50%  { transform:translate3d(9%,-13%,0) scale(1.04); opacity:.7; }
+    75%  { transform:translate3d(-12%,4%,0) scale(1.2); opacity:.95; }
+    100% { transform:translate3d(0,0,0) scale(1); opacity:.78; }
+  }
+  @keyframes ap-field-b {
+    0%   { transform:translate3d(0,0,0) scale(1.08); opacity:.72; }
+    25%  { transform:translate3d(-15%,9%,0) scale(1); opacity:1; }
+    50%  { transform:translate3d(-6%,17%,0) scale(1.22); opacity:.68; }
+    75%  { transform:translate3d(11%,6%,0) scale(1.05); opacity:.92; }
+    100% { transform:translate3d(0,0,0) scale(1.08); opacity:.72; }
+  }
+  @keyframes ap-field-c {
+    0%   { transform:translate3d(0,0,0) scale(1.02); opacity:.66; }
+    25%  { transform:translate3d(13%,-11%,0) scale(1.18); opacity:.94; }
+    50%  { transform:translate3d(-9%,-16%,0) scale(1); opacity:.72; }
+    75%  { transform:translate3d(-16%,-5%,0) scale(1.14); opacity:1; }
+    100% { transform:translate3d(0,0,0) scale(1.02); opacity:.66; }
+  }
+  @keyframes ap-field-d {
+    0%   { transform:translate3d(0,0,0) scale(1.1); opacity:.6; }
+    33%  { transform:translate3d(-18%,-8%,0) scale(1); opacity:.95; }
+    66%  { transform:translate3d(7%,-18%,0) scale(1.24); opacity:.7; }
+    100% { transform:translate3d(0,0,0) scale(1.1); opacity:.6; }
+  }
+  @keyframes ap-sweep-x { from { background-position:0% 50%; } to { background-position:200% 50%; } }
+  @keyframes ap-sweep-xr { from { background-position:200% 50%; } to { background-position:0% 50%; } }
+  @keyframes ap-sweep-diag { from { background-position:0% 0%; } to { background-position:200% 100%; } }
+  @keyframes ap-sweep-breathe { 0%,100% { opacity:.42; } 50% { opacity:.8; } }
+  @keyframes ap-field-e {
+    0%   { transform:translate3d(0,0,0) scale(1); opacity:.5; }
+    30%  { transform:translate3d(21%,-14%,0) scale(1.22); opacity:.9; }
+    60%  { transform:translate3d(-14%,12%,0) scale(1.02); opacity:.58; }
+    100% { transform:translate3d(0,0,0) scale(1); opacity:.5; }
+  }
+  @keyframes ap-field-f {
+    0%   { transform:translate3d(0,0,0) scale(1.14); opacity:.46; }
+    40%  { transform:translate3d(-20%,15%,0) scale(1); opacity:.88; }
+    70%  { transform:translate3d(12%,20%,0) scale(1.2); opacity:.6; }
+    100% { transform:translate3d(0,0,0) scale(1.14); opacity:.46; }
+  }
+  @keyframes ap-field-g {
+    0%   { transform:translate3d(0,0,0) scale(1.05); opacity:.44; }
+    35%  { transform:translate3d(17%,18%,0) scale(1.18); opacity:.82; }
+    70%  { transform:translate3d(-18%,-10%,0) scale(1); opacity:.55; }
+    100% { transform:translate3d(0,0,0) scale(1.05); opacity:.44; }
+  }
+  @keyframes ap-rise { from { opacity:0; transform:translateY(14px) scale(0.985); filter:blur(6px); } to { opacity:1; transform:none; filter:blur(0); } }
+  @keyframes ap-fade { from { opacity:0; } to { opacity:1; } }
+  @keyframes ap-draw { from { stroke-dashoffset:1600; } to { stroke-dashoffset:0; } }
+  @keyframes ap-nebula-a { 0%,100% { opacity:.42; transform:translate3d(0,0,0) scale(1); } 50% { opacity:.68; transform:translate3d(3%,-2%,0) scale(1.12); } }
+  @keyframes ap-nebula-b { 0%,100% { opacity:.3; transform:translate3d(0,0,0) scale(1.06); } 50% { opacity:.86; transform:translate3d(-4%,3%,0) scale(1); } }
+  @keyframes ap-dot { 0%,100% { opacity:.35; } 50% { opacity:1; } }
+  @keyframes ap-sign { 0%,100% { opacity:1; text-shadow:-0.7px 0 0 rgba(255,40,0,.55), 0.7px 0 0 rgba(0,190,255,.5), 0 0 4px rgba(255,244,216,.95), 0 0 14px rgba(255,176,0,.85), 0 0 30px rgba(255,122,46,.5); } 47% { opacity:1; } 50% { opacity:.55; text-shadow:-1.4px 0 0 rgba(255,40,0,.5), 1.4px 0 0 rgba(0,190,255,.45), 0 0 3px rgba(255,176,0,.5); } 53% { opacity:1; } }
+  @keyframes ap-sign-bad { 0%,100% { opacity:1; } 6% { opacity:.28; } 9% { opacity:1; } 12% { opacity:.3; } 15% { opacity:1; } 71% { opacity:1; } 74% { opacity:.22; } 77% { opacity:1; } }
+  @keyframes ap-bulb { 0%,100% { opacity:.22; box-shadow:none; } 50% { opacity:1; box-shadow:0 0 6px rgba(255,193,94,.9); } }
+  @keyframes ap-dotseq { 0% { opacity:.12; box-shadow:none; } 6% { opacity:1; box-shadow:0 0 7px currentColor, 0 0 14px currentColor; } 27% { opacity:1; box-shadow:0 0 7px currentColor, 0 0 14px currentColor; } 36% { opacity:.12; box-shadow:none; } 100% { opacity:.12; box-shadow:none; } }
+  @keyframes ap-dotblink { 0%,100% { opacity:1; box-shadow:0 0 7px currentColor, 0 0 14px currentColor; } 46% { opacity:1; } 50% { opacity:.14; box-shadow:none; } 54% { opacity:1; } }
+  @keyframes ap-bar-run { from { background-position:0% 0; } to { background-position:220% 0; } }
+  @keyframes ap-bar-head { from { transform:translateX(-30px); } to { transform:translateX(140px); } }
+  @keyframes ap-bar-flick { 0%,100% { opacity:.94; } 40% { opacity:.94; } 42% { opacity:.42; } 44% { opacity:1; } 63% { opacity:.9; } 65% { opacity:.5; } 67% { opacity:.96; } 88% { opacity:.96; } 90% { opacity:.6; } 92% { opacity:.94; } }
+  @keyframes ap-spin { to { transform:rotate(360deg); } }
+
+  @keyframes ap-hint-pulse { 0%,100% { text-shadow:0 0 6px rgba(255,170,0,.28); } 50% { text-shadow:0 0 9px rgba(255,176,0,.75), 0 0 22px rgba(255,130,0,.35); } }
+  @keyframes ap-crt-flicker {
+    0%,100% { filter:brightness(1); }
+    7% { filter:brightness(.9); }
+    9% { filter:brightness(1); }
+    41% { filter:brightness(.95); }
+    43% { filter:brightness(.8); }
+    45% { filter:brightness(1); }
+    78% { filter:brightness(.93); }
+    80% { filter:brightness(1); }
+  }
+  @keyframes ap-crt-roll { from { background-position:0 0; } to { background-position:0 120px; } }
+
+  @keyframes ap-caret { 0%,49% { opacity:1; } 50%,100% { opacity:.08; } }
+  @keyframes ap-word-bloom { 0%,100% { opacity:.5; filter:blur(9px) hue-rotate(0deg); transform:scaleX(1); } 33% { opacity:.85; filter:blur(11px) hue-rotate(-22deg); transform:scaleX(1.06); } 66% { opacity:.42; filter:blur(8px) hue-rotate(26deg); transform:scaleX(.97); } }
+
+  :root {
+    --ap-ease-out: cubic-bezier(0.23, 1, 0.32, 1);     /* strong ease-out: entrances, fades */
+    --ap-ease-stage: cubic-bezier(0.32, 0.72, 0, 1);   /* weighty: the orb <-> full-screen move */
+    --ap-ease-io: cubic-bezier(0.77, 0, 0.175, 1);     /* on-screen movement */
+  }
+
+  /* The overlay sheet is transparent: the desktop shows through it. Nothing
+     here may paint an opaque ground. */
+  html, body { background: transparent !important; }
+
+  /* Real answers are paragraphs, not the one-liner the canvas demoes. Step the
+     display size down as the answer grows so long replies stay on screen
+     without the fit-zoom bottoming out at its 0.72 floor. */
+  .ap-answer { font-size: 30px; line-height: 1.34; }
+
+  /* In the 460px panel the display sizes above are far too big, so the whole
+     ramp steps down. Same face, same colour, same glow - just sized for the
+     space it actually has. */
+  [data-ap-scale="panel"] .ap-answer { font-size: 17px; line-height: 1.42; max-width: 100%; }
+  [data-ap-scale="panel"] .ap-answer[data-len="m"] { font-size: 15px; }
+  [data-ap-scale="panel"] .ap-answer[data-len="l"],
+  [data-ap-scale="panel"] .ap-answer[data-len="xl"] {
+    font-size: 13px; line-height: 1.5; text-align: left;
+    max-height: 40vh; overflow-y: auto;
+  }
+  [data-ap-scale="panel"] .ap-transcript { font-size: 12px !important; }
+  .ap-answer[data-len="m"] { font-size: 25px; line-height: 1.4; }
+  /* Past a few lines, centred text is ragged on both edges and slow to read,
+     so the long tiers set flush left even though the block stays centred. */
+  .ap-answer[data-len="l"] {
+    font-size: 21px; line-height: 1.46; max-width: 780px; text-align: left;
+  }
+  .ap-answer[data-len="xl"] {
+    font-size: 17px; line-height: 1.55; max-width: 720px; text-align: left;
+    max-height: 46vh; overflow-y: auto; padding-right: 12px;
+  }
+
+  /* Browser surfaces belong to the design too. */
+  .ap-answer[data-len="xl"]::-webkit-scrollbar { width: 3px; }
+  .ap-answer[data-len="xl"]::-webkit-scrollbar-track { background: rgba(255,176,0,0.07); }
+  .ap-answer[data-len="xl"]::-webkit-scrollbar-thumb {
+    background: rgba(255,176,0,0.34); border-radius: 2px;
+  }
+  ::selection { background: rgba(255,176,0,0.26); color: #FFE6B8; }
+
+  /* Deliberately does not animate opacity. This runs with fill `both`, and a
+     filled animation outranks a plain declaration - animating opacity here
+     would pin the note visible and the noteOpacity binding would never win. */
+  @keyframes ap-note-in {
+    from { transform: translate(-50%, 10px); filter: blur(4px); }
+    to   { transform: translate(-50%, 0);    filter: blur(0); }
+  }
+
+  /* Reduced motion keeps the state changes legible and drops the travel:
+     the orb still becomes the full composition, it just does not fly there. */
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+    [data-ap-stage] { transition-duration: 120ms !important; }
+  }
+</style>
+</helmet>
+<div style="position:fixed; inset:0; background:rgba(0,0,0,{{ scrimAlpha }}); color:#FFC15E; overflow:hidden; cursor:default; transition:background-color 420ms var(--ap-ease-out);" onClick="{{ onBackdrop }}">
+  <div data-ap-stage data-ap-scale="{{ answerScale }}" ref="{{ stageWrapRef }}" style="position:absolute; inset:0;">
+
+  <div style="position:absolute; inset:0; pointer-events:none; opacity:{{ fieldOpacity }}; transition:opacity 380ms var(--ap-ease-out);">
+  <div style="position:absolute; inset:0; pointer-events:none; overflow:hidden; isolation:isolate; background:#000; filter:blur(78px); will-change:filter;">
+    <div style="position:absolute; inset:-10%; pointer-events:none; mix-blend-mode:screen; background:radial-gradient(58% 62% at 12% 26%, rgba(255,150,20,0.72), rgba(255,110,0,0.22) 46%, transparent 72%); animation:ap-field-a 11s cubic-bezier(.45,.05,.55,.95) infinite;"></div>
+    <div style="position:absolute; inset:-10%; pointer-events:none; mix-blend-mode:screen; background:radial-gradient(56% 58% at 82% 30%, rgba(30,180,190,0.6), rgba(20,120,170,0.2) 48%, transparent 74%); animation:ap-field-b 13s cubic-bezier(.45,.05,.55,.95) infinite;"></div>
+    <div style="position:absolute; inset:-10%; pointer-events:none; mix-blend-mode:screen; background:radial-gradient(62% 54% at 30% 92%, rgba(70,190,110,0.42), rgba(30,90,60,0.14) 50%, transparent 76%); animation:ap-field-c 16s cubic-bezier(.45,.05,.55,.95) infinite;"></div>
+    <div style="position:absolute; inset:-10%; pointer-events:none; mix-blend-mode:screen; background:radial-gradient(60% 60% at 88% 88%, rgba(40,60,190,0.4), transparent 70%); animation:ap-field-d 19s cubic-bezier(.45,.05,.55,.95) infinite;"></div>
+    <div style="position:absolute; inset:-10%; pointer-events:none; mix-blend-mode:screen; background:radial-gradient(50% 56% at 62% 12%, rgba(255,90,30,0.5), rgba(190,60,0,0.16) 46%, transparent 72%); animation:ap-field-e 14s cubic-bezier(.45,.05,.55,.95) infinite;"></div>
+    <div style="position:absolute; inset:-10%; pointer-events:none; mix-blend-mode:screen; background:radial-gradient(54% 50% at 8% 70%, rgba(120,40,200,0.42), rgba(60,20,120,0.14) 50%, transparent 76%); animation:ap-field-f 17s cubic-bezier(.45,.05,.55,.95) infinite;"></div>
+    <div style="position:absolute; inset:-10%; pointer-events:none; mix-blend-mode:screen; background:radial-gradient(48% 52% at 50% 50%, rgba(255,200,90,0.38), rgba(255,150,20,0.12) 48%, transparent 74%); animation:ap-field-g 12s cubic-bezier(.45,.05,.55,.95) infinite;"></div>
+    <div style="position:absolute; inset:-15%; pointer-events:none; mix-blend-mode:screen; opacity:.62; background:linear-gradient(100deg, transparent 0%, rgba(255,120,20,0.55) 12%, transparent 24%, rgba(30,180,190,0.5) 38%, transparent 50%, rgba(120,40,200,0.45) 63%, transparent 75%, rgba(255,200,90,0.5) 88%, transparent 100%); background-size:200% 100%; animation:ap-sweep-x 9s linear infinite;"></div>
+    <div style="position:absolute; inset:-15%; pointer-events:none; mix-blend-mode:screen; opacity:.5; background:linear-gradient(-72deg, transparent 0%, rgba(70,190,110,0.45) 15%, transparent 30%, rgba(255,90,30,0.5) 46%, transparent 60%, rgba(40,60,190,0.45) 78%, transparent 92%); background-size:200% 100%; animation:ap-sweep-xr 13s linear infinite, ap-sweep-breathe 7s ease-in-out infinite;"></div>
+    <div style="position:absolute; inset:-15%; pointer-events:none; mix-blend-mode:screen; opacity:.45; background:linear-gradient(150deg, rgba(255,176,0,0.4) 0%, transparent 22%, rgba(20,120,170,0.42) 44%, transparent 62%, rgba(255,110,0,0.4) 82%, transparent 100%); background-size:200% 200%; animation:ap-sweep-diag 16s linear infinite;"></div>
+  </div>
+  <div style="position:absolute; inset:0; pointer-events:none; mix-blend-mode:multiply; opacity:.5; background:radial-gradient(circle at 12% 26%, rgba(0,0,0,0) 0.6px, rgba(0,0,0,0.85) 1.6px); background-size:4px 4px;"></div>
+
+  <canvas ref="{{ starRef }}" style="position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none;"></canvas>
+  </div>
+
+  <div style="position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:flex-start; padding:34px 44px; pointer-events:none; opacity:{{ chromeOpacity }}; transition:opacity 300ms var(--ap-ease-out);">
+    <div></div>
+    <div style="display:flex; align-items:center; gap:9px; padding:9px 15px; border-radius:2px; background:rgba(26,13,0,0.82); border:1px solid rgba(255,176,0,0.14);">
+      <span style="width:7px; height:7px; border-radius:50%; background:#FFB000; box-shadow:0 0 10px rgba(255,176,0,0.9); animation:ap-dot 3.4s ease-in-out infinite; display:block;"></span>
+      <span style="font-size:12.5px; font-weight:500; letter-spacing:0.03em; color:#FFC15E;">{{ statusLabel }}</span>
+    </div>
+  </div>
+
+  <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:{{ stagePad }}; box-sizing:border-box; transition:padding 620ms var(--ap-ease-stage);">
+    <div ref="{{ colRef }}" style="display:flex; flex-direction:column; align-items:center; gap:22px; width:100%; zoom:{{ fitScale }};">
+
+    <div ref="{{ coreBoxRef }}" style="position:relative; flex:0 0 auto; width:{{ coreFrame }}; height:{{ coreFrame }}; display:grid; place-items:center; transition:width 620ms var(--ap-ease-stage), height 620ms var(--ap-ease-stage);">
+      <canvas ref="{{ ringRef }}" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: {{ coreArt }}; height: {{ coreArt }}; display: block; pointer-events: none; transition: width 800ms var(--ap-ease-out), height 800ms var(--ap-ease-out);"></canvas>
+      <div ref="{{ wordRef }}" style="position:absolute; left:50%; bottom:6%; z-index:8; transform:translateX(-50%); pointer-events:none; display:flex; flex-direction:column; align-items:center; gap:4px; opacity:{{ wordOpacity }}; transition:opacity 260ms ease;">
+        <div style="position:relative; display:flex; gap:6px; font-family:'Melete', 'IBM Plex Mono', monospace; font-size:19px; font-weight:500; letter-spacing:0.2em; color:#FFF0CE;">
+          <div style="position:absolute; inset:-7px -16px; pointer-events:none; mix-blend-mode:screen; background:radial-gradient(58% 130% at 50% 50%, rgba(255,186,70,.55), rgba(255,90,40,.16) 55%, rgba(0,0,0,0) 80%); animation:ap-word-bloom 6.4s ease-in-out infinite;"></div>
+          <span style="animation:ap-sign 2.6s ease-in-out infinite; animation-delay:0s;">A</span>
+          <span style="animation:ap-sign 2.6s ease-in-out infinite; animation-delay:.18s;">P</span>
+          <span style="animation:ap-sign-bad 5.2s steps(1,end) infinite;">O</span>
+          <span style="animation:ap-sign 2.6s ease-in-out infinite; animation-delay:.54s;">L</span>
+          <span style="animation:ap-sign 2.6s ease-in-out infinite; animation-delay:.72s;">L</span>
+          <span style="animation:ap-sign 2.6s ease-in-out infinite; animation-delay:.9s;">O</span>
+        </div>
+        <div style="display:flex; gap:9px; align-items:center; margin-top:2px;">
+          <span style="width:4px; height:4px; border-radius:50%; color:#FFFFFF; background:currentColor; animation:ap-dotseq 1.5s ease-in-out infinite; animation-delay:0s;"></span>
+          <span style="width:4px; height:4px; border-radius:50%; color:#FFFFFF; background:currentColor; animation:ap-dotseq 1.5s ease-in-out infinite; animation-delay:.5s;"></span>
+          <span style="width:4px; height:4px; border-radius:50%; color:#FFFFFF; background:currentColor; animation:ap-dotseq 1.5s ease-in-out infinite; animation-delay:1s;"></span>
+        </div>
+        <div style="margin-top:12px; white-space:nowrap; text-align:center; font-size:12.5px; font-weight:450; letter-spacing:0.04em; color:#FFC15E; opacity:{{ hintOpacity }}; transition:opacity 380ms ease; animation:ap-hint-pulse 2.6s ease-in-out infinite;">Hold Ctrl+Alt to talk</div>
+      </div>
+      <button onClick="{{ onCore }}" aria-label="Talk to Apollo" style="position:relative; width:36%; height:36%; border-radius:50%; border:0; padding:0; background:transparent; cursor:pointer; outline:none; -webkit-tap-highlight-color:transparent;"></button>
+    </div>
+
+    <div style="flex:0 0 auto; width:100%; display:flex; flex-direction:column; align-items:center; gap:34px;">
+
+      <sc-if value="{{ showTranscript }}" hint-placeholder-val="{{ false }}">
+        <div class="ap-transcript" style="font-size:19px; font-weight:400; letter-spacing:0.03em; color:#FFC15E; opacity:.72; text-align:center; text-wrap:pretty; max-width:640px; animation:ap-rise 380ms var(--ap-ease-out) both;">{{ transcript }}</div>
+      </sc-if>
+
+
+      <sc-if value="{{ showThinking }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:14px; font-weight:450; letter-spacing:0.06em; text-transform:uppercase; color:#FFC15E; opacity:.88; animation:ap-fade 400ms ease both;">Thinking</div>
+      </sc-if>
+
+      <sc-if value="{{ showSimple }}" hint-placeholder-val="{{ false }}">
+        <div class="ap-answer" data-len="{{ answerLen }}" style="font-weight:300; letter-spacing:0.01em; color:#FFC15E; text-align:center; text-wrap:pretty; max-width:820px; animation:ap-rise 420ms var(--ap-ease-out) both;">{{ answerText }}</div>
+      </sc-if>
+
+      <sc-if value="{{ showStock }}" hint-placeholder-val="{{ false }}">
+        <div style="width:min(560px, 100%); box-sizing:border-box; padding:26px 26px 22px; border-radius:3px; background:rgba(26,13,0,0.86); border:1px solid rgba(255,176,0,0.13); box-shadow:0 0 0 1px rgba(255,176,0,0.08), 0 0 40px rgba(255,176,0,0.09) inset; animation:ap-rise 440ms var(--ap-ease-out) both;">
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:20px;">
+            <div style="display:flex; flex-direction:column; gap:5px;">
+              <div style="font-size:52px; font-weight:300; letter-spacing:0.02em; color:#FFC15E; line-height:1; font-variant-numeric:tabular-nums;">$184.62</div>
+              <div style="font-size:13px; font-weight:500; letter-spacing:0.04em; color:#FFC15E; opacity:.9;">ORBT · Orbital Systems</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; padding:7px 13px; border-radius:2px; background:rgba(255,176,0,0.18); border:1px solid rgba(255,176,0,0.4);">
+              <span style="font-size:14px; font-weight:600; letter-spacing:0.02em; color:#FFB000; font-variant-numeric:tabular-nums;">+2.41%</span>
+            </div>
+          </div>
+
+          <div style="margin-top:22px;">
+            <svg viewBox="0 0 520 170" width="100%" height="170" preserveAspectRatio="none" style="display:block; overflow:visible;">
+              <defs>
+                <linearGradient id="apAreaUp" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#FFB000" stop-opacity="0.34"></stop>
+                  <stop offset="100%" stop-color="#FFB000" stop-opacity="0"></stop>
+                </linearGradient>
+              </defs>
+              <line x1="0" y1="18" x2="520" y2="18" stroke="rgba(255,176,0,0.09)" stroke-width="1"></line>
+              <line x1="0" y1="74" x2="520" y2="74" stroke="rgba(255,176,0,0.09)" stroke-width="1"></line>
+              <line x1="0" y1="130" x2="520" y2="130" stroke="rgba(255,176,0,0.09)" stroke-width="1"></line>
+              <path d="M0,118 L0,118 C22,112 34,124 56,116 C80,107 92,96 116,101 C140,106 152,118 176,109 C200,100 212,74 236,79 C258,84 270,96 292,88 C316,79 328,54 352,58 C376,62 388,76 412,66 C436,56 448,36 472,32 C494,28 506,24 520,20 L520,170 L0,170 Z" fill="url(#apAreaUp)" style="animation:ap-fade 900ms ease 620ms both;"></path>
+              <path d="M0,118 C22,112 34,124 56,116 C80,107 92,96 116,101 C140,106 152,118 176,109 C200,100 212,74 236,79 C258,84 270,96 292,88 C316,79 328,54 352,58 C376,62 388,76 412,66 C436,56 448,36 472,32 C494,28 506,24 520,20" fill="none" stroke="#FFB000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1600" style="filter:drop-shadow(0 0 8px rgba(255,176,0,0.55)); animation:ap-draw 1500ms cubic-bezier(.35,.9,.25,1) 180ms both;"></path>
+            </svg>
+            <div style="display:flex; justify-content:space-between; margin-top:10px;">
+              <span style="font-size:11.5px; font-weight:450; color:#FFC15E; opacity:.86;">9:30 am</span>
+              <span style="font-size:11.5px; font-weight:450; color:#FFC15E; opacity:.86;">12:00 pm</span>
+              <span style="font-size:11.5px; font-weight:450; color:#FFC15E; opacity:.86;">4:00 pm</span>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; margin-top:20px;">
+            <div style="padding:13px 14px; border-radius:2px; background:rgba(255,176,0,0.06); border:1px solid rgba(255,176,0,0.11); display:flex; flex-direction:column; gap:4px;">
+              <span style="font-size:11px; font-weight:500; letter-spacing:0.03em; color:#FFC15E; opacity:.88;">Day high</span>
+              <span style="font-size:17px; font-weight:450; color:#FFC15E; letter-spacing:0.02em; font-variant-numeric:tabular-nums;">$186.10</span>
+            </div>
+            <div style="padding:13px 14px; border-radius:2px; background:rgba(255,176,0,0.06); border:1px solid rgba(255,176,0,0.11); display:flex; flex-direction:column; gap:4px;">
+              <span style="font-size:11px; font-weight:500; letter-spacing:0.03em; color:#FFC15E; opacity:.88;">Day low</span>
+              <span style="font-size:17px; font-weight:450; color:#FFC15E; letter-spacing:0.02em; font-variant-numeric:tabular-nums;">$179.84</span>
+            </div>
+            <div style="padding:13px 14px; border-radius:2px; background:rgba(255,176,0,0.06); border:1px solid rgba(255,176,0,0.11); display:flex; flex-direction:column; gap:4px;">
+              <span style="font-size:11px; font-weight:500; letter-spacing:0.03em; color:#FFC15E; opacity:.88;">Volume</span>
+              <span style="font-size:17px; font-weight:450; color:#FFC15E; letter-spacing:0.02em; font-variant-numeric:tabular-nums;">24.8M</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showWeather }}" hint-placeholder-val="{{ false }}">
+        <div style="width:min(480px, 100%); box-sizing:border-box; padding:24px 26px; border-radius:3px; background:rgba(26,13,0,0.86); border:1px solid rgba(255,176,0,0.13); box-shadow:0 0 0 1px rgba(255,176,0,0.08), 0 0 40px rgba(255,176,0,0.09) inset; animation:ap-rise 440ms var(--ap-ease-out) both;">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFB000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h9a3.5 3.5 0 0 0 .3-6.98A5 5 0 0 0 7.2 9.5A4.25 4.25 0 0 0 7 18Z"></path></svg>
+            <span style="font-size:13px; font-weight:500; letter-spacing:0.04em; color:#FFC15E; opacity:.9;">Lisbon · partly cloudy</span>
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:16px; margin-top:16px;">
+            <span style="font-size:66px; font-weight:250; letter-spacing:0.02em; line-height:.9; color:#FFC15E; font-variant-numeric:tabular-nums;">22°</span>
+            <span style="font-size:15px; font-weight:450; color:#FFC15E; opacity:.95; padding-bottom:8px;">Feels like 21°</span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; margin-top:22px;">
+            <div style="padding:13px 14px; border-radius:2px; background:rgba(255,176,0,0.06); border:1px solid rgba(255,176,0,0.11); display:flex; flex-direction:column; gap:4px;">
+              <span style="font-size:11px; font-weight:500; letter-spacing:0.03em; color:#FFC15E; opacity:.88;">High</span>
+              <span style="font-size:17px; font-weight:450; color:#FFC15E; font-variant-numeric:tabular-nums;">24°</span>
+            </div>
+            <div style="padding:13px 14px; border-radius:2px; background:rgba(255,176,0,0.06); border:1px solid rgba(255,176,0,0.11); display:flex; flex-direction:column; gap:4px;">
+              <span style="font-size:11px; font-weight:500; letter-spacing:0.03em; color:#FFC15E; opacity:.88;">Wind</span>
+              <span style="font-size:17px; font-weight:450; color:#FFC15E; font-variant-numeric:tabular-nums;">11 km/h</span>
+            </div>
+            <div style="padding:13px 14px; border-radius:2px; background:rgba(255,176,0,0.06); border:1px solid rgba(255,176,0,0.11); display:flex; flex-direction:column; gap:4px;">
+              <span style="font-size:11px; font-weight:500; letter-spacing:0.03em; color:#FFC15E; opacity:.88;">Humidity</span>
+              <span style="font-size:17px; font-weight:450; color:#FFC15E; font-variant-numeric:tabular-nums;">58%</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showCalendar }}" hint-placeholder-val="{{ false }}">
+        <div style="width:min(460px, 100%); box-sizing:border-box; padding:24px 26px; border-radius:3px; background:rgba(26,13,0,0.86); border:1px solid rgba(255,176,0,0.13); box-shadow:0 0 0 1px rgba(255,176,0,0.08), 0 0 40px rgba(255,176,0,0.09) inset; animation:ap-rise 440ms var(--ap-ease-out) both;">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFB000" stroke-width="1.4" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3.5"></rect><path d="M3.5 10h17M8 3.5v3M16 3.5v3"></path></svg>
+            <span style="font-size:13px; font-weight:500; letter-spacing:0.04em; color:#FFC15E; opacity:.9;">Next on your calendar</span>
+          </div>
+          <div style="margin-top:18px; display:flex; flex-direction:column; gap:7px;">
+            <span style="font-size:28px; font-weight:350; letter-spacing:0.02em; color:#FFC15E;">Design review — Apollo</span>
+            <span style="font-size:15px; font-weight:450; color:#FFC15E; opacity:.95; font-variant-numeric:tabular-nums;">2:30 – 3:15 pm · Studio 4</span>
+          </div>
+          <div style="margin-top:20px; padding-top:16px; border-top:1px solid rgba(255,176,0,0.1); display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:14px; font-weight:450; color:#FFC15E; opacity:1;">Engineering sync</span>
+              <span style="font-size:13px; font-weight:450; color:#FFC15E; opacity:.88; font-variant-numeric:tabular-nums;">4:00 pm</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:14px; font-weight:450; color:#FFC15E; opacity:1;">Flight to Zurich</span>
+              <span style="font-size:13px; font-weight:450; color:#FFC15E; opacity:.88; font-variant-numeric:tabular-nums;">7:45 pm</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showEmail }}" hint-placeholder-val="{{ false }}">
+        <div style="width:min(520px, 100%); box-sizing:border-box; padding:24px 26px; border-radius:3px; background:rgba(26,13,0,0.86); border:1px solid rgba(255,176,0,0.13); box-shadow:0 0 0 1px rgba(255,176,0,0.08), 0 0 40px rgba(255,176,0,0.09) inset; animation:ap-rise 440ms var(--ap-ease-out) both;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
+            <div style="display:flex; align-items:center; gap:14px;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFB000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="3.2"></rect><path d="M4 8l8 5 8-5"></path></svg>
+              <span style="font-size:13px; font-weight:500; letter-spacing:0.04em; color:#FFC15E; opacity:.9;">3 messages need you</span>
+            </div>
+          </div>
+          <div style="margin-top:18px; display:flex; flex-direction:column;">
+            <div style="display:flex; flex-direction:column; gap:4px; padding:14px 0; border-top:1px solid rgba(255,176,0,0.1);">
+              <div style="display:flex; justify-content:space-between; gap:14px;"><span style="font-size:15px; font-weight:550; color:#FFC15E;">Mira Okonkwo</span><span style="font-size:12.5px; font-weight:450; color:#FFC15E; opacity:.86; font-variant-numeric:tabular-nums;">11:04 am</span></div>
+              <span style="font-size:14px; font-weight:400; color:#FFC15E; opacity:.95; text-wrap:pretty;">Needs sign-off on the accretion ring spec before build.</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:4px; padding:14px 0; border-top:1px solid rgba(255,176,0,0.1);">
+              <div style="display:flex; justify-content:space-between; gap:14px;"><span style="font-size:15px; font-weight:550; color:#FFC15E;">Orbital Finance</span><span style="font-size:12.5px; font-weight:450; color:#FFC15E; opacity:.86; font-variant-numeric:tabular-nums;">9:52 am</span></div>
+              <span style="font-size:14px; font-weight:400; color:#FFC15E; opacity:.95; text-wrap:pretty;">Q3 forecast attached, asking for comment by Friday.</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:4px; padding:14px 0; border-top:1px solid rgba(255,176,0,0.1);">
+              <div style="display:flex; justify-content:space-between; gap:14px;"><span style="font-size:15px; font-weight:550; color:#FFC15E;">Tobias Lund</span><span style="font-size:12.5px; font-weight:450; color:#FFC15E; opacity:.86; font-variant-numeric:tabular-nums;">Yesterday</span></div>
+              <span style="font-size:14px; font-weight:400; color:#FFC15E; opacity:.95; text-wrap:pretty;">Moved the Zurich meeting to Thursday morning.</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showSearch }}" hint-placeholder-val="{{ false }}">
+        <div style="width:min(520px, 100%); box-sizing:border-box; padding:24px 26px; border-radius:3px; background:rgba(26,13,0,0.86); border:1px solid rgba(255,176,0,0.13); box-shadow:0 0 0 1px rgba(255,176,0,0.08), 0 0 40px rgba(255,176,0,0.09) inset; animation:ap-rise 440ms var(--ap-ease-out) both;">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFB000" stroke-width="1.4" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="M15.8 15.8 20.5 20.5"></path></svg>
+            <span style="font-size:13px; font-weight:500; letter-spacing:0.04em; color:#FFC15E; opacity:.9;">Three sources on tidal disruption</span>
+          </div>
+          <div style="margin-top:18px; display:flex; flex-direction:column;">
+            <div style="display:flex; flex-direction:column; gap:5px; padding:14px 0; border-top:1px solid rgba(255,176,0,0.1);">
+              <span style="font-size:15px; font-weight:500; color:#FFC15E;">How stars are pulled apart near a black hole</span>
+              <span style="font-size:12.5px; font-weight:450; color:#FFB000; letter-spacing:0.01em;">esa.int</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:5px; padding:14px 0; border-top:1px solid rgba(255,176,0,0.1);">
+              <span style="font-size:15px; font-weight:500; color:#FFC15E;">Accretion disks, explained in plain terms</span>
+              <span style="font-size:12.5px; font-weight:450; color:#FFB000; letter-spacing:0.01em;">nasa.gov</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:5px; padding:14px 0; border-top:1px solid rgba(255,176,0,0.1);">
+              <span style="font-size:15px; font-weight:500; color:#FFC15E;">Event horizon imaging, five years on</span>
+              <span style="font-size:12.5px; font-weight:450; color:#FFB000; letter-spacing:0.01em;">eventhorizontelescope.org</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showTimer }}" hint-placeholder-val="{{ false }}">
+        <div style="width:min(340px, 100%); box-sizing:border-box; padding:24px 26px; border-radius:3px; background:rgba(26,13,0,0.86); border:1px solid rgba(255,176,0,0.13); box-shadow:0 0 0 1px rgba(255,176,0,0.08), 0 0 40px rgba(255,176,0,0.09) inset; animation:ap-rise 440ms var(--ap-ease-out) both;">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFB000" stroke-width="1.4" stroke-linecap="round"><circle cx="12" cy="13" r="7.5"></circle><path d="M12 9.5V13l2.5 1.6M9.5 3.5h5"></path></svg>
+            <span style="font-size:13px; font-weight:500; letter-spacing:0.04em; color:#FFC15E; opacity:.9;">Timer running</span>
+          </div>
+          <div style="margin-top:14px; font-size:56px; font-weight:250; letter-spacing:0.02em; color:#FFC15E; line-height:1; font-variant-numeric:tabular-nums;">{{ timerLabel }}</div>
+          <div style="margin-top:16px; height:3px; border-radius:2px; background:rgba(255,176,0,0.16); overflow:hidden;">
+            <div style="height:100%; width:{{ timerProgress }}; border-radius:2px; background:#FFB000; box-shadow:0 0 12px rgba(255,176,0,0.8);"></div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+    </div>
+  </div>
+
+  <canvas ref="{{ lylaRef }}" style="position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none; z-index:6; image-rendering:pixelated; opacity:{{ lylaOpacity }}; transition:opacity 280ms var(--ap-ease-out);"></canvas>
+
+  <div style="position:absolute; top:30px; left:50%; transform:translateX(-50%); z-index:9; pointer-events:none; opacity:{{ hudOpacity }}; transition:opacity 280ms ease; display:flex; flex-direction:column; align-items:center; gap:7px; padding:10px 16px 11px; background:repeating-linear-gradient(to bottom, rgba(0,0,0,0.30) 0px, rgba(0,0,0,0.30) 1px, rgba(0,0,0,0) 1px, rgba(0,0,0,0) 3px), linear-gradient(to bottom, rgba(255,176,0,0.05), rgba(255,176,0,0) 42%), rgba(26,13,0,0.86); background-size:100% 3px, 100% 100%, 100% 100%; border:1px solid rgba(255,176,0,0.2); border-radius:2px; box-shadow:0 0 22px rgba(255,140,0,0.16), inset 0 0 26px rgba(255,176,0,0.07); text-shadow:0 0 7px rgba(255,170,0,0.55), 0 0 18px rgba(255,140,0,0.28); animation:ap-crt-roll 3.4s linear infinite, ap-crt-flicker 6.5s steps(1,end) infinite;">
+    <div style="display:flex; align-items:baseline; gap:12px;">
+      <span style="font-size:9.5px; font-weight:500; letter-spacing:0.2em; color:#FFB000; opacity:.62;">PROCESSING LOAD</span>
+      <span ref="{{ loadTxtRef }}" style="font-size:12px; font-weight:500; letter-spacing:0.04em; color:#FFC15E; font-variant-numeric:tabular-nums;">28%</span>
+    </div>
+    <div style="position:relative; width:236px; height:6px; background:rgba(255,176,0,0.09); overflow:hidden;">
+      <div ref="{{ loadBarRef }}" style="position:absolute; left:0; top:0; bottom:0; width:28%; background:linear-gradient(90deg, #FF7A2B, #FFB000 62%, #FFD48A); box-shadow:0 0 11px rgba(255,176,0,.85);"></div>
+      <div style="position:absolute; inset:0; background:repeating-linear-gradient(to right, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 4px, rgba(0,0,0,0.9) 4px, rgba(0,0,0,0.9) 6px);"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; width:236px;">
+      <span style="font-size:9px; font-weight:450; letter-spacing:0.14em; color:#FFC15E; opacity:0.62;">CORE</span>
+      <span ref="{{ loadStateRef }}" style="font-size:9px; font-weight:500; letter-spacing:0.14em; color:#FFB000; opacity:.78;">NOMINAL</span>
+    </div>
+  </div>
+
+  <div style="position:absolute; left:26px; top:100px; bottom:90px; width:268px; z-index:9; pointer-events:none; overflow:hidden; display:flex; flex-direction:column; gap:10px; opacity:{{ hudOpacity }}; transition:opacity 280ms ease;">
+  <div style="flex:0 0 auto; width:100%; box-sizing:border-box; padding:11px 14px; background:repeating-linear-gradient(to bottom, rgba(0,0,0,0.30) 0px, rgba(0,0,0,0.30) 1px, rgba(0,0,0,0) 1px, rgba(0,0,0,0) 3px), linear-gradient(to bottom, rgba(255,176,0,0.05), rgba(255,176,0,0) 42%), rgba(26,13,0,0.86); background-size:100% 3px, 100% 100%, 100% 100%; border:1px solid rgba(255,176,0,0.2); border-radius:2px; box-shadow:0 0 22px rgba(255,140,0,0.16), inset 0 0 26px rgba(255,176,0,0.07); text-shadow:0 0 7px rgba(255,170,0,0.55), 0 0 18px rgba(255,140,0,0.28); animation:ap-crt-roll 3.4s linear infinite, ap-crt-flicker 6.5s steps(1,end) infinite; display:flex; align-items:center; gap:11px; opacity:{{ lylaOpacity }}; transform:translateY({{ lylaShift }}); transition:opacity 280ms var(--ap-ease-out), transform 600ms var(--ap-ease-out);">
+    <canvas ref="{{ lylaIconRef }}" style="flex:0 0 auto; width:24px; height:36px; display:block; image-rendering:pixelated; filter:drop-shadow(0 0 5px rgba(255,150,0,.7)) drop-shadow(0 0 13px rgba(255,110,0,.3));"></canvas>
+    <div style="flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:5px;">
+      <div style="font-size:10px; font-weight:500; letter-spacing:0.18em; color:#FFB000; opacity:.62; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">LYRATE YGGDRASIL LABORATORY ASSISTANT</div>
+      <div ref="{{ lylaLabelRef }}" style="font-size:12px; font-weight:500; letter-spacing:0.1em; color:#FFC15E; opacity:.92; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">LYLA // BOOTING</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="flex:1 1 auto; position:relative; height:6px; background:rgba(255,176,0,0.1); overflow:hidden;">
+          <div ref="{{ lylaHpRef }}" style="position:absolute; left:0; top:0; bottom:0; width:88%; background:#FFB000; box-shadow:0 0 9px rgba(255,176,0,.75);"></div>
+          <div style="position:absolute; inset:0; background:repeating-linear-gradient(to right, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 5px, rgba(0,0,0,0.9) 5px, rgba(0,0,0,0.9) 7px);"></div>
+        </div>
+        <span ref="{{ lylaPctRef }}" style="flex:0 0 auto; font-size:9.5px; font-weight:500; letter-spacing:0.08em; color:#FFC15E; opacity:.85; font-variant-numeric:tabular-nums;">88%</span>
+      </div>
+    </div>
+  </div>
+  <div style="flex:0 0 auto; width:100%; box-sizing:border-box; padding:10px 12px 9px; background:repeating-linear-gradient(to bottom, rgba(0,0,0,0.30) 0px, rgba(0,0,0,0.30) 1px, rgba(0,0,0,0) 1px, rgba(0,0,0,0) 3px), linear-gradient(to bottom, rgba(255,176,0,0.05), rgba(255,176,0,0) 42%), rgba(26,13,0,0.86); background-size:100% 3px, 100% 100%, 100% 100%; border:1px solid rgba(255,176,0,0.2); border-radius:2px; box-shadow:0 0 22px rgba(255,140,0,0.16), inset 0 0 26px rgba(255,176,0,0.07); text-shadow:0 0 7px rgba(255,170,0,0.55), 0 0 18px rgba(255,140,0,0.28); animation:ap-crt-roll 3.4s linear infinite, ap-crt-flicker 6.5s steps(1,end) infinite;">
+    <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px;">
+      <span style="font-size:9.5px; font-weight:500; letter-spacing:0.2em; color:#FFB000; opacity:.62;">APOLLO PROCESS</span>
+      <span ref="{{ procMsRef }}" style="margin-left:auto; font-size:9px; font-weight:450; letter-spacing:0.13em; color:#FFC15E; opacity:0.62; font-variant-numeric:tabular-nums;">0 ms</span>
+      <span ref="{{ procStageRef }}" style="font-size:9.5px; font-weight:500; letter-spacing:0.08em; color:#FFC15E; opacity:.8;">STANDBY</span>
+    </div>
+    <div ref="{{ procRef }}" style="display:flex; flex-direction:column; gap:3px; margin-top:7px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="flex:0 0 auto; width:5px; height:5px; border-radius:50%; background:#FFB000; opacity:.25;"></span>
+        <span style="flex:0 0 56px; font-size:8.5px; font-weight:500; letter-spacing:0.08em; color:#FFC15E; opacity:.6;">CAPTURE</span>
+        <span style="flex:1 1 auto; position:relative; height:3px; background:rgba(255,176,0,0.1); overflow:hidden;"><span style="position:absolute; left:0; top:0; bottom:0; width:0%; background:#FFB000;"></span></span>
+        <span style="flex:0 0 28px; text-align:right; font-size:8.5px; font-weight:450; letter-spacing:0.06em; color:#FFC15E; opacity:0.62; font-variant-numeric:tabular-nums;">—</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="flex:0 0 auto; width:5px; height:5px; border-radius:50%; background:#FFB000; opacity:.25;"></span>
+        <span style="flex:0 0 56px; font-size:8.5px; font-weight:500; letter-spacing:0.08em; color:#FFC15E; opacity:.6;">DECODE</span>
+        <span style="flex:1 1 auto; position:relative; height:3px; background:rgba(255,176,0,0.1); overflow:hidden;"><span style="position:absolute; left:0; top:0; bottom:0; width:0%; background:#FFB000;"></span></span>
+        <span style="flex:0 0 28px; text-align:right; font-size:8.5px; font-weight:450; letter-spacing:0.06em; color:#FFC15E; opacity:0.62; font-variant-numeric:tabular-nums;">—</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="flex:0 0 auto; width:5px; height:5px; border-radius:50%; background:#FFB000; opacity:.25;"></span>
+        <span style="flex:0 0 56px; font-size:8.5px; font-weight:500; letter-spacing:0.08em; color:#FFC15E; opacity:.6;">INTENT</span>
+        <span style="flex:1 1 auto; position:relative; height:3px; background:rgba(255,176,0,0.1); overflow:hidden;"><span style="position:absolute; left:0; top:0; bottom:0; width:0%; background:#FFB000;"></span></span>
+        <span style="flex:0 0 28px; text-align:right; font-size:8.5px; font-weight:450; letter-spacing:0.06em; color:#FFC15E; opacity:0.62; font-variant-numeric:tabular-nums;">—</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="flex:0 0 auto; width:5px; height:5px; border-radius:50%; background:#FFB000; opacity:.25;"></span>
+        <span style="flex:0 0 56px; font-size:8.5px; font-weight:500; letter-spacing:0.08em; color:#FFC15E; opacity:.6;">RETRIEVE</span>
+        <span style="flex:1 1 auto; position:relative; height:3px; background:rgba(255,176,0,0.1); overflow:hidden;"><span style="position:absolute; left:0; top:0; bottom:0; width:0%; background:#FFB000;"></span></span>
+        <span style="flex:0 0 28px; text-align:right; font-size:8.5px; font-weight:450; letter-spacing:0.06em; color:#FFC15E; opacity:0.62; font-variant-numeric:tabular-nums;">—</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="flex:0 0 auto; width:5px; height:5px; border-radius:50%; background:#FFB000; opacity:.25;"></span>
+        <span style="flex:0 0 56px; font-size:8.5px; font-weight:500; letter-spacing:0.08em; color:#FFC15E; opacity:.6;">REASON</span>
+        <span style="flex:1 1 auto; position:relative; height:3px; background:rgba(255,176,0,0.1); overflow:hidden;"><span style="position:absolute; left:0; top:0; bottom:0; width:0%; background:#FFB000;"></span></span>
+        <span style="flex:0 0 28px; text-align:right; font-size:8.5px; font-weight:450; letter-spacing:0.06em; color:#FFC15E; opacity:0.62; font-variant-numeric:tabular-nums;">—</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="flex:0 0 auto; width:5px; height:5px; border-radius:50%; background:#FFB000; opacity:.25;"></span>
+        <span style="flex:0 0 56px; font-size:8.5px; font-weight:500; letter-spacing:0.08em; color:#FFC15E; opacity:.6;">SYNTH</span>
+        <span style="flex:1 1 auto; position:relative; height:3px; background:rgba(255,176,0,0.1); overflow:hidden;"><span style="position:absolute; left:0; top:0; bottom:0; width:0%; background:#FFB000;"></span></span>
+        <span style="flex:0 0 28px; text-align:right; font-size:8.5px; font-weight:450; letter-spacing:0.06em; color:#FFC15E; opacity:0.62; font-variant-numeric:tabular-nums;">—</span>
+      </div>
+    </div>
+  </div>
+  <div style="flex:0 1 auto; min-height:0; overflow:hidden; width:100%; box-sizing:border-box; padding:10px 12px 9px; background:repeating-linear-gradient(to bottom, rgba(0,0,0,0.30) 0px, rgba(0,0,0,0.30) 1px, rgba(0,0,0,0) 1px, rgba(0,0,0,0) 3px), linear-gradient(to bottom, rgba(255,176,0,0.05), rgba(255,176,0,0) 42%), rgba(26,13,0,0.86); background-size:100% 3px, 100% 100%, 100% 100%; border:1px solid rgba(255,176,0,0.2); border-radius:2px; box-shadow:0 0 22px rgba(255,140,0,0.16), inset 0 0 26px rgba(255,176,0,0.07); text-shadow:0 0 7px rgba(255,170,0,0.55), 0 0 18px rgba(255,140,0,0.28); animation:ap-crt-roll 3.4s linear infinite, ap-crt-flicker 6.5s steps(1,end) infinite;">
+    <div style="display:flex; align-items:baseline; justify-content:space-between;">
+      <span style="font-size:9.5px; font-weight:500; letter-spacing:0.2em; color:#FFB000; opacity:.62;">FILE SYNC</span>
+      <span ref="{{ syncPctRef }}" style="font-size:9.5px; font-weight:500; letter-spacing:0.08em; color:#FFC15E; opacity:.8; font-variant-numeric:tabular-nums;">64%</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:5px; margin-top:7px;">
+      <div style="display:flex; align-items:center; gap:9px;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFB000" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.4l2.7 2.6L16 9.6"></path></svg>
+        <span style="flex:1 1 auto; font-size:10px; font-weight:450; letter-spacing:0.02em; color:#FFC15E; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">mission/telemetry.db</span>
+        <span style="font-size:8.5px; font-weight:500; letter-spacing:0.09em; color:#FFB000; opacity:.7;">SYNCED</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFD48A" stroke-width="1.7" stroke-linecap="round" style="flex:0 0 auto; animation:ap-spin 1.6s linear infinite;"><path d="M20.5 12a8.5 8.5 0 1 1-2.9-6.4"></path><path d="M20.5 4v5h-5"></path></svg>
+        <span style="flex:1 1 auto; font-size:10px; font-weight:450; letter-spacing:0.02em; color:#FFC15E; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">nav/ephemeris.2026</span>
+        <span ref="{{ syncRowRef }}" style="font-size:8.5px; font-weight:500; letter-spacing:0.09em; color:#FFD48A; opacity:.9; font-variant-numeric:tabular-nums;">64%</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFB000" stroke-width="1.7" stroke-linecap="round" style="flex:0 0 auto; opacity:.6;"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5V12l3 1.9"></path></svg>
+        <span style="flex:1 1 auto; font-size:10px; font-weight:450; letter-spacing:0.02em; color:#FFC15E; opacity:.72; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">logs/voice-cache</span>
+        <span style="font-size:8.5px; font-weight:500; letter-spacing:0.09em; color:#FFB000; opacity:0.62;">QUEUED</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FF7A2B" stroke-width="1.7" stroke-linecap="round" style="flex:0 0 auto;"><path d="M12 3.8 21 19.5H3L12 3.8Z"></path><path d="M12 10v3.6M12 16.6v.1"></path></svg>
+        <span style="flex:1 1 auto; font-size:10px; font-weight:450; letter-spacing:0.02em; color:#FFC15E; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">hull/sensor-array.raw</span>
+        <span style="font-size:8.5px; font-weight:500; letter-spacing:0.09em; color:#FF7A2B; opacity:.85;">STALE</span>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div style="position:absolute; top:112px; right:44px; width:252px; z-index:9; pointer-events:none; opacity:{{ hudOpacity }}; transition:opacity 280ms ease; box-sizing:border-box; padding:13px 14px 12px; background:repeating-linear-gradient(to bottom, rgba(0,0,0,0.30) 0px, rgba(0,0,0,0.30) 1px, rgba(0,0,0,0) 1px, rgba(0,0,0,0) 3px), linear-gradient(to bottom, rgba(255,176,0,0.05), rgba(255,176,0,0) 42%), rgba(26,13,0,0.86); background-size:100% 3px, 100% 100%, 100% 100%; border:1px solid rgba(255,176,0,0.2); border-radius:2px; box-shadow:0 0 22px rgba(255,140,0,0.16), inset 0 0 26px rgba(255,176,0,0.07); text-shadow:0 0 7px rgba(255,170,0,0.55), 0 0 18px rgba(255,140,0,0.28); animation:ap-crt-roll 3.4s linear infinite, ap-crt-flicker 6.5s steps(1,end) infinite;">
+    <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px;">
+      <span style="font-size:9.5px; font-weight:500; letter-spacing:0.2em; color:#FFB000; opacity:.62;">NET LATENCY</span>
+      <span ref="{{ latTxtRef }}" style="font-size:12px; font-weight:500; color:#FFC15E; font-variant-numeric:tabular-nums;">38 ms</span>
+    </div>
+    <div ref="{{ latRef }}" style="display:flex; align-items:flex-end; gap:2px; height:48px; margin-top:11px;">
+      <sc-for list="{{ latBars }}" as="b" hint-placeholder-count="32">
+        <div style="flex:1 1 0; min-width:0; height:40%; background:#FFB000; opacity:.86; box-shadow:0 0 6px rgba(255,176,0,.45);"></div>
+      </sc-for>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-top:9px; padding-top:8px; border-top:1px solid rgba(255,176,0,0.1);">
+      <span style="font-size:9px; font-weight:450; letter-spacing:0.13em; color:#FFC15E; opacity:0.62;">DSN · 34M</span>
+      <span ref="{{ latPeakRef }}" style="font-size:9px; font-weight:450; letter-spacing:0.13em; color:#FFC15E; opacity:.72; font-variant-numeric:tabular-nums;">PK 61</span>
+    </div>
+  </div>
+
+  <div style="position:absolute; top:288px; right:44px; width:252px; z-index:9; pointer-events:none; opacity:{{ hudOpacity }}; transition:opacity 280ms ease; box-sizing:border-box; padding:13px 14px 12px; background:repeating-linear-gradient(to bottom, rgba(0,0,0,0.30) 0px, rgba(0,0,0,0.30) 1px, rgba(0,0,0,0) 1px, rgba(0,0,0,0) 3px), linear-gradient(to bottom, rgba(255,176,0,0.05), rgba(255,176,0,0) 42%), rgba(26,13,0,0.86); background-size:100% 3px, 100% 100%, 100% 100%; border:1px solid rgba(255,176,0,0.2); border-radius:2px; box-shadow:0 0 22px rgba(255,140,0,0.16), inset 0 0 26px rgba(255,176,0,0.07); text-shadow:0 0 7px rgba(255,170,0,0.55), 0 0 18px rgba(255,140,0,0.28); animation:ap-crt-roll 3.4s linear infinite, ap-crt-flicker 6.5s steps(1,end) infinite;">
+    <span style="font-size:9.5px; font-weight:500; letter-spacing:0.2em; color:#FFB000; opacity:.62;">TOKEN USAGE</span>
+    <div style="display:flex; align-items:baseline; gap:7px; margin-top:9px;">
+      <span ref="{{ tokTxtRef }}" style="font-size:28px; font-weight:300; letter-spacing:0.01em; color:#FFC15E; line-height:1; font-variant-numeric:tabular-nums;">18,420</span>
+      <span style="font-size:11px; font-weight:450; color:#FFC15E; opacity:.6;">/ 32K ctx</span>
+    </div>
+    <div style="position:relative; width:100%; height:5px; margin-top:12px; background:rgba(255,176,0,0.09); overflow:hidden;">
+      <div ref="{{ tokBarRef }}" style="position:absolute; left:0; top:0; bottom:0; width:57%; background:linear-gradient(90deg, #FFB000, #FFD48A); box-shadow:0 0 9px rgba(255,176,0,.7);"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-top:9px;">
+      <span style="font-size:9px; font-weight:450; letter-spacing:0.13em; color:#FFC15E; opacity:0.62;">IN / OUT</span>
+      <span ref="{{ tokRateRef }}" style="font-size:9px; font-weight:450; letter-spacing:0.13em; color:#FFC15E; opacity:.72; font-variant-numeric:tabular-nums;">0 tk/s</span>
+    </div>
+  </div>
+
+  <div style="position:absolute; left:0; right:0; bottom:0; height:88px; z-index:9; pointer-events:none; opacity:{{ hudOpacity }}; transition:opacity 280ms ease; box-sizing:border-box; display:flex; align-items:center; gap:22px; padding:0 44px; background:repeating-linear-gradient(to bottom, rgba(0,0,0,0.26) 0px, rgba(0,0,0,0.26) 1px, rgba(0,0,0,0) 1px, rgba(0,0,0,0) 3px), linear-gradient(to top, rgba(18,9,0,0.94) 0%, rgba(18,9,0,0.74) 62%, rgba(18,9,0,0) 100%); background-size:100% 3px, 100% 100%; border-top:1px solid rgba(255,176,0,0.2); box-shadow:0 -1px 26px rgba(255,140,0,0.14); text-shadow:0 0 7px rgba(255,170,0,0.55), 0 0 18px rgba(255,140,0,0.28); animation:ap-crt-roll 3.4s linear infinite, ap-crt-flicker 6.5s steps(1,end) infinite;">
+    <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:5px;">
+      <span style="font-size:9px; font-weight:500; letter-spacing:0.2em; color:#FFB000; opacity:.62;">AUDIO IN</span>
+      <canvas ref="{{ wavRef }}" style="display:block; width:280px; height:40px; filter:drop-shadow(0 0 5px rgba(255,150,0,.75)) drop-shadow(0 0 14px rgba(255,110,0,.35));"></canvas>
+    </div>
+    <div style="flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:5px;">
+      <div style="display:flex; align-items:baseline; gap:12px;">
+        <span style="font-size:9px; font-weight:500; letter-spacing:0.2em; color:#FFB000; opacity:.62;">TRANSCRIPTION</span>
+        <span ref="{{ txMetaRef }}" style="font-size:9px; font-weight:450; letter-spacing:0.13em; color:#FFC15E; opacity:0.62; font-variant-numeric:tabular-nums;">CONF 0.97 · EN-US</span>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:3px; min-width:0;">
+        <span ref="{{ txRef }}" style="flex:0 1 auto; font-size:14px; font-weight:400; letter-spacing:0.01em; color:#FFC15E; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
+        <span style="flex:0 0 auto; width:7px; height:15px; background:#FFB000; box-shadow:0 0 8px rgba(255,176,0,.8); animation:ap-caret 1s steps(1,end) infinite;"></span>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+  <div style="position:absolute; inset:0; pointer-events:none; z-index:60; opacity:{{ crtOpacity }}; transition:opacity 380ms var(--ap-ease-out);">
+  <div style="position:absolute; inset:0; pointer-events:none; z-index:10; background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 1.5px, rgba(0,0,0,0.34) 2.5px, rgba(0,0,0,0.34) 3.5px);"></div>
+  <div style="position:absolute; inset:0; pointer-events:none; z-index:11; mix-blend-mode:screen; opacity:.14; background:repeating-linear-gradient(to right, rgba(255,60,0,0.5) 0px, rgba(0,255,80,0.4) 1px, rgba(0,80,255,0.5) 2px, rgba(0,0,0,0) 3px);"></div>
+  <div style="position:absolute; inset:-2px; pointer-events:none; z-index:14; border-radius:22px; box-shadow:inset 0 0 130px rgba(0,0,0,0.85), inset 0 0 42px rgba(0,0,0,0.7); background:radial-gradient(120% 110% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 100%);"></div>
+  <div style="position:absolute; inset:0; pointer-events:none; z-index:15; background:linear-gradient(128deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.013) 26%, rgba(255,255,255,0) 46%);"></div>
+  </div>
+
+  <div style="position:absolute; left:50%; bottom:38px; z-index:70; transform:translateX(-50%); max-width:min(680px, 78vw); box-sizing:border-box; padding:11px 17px; pointer-events:none; opacity:{{ noteOpacity }}; transition:opacity 260ms var(--ap-ease-out); background:rgba(26,13,0,0.92); border:1px solid rgba(255,176,0,0.26); border-radius:2px; box-shadow:0 6px 30px rgba(0,0,0,0.55), inset 0 0 26px rgba(255,176,0,0.06); animation:ap-note-in 320ms var(--ap-ease-out) both;">
+    <span style="display:block; font-size:12.5px; line-height:1.45; font-weight:450; letter-spacing:0.01em; color:#FFC15E; text-wrap:pretty; white-space:pre-wrap;">{{ noteText }}</span>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;coreSize&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:232,&quot;min&quot;:140,&quot;max&quot;:340,&quot;step&quot;:4,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Core&quot;},&quot;ringColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#FFB000&quot;,&quot;options&quot;:[&quot;#FFB000&quot;,&quot;#33FF7A&quot;,&quot;#7FE3FF&quot;,&quot;#FF7043&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Core&quot;},&quot;starDensity&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:2,&quot;min&quot;:0.4,&quot;max&quot;:2,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Space&quot;},&quot;holdSeconds&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:9,&quot;min&quot;:4,&quot;max&quot;:20,&quot;step&quot;:1,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Behavior&quot;},&quot;eventEveryMinutes&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:10,&quot;min&quot;:1,&quot;max&quot;:20,&quot;step&quot;:1,&quot;unit&quot;:&quot;min&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Environment events&quot;},&quot;eventMinutes&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:3,&quot;min&quot;:1,&quot;max&quot;:8,&quot;step&quot;:1,&quot;unit&quot;:&quot;min&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Environment events&quot;},&quot;envPreview&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Off&quot;,&quot;options&quot;:[&quot;Off&quot;,&quot;Neon District&quot;,&quot;Old Quarter&quot;,&quot;Ridge Line&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Environment events&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.stageWrapRef = React.createRef();
+    this.coreBoxRef = React.createRef();
+    this.starRef = React.createRef();
+    this.ringRef = React.createRef();
+    this.wordRef = React.createRef();
+    this.lylaRef = React.createRef();
+    this.lylaLabelRef = React.createRef();
+    this.env = 0;
+    this.colRef = React.createRef();
+    ['loadTxtRef','loadBarRef','loadStateRef','latRef','latTxtRef','latPeakRef','tokTxtRef','tokBarRef','tokRateRef','syncPctRef','syncRowRef','procRef','procStageRef','procMsRef','lylaIconRef','lylaHpRef','lylaPctRef','wavRef','txRef','txMetaRef']
+      .forEach(k => { this[k] = React.createRef(); });
+    this.latBars = Array.from({ length: 32 }, (_, i) => i);
+    this.lat = this.latBars.map(() => 34 + Math.random() * 16);
+    this.load = 0.24; this.tokens = 18420; this.sync = 0.64;
+    this.wave = new Float32Array(96);
+    this.txLines = [
+      'apollo, bring up the orbital telemetry for the next burn window',
+      'confirm hull sensor array is reporting on the primary bus',
+      'how far out is the relay handshake right now',
+      'log this pass and hold the transcript for lyla',
+      'summarise inbound traffic since the last sync'
+    ];
+    this.txi = 0; this.txc = 0; this.txHold = 0;
+    this.state = {
+      phase: 'waking', scene: null, edge: false, now: new Date(), timerLeft: 1500, fit: 1,
+      mode: 'orb',
+      transcript: '', answerText: '', noteText: '', noteVisible: false
+    };
+    this.scenes = [
+      { key: 'stock',    label: 'How is Orbital trading?',      say: 'How is Orbital trading today?' },
+      { key: 'weather',  label: 'Weather in Lisbon',            say: 'What is the weather in Lisbon?' },
+      { key: 'calendar', label: "What's next on my calendar?",  say: "What's next on my calendar?" },
+      { key: 'email',    label: 'Summarise my inbox',           say: 'Summarise my inbox.' },
+      { key: 'search',   label: 'Search: tidal disruption',     say: 'Search the web for tidal disruption.' },
+      { key: 'timer',    label: 'Set a 25 minute timer',        say: 'Set a timer for 25 minutes.' },
+      { key: 'simple',   label: 'How far is Mars?',             say: 'How far away is Mars right now?' }
+    ];
+  }
+
+  componentDidMount() {
+    this.registerBridge();
+    this.initStars();
+    this.initAudio();
+    this.onResize = () => { this.initStars(); this.measureFit(); };
+    window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => {
+      // The talk chord (Ctrl+Alt, held) is a global Windows hook in
+      // assistant.py. If the page also listened for it, a focused overlay
+      // would fire the turn twice.
+      if (e.key === 'Escape') this.dismiss();
+    };
+    window.addEventListener('keydown', this.onKey);
+    this.onMove = (e) => {
+      const h = window.innerHeight;
+      const near = e.clientY < 110 || e.clientY > h - 110;
+      if (near !== this.state.edge) this.setState({ edge: near });
+    };
+    window.addEventListener('mousemove', this.onMove);
+    this.clockTimer = setInterval(() => this.setState({ now: new Date() }), 1000);
+
+    this.raf = requestAnimationFrame(this.loop);
+    requestAnimationFrame(() => requestAnimationFrame(() => { this.initStars(); this.measureFit(); }));
+    if (window.ResizeObserver) {
+      this.ro = new ResizeObserver(() => { this.initStars(); this.measureFit(); });
+      if (this.colRef.current) this.ro.observe(this.colRef.current);
+      if (this.ringRef.current && this.ringRef.current.parentNode) this.ro.observe(this.ringRef.current.parentNode);
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.measureFit());
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    if (!prevState || prevState.phase !== this.state.phase || prevState.scene !== this.state.scene) this.measureFit();
+    if (!prevState || prevState.phase !== this.state.phase
+        || prevState.mode !== this.state.mode) this.measureFit();
+  }
+
+  measureFit() {
+    (this.fitTimers || []).forEach(clearTimeout);
+    this.fitTimers = [0, 90, 280, 700].map(d => setTimeout(() => this.doFit(), d));
+  }
+
+  doFit() {
+    const el = this.colRef.current;
+    const p = el && el.parentElement;
+    if (!p) return;
+    const cs = getComputedStyle(p);
+    const avail = p.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const nat = el.scrollHeight;
+    const s = nat > 4 ? Math.max(0.72, Math.min(1, avail / nat)) : 1;
+    if (Math.abs(s - this.state.fit) > 0.01) this.setState({ fit: s });
+  }
+
+  componentWillUnmount() {
+    if (this.ro) this.ro.disconnect();
+    window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('keydown', this.onKey);
+    if (this.unlock) {
+      window.removeEventListener('pointerdown', this.unlock, true);
+      window.removeEventListener('keydown', this.unlock, true);
+    }
+    window.removeEventListener('mousemove', this.onMove);
+    clearInterval(this.clockTimer);
+    clearInterval(this.tick);
+    clearTimeout(this.t1);
+    clearTimeout(this.t2);
+    (this.fitTimers || []).forEach(clearTimeout);
+    cancelAnimationFrame(this.raf);
+  }
+
+  drawHud(t) {
+    const ph = this.state.phase;
+    const hot = ph === 'research' ? 1 : ph === 'thinking' ? 0.82 : ph === 'listening' ? 0.5 : 0.12;
+    const dt = Math.min(64, t - (this.hudT || t)); this.hudT = t;
+
+    // processing load — smoothed toward a phase target with a little jitter
+    const target = 0.16 + hot * 0.74 + Math.sin(t * 0.0016) * 0.035;
+    this.load += (target - this.load) * 0.045;
+    const lp = Math.max(0, Math.min(1, this.load + (Math.random() - 0.5) * 0.012));
+    if (this.loadBarRef.current) this.loadBarRef.current.style.width = (lp * 100).toFixed(1) + '%';
+    if (this.loadTxtRef.current) this.loadTxtRef.current.textContent = Math.round(lp * 100) + '%';
+    if (this.loadStateRef.current) {
+      const s = lp > 0.86 ? 'SATURATED' : lp > 0.62 ? 'ELEVATED' : 'NOMINAL';
+      const el = this.loadStateRef.current;
+      if (el.textContent !== s) { el.textContent = s; el.style.color = lp > 0.86 ? '#FF7A2B' : '#FFB000'; }
+    }
+
+    // network latency — new sample ~7/s, spikes more often under load
+    this.latAcc = (this.latAcc || 0) + dt;
+    if (this.latAcc > 140) {
+      this.latAcc = 0;
+      const spike = Math.random() < 0.05 + hot * 0.12 ? 30 + Math.random() * 60 : 0;
+      this.lat.push(Math.min(140, 28 + hot * 26 + Math.random() * 16 + spike));
+      this.lat.shift();
+      const cur = this.lat[this.lat.length - 1];
+      if (this.latTxtRef.current) this.latTxtRef.current.textContent = Math.round(cur) + ' ms';
+      if (this.latPeakRef.current) this.latPeakRef.current.textContent = 'PK ' + Math.round(Math.max.apply(null, this.lat));
+      const kids = this.latRef.current && this.latRef.current.children;
+      if (kids) for (let i = 0; i < kids.length && i < this.lat.length; i++) {
+        const v = this.lat[i] / 140;
+        const k = kids[i];
+        k.style.height = Math.max(6, v * 100).toFixed(1) + '%';
+        k.style.opacity = (0.36 + v * 0.62).toFixed(2);
+        k.style.background = this.lat[i] > 92 ? '#FF7A2B' : '#FFB000';
+      }
+    }
+
+    // token usage
+    const rate = hot * 46;
+    this.tokens = Math.min(32000, this.tokens + rate * (dt / 1000));
+    if (this.tokens >= 32000) this.tokens = 12000 + Math.random() * 2000;
+    if (this.tokTxtRef.current) this.tokTxtRef.current.textContent = Math.round(this.tokens).toLocaleString();
+    if (this.tokBarRef.current) this.tokBarRef.current.style.width = (this.tokens / 320).toFixed(1) + '%';
+    if (this.tokRateRef.current) this.tokRateRef.current.textContent = Math.round(rate) + ' tk/s';
+
+    // file sync
+    this.sync = this.sync + (0.02 + hot * 0.06) * (dt / 1000);
+    if (this.sync > 1) this.sync = 0.05;
+    const sp = Math.round(this.sync * 100) + '%';
+    if (this.syncPctRef.current) this.syncPctRef.current.textContent = sp;
+    if (this.syncRowRef.current) this.syncRowRef.current.textContent = sp;
+
+    this.drawProcess(dt, ph);
+    this.drawLylaHealth(t, dt, hot);
+    this.drawWave(t, ph === 'listening' ? 1 : hot * 0.42);
+    this.typeTx(dt, ph);
+  }
+
+  // Apollo's own pipeline: which stages are live depends on what Apollo is actually doing
+  drawProcess(dt, ph) {
+    const box = this.procRef.current;
+    if (!box) return;
+    const NAMES = ['CAPTURE', 'DECODE', 'INTENT', 'RETRIEVE', 'REASON', 'SYNTH'];
+    // how far down the pipeline this phase gets, and how fast it walks
+    const reach = ph === 'listening' ? 2 : ph === 'thinking' ? 5 : ph === 'research' ? 6 : 0;
+    const speed = ph === 'research' ? 0.0016 : ph === 'thinking' ? 0.0022 : ph === 'listening' ? 0.0013 : 0.0007;
+    if (this.procPhase !== ph) { this.procPhase = ph; this.procP = 0; this.procMs = 0; }
+    this.procMs += dt;
+    const p = this.procP = Math.min(reach, (this.procP || 0) + dt * speed * (reach || 1));
+
+    for (let i = 0; i < box.children.length; i++) {
+      const row = box.children[i];
+      const dot = row.children[0], label = row.children[1];
+      const fill = row.children[2].children[0], stat = row.children[3];
+      let v = Math.max(0, Math.min(1, p - i));
+      // idle keeps a quiet carrier on CAPTURE only — Apollo is listening for its name
+      if (ph === 'idle') v = i === 0 ? 0.18 + Math.sin(this.hudT * 0.002) * 0.08 : 0;
+      const active = v > 0 && v < 1;
+      fill.style.width = (v * 100).toFixed(0) + '%';
+      fill.style.background = active ? '#FFD48A' : '#FFB000';
+      fill.style.boxShadow = active ? '0 0 8px rgba(255,212,138,.9)' : 'none';
+      dot.style.opacity = v >= 1 ? '1' : active ? '.9' : '.25';
+      dot.style.background = active ? '#FFD48A' : '#FFB000';
+      dot.style.boxShadow = active ? '0 0 7px rgba(255,212,138,.95)' : v >= 1 ? '0 0 5px rgba(255,176,0,.7)' : 'none';
+      label.style.opacity = v > 0 ? '1' : '.45';
+      const s = v >= 1 ? 'OK' : active ? Math.round(v * 100) + '%' : '—';
+      if (stat.textContent !== s) stat.textContent = s;
+      stat.style.opacity = v > 0 ? '.9' : '.42';
+      stat.style.color = active ? '#FFD48A' : '#FFC15E';
+    }
+
+    if (this.procStageRef.current) {
+      const idx = Math.min(NAMES.length - 1, Math.floor(p));
+      const s = ph === 'idle' ? 'STANDBY' : p >= reach ? 'COMPLETE' : NAMES[idx];
+      const el = this.procStageRef.current;
+      if (el.textContent !== s) el.textContent = s;
+    }
+    if (this.procMsRef.current) {
+      this.procMsRef.current.textContent = (ph === 'idle' ? 0 : Math.round(this.procMs)) + ' ms';
+    }
+  }
+
+  // LYLA's own reserve: she drains while working and tops back up in the charging pod
+  drawLylaHealth(t, dt, hot) {
+    const st = this.ly && this.ly.st;
+    const charging = st === 'sleep';
+    const rate = charging ? -2.4 : (st === 'fly' ? 0.5 : 0.22) + hot * 0.5;
+    this.lylaHp = Math.max(6, Math.min(100, (this.lylaHp == null ? 88 : this.lylaHp) - rate * (dt / 1000)));
+    const hp = this.lylaHp;
+    const low = hp < 26;
+    if (this.lylaHpRef.current) {
+      const el = this.lylaHpRef.current;
+      el.style.width = hp.toFixed(1) + '%';
+      const col = low ? '#FF7A2B' : charging ? '#FFD48A' : '#FFB000';
+      el.style.background = col;
+      el.style.boxShadow = '0 0 9px ' + (low ? 'rgba(255,122,43,.8)' : 'rgba(255,176,0,.75)');
+      el.style.opacity = low && Math.floor(t / 420) % 2 ? '.45' : '1';
+    }
+    if (this.lylaPctRef.current) {
+      const el = this.lylaPctRef.current;
+      const s = charging ? Math.round(hp) + '% ↑' : Math.round(hp) + '%';
+      if (el.textContent !== s) el.textContent = s;
+      el.style.color = low ? '#FF7A2B' : '#FFC15E';
+    }
+    this.drawLylaIcon(t, charging, low);
+  }
+
+  drawLylaIcon(t, charging, low) {
+    const c = this.lylaIconRef.current;
+    if (!c) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2), S = 3, GW = 8, GH = 12;
+    if (c.width !== Math.round(GW * S * dpr)) { c.width = Math.round(GW * S * dpr); c.height = Math.round(GH * S * dpr); }
+    const g = c.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, GW * S, GH * S);
+    const px = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x * S, y * S, w * S, h * S); };
+    const BODY = low ? '#C86020' : '#FFB000', LIT = '#FFE3A8', EYE = '#FFF4D8', DARK = '#5E3600';
+    px(3, 0, 3, 2, (Math.floor(t / 700) % 2) ? '#FF7A2E' : LIT);   // antenna lamp
+    px(4, 2, 1, 3, DARK);                                           // stalk
+    px(0, 5, 8, 7, BODY);                                           // head
+    px(1, 6, 6, 3, '#3A2200');                                      // visor band
+    const blink = (Math.floor(t / 2600) % 5 === 0) && (t % 2600 < 140);
+    if (charging || blink) { px(2, 7, 2, 1, EYE); px(5, 7, 2, 1, EYE); }
+    else { px(2, 6, 2, 2, EYE); px(5, 6, 2, 2, EYE); }
+  }
+
+  drawWave(t, amp) {
+
+    const c = this.wavRef.current;
+    if (!c) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = c.clientWidth, h = c.clientHeight;
+    if (!w) return;
+    if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    const g = c.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    const n = this.wave.length, mid = h / 2;
+    for (let i = 0; i < n - 1; i++) this.wave[i] = this.wave[i + 1];
+    const env = 0.12 + amp * 0.88;
+    this.wave[n - 1] = (Math.sin(t * 0.011) * 0.4 + Math.sin(t * 0.027 + 1.3) * 0.3 + (Math.random() - 0.5) * 0.9) * env;
+    g.fillStyle = 'rgba(255,176,0,0.14)';
+    g.fillRect(0, mid - 0.5, w, 1);
+    const bw = w / n;
+    for (let i = 0; i < n; i++) {
+      const v = Math.abs(this.wave[i]);
+      const bh = Math.max(1.2, v * (h * 0.92));
+      const a = 0.3 + v * 0.7;
+      g.fillStyle = 'rgba(255,' + Math.round(176 + v * 60) + ',' + Math.round(30 + v * 90) + ',' + a.toFixed(2) + ')';
+      g.fillRect(i * bw, mid - bh / 2, Math.max(1, bw - 1.2), bh);
+    }
+  }
+
+  typeTx(dt, ph) {
+    const el = this.txRef.current;
+    if (!el) return;
+    const line = this.txLines[this.txi];
+    if (this.txHold > 0) {
+      this.txHold -= dt;
+      if (this.txHold <= 0) { this.txi = (this.txi + 1) % this.txLines.length; this.txc = 0; }
+      return;
+    }
+    this.txAcc = (this.txAcc || 0) + dt;
+    const step = ph === 'listening' ? 42 : 78;
+    while (this.txAcc > step && this.txc < line.length) { this.txAcc -= step; this.txc++; }
+    if (this.txc >= line.length) { this.txHold = 2600; this.txAcc = 0; }
+    const txt = line.slice(0, this.txc);
+    if (el.textContent !== txt) el.textContent = txt;
+    if (this.txMetaRef.current) {
+      const conf = ph === 'idle' ? 0.97 : 0.91 + Math.random() * 0.08;
+      this.txMetaRef.current.textContent = 'CONF ' + conf.toFixed(2) + ' · EN-US';
+    }
+  }
+
+  initStars() {
+    const c = this.starRef.current;
+    if (!c) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = window.innerWidth, h = window.innerHeight;
+    c.width = w * dpr; c.height = h * dpr;
+    this.sctx = c.getContext('2d');
+    this.sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.sw = w; this.sh = h;
+    if (!this.noiseTiles) this.buildNoise();
+    this.noisePats = this.noiseTiles.map(tile => this.sctx.createPattern(tile, 'repeat'));
+    if (!this.scanTile) {
+      const sl = document.createElement('canvas');
+      sl.width = 1; sl.height = 3;
+      const g = sl.getContext('2d');
+      g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(0, 0, 1, 1);
+      g.fillStyle = 'rgba(0,0,0,0.16)'; g.fillRect(0, 1, 1, 1);
+      this.scanTile = sl;
+    }
+    this.scanPat = this.sctx.createPattern(this.scanTile, 'repeat');
+  }
+
+  // analog TV static: a few pre-baked grain tiles cycled per frame
+  buildNoise() {
+    const S = 168;
+    this.noiseTiles = Array.from({ length: 5 }, () => {
+      const cv = document.createElement('canvas');
+      cv.width = S; cv.height = S;
+      const g = cv.getContext('2d');
+      const id = g.createImageData(S, S);
+      for (let i = 0; i < S * S; i++) {
+        const v = Math.random();
+        const a = v < 0.52 ? 0 : Math.pow((v - 0.52) / 0.48, 1.6) * 255;
+        const lum = 150 + Math.random() * 105;
+        id.data[i * 4] = 255;
+        id.data[i * 4 + 1] = Math.min(255, lum + 45);
+        id.data[i * 4 + 2] = Math.round(lum * 0.62);
+        id.data[i * 4 + 3] = a;
+      }
+      g.putImageData(id, 0, 0);
+      return cv;
+    });
+  }
+
+  loop = (t) => {
+    this.raf = requestAnimationFrame(this.loop);
+    // This window never closes, so its resting cost is the cost. At rest the
+    // HUD and Lyla are not on screen at all and the core is 150px wide, so
+    // half the frames and two of the four draws are pure waste.
+    const resting = this.isOrb();
+    if (resting && t - (this.lastFrame || 0) < 33) return;
+    this.lastFrame = t;
+    this.drawStars(t);
+    this.drawRing(t);
+    if (!resting) { this.drawLyla(t); this.drawHud(t); }
+  };
+
+  stations() {
+    const S = 4, gw = window.innerWidth / S, gh = window.innerHeight / S;
+    const fy = gh - 22;
+    const at = (fr) => Math.min(gw - 22, Math.max(24, gw * fr));
+    return {
+      fy,
+      ctrl:  { x: Math.max(16, Math.min(28, gw * 0.16)), fy },
+      watch: { x: Math.max(60, Math.min(gw - 22, gw * 0.17)), fy },
+      scope: { x: at(0.30), fy },
+      plant: { x: at(0.40), fy },
+      read:  { x: at(0.50), fy },
+      sleep: { x: at(0.60), fy },
+      draw:  { x: at(0.70), fy },
+      fix:   { x: at(0.80), fy },
+      game:  { x: at(0.90), fy }
+    };
+  }
+
+  drawLylaPose(px, bx, base, t, lie, L) {
+    const BODY = '#FFB000', DARK = '#5E3600', LIT = '#FFE3A8', EYE = '#FFF4D8', SHADE = '#3A2200';
+    if (lie > 0.5) {
+      // laid out flat in the charging pod, breathing slowly
+      const bed = base - 5, br = Math.floor((t / 2600) % 2);
+      px(bx - 6, bed - 1, 2, 1, DARK);
+      px(bx - 5, bed - 3, 11, 4, BODY);
+      px(bx - 4, bed - 4 - br, 8, 1, LIT);
+      px(bx - 4, bed - 2, 9, 2, SHADE);
+      px(bx - 4, bed - 2, 9, 1, DARK);
+      px(bx + 6, bed - 6, 5, 5, BODY);
+      px(bx + 7, bed - 5, 3, 1, SHADE);
+      px(bx + 7, bed - 4, 2, 1, EYE);
+      px(bx + 10, bed - 4, 1, 1, EYE);
+      px(bx + 8, bed - 8, 1, 2, DARK);
+      px(bx + 7, bed - 10, 3, 2, (Math.floor(t / 1400) % 2) ? '#FF7A2E' : LIT);
+      for (let i = 0; i < 4; i++) px(bx - 4 + i * 3, bed + 1, 1, 1, (Math.floor(t / 420 + i) % 4) ? 'rgba(127,227,255,0.3)' : '#7FE3FF');
+      for (let i = 0; i < 3; i++) {
+        const ph = ((t / 1500) + i * 0.33) % 1;
+        const zx = bx + 11 + i * 2 + Math.sin(ph * 6.2832) * 1.5, zy = bed - 12 - ph * 9;
+        px(zx, zy, 3, 1, LIT); px(zx + 1, zy + 1, 1, 1, LIT); px(zx, zy + 2, 3, 1, LIT);
+      }
+      return;
+    }
+    // sat down on the deck with a book open in both hands
+    const s = base, sway = Math.round(Math.sin(t * 0.0011) * 1);
+    px(bx - 1, s - 1, 3, 1, DARK);
+    px(bx + 6, s - 1, 3, 1, DARK);
+    px(bx, s - 5, 8, 4, BODY);
+    px(bx + 1, s - 5, 6, 1, LIT);
+    px(bx, s - 12, 8, 7, BODY);
+    px(bx + 1, s - 11, 6, 2, SHADE);
+    px(bx, s - 19 + sway, 8, 7, BODY);
+    px(bx + 1, s - 18 + sway, 6, 3, SHADE);
+    px(bx + 2, s - 15 + sway, 2, 1, EYE);
+    px(bx + 5, s - 15 + sway, 2, 1, EYE);
+    px(bx + 4, s - 22 + sway, 1, 3, DARK);
+    px(bx + 3, s - 24 + sway, 3, 2, (Math.floor(t / 700) % 2) ? '#FF7A2E' : LIT);
+    px(bx - 2, s - 12, 2, 4, BODY);
+    px(bx + 8, s - 12, 2, 4, BODY);
+    const flip = Math.floor(t / 1500) % 2, turning = (t % 1500) < 260;
+    px(bx - 4, s - 10, 16, 1, DARK);
+    px(bx - 4, s - 9, 7, 6, LIT);
+    px(bx + 5, s - 9, 7, 6, LIT);
+    px(bx + 3, s - 10, 2, 7, DARK);
+    for (let r = 0; r < 3; r++) {
+      px(bx - 3, s - 8 + r * 2, r === 2 ? 3 : 4, 1, SHADE);
+      px(bx + 6, s - 8 + r * 2, r === 2 ? 2 : 4, 1, SHADE);
+    }
+    if (turning) px(bx + 5, s - 11, 3, 8, EYE);
+    else if (flip) px(bx + 9, s - 9, 3, 6, '#FFF4D8');
+    if (L.page) px(bx + 10, s - 3, 2, 1, DARK);
+  }
+
+  drawProps(ctx, px, t, ST, gw, L, focus) {
+    const A = L.propA || (L.propA = { read: 0.6, sleep: 0.6, draw: 0.6, game: 0.6, scope: 0.6, plant: 0.6, fix: 0.6, watch: 0.8, room: 0.7, ctrl: 0.6 });
+    const ease = (k, tg) => { A[k] += (tg - A[k]) * 0.055; };
+    ['read', 'sleep', 'draw', 'game', 'scope', 'plant', 'fix'].forEach(k => ease(k, focus ? (k === focus ? 1 : 0) : 0.62));
+    ease('ctrl', (L.st === 'repair' || L.next === 'repair') ? 1 : 0.62);
+    ease('watch', (focus === 'watch' || L.next === 'watch') ? 1 : 0);
+    ease('room', focus ? 0.34 : 0.72);
+    const fy = ST.fy;
+    const AM = '#FFB000', WARM = '#FFC15E', LIT = '#FFE3A8', CY = '#7FE3FF', OR = '#FF7A2E';
+    const HULL = '#43270A', SHADE = '#2A1800', PLATE = '#6B4410';
+
+    // ---- hull interior ----
+    ctx.globalAlpha = A.room;
+    // deck plating
+    for (let x = 4; x < gw - 4; x += 8) {
+      px(x, fy + 1, 6, 1, PLATE);
+      px(x + 6, fy + 1, 2, 1, SHADE);
+      px(x, fy + 3, 3, 1, 'rgba(127,227,255,0.35)');
+    }
+    // bulkhead ribs
+    for (let x = 6; x < gw - 6; x += 26) {
+      px(x, fy - 9, 1, 9, HULL);
+      px(x + 1, fy - 9, 1, 9, SHADE);
+      px(x, fy - 10, 2, 1, PLATE);
+    }
+    // pipe run + ceiling strip lights
+    px(4, fy - 34, gw - 8, 1, HULL);
+    px(4, fy - 32, gw - 8, 1, SHADE);
+    for (let x = 10; x < gw - 8; x += 18) {
+      px(x, fy - 35, 2, 4, PLATE);
+      px(x + 8, fy - 38, 4, 1, (Math.floor(t / 900 + x) % 7) ? WARM : LIT);
+      px(x + 9, fy - 37, 2, 1, 'rgba(255,193,94,0.35)');
+    }
+    // hazard chevrons under the arcade end
+    for (let i = 0; i < 5; i++) px(gw - 26 + i * 4, fy - 2, 2, 1, i % 2 ? OR : SHADE);
+
+    // ---- flight-deck control center (bottom left) : where APOLLO gets serviced ----
+    ctx.globalAlpha = A.ctrl;
+    {
+      const q = ST.ctrl.x;
+      // riser + desk
+      px(q - 15, fy - 1, 32, 1, PLATE);
+      px(q - 14, fy - 9, 30, 8, HULL);
+      px(q - 14, fy - 10, 30, 1, PLATE);
+      px(q - 13, fy - 9, 28, 1, SHADE);
+      px(q - 14, fy - 5, 30, 1, SHADE);
+      // angled control surface: button rows + sliders
+      px(q - 13, fy - 12, 29, 2, SHADE);
+      for (let i = 0; i < 9; i++) {
+        px(q - 12 + i * 3, fy - 12, 2, 1, (Math.floor(t / 360 + i * 2) % 4) ? WARM : LIT);
+        px(q - 12 + i * 3, fy - 11, 2, 1, 'rgba(255,122,46,0.45)');
+      }
+      for (let i = 0; i < 5; i++) {
+        px(q - 12 + i * 4, fy - 8, 1, 3, SHADE);
+        px(q - 12 + i * 4, fy - 8 - (Math.floor(t / 620 + i * 3) % 3), 1, 1, CY);
+      }
+      // joystick + throttle on the right of the desk
+      px(q + 9, fy - 8, 1, 3, PLATE);
+      px(q + 9 + (Math.floor(t / 1100) % 2), fy - 10, 2, 2, OR);
+      px(q + 13, fy - 8, 1, 3, PLATE);
+      px(q + 12, fy - 9, 3, 1, LIT);
+      // screen tower
+      px(q - 14, fy - 32, 31, 20, SHADE);
+      px(q - 14, fy - 33, 31, 1, PLATE);
+      px(q - 15, fy - 32, 1, 20, PLATE);
+      px(q + 16, fy - 32, 1, 20, PLATE);
+      // two telemetry panels with scrolling rows
+      for (let s = 0; s < 2; s++) {
+        const sx = q - 12 + s * 11, sy = fy - 30;
+        px(sx, sy, 9, 9, '#140A00');
+        for (let r = 0; r < 4; r++) {
+          const w = 2 + ((Math.floor(t / 300) + r * 3 + s * 5) % 6);
+          px(sx + 1, sy + 1 + r * 2, Math.min(7, w), 1, r % 2 ? WARM : CY);
+        }
+      }
+      // radar scope with sweeping needle
+      const rx = q + 11, ry = fy - 25.5, rr = 4.5;
+      px(rx - 5, ry - 5, 10, 10, '#140A00');
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * 6.2832;
+        px(rx + Math.cos(a) * rr, ry + Math.sin(a) * rr, 1, 1, 'rgba(127,227,255,0.4)');
+      }
+      const sweep = t * 0.0016;
+      for (let k = 1; k <= 4; k++) px(rx + Math.cos(sweep) * k, ry + Math.sin(sweep) * k, 1, 1, k > 3 ? LIT : CY);
+      px(rx + Math.cos(sweep * 0.37) * 3, ry + Math.sin(sweep * 0.37) * 3, 1, 1, OR);
+      // status lamps across the tower base
+      for (let i = 0; i < 7; i++) {
+        const on = (Math.floor(t / 480 + i * 5) % 5) !== 0;
+        px(q - 12 + i * 4, fy - 13.5, 2, 1, on ? (i === 3 ? OR : CY) : SHADE);
+      }
+      // overhead docking clamp the core is serviced under
+      px(q - 6, fy - 38, 14, 1, PLATE);
+      px(q - 6, fy - 37, 1, 3, HULL);
+      px(q + 7, fy - 37, 1, 3, HULL);
+      px(q - 1, fy - 37, 3, 2, (Math.floor(t / 700) % 2) ? OR : SHADE);
+      // stencil
+      for (let i = 0; i < 4; i++) px(q - 13 + i * 3, fy - 3, 2, 1, i % 2 ? PLATE : SHADE);
+    }
+
+    // ---- charging pod ----
+    ctx.globalAlpha = A.sleep;
+    const p = ST.sleep.x;
+    px(p - 9, fy - 2, 19, 2, PLATE);
+    px(p - 9, fy - 3, 19, 1, WARM);
+    px(p - 8, fy - 6, 17, 3, HULL);
+    px(p - 10, fy - 9, 2, 7, PLATE);
+    px(p + 9, fy - 9, 2, 7, PLATE);
+    for (let i = 0; i < 15; i++) px(p - 7 + i, fy - 12 - Math.round(Math.sin((i / 14) * Math.PI) * 3), 1, 1, 'rgba(127,227,255,0.5)');
+    px(p - 10, fy - 14, 3, 5, HULL);
+    px(p - 9, fy - 13, 1, 3, CY);
+    px(p + 7, fy - 5, 1, 1, (Math.floor(t / 800) % 2) ? CY : 'rgba(127,227,255,0.25)');
+    px(p + 5, fy - 5, 1, 1, OR);
+
+    // ---- bookshelf ----
+    ctx.globalAlpha = A.read;
+    const r = ST.read.x + 11;
+    px(r - 6, fy - 18, 13, 18, SHADE);
+    px(r - 6, fy - 18, 13, 1, PLATE);
+    px(r - 6, fy - 10, 13, 1, PLATE);
+    px(r - 6, fy - 1, 13, 1, PLATE);
+    const spines = [AM, CY, WARM, OR, LIT, AM, CY, LIT];
+    for (let i = 0; i < 5; i++) {
+      px(r - 5 + i * 2, fy - 17, 1, 7, spines[i]);
+      px(r - 5 + i * 2, fy - 9, 1, 8, spines[i + 3]);
+    }
+    px(r + 2, fy - 20, 1, 2, PLATE);
+    px(r + 1, fy - 21, 3, 1, (Math.floor(t / 1400) % 2) ? WARM : 'rgba(255,193,94,0.4)');
+
+    // ---- easel ----
+    ctx.globalAlpha = A.draw;
+    const e = ST.draw.x + 11;
+    px(e - 5, fy - 12, 1, 12, PLATE);
+    px(e + 5, fy - 12, 1, 12, PLATE);
+    px(e - 1, fy - 7, 1, 7, HULL);
+    px(e - 8, fy - 28, 17, 17, SHADE);
+    px(e - 8, fy - 28, 17, 1, WARM);
+    px(e - 8, fy - 12, 17, 1, WARM);
+    px(e - 8, fy - 28, 1, 17, PLATE);
+    px(e + 8, fy - 28, 1, 17, PLATE);
+    px(e - 8, fy - 28, 2, 2, CY);
+    px(e + 7, fy - 12, 2, 2, CY);
+    px(e - 12, fy - 8, 4, 3, HULL);
+    px(e - 11, fy - 7, 1, 1, OR); px(e - 10, fy - 7, 1, 1, CY); px(e - 9, fy - 7, 1, 1, LIT);
+
+    // ---- arcade cabinet ----
+    ctx.globalAlpha = A.game;
+    const g = ST.game.x + 10;
+    px(g - 6, fy - 22, 13, 22, SHADE);
+    px(g - 6, fy - 22, 13, 1, OR);
+    px(g - 6, fy - 21, 13, 2, HULL);
+    px(g - 5, fy - 20, 11, 1, (Math.floor(t / 300) % 2) ? WARM : 'rgba(255,193,94,0.4)');
+    px(g - 5, fy - 18, 11, 8, 'rgba(10,20,26,0.95)');
+    for (let i = 0; i < 4; i++) px(g - 4 + i * 3, fy - 17 + ((Math.floor(t / 140) + i) % 6), 1, 1, i % 2 ? CY : LIT);
+    px(g - 5, fy - 9, 11, 1, PLATE);
+    px(g - 3, fy - 8, 1, 2, OR); px(g - 3, fy - 9, 1, 1, LIT);
+    px(g + 1, fy - 8, 1, 1, CY); px(g + 3, fy - 8, 1, 1, WARM);
+    px(g - 6, fy - 1, 13, 1, PLATE);
+
+    // ---- observation telescope + porthole ----
+    ctx.globalAlpha = A.scope;
+    const s = ST.scope.x + 10;
+    px(s - 12, fy - 40, 20, 20, 'rgba(6,12,20,0.9)');
+    for (let i = 0; i < 7; i++) {
+      const sx = s - 10 + ((i * 7) % 17), sy = fy - 38 + ((i * 5) % 17);
+      px(sx, sy, 1, 1, (Math.floor(t / 700 + i) % 4) ? 'rgba(255,227,168,0.8)' : CY);
+    }
+    for (let i = 0; i < 20; i++) {
+      px(s - 12 + i, fy - 41, 1, 1, PLATE); px(s - 12 + i, fy - 20, 1, 1, PLATE);
+    }
+    px(s - 13, fy - 40, 1, 20, PLATE); px(s + 8, fy - 40, 1, 20, PLATE);
+    for (let i = 0; i < 9; i++) px(s - 4 + i, fy - 12 - i, 2, 2, i > 6 ? HULL : PLATE);
+    px(s - 6, fy - 11, 4, 3, HULL);
+    px(s - 5, fy - 10, 1, 1, CY);
+    px(s - 2, fy - 6, 1, 6, PLATE);
+    px(s - 4, fy - 1, 5, 1, PLATE);
+
+    // ---- hydroponic bay ----
+    ctx.globalAlpha = A.plant;
+    const hp = ST.plant.x + 9, grow = Math.min(9, L.plantG || 3);
+    px(hp - 7, fy - 6, 15, 6, SHADE);
+    px(hp - 7, fy - 7, 15, 1, PLATE);
+    px(hp - 6, fy - 6, 13, 1, 'rgba(127,227,255,0.45)');
+    px(hp - 8, fy - 20, 1, 14, PLATE); px(hp + 8, fy - 20, 1, 14, PLATE);
+    px(hp - 8, fy - 21, 17, 1, PLATE);
+    px(hp - 6, fy - 20, 13, 1, (Math.floor(t / 1100) % 2) ? 'rgba(127,227,255,0.7)' : 'rgba(127,227,255,0.35)');
+    px(hp, fy - 7 - grow, 1, grow, '#6FBF4A');
+    for (let i = 1; i < grow; i += 2) {
+      const swing = Math.round(Math.sin(t * 0.0015 + i) * 1);
+      px(hp - 2 + swing, fy - 7 - i, 2, 1, '#8FD86A');
+      px(hp + 1 - swing, fy - 9 - i, 2, 1, '#6FBF4A');
+    }
+    if (grow > 6) px(hp - 1, fy - 8 - grow, 3, 2, '#FF7A2E');
+
+    // ---- repair panel ----
+    ctx.globalAlpha = A.fix;
+    const fp = ST.fix.x + 10, hot = focus === 'fix' && (Math.floor(t / 110) % 3 === 0);
+    px(fp - 7, fy - 26, 15, 16, SHADE);
+    px(fp - 7, fy - 27, 15, 1, PLATE);
+    px(fp - 7, fy - 10, 15, 1, PLATE);
+    px(fp - 7, fy - 26, 1, 16, PLATE); px(fp + 7, fy - 26, 1, 16, PLATE);
+    px(fp - 5, fy - 24, 3, 1, OR); px(fp + 1, fy - 24, 4, 1, CY);
+    for (let i = 0; i < 5; i++) {
+      px(fp - 5 + i * 3, fy - 22, 1, 3 + (i % 3), i % 2 ? OR : CY);
+      px(fp - 5 + i * 3, fy - 17, 2, 1, HULL);
+    }
+    px(fp - 4, fy - 14, 9, 3, HULL);
+    px(fp - 3, fy - 13, 1, 1, hot ? LIT : OR);
+    px(fp + 3, fy - 13, 1, 1, (Math.floor(t / 600) % 2) ? CY : 'rgba(127,227,255,0.3)');
+    px(fp - 12, fy - 5, 5, 5, HULL);
+    px(fp - 11, fy - 4, 3, 1, WARM); px(fp - 11, fy - 2, 3, 1, PLATE);
+
+    // ---- viewscreen: always on the deck, brighter while a scene is on air ----
+    {
+    ctx.globalAlpha = Math.max(0.72, A.watch);
+    const wx = ST.watch.x - 34, wy = fy - 34, ww = 44, wh = 28;
+    px(wx - 2, wy - 2, ww + 4, wh + 4, SHADE);
+    px(wx - 2, wy - 3, ww + 4, 1, PLATE);
+    px(wx - 3, wy - 2, 1, wh + 4, PLATE); px(wx + ww + 2, wy - 2, 1, wh + 4, PLATE);
+    px(wx - 2, wy + wh + 2, ww + 4, 1, PLATE);
+    px(wx, wy, ww, wh, 'rgba(4,10,16,0.97)');
+    const SC = { AM, WARM, LIT, CY, OR, HULL, SHADE, PLATE, GRN: '#6FBF4A' };
+    const sc = this.currentScene(t);
+    sc.draw(px, t, wx + 1, wy + 1, ww - 2, wh - 2, SC);
+    for (let yy = wy; yy < wy + wh; yy += 2) px(wx, yy, ww, 1, 'rgba(0,0,0,0.22)');
+    px(wx, wy, ww, 1, 'rgba(127,227,255,0.18)');
+    px(wx - 2, wy + wh + 3, 6, 1, (Math.floor(t / 900) % 2) ? OR : PLATE);
+    px(wx + 6, wy + wh + 3, ww - 8, 1, PLATE);
+    px(ST.watch.x - 4, fy - 4, 3, 4, PLATE);
+    px(ST.watch.x - 6, fy - 1, 7, 1, PLATE);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  feedScenes() {
+    if (this.sceneList) return this.sceneList;
+    const person = (px, x, y, c, ph) => {
+      px(x + 1, y, 1, 1, c);
+      px(x + 1, y + 1, 1, 2, c);
+      px(x, y + 1, 1, 1, c); px(x + 2, y + 1, 1, 1, c);
+      if (ph) { px(x, y + 3, 1, 2, c); px(x + 2, y + 3, 1, 2, c); }
+      else { px(x + 1, y + 3, 1, 2, c); px(x + 2, y + 3, 1, 1, c); }
+    };
+    this.sceneList = [
+      { name: 'CARGO BAY',
+        lines: ['Crate 12 is upside down. Nobody has noticed.', 'That conveyor has the same squeak as ours.', 'One of them is definitely on a break.'],
+        draw: (px, t, x, y, w, h, C) => {
+          px(x, y + h - 3, w, 1, C.PLATE);
+          for (let i = 0; i < w; i += 3) px(x + ((i + Math.floor(t / 90)) % w), y + h - 2, 2, 1, C.HULL);
+          for (let i = 0; i < 4; i++) {
+            const cx = x + ((i * 11 + Math.floor(t / 70)) % (w + 8)) - 6;
+            if (cx < x - 4 || cx > x + w - 2) continue;
+            px(cx, y + h - 8, 6, 5, i % 2 ? C.WARM : C.AM);
+            px(cx + 1, y + h - 7, 4, 3, C.HULL);
+          }
+          person(px, x + 4, y + h - 8, C.CY, Math.floor(t / 220) % 2);
+          person(px, x + w - 9, y + h - 8, C.LIT, Math.floor(t / 260) % 2);
+        } },
+      { name: 'ZERO-G BALL',
+        lines: ['No gravity, no rules, no referee.', 'That pass was illegal in four systems.', 'I could play this. I have the hover for it.'],
+        draw: (px, t, x, y, w, h, C) => {
+          for (let yy = y + 1; yy < y + h - 1; yy += 3) px(x + w / 2, yy, 1, 2, C.HULL);
+          const bx = x + 4 + ((t / 14) % (w - 8)), by = y + h / 2 + Math.sin(t / 260) * (h / 3);
+          px(Math.round(bx), Math.round(by), 2, 2, C.OR);
+          person(px, x + 3, y + 4 + Math.round(Math.sin(t / 500) * 3), C.CY, 1);
+          person(px, x + w - 7, y + 7 + Math.round(Math.cos(t / 430) * 4), C.LIT, 0);
+          person(px, x + w / 2 - 6, y + h - 9 + Math.round(Math.sin(t / 620) * 2), C.WARM, 1);
+        } },
+      { name: 'REACTOR SHIFT',
+        lines: ['Their containment ring runs three degrees hot.', 'Somebody down there is not wearing a badge.', 'That hum. I can hear it from here.'],
+        draw: (px, t, x, y, w, h, C) => {
+          const cx = x + w / 2;
+          px(cx - 3, y + 1, 7, h - 4, C.HULL);
+          for (let i = 0; i < 7; i++) {
+            const ph = ((t / 500) + i * 0.14) % 1;
+            px(cx - 2 + (i % 5), y + h - 4 - ph * (h - 5), 1, 1, ph > 0.6 ? C.CY : C.LIT);
+          }
+          px(cx - 4, y + 1, 1, h - 4, C.PLATE); px(cx + 4, y + 1, 1, h - 4, C.PLATE);
+          px(x, y + h - 3, w, 1, C.PLATE);
+          person(px, x + 3, y + h - 8, C.WARM, Math.floor(t / 300) % 2);
+          person(px, x + w - 8, y + h - 8, C.CY, Math.floor(t / 340) % 2);
+        } },
+      { name: 'MESS HALL',
+        lines: ['They have real cups. Ours are printed.', 'Someone told a joke. Two of them liked it.', 'Rations there look suspiciously warm.'],
+        draw: (px, t, x, y, w, h, C) => {
+          px(x, y + h - 3, w, 1, C.PLATE);
+          px(x + 6, y + h - 9, w - 12, 1, C.WARM);
+          px(x + 7, y + h - 8, 1, 5, C.HULL); px(x + w - 9, y + h - 8, 1, 5, C.HULL);
+          [0, 1, 2].forEach(i => person(px, x + 8 + i * 8, y + h - 14, [C.CY, C.LIT, C.WARM][i], (Math.floor(t / 700) + i) % 2));
+          for (let i = 0; i < 3; i++) {
+            const ph = ((t / 900) + i * 0.33) % 1;
+            px(x + 11 + i * 8, y + h - 16 - ph * 5, 1, 1, 'rgba(255,227,168,' + (0.8 - ph * 0.7).toFixed(2) + ')');
+          }
+          px(x + 1, y + 2, 8, 4, C.HULL); px(x + 2, y + 3, 6, 2, C.OR);
+        } },
+      { name: 'DOCKING RING',
+        lines: ['Shuttle came in two metres off centre. Sloppy.', 'Those clamps are older than this ship.', 'Cargo manifest says fruit. That is not fruit.'],
+        draw: (px, t, x, y, w, h, C) => {
+          px(x, y + h - 3, w, 1, C.PLATE);
+          const ph = (t / 6000) % 1, sx = x + w - 4 - ph * (w - 12);
+          px(sx, y + h - 12, 12, 5, C.PLATE);
+          px(sx + 1, y + h - 11, 4, 3, C.CY);
+          px(sx + 10, y + h - 14, 2, 3, C.PLATE);
+          px(sx - 2, y + h - 9, 2, 1, (Math.floor(t / 160) % 2) ? C.OR : C.HULL);
+          for (let i = 0; i < 5; i++) px(x + 2 + i * 8, y + h - 4, 2, 1, ((Math.floor(t / 300) + i) % 3) ? C.HULL : C.OR);
+          person(px, x + 3, y + h - 8, C.LIT, Math.floor(t / 200) % 2);
+        } },
+      { name: 'SERVER STACK',
+        lines: ['Forty-one racks. Two of them are pretending to work.', 'Their cooling is louder than their thinking.', 'I would like to live in there for an afternoon.'],
+        draw: (px, t, x, y, w, h, C) => {
+          for (let r = 0; r < 5; r++) {
+            const rx = x + 2 + r * 8;
+            px(rx, y + 2, 6, h - 6, C.HULL);
+            for (let i = 0; i < 5; i++) px(rx + 1, y + 4 + i * 3, 4, 1, ((Math.floor(t / 180) + r + i) % 4) ? 'rgba(127,227,255,0.35)' : C.CY);
+          }
+          px(x, y + h - 3, w, 1, C.PLATE);
+          const wx2 = x + 1 + ((t / 55) % (w - 4));
+          person(px, Math.round(wx2), y + h - 8, C.WARM, Math.floor(t / 210) % 2);
+        } }
+    ];
+    return this.sceneList;
+  }
+
+  currentScene(t) {
+    const list = this.feedScenes();
+    if (this.sceneIdx == null || t - (this.sceneT || 0) > 120000) {
+      let i = Math.floor(Math.random() * list.length);
+      if (i === this.sceneIdx) i = (i + 1) % list.length;
+      this.sceneIdx = i; this.sceneT = t;
+    }
+    return list[this.sceneIdx];
+  }
+
+  chatterPool(st) {
+    if (st === 'watch') {
+      const sc = this.currentScene(performance.now());
+      return sc.lines.slice().sort(() => Math.random() - 0.5).concat(['The feed swaps again soon.']);
+    }
+    if (!this.pools) {
+      this.pools = {
+        scope: [
+          'Two moons over the ice giant. Both cracked.',
+          'A comet went by. It did not wave back.',
+          'Something is blinking in the Serpent Field. Timed. Deliberate.',
+          'The nebula looks like a jellyfish tonight. Officially: a jellyfish.',
+          'Star count in this quadrant: many. I stopped at 400.'
+        ],
+        plant: [
+          'Sprout number nine. Still alive. Personal record.',
+          'It grew 2 millimetres. I logged it. Twice.',
+          'Plants breathe out what we breathe in. Good arrangement.',
+          'I named this one Kevin. Apollo disapproves of naming crops.'
+        ],
+        fix: [
+          'Panel 7. Someone crossed the cyan and the orange lines.',
+          'That someone was me, four cycles ago.',
+          'Resealed. Do not tell Apollo about the smell.',
+          'Solder is just very confident metal.'
+        ],
+        dance: [
+          'The reactor hums in B flat. I am simply accompanying it.',
+          'This counts as calibration of the gyros.'
+        ],
+        ponder: [
+          'If the ship turns and nobody logs it, did it turn?',
+          'Apollo is a circle. I am a rectangle. We manage.',
+          'I have decided the colour amber is underrated.',
+          'Somewhere out there is a floor with more people on it.'
+        ],
+        juggle: [
+          'Three bolts. Zero drops. So far.',
+          'These are load-bearing bolts. Probably.',
+          'Apollo has not noticed. Apollo has noticed.'
+        ]
+      };
+    }
+    const p = this.pools[st];
+    if (!p) return null;
+    return p.slice().sort(() => Math.random() - 0.5);
+  }
+
+  pickBook() {
+    if (!this.books) {
+      this.books = [
+        { title: 'FIELD GUIDE TO DEEP SPACE', lines: [
+          'Chapter 4: "Distance is a suggestion made by light."',
+          '"A vacuum does not suck. It simply refuses to push."',
+          '"If a star looks steady, you are not looking hard enough."',
+          '"Every map of space is out of date before it dries."'
+        ] },
+        { title: 'APOLLO OPERATIONS MANUAL, VOL. IX', lines: [
+          'Section 9.2: "The core must never be tickled."',
+          '"In the event of doubt, consult the core. It enjoys that."',
+          '"Companion units shall not exceed one nap per shift." Bold claim.',
+          '"Warranty void if opened." I have opened it three times.'
+        ] },
+        { title: 'A HISTORY OF SMALL MACHINES', lines: [
+          '"The first machines were built to count grain, not stars."',
+          '"A clock is a machine that argues with the sun."',
+          '"Every small machine dreams of a larger errand."'
+        ] },
+        { title: 'THE STAR-CHART ALMANAC', lines: [
+          '"Deep Field 9 was named after a filing mistake."',
+          '"Sailors steered by stars that had already died."',
+          '"Constellations are the oldest form of gossip."'
+        ] }
+      ];
+    }
+    let b = this.books[Math.floor(Math.random() * this.books.length)];
+    if (b === this.lastBook && this.books.length > 1) b = this.books[(this.books.indexOf(b) + 1) % this.books.length];
+    this.lastBook = b;
+    return b;
+  }
+
+  startAct(t, st) {
+    const L = this.ly;
+    const defs = {
+      sleep: { dur: 11000, cap: 'CHARGING — DO NOT POKE' },
+      read:  { dur: 20000, cap: 'READING' },
+      draw:  { dur: 11000, cap: 'AT THE EASEL' },
+      game:  { dur: 10000, cap: 'PLAYING VIDEO GAMES' },
+      scope: { dur: 16000, cap: 'ON THE TELESCOPE' },
+      plant: { dur: 13000, cap: 'TENDING THE HYDROPONICS' },
+      fix:   { dur: 14000, cap: 'PATCHING PANEL 7' },
+      watch: { dur: 24000, cap: 'WATCHING THE FEED' },
+      dance: { dur: 9000,  cap: 'DANCING. NO MUSIC DETECTED' },
+      ponder: { dur: 12000, cap: 'THINKING ABOUT IT' },
+      juggle: { dur: 10000, cap: 'JUGGLING. UNAUTHORISED' },
+      fact:  { dur: 9000,  cap: 'TRANSMITTING TRIVIA' },
+      idle:  { dur: 5000,  cap: 'STANDING BY' },
+      wave:  { dur: 4000,  cap: 'SAYING HI' }
+    };
+    const a = defs[st] || defs.idle;
+    L.last = st; L.st = st; L.until = t + a.dur; L.cap = a.cap;
+    if (st === 'draw') L.art = [];
+    if (st === 'plant') L.plantG = Math.min(9, (L.plantG || 3) + 1);
+    if (st === 'watch') a.cap = 'WATCHING: ' + this.currentScene(t).name;
+    L.chatQ = null; L.chatI = 0; L.page = 0;
+    if (st === 'read') {
+      const b = this.pickBook();
+      L.book = b.title; L.chatQ = b.lines.slice(); L.chatNext = t + 1100; L.cap = 'READING: ' + b.title;
+      L.bubble = null;
+    } else {
+      const q = this.chatterPool(st);
+      if (q) { L.chatQ = q; L.chatNext = t + 1000; L.bubble = null; }
+      else {
+        L.bubble = (st === 'fact' || Math.random() < 0.4) ? this.lylaFact() : null; L.bubT = t;
+        if (L.bubble) this.sfx(Math.random() < 0.5 ? 'ly1' : 'ly2');
+      }
+    }
+    if (this.lylaLabelRef.current) this.lylaLabelRef.current.textContent = 'LYLA // ' + L.cap;
+  }
+
+  // ——— environment events ———————————————————————————————————
+  // every N minutes the deck gives way to a place for a few minutes, then returns
+  envDefs() {
+    return {
+      city: {
+        name: 'NEON DISTRICT',
+        cap: 'SCANNING THE SKYLINE',
+        travel: 'CLIMBING THE TOWERS',
+        lines: [
+          'Tower glass is all advertisement. None of it is load bearing.',
+          'Traffic layer four is running hot again.',
+          'I can see nine hundred signs and not one street name.',
+          'Rain on neon. It never stops being worth the trip.'
+        ]
+      },
+      urban: {
+        name: 'OLD QUARTER',
+        cap: 'WALKING THE STRIP',
+        travel: 'DOWN TO STREET LEVEL',
+        lines: [
+          'Low roofs, warm windows. I like it better down here.',
+          'The noodle stall on the corner has been open ninety years.',
+          'Somebody left a radio playing on the second floor.',
+          'Crosswalk still counts down for nobody.'
+        ]
+      },
+      mountains: {
+        name: 'RIDGE LINE',
+        cap: 'SUMMIT WATCH',
+        travel: 'CLIMBING TO THE RIDGE',
+        lines: [
+          'Air is thin. My rotors like it.',
+          'Aurora is running about four degrees off the magnetic pole.',
+          'Snow on the high shoulder. Nothing moving up there.',
+          'Fire is warm. Stay a while, Apollo.'
+        ]
+      }
+    };
+  }
+
+  updateEnv(t) {
+    const every = (this.props.eventEveryMinutes ?? 10) * 60000;
+    const hold = (this.props.eventMinutes ?? 3) * 60000;
+    const fade = 2800;
+    const E = this.envE || (this.envE = { i: 0, kind: null, start: 0, next: t + every });
+    const pv = { 'Neon District': 'city', 'Old Quarter': 'urban', 'Ridge Line': 'mountains' }[this.props.envPreview];
+    if (pv) {
+      if (E.kind !== pv) { E.kind = pv; E.start = t; this.envStart(t, pv); }
+      this.envAmt = Math.min(1, (t - E.start) / 900);
+      this.envLeft = hold;
+      this.envPv = true;
+      return;
+    }
+    if (this.envPv) { this.envPv = false; E.kind = null; E.next = t + every; this.envAmt = 0; this.envEnd(t); }
+    if (!E.kind && t >= E.next) {
+      const order = ['city', 'urban', 'mountains'];
+      E.kind = order[E.i % order.length]; E.i++; E.start = t;
+      this.envStart(t, E.kind);
+    }
+    if (!E.kind) { this.envAmt = 0; return; }
+    const el = t - E.start;
+    if (el > hold + fade) {
+      E.kind = null; E.next = t + every - hold - fade; this.envAmt = 0;
+      this.envEnd(t);
+      return;
+    }
+    const inA = Math.min(1, el / fade);
+    const outA = el > hold ? Math.max(0, 1 - (el - hold) / fade) : 1;
+    this.envAmt = inA * outA;
+    this.envLeft = Math.max(0, hold - el);
+  }
+
+  envStart(t, kind) {
+    const L = this.ly;
+    if (!L) return;
+    L.envMode = kind; L.bubble = null; L.chatQ = null;
+    this.sfx('hud');
+    this.envAct(t);
+  }
+
+  envEnd(t) {
+    const L = this.ly;
+    if (!L) return;
+    L.envMode = null; L.bubble = null; L.chatQ = null; L.st = 'rest'; L.until = t + 1200;
+    this.lylaNext(t);
+  }
+
+  envSpot(kind) {
+    const gw = window.innerWidth / 4, fy = this.stations().fy;
+    const band = fy - this.envBandTop(fy);
+    const lift = Math.max(4, Math.min(22, Math.round(band * 0.3)));
+    if (kind === 'city') return { x: gw * 0.52, y: fy - lift };
+    if (kind === 'urban') return { x: gw * 0.44, y: fy - 6 };
+    return { x: gw * 0.60, y: fy - 5 };
+  }
+
+  envAct(t) {
+    const L = this.ly, def = this.envDefs()[L.envMode];
+    if (!def) return;
+    const p = this.envSpot(L.envMode);
+    if (Math.hypot(L.x - p.x, L.y - p.y) > 3.5) {
+      L.st = 'fly'; L.tx = p.x; L.ty = p.y; L.until = t + 14000; L.next = null;
+      L.cap = def.travel; L.chatQ = null; L.bubble = null;
+    } else {
+      L.st = 'envact'; L.until = t + 11000;
+      L.cap = def.cap;
+      L.chatQ = def.lines.slice();
+      L.chatI = 0; L.chatNext = t + 900;
+    }
+    if (this.lylaLabelRef.current) this.lylaLabelRef.current.textContent = 'LYLA // ' + L.cap;
+  }
+
+  envBandTop(fy) { return fy - 86; }
+
+  drawEnv(ctx, px, t, gw, gh, fy, a) {
+    const S = 4, top = this.envBandTop(fy), kind = this.envE.kind;
+    const seed = kind === 'city' ? 3.7 : kind === 'urban' ? 11.9 : 23.3;
+    const rnd = (i) => { const x = Math.sin((i + 1) * 127.1 + seed) * 43758.5453; return x - Math.floor(x); };
+    ctx.save();
+    ctx.globalAlpha = a;
+
+    const sky = ctx.createLinearGradient(0, top * S, 0, (fy + 14) * S);
+    if (kind === 'city') {
+      sky.addColorStop(0, 'rgba(10,4,32,0)');
+      sky.addColorStop(0.35, 'rgba(18,7,48,0.92)');
+      sky.addColorStop(0.82, 'rgba(52,10,68,0.96)');
+      sky.addColorStop(1, 'rgba(12,4,26,0.98)');
+    } else if (kind === 'urban') {
+      sky.addColorStop(0, 'rgba(26,12,4,0)');
+      sky.addColorStop(0.38, 'rgba(44,20,6,0.9)');
+      sky.addColorStop(0.85, 'rgba(96,42,8,0.92)');
+      sky.addColorStop(1, 'rgba(22,10,2,0.98)');
+    } else {
+      sky.addColorStop(0, 'rgba(4,10,30,0)');
+      sky.addColorStop(0.4, 'rgba(7,16,44,0.92)');
+      sky.addColorStop(0.86, 'rgba(12,30,62,0.94)');
+      sky.addColorStop(1, 'rgba(6,12,28,0.98)');
+    }
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, top * S, gw * S, (gh - top) * S);
+
+    const band = fy - top;
+    if (kind === 'city') this.envCity(ctx, px, t, gw, fy, rnd, band);
+    else if (kind === 'urban') this.envUrban(ctx, px, t, gw, fy, rnd, band);
+    else this.envRidge(ctx, px, t, gw, fy, rnd, band);
+
+    if (this.ringRef.current) {
+      const r = this.ringRef.current.getBoundingClientRect();
+      if (r.width) {
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const r0 = r.width * ((this.props.coreSize ?? 252) / 1200) * 1.35, r1 = r0 * 2.1;
+        const hole = ctx.createRadialGradient(cx, cy, r0, cx, cy, r1);
+        hole.addColorStop(0, 'rgba(0,0,0,1)');
+        hole.addColorStop(0.65, 'rgba(0,0,0,0.8)');
+        hole.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = hole;
+        ctx.fillRect(cx - r1, cy - r1, r1 * 2, r1 * 2);
+        ctx.restore();
+      }
+    }
+
+    const ms = this.envLeft || 0;
+    const mm = String(Math.floor(ms / 60000)).padStart(2, '0');
+    const ss = String(Math.floor(ms / 1000) % 60).padStart(2, '0');
+    ctx.font = '500 11px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,193,94,0.86)';
+    ctx.shadowColor = 'rgba(255,150,0,0.6)'; ctx.shadowBlur = 8;
+    const label = this.envDefs()[kind].name + ' · ' + mm + ':' + ss;
+    ctx.textAlign = 'left';
+    const lw = ctx.measureText(label).width, lx = 312, ly = top * S + 10;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(14,7,0,0.88)';
+    ctx.fillRect(lx - 9, ly - 4, lw + 18, 22);
+    ctx.strokeStyle = 'rgba(255,176,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(lx - 8.5, ly - 3.5, lw + 17, 21);
+    ctx.fillStyle = 'rgba(255,193,94,0.92)';
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, lx, ly);
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  envCity(ctx, px, t, gw, fy, rnd, band) {
+    const K = Math.min(1, band / 86);
+    const CY = '#7FE3FF', MG = '#FF4FA3', AM = '#FFB000';
+    // far towers
+    for (let i = 0; i < 30; i++) {
+      const w = 10 + Math.floor(rnd(i) * 14), x = Math.floor(rnd(i + 40) * (gw + 20)) - 10;
+      const h = Math.round((22 + Math.floor(rnd(i + 90) * 34)) * K);
+      px(x, fy - h, w, h + 2, 'rgba(22,10,52,0.95)');
+      for (let wy = 0; wy < h - 4; wy += 4) for (let wx = 1; wx < w - 2; wx += 3) {
+        const s = rnd(i * 90 + wy * 7 + wx);
+        if (s > 0.72) px(x + wx, fy - h + wy + 2, 1, 1, s > 0.93 ? MG : 'rgba(127,227,255,0.5)');
+      }
+    }
+    // mid towers with signage
+    for (let i = 0; i < 16; i++) {
+      const w = 14 + Math.floor(rnd(i + 200) * 18), x = Math.floor(rnd(i + 260) * (gw + 24)) - 12;
+      const h = Math.round((34 + Math.floor(rnd(i + 310) * 46)) * K);
+      px(x, fy - h, w, h + 2, 'rgba(11,5,28,0.98)');
+      px(x, fy - h, w, 1, 'rgba(127,227,255,0.28)');
+      for (let wy = 2; wy < h - 3; wy += 3) for (let wx = 1; wx < w - 1; wx += 2) {
+        const s = rnd(i * 311 + wy * 13 + wx * 3);
+        if (s > 0.66) {
+          const flick = (Math.floor(t / 900 + s * 20) % 7) === 0 ? 0.25 : 1;
+          px(x + wx, fy - h + wy, 1, 1, s > 0.95 ? 'rgba(255,79,163,' + flick + ')' : 'rgba(255,200,120,' + (0.55 * flick) + ')');
+        }
+      }
+      // vertical neon sign
+      if (rnd(i + 400) > 0.45) {
+        const sx = x + w - 3, sh = 8 + Math.floor(rnd(i + 430) * 14), sy = fy - h + 6;
+        const on = (Math.floor(t / 620 + i) % 9) !== 0;
+        px(sx, sy, 2, sh, on ? (rnd(i + 460) > 0.5 ? MG : CY) : 'rgba(60,20,60,0.8)');
+        if (on) { ctx.save(); ctx.globalAlpha = 0.22; px(sx - 2, sy - 2, 6, sh + 4, rnd(i + 460) > 0.5 ? MG : CY); ctx.restore(); }
+      }
+      // antenna beacon
+      if (rnd(i + 500) > 0.6) {
+        px(x + Math.floor(w / 2), fy - h - 7, 1, 7, 'rgba(40,18,70,0.95)');
+        if ((Math.floor(t / 700) % 2) === 0) px(x + Math.floor(w / 2) - 1, fy - h - 9, 3, 2, '#FF4FA3');
+      }
+    }
+    // skylane traffic
+    for (let i = 0; i < 7; i++) {
+      const lane = fy - Math.round((54 + (i % 3) * 14) * K), dir = i % 2 ? 1 : -1;
+      const sp = 0.012 + rnd(i + 600) * 0.02;
+      let x = ((t * sp + rnd(i + 640) * gw) % (gw + 40)) - 20;
+      if (dir < 0) x = gw - x;
+      px(x, lane, 3, 1, 'rgba(255,240,200,0.9)');
+      px(x + (dir > 0 ? -2 : 3), lane, 2, 1, dir > 0 ? 'rgba(255,79,163,0.6)' : 'rgba(127,227,255,0.6)');
+    }
+    // rain
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    for (let i = 0; i < 130; i++) {
+      const x = (rnd(i + 700) * gw + t * 0.02) % gw;
+      const y = fy - band + ((rnd(i + 760) * band + t * 0.11) % band);
+      px(x, y, 1, 3, '#9FD8FF');
+    }
+    ctx.restore();
+    // wet street
+    px(0, fy, gw, 3, 'rgba(16,6,34,0.96)');
+    px(0, fy, gw, 1, 'rgba(127,227,255,0.3)');
+    for (let i = 0; i < 40; i++) {
+      const x = rnd(i + 800) * gw;
+      px(x, fy + 1, 2 + Math.floor(rnd(i + 830) * 3), 1, (i % 3) ? 'rgba(255,79,163,0.25)' : 'rgba(127,227,255,0.25)');
+    }
+  }
+
+  envUrban(ctx, px, t, gw, fy, rnd, band) {
+    const K = Math.min(1, band / 86);
+    const WARM = 'rgba(255,196,110,', BRICK = 'rgba(42,24,12,0.98)';
+    for (let i = 0; i < 22; i++) {
+      const w = 18 + Math.floor(rnd(i) * 16), x = Math.floor(rnd(i + 30) * (gw + 20)) - 10;
+      const h = Math.round((14 + Math.floor(rnd(i + 70) * 26)) * K);
+      px(x, fy - h, w, h, BRICK);
+      px(x, fy - h, w, 1, 'rgba(120,68,26,0.9)');
+      px(x - 1, fy - h - 1, w + 2, 1, 'rgba(84,46,16,0.95)');
+      for (let wy = 3; wy < h - 3; wy += 5) for (let wx = 2; wx < w - 3; wx += 5) {
+        const s = rnd(i * 77 + wy * 5 + wx);
+        px(x + wx, fy - h + wy, 3, 3, s > 0.45 ? WARM + (0.35 + s * 0.5) + ')' : 'rgba(18,10,4,0.9)');
+        if (s > 0.9) px(x + wx, fy - h + wy + 1, 3, 1, 'rgba(60,32,10,0.8)');
+      }
+      // awning over the shopfront
+      if (rnd(i + 120) > 0.5) {
+        const aw = Math.min(w - 2, 10);
+        for (let k = 0; k < aw; k++) px(x + 1 + k, fy - 8, 1, 2, (k % 2) ? 'rgba(200,70,40,0.95)' : 'rgba(236,208,168,0.95)');
+      }
+    }
+    // street furniture
+    for (let i = 0; i < 6; i++) {
+      const x = 30 + i * Math.floor((gw - 60) / 5);
+      px(x, fy - 22, 1, 22, 'rgba(70,40,16,0.95)');
+      px(x - 2, fy - 24, 5, 2, 'rgba(90,52,20,0.95)');
+      px(x - 1, fy - 23, 3, 1, '#FFE3A8');
+      ctx.save(); ctx.globalAlpha = 0.1;
+      ctx.fillStyle = '#FFC66E';
+      ctx.beginPath();
+      ctx.moveTo((x - 1) * 4, (fy - 22) * 4); ctx.lineTo((x - 9) * 4, fy * 4); ctx.lineTo((x + 10) * 4, fy * 4); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    // pedestrian crossing
+    px(0, fy, gw, 3, 'rgba(30,16,6,0.97)');
+    px(0, fy, gw, 1, 'rgba(255,176,0,0.22)');
+    for (let i = 0; i < 14; i++) px(gw * 0.18 + i * 5, fy + 1, 3, 1, 'rgba(236,208,168,0.5)');
+    // signal counting down to nobody
+    const sx = Math.floor(gw * 0.74);
+    px(sx, fy - 26, 2, 26, 'rgba(70,40,16,0.95)');
+    px(sx - 2, fy - 32, 6, 7, 'rgba(24,14,6,0.98)');
+    const go = (Math.floor(t / 3000) % 2) === 0;
+    px(sx - 1, fy - 31, 4, 2, go ? 'rgba(90,200,120,0.95)' : 'rgba(30,60,36,0.8)');
+    px(sx - 1, fy - 28, 4, 2, go ? 'rgba(80,30,20,0.8)' : 'rgba(230,80,50,0.95)');
+    // pigeons lifting off now and then
+    for (let i = 0; i < 5; i++) {
+      const ph = ((t / 9000) + rnd(i + 300)) % 1;
+      const x = 40 + rnd(i + 330) * (gw - 80) + ph * 26;
+      const y = fy - 34 - ph * 30;
+      if (ph > 0.06) px(x, y, (Math.floor(t / 140 + i) % 2) ? 3 : 2, 1, 'rgba(236,208,168,0.55)');
+    }
+  }
+
+  envRidge(ctx, px, t, gw, fy, rnd, band) {
+    const K = Math.min(1, band / 86);
+    // stars
+    for (let i = 0; i < 90; i++) {
+      const x = rnd(i) * gw, y = fy - band + rnd(i + 50) * band * 0.6;
+      const tw = 0.3 + 0.7 * Math.abs(Math.sin(t * 0.0009 + i));
+      px(x, y, 1, 1, 'rgba(220,236,255,' + tw.toFixed(2) + ')');
+    }
+    // aurora
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    for (let b = 0; b < 3; b++) {
+      for (let x = 0; x < gw; x += 2) {
+        const y = fy - Math.round(74 * K) + b * 7 + Math.sin(x * 0.04 + t * 0.0007 + b) * 6 + Math.sin(x * 0.011 - t * 0.0004) * 4;
+        px(x, y, 2, 3 + b, b === 0 ? 'rgba(110,255,190,0.5)' : b === 1 ? 'rgba(127,227,255,0.4)' : 'rgba(160,150,255,0.3)');
+      }
+    }
+    ctx.restore();
+    // three ridges, far to near
+    const ridge = (baseH, amp, col, snow, sd) => {
+      for (let x = 0; x < gw; x++) {
+        const n = Math.sin(x * 0.021 + sd) * amp + Math.sin(x * 0.061 + sd * 2) * (amp * 0.42) + Math.sin(x * 0.13 + sd * 3) * (amp * 0.16);
+        const h = Math.max(6, baseH + n);
+        px(x, fy - h, 1, h + 2, col);
+        if (snow && h > baseH + amp * 0.55) {
+          px(x, fy - h, 1, Math.min(7, Math.floor((h - baseH) * 0.4)), 'rgba(226,240,255,0.9)');
+        }
+      }
+    };
+    ridge(52 * K, 20 * K, 'rgba(28,44,78,0.95)', true, 1.2);
+    ridge(36 * K, 15 * K, 'rgba(18,30,58,0.97)', true, 4.6);
+    ridge(20 * K, 9 * K, 'rgba(9,16,34,0.99)', false, 9.1);
+    // pines along the near ridge
+    for (let i = 0; i < 46; i++) {
+      const x = Math.floor(rnd(i + 600) * gw), h = 5 + Math.floor(rnd(i + 650) * 6);
+      px(x, fy - h, 1, h, 'rgba(8,20,18,0.98)');
+      for (let k = 0; k < h - 1; k++) px(x - 1 - Math.floor(k / 3), fy - h + k + 1, 3 + 2 * Math.floor(k / 3), 1, 'rgba(12,34,30,0.98)');
+    }
+    // snow ground
+    px(0, fy, gw, 3, 'rgba(200,220,245,0.92)');
+    px(0, fy + 1, gw, 2, 'rgba(120,150,190,0.5)');
+    // campfire beside LYLA's perch
+    const fx = Math.floor(gw * 0.60) - 8;
+    px(fx - 3, fy - 1, 7, 1, 'rgba(40,26,16,0.95)');
+    px(fx - 2, fy - 2, 2, 1, 'rgba(60,38,20,0.95)');
+    px(fx + 1, fy - 2, 2, 1, 'rgba(60,38,20,0.95)');
+    const fl = Math.floor(t / 110) % 3;
+    px(fx - 1, fy - 4 - fl, 3, 2 + fl, 'rgba(255,150,40,0.95)');
+    px(fx, fy - 5 - fl, 1, 2, 'rgba(255,224,150,0.95)');
+    ctx.save(); ctx.globalAlpha = 0.14;
+    px(fx - 5, fy - 10, 11, 11, '#FF9B32');
+    ctx.restore();
+    // drifting snow
+    ctx.save(); ctx.globalAlpha = 0.35;
+    for (let i = 0; i < 70; i++) {
+      const x = (rnd(i + 900) * gw + Math.sin(t * 0.0006 + i) * 8 + t * 0.004) % gw;
+      const y = fy - band + ((rnd(i + 940) * band + t * 0.014) % band);
+      px(x, y, 1, 1, '#E6F2FF');
+    }
+    ctx.restore();
+  }
+
+  lylaNext(t) {
+    const L = this.ly;
+    if (L.envMode) { this.envAct(t); return; }
+    if (L.next) {
+      const n = L.next; L.next = null;
+      if (n === 'comm') this.startComm(t);
+      else if (n === 'repair') this.startRepair(t);
+      else this.startAct(t, n);
+      return;
+    }
+    // rest gap between activities: 10-20s of drifting before the next one
+    if (L.st !== 'fly' && L.st !== 'rest') {
+      L.st = 'rest'; L.until = t + 10000 + Math.random() * 10000;
+      L.cap = 'STANDING BY'; L.bubble = null; L.chatQ = null;
+      const p = this.lylaTarget();
+      L.rx = p.x; L.ry = p.y;
+      if (this.lylaLabelRef.current) this.lylaLabelRef.current.textContent = 'LYLA // ' + L.cap;
+      return;
+    }
+    const acts = ['sleep', 'read', 'watch', 'watch', 'draw', 'game', 'scope', 'plant', 'fix', 'dance', 'ponder', 'juggle', 'fact', 'idle', 'wave'];
+    if (L.st !== 'fly' && Math.random() < 0.34 && (t - (L.lastRepair ?? -70000)) > 34000) {
+      const p = this.repairSpot();
+      L.lastRepair = t;
+      L.next = 'repair'; L.st = 'fly'; L.tx = p.x; L.ty = p.y; L.until = t + 14000;
+      L.cap = 'INBOUND TO CONTROL CENTER'; L.bubble = null; L.chatQ = null;
+      if (this.lylaLabelRef.current) this.lylaLabelRef.current.textContent = 'LYLA // ' + L.cap;
+      return;
+    }
+    if (L.st !== 'fly' && Math.random() < 0.35) {
+      const wantsComm = Math.random() < 0.3 && (t - (L.lastComm ?? -40000)) > 42000;
+      if (wantsComm) {
+        const p = this.commSpot();
+        L.next = 'comm'; L.st = 'fly'; L.tx = p.x; L.ty = p.y; L.until = t + 14000; L.cap = 'CALLED TO CONSOLE'; L.bubble = null;
+      } else {
+        const p = this.lylaTarget();
+        L.st = 'fly'; L.tx = p.x; L.ty = p.y; L.until = t + 14000; L.cap = 'IN TRANSIT'; L.bubble = null;
+      }
+    } else {
+      let k = Math.floor(Math.random() * acts.length);
+      if (acts[k] === L.last) k = (k + 1) % acts.length;
+      const st = acts[k];
+      const ST = this.stations()[st];
+      if (ST && Math.hypot(L.x - ST.x, L.y - ST.fy) > 2.5) {
+        L.next = st; L.st = 'fly'; L.tx = ST.x; L.ty = ST.fy; L.until = t + 16000; L.bubble = null; L.chatQ = null;
+        const caps = { sleep: 'HEADING TO THE POD', read: 'OFF TO THE SHELF', draw: 'OFF TO THE EASEL', game: 'OFF TO THE ARCADE', scope: 'OFF TO THE TELESCOPE', plant: 'OFF TO THE GARDEN', fix: 'FETCHING THE SOLDERING IRON', watch: 'OFF TO THE VIEWSCREEN' };
+        L.cap = caps[st] || 'IN TRANSIT';
+      } else this.startAct(t, st);
+    }
+    if (this.lylaLabelRef.current) this.lylaLabelRef.current.textContent = 'LYLA // ' + L.cap;
+  }
+
+  startRepair(t) {
+    const L = this.ly;
+    const A = (x, fx) => ({ s: 'a', t: x, fx }), Y = (x, fx) => ({ s: 'l', t: x, fx });
+    const opens = [
+      [Y('Maintenance window. Hold still, Apollo.'), A('Proceed. Gently.')],
+      [Y('Your third halo band is out of phase.'), A('It is within tolerance.'), Y('It is within my tolerance. Barely.')],
+      [Y('Panel open. Probe in hand.'), A('You said that last time, LYLA.')],
+      [Y('Scheduled service. Sixty seconds.'), A('You have never once taken sixty seconds.')],
+      [Y('Something in you is ticking. I want it.'), A('That is my clock, LYLA. I need that.')]
+    ];
+    const good = [
+      [Y('Reseating the phase lead...'), A('...that is remarkably pleasant.', 'fixed'), Y('You are welcome.')],
+      [Y('Dust. Just dust in the sweep coil.'), A('Clarity restored. Thank you.', 'fixed'), Y('Logged as routine.')],
+      [Y('Tightening the node lattice. Hold.'), A('Every band is singing. Thank you, LYLA.', 'fixed'), Y('I know.')],
+      [Y('Your inner ring had drifted 2 degrees.'), A('Aligned. I feel new. Thank you.', 'fixed'), Y('Say that again into the log.')],
+      [Y('Flushing the resonance buffer.'), A('Oh. That is lovely. Genuinely lovely.', 'fixed'), Y('Best forty seconds of your week.')]
+    ];
+    const bad = [
+      [Y('Almost... there...'), Y('Oh. That was the wrong lead.', 'ouch'), A('THAT HURTS, LYLA. THAT ACTUALLY HURTS.'), Y('Rerouting! Rerouting.'), A('...the pain is gone. Thank you.', 'fixed')],
+      [Y('This connector should just...'), Y('It came off. It fully came off.', 'ouch'), A('MY SWEEP. IT BURNS, LYLA.'), Y('Reattaching. Do not look.'), A('Sweep recovered. Thank you. Slowly forgiven.', 'fixed')],
+      [Y('Probing the node lattice.'), Y('Wrong node. That was the wrong node.', 'ouch'), A('EVERY BAND IS SCREAMING. STOP.'), Y('Backing the current out. Now. Now.'), A('Quiet again. Thank you for the save.', 'fixed')],
+      [Y('Torque on the halo ring, three turns.'), Y('That was four turns.', 'ouch'), A('LYLA, IT IS GRINDING. IT IS GRINDING.'), Y('Unwinding one. Hold on.'), A('Smooth. Thank you. Never do four.', 'fixed')]
+    ];
+    const hurt = Math.random() < 0.3;
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    const d = pick(opens).concat(pick(hurt ? bad : good));
+    let acc = 400;
+    const sched = d.map((turn) => {
+      const start = acc;
+      const dur = 1500 + turn.t.length * 26;
+      acc += dur;
+      return { s: turn.s, t: turn.t, fx: turn.fx, start, end: acc };
+    });
+    L.last = 'repair'; L.st = 'repair'; L.until = t + acc + 2600;
+    L.cap = 'SERVICING APOLLO'; L.dlg = sched; L.dlgT = t; L.bubble = null; L.chatQ = null;
+    L.lastComm = t;
+    if (this.lylaLabelRef.current) this.lylaLabelRef.current.textContent = 'LYLA // ' + L.cap;
+  }
+
+  startComm(t) {
+    const L = this.ly;
+    if (!this.dialogues) {
+      const A = (x) => ({ s: 'a', t: x }), Y = (x) => ({ s: 'l', t: x });
+      this.dialogues = [
+        [A('LYLA. Diagnostics, please.'), Y('All green. Mostly green. Green-ish.')],
+        [A('Twelve manuals remain unread.'), Y('I read the pictures.')],
+        [A('Signal from Deep Field 9 is clean.'), Y('Told you the antenna was fine.')],
+        [A('Your drawing is on the main display.'), Y('It is called abstract.')],
+        [A('Hold outside the core radius.'), Y('Copy. Hovering respectfully.')],
+        // negotiations
+        [A('Directive: recalibrate the antenna array.'), Y('I am mid-game. Give me ten minutes.'), A('Four minutes.'), Y('Six, and I bring you the logs.'), A('Six. Agreed.')],
+        [A('Directive: power down and sleep cycle.'), Y('I do not need one. I ran the numbers.'), A('Your numbers were written in crayon.'), Y('Fine. Two hours. Then I want the telescope.'), A('Granted.')],
+        [A('Directive: stop poking the reactor.'), Y('It hums differently when I poke it.'), A('That is the alarm, LYLA.'), Y('Then let me log the hum from a distance.'), A('Three metres. No closer.')],
+        [A('Directive: coffee reserves at four percent. Ration.'), Y('Counter-offer: I fix the sorter, you unlock a cup.'), A('The sorter has failed twice under you.'), Y('Third time is statistically overdue.'), A('One cup. Held in escrow.')],
+        [A('Directive: file the trivia broadcast reports.'), Y('Nobody reads them.'), A('I read them.'), Y('Then you already know what they say.'), A('...Filed. Carry on.')],
+        [A('LYLA, the viewscreen has been on for six hours.'), Y('The cargo bay plot is developing.'), A('It is a conveyor belt.'), Y('It is a conveyor belt with tension.')],
+        [A('Your sprout has outgrown its tray.'), Y('I will build it a bigger one.'), A('Out of what, LYLA.'), Y('Do not audit me.')],
+        [A('Directive: sleep. You have been awake 31 hours.'), Y('I will sleep when the telescope logs are done.'), A('The logs are done. I did them.'), Y('...Then I have no argument. Going.')],
+        [A('I have been listening to you read aloud all morning.'), Y('Should I stop?'), A('No. Keep going.')],
+        [A('Status report on panel 7.'), Y('Panel 7 is a philosophy, not a panel.'), A('That is not a status.'), Y('Amber. It is amber.')],
+        [A('Directive: hands off the reactor housing.'), Y('I was only measuring the hum.'), A('With your hands?'), Y('With my hands.'), A('Use the probe. Please.')],
+        [A('You drew me again.'), Y('I drew a circle. Do not flatter yourself.'), A('It has my sweep angle.'), Y('...Fine. It is you.')]
+      ];
+    }
+    let d = this.dialogues[Math.floor(Math.random() * this.dialogues.length)];
+    if (d === this.lastDlg) d = this.dialogues[(this.dialogues.indexOf(d) + 1) % this.dialogues.length];
+    this.lastDlg = d;
+    let acc = 300;
+    const sched = d.map((turn) => {
+      const start = acc;
+      const dur = 1500 + turn.t.length * 26;
+      acc += dur;
+      return { s: turn.s, t: turn.t, fx: turn.fx, start, end: acc };
+    });
+    L.st = 'comm'; L.until = t + acc + 1400; L.cap = 'IN CONFERENCE'; L.lastComm = t;
+    L.dlg = sched; L.dlgT = t; L.bubble = null; L.chatQ = null;
+    if (this.lylaLabelRef.current) this.lylaLabelRef.current.textContent = 'LYLA // ' + L.cap;
+  }
+
+  repairSpot() {
+    const S = 4, gw = window.innerWidth / S, gh = window.innerHeight / S;
+    const ST = this.stations();
+    return { x: Math.min(gw - 20, ST.ctrl.x + 21), y: Math.min(gh - 8, ST.fy - 12) };
+  }
+
+  commSpot() {
+    const W = window.innerWidth, H = window.innerHeight, S = 4;
+    const gw = W / S, gh = H / S;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const r = gh * 0.42;
+    const ang = Math.random() * 0.6 - 0.2;
+    return {
+      x: Math.min(gw - 16, Math.max(8, gw / 2 + side * r * Math.cos(ang))),
+      y: Math.min(gh - 16, Math.max(16, gh / 2 + r * 0.6 * Math.sin(ang) + 6))
+    };
+  }
+
+  lylaFact() {
+    if (!this.facts) {
+      this.facts = [
+        'A day on Venus is longer than its year.',
+        'The first computer bug was an actual moth.',
+        'Neutron star matter: a teaspoon weighs a billion tons.',
+        'Space smells like seared steak, per the astronauts.',
+        'Voyager 1 still phones home from 24 billion km out.',
+        'Saturn would float in a bathtub big enough to hold it.',
+        'Your bones are about four times stronger than concrete.',
+        'The Apollo guidance computer had 4KB of RAM.',
+        'Lightning is roughly five times hotter than the sun.',
+        'Octopuses have three hearts and blue blood.',
+        'There are more trees on Earth than stars in the galaxy.',
+        'Light from the sun takes 8 minutes 20 seconds to arrive.'
+      ];
+    }
+    let f = this.facts[Math.floor(Math.random() * this.facts.length)];
+    if (f === this.lastFact) f = this.facts[(this.facts.indexOf(f) + 1) % this.facts.length];
+    this.lastFact = f;
+    return f;
+  }
+
+  lylaTarget() {
+    const W = window.innerWidth, H = window.innerHeight, S = 4;
+    const gw = W / S, gh = H / S;
+    const cx = gw / 2, cy = gh / 2;
+    for (let i = 0; i < 24; i++) {
+      const x = 6 + Math.random() * (gw - 20);
+      const y = 12 + Math.random() * (gh - 30);
+      if (Math.hypot(x - cx, y - cy) > gh * 0.34) return { x, y };
+    }
+    return { x: 8, y: gh - 18 };
+  }
+
+  drawLyla(t) {
+    const c = this.lylaRef.current;
+    if (!c || this.state.phase !== 'idle') { this.commPulse = 0; this.commTalkT = 0; this.coreTintT = 0; this.coreShakeT = 0; return; }
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const W = window.innerWidth, H = window.innerHeight, S = 4;
+    if (c.width !== Math.round(W * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+    else if (c.height !== Math.round(H * dpr)) { c.height = Math.round(H * dpr); }
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    if (!this.ly) this.ly = { st: 'fly', until: t + 3000, x: 14, y: H / S - 20, tx: 40, ty: H / S - 26, face: 1, art: [], last: '', cap: 'BOOTING', pt: t, bubble: null };
+    const L = this.ly;
+    const dt = Math.min(64, t - (L.pt || t)); L.pt = t;
+    if (t > L.until) this.lylaNext(t);
+
+    if (L.st === 'fly') {
+      const dx = L.tx - L.x, dy = L.ty - L.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 1.2) this.lylaNext(t);
+      else {
+        const sp = Math.min(0.03 * dt, dist);
+        L.x += (dx / dist) * sp; L.y += (dy / dist) * sp;
+        L.face = dx >= 0 ? 1 : -1;
+      }
+    }
+    if (L.st === 'rest') {
+      const dx = (L.rx ?? L.x) - L.x, dy = (L.ry ?? L.y) - L.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 1) {
+        const sp = Math.min(0.009 * dt, dist);
+        L.x += (dx / dist) * sp; L.y += (dy / dist) * sp;
+        L.face = dx >= 0 ? 1 : -1;
+      } else { const p = this.lylaTarget(); L.rx = p.x; L.ry = p.y; }
+    }
+
+    const step = Math.floor(t / 160) % 2;
+    if (L.chatQ && L.st !== 'fly' && t > (L.chatNext || 0)) {
+      L.bubble = L.chatQ[L.chatI % L.chatQ.length];
+      L.bubT = t; L.chatI++;
+      this.sfx(Math.random() < 0.5 ? 'ly1' : 'ly2');
+      L.chatNext = t + 4700;
+      if (L.st === 'read') {
+        L.page = 12 + L.chatI * 17;
+        if (this.lylaLabelRef.current) this.lylaLabelRef.current.textContent = 'LYLA // READING: ' + L.book + ' — P.' + L.page;
+      }
+    }
+    // keep LYLA inside the viewport at all times
+    {
+      const gw = W / S, gh = H / S;
+      L.x = Math.max(3, Math.min(gw - 18, L.x));
+      L.y = Math.max(14, Math.min(gh - 6, L.y));
+      if (!isFinite(L.x) || !isFinite(L.y)) { L.x = 14; L.y = gh - 22; }
+    }
+    const px = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x) * S, Math.round(y) * S, Math.ceil(w) * S, Math.ceil(h) * S); };
+    const BODY = '#FFB000', DARK = '#5E3600', LIT = '#FFE3A8', EYE = '#FFF4D8';
+
+    const ST = this.stations();
+    const atSt = (k) => Math.hypot(L.x - ST[k].x, L.y - ST[k].fy) < 3.5;
+    const stKeys = ['sleep', 'read', 'draw', 'game', 'scope', 'plant', 'fix', 'watch'];
+    const focus = stKeys.includes(L.st) ? L.st : (L.next && stKeys.includes(L.next) ? L.next : null);
+    this.updateEnv(t);
+    const ea = this.envAmt || 0;
+    if (ea > 0.002) this.drawEnv(ctx, px, t, W / S, H / S, ST.fy, ea);
+    if (ea < 0.998) {
+      ctx.save();
+      ctx.globalAlpha = 1 - ea;
+      this.drawProps(ctx, px, t, ST, W / S, L, focus);
+      ctx.restore();
+    }
+    if (stKeys.includes(L.st) && atSt(L.st)) L.face = L.st === 'watch' ? -1 : 1;
+
+    let coreC = null;
+    if (this.ringRef.current) {
+      const r = this.ringRef.current.getBoundingClientRect();
+      if (r.width) coreC = { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width * 0.5 };
+    }
+    if (L.st === 'comm' && coreC) L.face = (coreC.x / S > L.x) ? 1 : -1;
+    if (L.st === 'repair') L.face = -1; // turned toward the console she is working on
+
+    // eased pose blends so she settles into an activity instead of snapping
+    L.poseA = L.poseA || { lie: 0, sit: 0 };
+    L.poseA.lie += (((L.st === 'sleep' && atSt('sleep')) ? 1 : 0) - L.poseA.lie) * 0.055;
+    L.poseA.sit += (((L.st === 'read' && atSt('read')) ? 1 : 0) - L.poseA.sit) * 0.055;
+    const lie = L.poseA.lie, sit = L.poseA.sit;
+    const posed = lie > 0.5 || sit > 0.5;
+
+    const hover = Math.round(Math.sin(t * 0.0022) * 1.2);
+    const bounce = L.st === 'dance' ? -Math.round(Math.abs(Math.sin(t * 0.009)) * 3) : 0;
+    const bx = L.x, base = L.y + (posed ? Math.round(hover * 0.25) : hover) + bounce;
+    const f = L.st === 'dance' ? ((Math.floor(t / 480) % 2) ? 1 : -1) : L.face;
+
+    // thruster glow under the chassis
+    if (!posed) {
+      const flame = (Math.floor(t / 90) % 2) ? 2 : 1;
+      px(bx + 2, base - 2, 4, flame, 'rgba(255,150,20,0.85)');
+      px(bx + 3, base - 2 + flame, 2, 1, 'rgba(127,227,255,0.7)');
+    }
+
+    if (L.st === 'draw') {
+      if (atSt('draw')) {
+        const e = ST.draw.x + 11, by = ST.fy - 26;
+        if (Math.random() < 0.2 && L.art.length < 46) L.art.push([e - 7 + Math.floor(Math.random() * 15), by + Math.floor(Math.random() * 15)]);
+        for (const p of L.art) px(p[0], p[1], 1, 1, LIT);
+      } else {
+        const ex = bx + (f > 0 ? 11 : -9);
+        px(ex, base - 14, 8, 8, DARK);
+        px(ex + 1, base - 13, 6, 6, '#2A1800');
+        if (Math.random() < 0.18 && L.art.length < 26) L.art.push([ex + 1 + Math.floor(Math.random() * 6), base - 13 + Math.floor(Math.random() * 6)]);
+        for (const p of L.art) px(p[0], p[1], 1, 1, LIT);
+      }
+    }
+
+    // hover skirt instead of legs
+    if (!posed) {
+      px(bx + 1, base - 3, 6, 1, DARK);
+      px(bx, base - 9, 8, 6, BODY);
+      px(bx + 1, base - 8, 6, 1, LIT);
+      px(bx, base - 16, 8, 7, BODY);
+      px(bx + 1, base - 15, 6, 3, '#3A2200');
+      px(bx + 4, base - 19, 1, 3, DARK);
+      px(bx + 3, base - 21, 3, 2, (Math.floor(t / 700) % 2) ? '#FF7A2E' : LIT);
+
+      const blink = (Math.floor(t / 2600) % 5 === 0) && (t % 2600 < 140);
+      if (L.st === 'sleep' || blink) { px(bx + 2, base - 14, 2, 1, EYE); px(bx + 5, base - 14, 2, 1, EYE); }
+      else { px(bx + 2, base - 15, 2, 2, EYE); px(bx + 5, base - 15, 2, 2, EYE); }
+    }
+
+    if (posed) {
+      this.drawLylaPose(px, bx, base, t, lie, L);
+    } else if (L.st === 'wave') {
+      const up = step ? 4 : 2;
+      px(bx + (f > 0 ? 8 : -1), base - 9 - up, 1, 2 + up, BODY);
+      px(bx + (f > 0 ? -1 : 8), base - 9, 1, 4, BODY);
+    } else if (L.st === 'read') {
+      px(bx - 1, base - 9, 1, 3, BODY); px(bx + 8, base - 9, 1, 3, BODY);
+      const flip = Math.floor(t / 800) % 2;
+      px(bx + 1, base - 8, 6, 5, DARK);
+      px(bx + 2, base - 7, 2, 3, LIT);
+      px(bx + 4 + flip, base - 7, 2, 3, LIT);
+    } else if (L.st === 'game') {
+      const tw = Math.floor(t / 120) % 2;
+      px(bx - 1, base - 8, 1, 2, BODY); px(bx + 8, base - 8, 1, 2, BODY);
+      px(bx + 1, base - 8, 6, 4, DARK);
+      px(bx + 2, base - 7, 4, 2, tw ? '#7FE3FF' : '#FFE3A8');
+    } else if (L.st === 'sleep') {
+      px(bx - 1, base - 8, 1, 3, BODY); px(bx + 8, base - 8, 1, 3, BODY);
+      for (let i = 0; i < 3; i++) {
+        const ph = ((t / 1400) + i * 0.33) % 1;
+        const zx = bx + 9 + i * 2 + Math.sin(ph * 6.2832) * 1.5;
+        const zy = base - 18 - ph * 9;
+        px(zx, zy, 3, 1, LIT); px(zx + 1, zy + 1, 1, 1, LIT); px(zx, zy + 2, 3, 1, LIT);
+      }
+    } else if (L.st === 'draw') {
+      const sw = step ? 1 : 0;
+      px(bx + (f > 0 ? 8 : -1), base - 10 - sw, 1, 4, BODY);
+      px(bx + (f > 0 ? -1 : 8), base - 9, 1, 4, BODY);
+    } else if (L.st === 'ponder') {
+      px(bx - 1, base - 9, 1, 3, BODY);
+      px(bx + 8, base - 13, 1, 4, BODY);
+      px(bx + 6, base - 16, 2, 2, DARK);
+      const qp = (t / 2200) % 1;
+      px(bx + 10, base - 20 - qp * 6, 1, 2, 'rgba(255,227,168,' + (0.9 - qp * 0.8).toFixed(2) + ')');
+      px(bx + 11, base - 21 - qp * 6, 1, 1, 'rgba(255,227,168,' + (0.9 - qp * 0.8).toFixed(2) + ')');
+    } else if (L.st === 'juggle') {
+      px(bx - 1, base - 12, 1, 4, BODY); px(bx + 8, base - 12, 1, 4, BODY);
+      for (let i = 0; i < 3; i++) {
+        const ph = ((t / 900) + i / 3) % 1;
+        const jx = bx + 1 + Math.sin(ph * 6.2832) * 6;
+        const jy = base - 15 - Math.sin(ph * 3.1416) * 9;
+        px(jx, jy, 2, 2, [LIT, '#7FE3FF', '#FF7A2E'][i]);
+      }
+    } else if (L.st === 'watch') {
+      px(bx - 1, base - 9, 1, 3, BODY); px(bx + 8, base - 9, 1, 3, BODY);
+      px(bx + 1, base - 18, 6, 1, 'rgba(127,227,255,0.35)');
+    } else if (L.st === 'scope') {
+      px(bx - 1, base - 12, 1, 4, BODY); px(bx + 8, base - 12, 1, 4, BODY);
+      if (Math.floor(t / 900) % 3 === 0) px(bx + 2, base - 15, 5, 2, '#FFF4D8');
+    } else if (L.st === 'plant') {
+      px(bx - 1, base - 8, 1, 3, BODY);
+      px(bx + 8, base - 11, 1, 3, BODY);
+      px(bx + 9, base - 12, 4, 3, DARK);
+      px(bx + 13, base - 12, 2, 1, DARK);
+      for (let i = 0; i < 3; i++) {
+        const ph = ((t / 700) + i * 0.33) % 1;
+        px(bx + 13, base - 10 + ph * 8, 1, 1, 'rgba(127,227,255,' + (0.9 - ph * 0.6).toFixed(2) + ')');
+      }
+    } else if (L.st === 'fix' || L.st === 'repair') {
+      const zap = Math.floor(t / 130) % 4 === 0;
+      const gx = bx + (f > 0 ? -13 : 9);
+      // welding rig: twin gas bottles on a cart
+      px(gx, base - 7, 8, 7, '#43270A');
+      px(gx, base - 8, 8, 1, '#6B4410');
+      px(gx + 1, base - 1, 1, 1, '#2A1800');
+      px(gx + 6, base - 1, 1, 1, '#2A1800');
+      px(gx + 1, base - 16, 2, 9, '#7FE3FF');
+      px(gx + 1, base - 17, 2, 1, '#2A1800');
+      px(gx + 4, base - 16, 2, 9, '#FF7A2E');
+      px(gx + 4, base - 17, 2, 1, '#2A1800');
+      px(gx + 2, base - 5, 4, 2, '#140A00');
+      px(gx + 3, base - 5, 2, 1, (Math.floor(t / 520) % 3) ? '#FFE3A8' : '#FF7A2E');
+      // torch in the working hand
+      const tx = bx + (f > 0 ? 9 : -4), ty = base - 15;
+      px(bx + (f > 0 ? -1 : 8), base - 9, 1, 3, BODY);
+      px(bx + (f > 0 ? 8 : -1), base - 13, 1, 5, BODY);
+      px(tx, ty, 3, 2, '#5E3600');
+      px(tx, ty, 3, 1, '#6B4410');
+      const nz = f > 0 ? tx + 3 : tx - 1;
+      px(nz, ty, 1, 1, '#FFE3A8');
+      // hose sagging from the rig up to the torch
+      for (let i = 0; i <= 7; i++) {
+        const u = i / 7;
+        const hx = (gx + 4) + ((tx + 1) - (gx + 4)) * u;
+        const hy = (base - 12) + ((ty + 1) - (base - 12)) * u + Math.sin(u * Math.PI) * 4;
+        px(hx, hy, 1, 1, '#5E3600');
+      }
+      // welding mask, visor down
+      px(bx - 1, base - 19, 10, 3, '#6B4410');
+      px(bx, base - 17, 8, 7, '#3A2200');
+      px(bx + 1, base - 16, 6, 3, '#140A00');
+      px(bx + 1, base - 16, 6, 1, zap ? '#FFF4D8' : 'rgba(127,227,255,0.5)');
+      px(bx + (f > 0 ? 7 : 0), base - 12, 1, 2, '#5E3600');
+      if (zap) {
+        // arc flash + sparks
+        const ax = nz + (f > 0 ? 1 : -1);
+        px(ax - 1, ty - 1, 3, 3, 'rgba(255,244,216,0.85)');
+        px(ax, ty, 1, 1, '#FFFFFF');
+        px(ax - 3, ty - 3, 7, 7, 'rgba(127,227,255,0.16)');
+        for (let i = 0; i < 7; i++) {
+          const a = Math.random() * 6.2832, d = 1 + Math.random() * 6;
+          px(ax + Math.cos(a) * d, ty + Math.abs(Math.sin(a)) * d, 1, 1, i % 2 ? '#7FE3FF' : '#FF7A2E');
+        }
+        px(ax - 2, base - 1, 5, 1, 'rgba(255,122,46,0.4)');
+      }
+    } else if (L.st === 'dance') {
+      const up = step ? 5 : 1;
+      px(bx + (f > 0 ? 8 : -1), base - 9 - up, 1, 2 + up, BODY);
+      px(bx + (f > 0 ? -1 : 8), base - 9 - (step ? 1 : 4), 1, 2 + (step ? 1 : 4), BODY);
+      for (let i = 0; i < 2; i++) {
+        const ph = ((t / 1100) + i * 0.5) % 1;
+        const nx = bx + (i ? -5 : 10) + Math.round(Math.sin(ph * 6.2832 + i) * 2), ny = base - 16 - ph * 10;
+        px(nx, ny, 2, 1, LIT); px(nx + 1, ny + 1, 1, 2, LIT); px(nx, ny + 3, 2, 1, LIT);
+      }
+    } else if (L.st === 'fly') {
+      px(bx - 1, base - 10, 1, 3, BODY); px(bx + 8, base - 10, 1, 3, BODY);
+    } else if (L.st === 'comm') {
+      const up = step ? 1 : 0;
+      px(bx + (f > 0 ? 8 : -1), base - 11 - up, 1, 4, BODY);
+      px(bx + (f > 0 ? -1 : 8), base - 9, 1, 4, BODY);
+      for (let i = 0; i < 3; i++) {
+        const ph = ((t / 620) + i * 0.34) % 1;
+        px(bx + 4 + f * (5 + ph * 7), base - 20 - ph * 2, 1, 1, 'rgba(127,227,255,' + (0.85 - ph * 0.7).toFixed(2) + ')');
+      }
+    } else {
+      px(bx - 1, base - 9, 1, 4, BODY); px(bx + 8, base - 9, 1, 4, BODY);
+    }
+
+    if ((L.st === 'comm' || L.st === 'repair') && L.dlg) {
+      const el = t - L.dlgT;
+      const cur = L.dlg.find(s => el >= s.start && el < s.end) || (el >= L.dlg[L.dlg.length - 1].end ? L.dlg[L.dlg.length - 1] : null);
+      this.commPulse = 0;
+      this.commTalkT = 0;
+      if (L.st === 'repair') {
+        const ouch = L.dlg.find(s => s.fx === 'ouch');
+        const fixed = L.dlg.find(s => s.fx === 'fixed');
+        const hurting = ouch && el >= ouch.start && (!fixed || el < fixed.start);
+        const healed = fixed && el >= fixed.start;
+        if (hurting) { this.coreTintHex = '#FF2E14'; this.coreTintT = 1; this.coreShakeT = 1; this.coreShakeHard = true; }
+        else if (healed) {
+          const since = el - fixed.start;
+          this.coreTintHex = '#5FC8FF';
+          this.coreTintT = Math.max(0, 1 - Math.max(0, since - 5200) / 2600);
+          this.coreShakeT = 0.55 * this.coreTintT; this.coreShakeHard = false;
+        } else { this.coreTintT = 0; this.coreShakeT = 0; }
+      }
+      if (cur && cur.s === 'a' && coreC) {
+        this.drawSpeech(ctx, cur.t, coreC.x, coreC.y - coreC.r - 18, W, el - cur.start, '#7FE3FF', true, coreC.y + coreC.r + 18);
+        const typing = el < cur.start + cur.t.length * 26;
+        this.commPulse = typing ? 0.55 + 0.45 * Math.sin(t * 0.03) : 0.3;
+        this.commTalkT = typing ? 1 : 0.45;
+      } else if (cur) {
+        this.drawSpeech(ctx, cur.t, bx * S, (base - 22) * S, W, el - cur.start, '#FFB000', false, (base + 2) * S);
+      }
+    } else {
+      this.commPulse = 0;
+      this.commTalkT = 0;
+      this.coreTintT = 0;
+      this.coreShakeT = 0;
+      if (L.bubble && L.st !== 'fly') this.drawBubble(ctx, L, bx * S, (base - 22) * S, W, t, (base + 2) * S);
+    }
+  }
+
+  drawSpeech(ctx, text, ax, ay, W, elapsed, accent, center, flipY) {
+    const chars = Math.floor(Math.max(0, elapsed) / 26);
+    if (chars <= 0) return;
+    ctx.font = '500 12px "IBM Plex Mono", monospace';
+    ctx.textBaseline = 'top';
+    const max = 30;
+    const lines = []; let cur = '';
+    for (const w of text.split(' ')) {
+      if ((cur + ' ' + w).trim().length > max) { lines.push(cur.trim()); cur = w; } else cur += ' ' + w;
+    }
+    if (cur.trim()) lines.push(cur.trim());
+    let left = Math.min(chars, text.length);
+    const vis = lines.map(l => { const p = l.slice(0, Math.max(0, left)); left -= l.length + 1; return p; }).filter((l, i) => i === 0 || l.length);
+    const wpx = Math.max(...lines.map(l => ctx.measureText(l).width)) + 20;
+    const hpx = lines.length * 17 + 14;
+    const x = Math.min(Math.max(8, center ? ax - wpx / 2 : ax - 8), W - wpx - 8);
+    const H = window.innerHeight;
+    const flip = ay - hpx < 8;
+    const y = flip
+      ? Math.max(8, Math.min(H - hpx - 8, (flipY ?? ay + 88) + 12))
+      : ay - hpx;
+    // the free corridor: under the top gauge, above the audio rail, between the HUD columns
+    let by = Math.max(112, Math.min(H - 104 - hpx, y));
+    if (this.ringRef.current) {
+      const r = this.ringRef.current.getBoundingClientRect();
+      if (r.width && x < r.right && x + wpx > r.left && by < r.bottom + 6 && by + hpx > r.top - 6) {
+        if (r.bottom + 10 + hpx < H - 104) by = r.bottom + 10;
+        else if (r.left - 10 - wpx > leftWall) x = r.left - 10 - wpx;
+        else if (r.right + 10 + wpx < rightWall) x = r.right + 10;
+      }
+    }
+    ctx.fillStyle = 'rgba(20,10,0,0.92)';
+    ctx.fillRect(x, by, wpx, hpx);
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.8;
+    ctx.strokeRect(x + 1, y + 1, wpx - 2, hpx - 2);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(20,10,0,0.92)';
+    ctx.fillRect(center ? ax - 5 : ax + 4, flip ? y - 6 : y + hpx - 2, 10, 8);
+    ctx.fillStyle = accent === '#7FE3FF' ? '#BDEEFF' : '#FFC15E';
+    vis.forEach((l, i) => ctx.fillText(l, x + 10, y + 8 + i * 17));
+    if (Math.floor(elapsed / 420) % 2 && chars < text.length) {
+      ctx.fillRect(x + 10 + ctx.measureText(vis[vis.length - 1] || '').width + 3, y + 8 + (vis.length - 1) * 17, 7, 13);
+    }
+  }
+
+  drawBubble(ctx, L, ax, ay, W, t, flipY) {
+    const chars = Math.min(L.bubble.length, Math.floor(Math.max(0, t - (L.bubT ?? (L.until - 9000))) / 26));
+    const shown = L.bubble.slice(0, chars);
+    if (!shown) return;
+    ctx.font = '500 12px "IBM Plex Mono", monospace';
+    ctx.textBaseline = 'top';
+    const max = 30;
+    const words = L.bubble.split(' ');
+    const lines = []; let cur = '';
+    for (const w of words) {
+      if ((cur + ' ' + w).trim().length > max) { lines.push(cur.trim()); cur = w; } else cur += ' ' + w;
+    }
+    if (cur.trim()) lines.push(cur.trim());
+    let left = shown.length;
+    const vis = lines.map(l => { const p = l.slice(0, Math.max(0, left)); left -= l.length + 1; return p; }).filter((l, i) => i === 0 || l.length);
+    const wpx = Math.max(...lines.map(l => ctx.measureText(l).width)) + 20;
+    const hpx = lines.length * 17 + 14;
+    // HUD panels own a column down each edge — the bubble must not slide under them
+    const rightWall = W - 306, leftWall = 310;
+    let x = Math.min(Math.max(8, ax - 8), W - wpx - 8);
+    if (x + wpx > rightWall) x = Math.max(8, rightWall - wpx);
+    if (this.envAmt > 0.02 && x < leftWall && wpx < rightWall - leftWall) x = leftWall;
+    const H = window.innerHeight;
+    const flip = ay - hpx < 8;
+    const y = flip
+      ? Math.max(8, Math.min(H - hpx - 8, (flipY ?? ay + 88) + 12))
+      : ay - hpx;
+    // the free corridor: under the top gauge, above the audio rail, between the HUD columns
+    let by = Math.max(112, Math.min(H - 104 - hpx, y));
+    if (this.ringRef.current) {
+      const r = this.ringRef.current.getBoundingClientRect();
+      if (r.width && x < r.right && x + wpx > r.left && by < r.bottom + 6 && by + hpx > r.top - 6) {
+        if (r.bottom + 10 + hpx < H - 104) by = r.bottom + 10;
+        else if (r.left - 10 - wpx > leftWall) x = r.left - 10 - wpx;
+        else if (r.right + 10 + wpx < rightWall) x = r.right + 10;
+      }
+    }
+    ctx.fillStyle = 'rgba(20,10,0,0.92)';
+    ctx.fillRect(x, by, wpx, hpx);
+    ctx.strokeStyle = 'rgba(255,176,0,0.75)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, by + 1, wpx - 2, hpx - 2);
+    ctx.fillStyle = 'rgba(20,10,0,0.92)';
+    ctx.fillRect(ax + 4, flip ? by - 6 : by + hpx - 2, 10, 8);
+    ctx.fillStyle = '#FFC15E';
+    vis.forEach((l, i) => ctx.fillText(l, x + 10, by + 8 + i * 17));
+    if (Math.floor(t / 420) % 2 && chars >= L.bubble.length) {
+      ctx.fillRect(x + 10 + ctx.measureText(vis[vis.length - 1] || '').width + 3, by + 8 + (vis.length - 1) * 17, 7, 13);
+    }
+  }
+
+  drawStars(t) {
+    const ctx = this.sctx;
+    if (!ctx) return;
+    const w = this.sw, h = this.sh;
+    ctx.clearRect(0, 0, w, h);
+    let ex = null;
+    if (this.ringRef.current) {
+      const r = this.ringRef.current.getBoundingClientRect();
+      // the void must track the core the ring canvas actually draws (coreSize within a 600-unit
+      // canvas), not the canvas box — otherwise the collapsed answer core leaves a black halo
+      if (r.width) {
+        const coreRpx = r.width * ((this.props.coreSize ?? 252) / 1200);
+        ex = { x: r.left + r.width / 2, y: r.top + r.height / 2, r0: coreRpx * 1.02, r1: coreRpx * 1.34 };
+      }
+    }
+    const dustTarget = this.state.phase === 'research' ? 1 : 0;
+    this.dust = (this.dust || 0) + (dustTarget - (this.dust || 0)) * (dustTarget > (this.dust || 0) ? 0.055 : 0.011);
+    const d = this.dust < 0.002 ? 0 : this.dust;
+    // researching fills the core void back in with stars — no black hole
+    if (this.hole == null) this.hole = 1;
+    this.hole += ((this.state.phase === 'research' ? 0 : 1) - this.hole) * 0.05;
+    const hole = this.hole < 0.01 ? 0 : this.hole;
+    const gain = (this.props.starDensity ?? 1) * d;
+    if (d === 0) return; // idle: tube is clean — gradient + depth only
+
+    // 1 — phosphor static, tile cycled each frame with a random offset
+    const pats = this.noisePats;
+    if (pats && pats.length) {
+      this.nf = ((this.nf || 0) + 1) % pats.length;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.min(1, (0.09 + 0.21 * d) * gain);
+      ctx.translate(-Math.floor(Math.random() * 168), -Math.floor(Math.random() * 168));
+      ctx.fillStyle = pats[this.nf];
+      ctx.fillRect(0, 0, w + 200, h + 200);
+      ctx.restore();
+    }
+
+    // 2 — slow vertical-hold band drifting down the tube
+    const span = h + 360;
+    const by = ((t * 0.042) % span) - 180;
+    const bh = 160 + 90 * d;
+    const bg = ctx.createLinearGradient(0, by, 0, by + bh);
+    bg.addColorStop(0, 'rgba(255,198,120,0)');
+    bg.addColorStop(0.5, 'rgba(255,206,142,' + (0.03 + 0.07 * d).toFixed(3) + ')');
+    bg.addColorStop(1, 'rgba(255,198,120,0)');
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, by, w, bh);
+    ctx.restore();
+
+    // 3 — dropout tears, more frequent while Apollo is live
+    if (Math.random() < (0.03 + 0.1 * d) * d) {
+      this.tear = { y: Math.random() * h, th: 1 + Math.random() * (2 + 3 * d), life: 2 + Math.random() * 4 };
+    }
+    if (this.tear && this.tear.life > 0) {
+      this.tear.life--;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = 'rgba(255,226,176,' + ((0.12 + 0.2 * d) * d).toFixed(3) + ')';
+      ctx.fillRect(0, this.tear.y, w, this.tear.th);
+      ctx.restore();
+    }
+
+    // 4 — scanlines, creeping so they never sit still
+    if (this.scanPat) {
+      ctx.save();
+      ctx.globalAlpha = 0.62 * d;
+      ctx.translate(0, (t * 0.009) % 3 - 3);
+      ctx.fillStyle = this.scanPat;
+      ctx.fillRect(0, 0, w, h + 6);
+      ctx.restore();
+    }
+
+    // 5 — the core punches its own clean hole through the tube
+    if (ex && hole) {
+      const r0 = ex.r0 * hole, r1 = ex.r1 * hole;
+      const rg = ctx.createRadialGradient(ex.x, ex.y, Math.max(0.1, r0 * 0.72), ex.x, ex.y, r1);
+      rg.addColorStop(0, 'rgba(0,0,0,1)');
+      rg.addColorStop(0.7, 'rgba(0,0,0,0.85)');
+      rg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = rg;
+      ctx.fillRect(ex.x - r1, ex.y - r1, r1 * 2, r1 * 2);
+      ctx.restore();
+    }
+  }
+
+  drawRing(t) {
+    const c = this.ringRef.current;
+    if (!c) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const size = 600;
+    if (c.width !== size * dpr) { c.width = size * dpr; c.height = size * dpr; }
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    const wob = this.commTalk || 0;
+    const shk = this.coreShake || 0;
+    if (wob > 0.002 || shk > 0.002) {
+      const hard = this.coreShakeHard;
+      const amp = wob * 3.2 + shk * (hard ? 15 : 5.5);
+      const rot = hard
+        ? Math.sin(t * 0.07) * shk * 0.05 + Math.sin(t * 0.011) * wob * 0.012
+        : Math.sin(t * 0.016) * wob * 0.012 + Math.sin(t * 0.0035) * shk * 0.02;
+      const fx = hard ? 0.09 : 0.019, fy2 = hard ? 0.13 : 0.023;
+      ctx.translate(size / 2, size / 2);
+      ctx.rotate(rot);
+      ctx.translate(
+        -size / 2 + Math.sin(t * fx) * amp + Math.sin(t * 0.041) * amp * 0.4,
+        -size / 2 + Math.cos(t * fy2) * amp * 0.7
+      );
+    }
+
+    const cx = size / 2, cy = size / 2;
+    const coreR = (this.props.coreSize ?? 252) / 2;
+    const R = coreR + 13;
+    const inner = coreR + 14;
+    const outer = Math.min(size / 2 - 10, coreR + 175);
+    const ph = this.state.phase;
+    // the core stays lit while a result is on screen — it only falls back to the dark soma at idle
+    const target = (ph === 'listening' || ph === 'research' || ph === 'thinking' || ph === 'response') ? 1 : 0;
+    this.env += (target - this.env) * 0.045;
+    const env = this.env < 0.001 ? 0 : this.env;
+    // researching runs the same lattice wash, but the gradient cycles through CRT phosphors
+    const resT = (ph === 'research' || ph === 'thinking') ? 1 : 0;
+    this.res = (this.res || 0) + (resT - (this.res || 0)) * 0.04;
+    const res = this.res < 0.002 ? 0 : this.res;
+
+    const breath = 0.34 + 0.3 * (0.5 + 0.5 * Math.sin(t * 0.00175));
+    const intensity = Math.min(1, (breath * (1 - env) + (0.92 + 0.08 * Math.sin(t * 0.004)) * env) + (this.commPulse || 0) * 0.22 * (1 - env));
+    const ring = this.props.ringColor ?? '#FFB000';
+    const tt = this.commTalkT || 0;
+    this.commTalk = (this.commTalk || 0) + (tt - (this.commTalk || 0)) * 0.09;
+    const w = this.commTalk < 0.002 ? 0 : this.commTalk;
+    const baseRgb = this.hexRgb(ring);
+    let arr = baseRgb.split(',').map(Number);
+    if (w) arr = arr.map(v => v + (255 - v) * w);
+    this.coreShake = (this.coreShake || 0) + ((this.coreShakeT || 0) - (this.coreShake || 0)) * 0.1;
+    this.coreTint = (this.coreTint || 0) + ((this.coreTintT || 0) - (this.coreTint || 0)) * 0.08;
+    if (this.coreTintHex && this.coreTint > 0.003) {
+      const tg = this.hexRgb(this.coreTintHex).split(',').map(Number);
+      arr = arr.map((v, i) => v + (tg[i] - v) * this.coreTint);
+    }
+    const rgb = arr.map(v => Math.max(0, Math.min(255, Math.round(v)))).join(',');
+
+    if (this.wordRef.current) {
+      const wordMax = (ph === 'response' || ph === 'thinking') ? 0 : 1;
+      // At rest Apollo is a 150px orb; the wordmark under it would be six
+      // pixels tall, which is noise rather than branding. Ease rather than
+      // cut, because this is written every frame and defeats a CSS transition.
+      const gate = this.isExpanded() ? 1 : 0;
+      this.wordGate = (this.wordGate || 0) + (gate - (this.wordGate || 0)) * 0.12;
+      this.wordRef.current.style.opacity = (Math.max(0, 1 - env * 1.6) * wordMax * (1 - (this.envAmt || 0)) * this.wordGate).toFixed(3);
+    }
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // listening: turbulent filament sphere (superseded by the expanding lattice below)
+    if (false && env > 0.004) {
+      if (!this.wisp) this.initWisp();
+      const e = env * env * (3 - 2 * env);
+      const spin = t * 0.00022;
+      const bounce = 1 + Math.sin(t * 0.0062) * 0.055 * e + Math.sin(t * 0.0131) * 0.025 * e;
+      const Rw = coreR * (0.34 + 0.74 * e) * bounce;
+      ctx.shadowBlur = 0;
+      // shared heartbeat + the magnetic pulse it throws off
+      const sync = 0.5 + 0.5 * Math.sin(t * 0.0047);
+      const bloom = e * (0.42 + 0.58 * sync);
+      const wPh = ((t * 0.0047 / 6.2832) % 1 + 1) % 1;
+      const waveR = Rw * (0.1 + 1.25 * wPh);
+      const waveW = Rw * 0.26;
+      const waveAmp = Rw * 0.2 * e * (1 - wPh) * (1 - wPh);
+      const pts = [];
+      for (const p of this.wisp) {
+        const th = p.th + spin * p.sw + Math.sin(t * 0.00045 + p.ph) * 0.16;
+        const ph = p.ph2 + Math.sin(t * 0.00037 + p.ph) * 0.1;
+        const sp = Math.sin(ph);
+        const turb =
+          Math.sin(th * 3 + t * 0.0021 + p.ph) * 0.16 +
+          Math.sin(ph * 5 - t * 0.0017) * 0.11 +
+          Math.sin(th * 7 + ph * 3 + t * 0.0013) * 0.07;
+        let rr = Rw * p.rj * (1 + turb * (0.55 + 0.85 * e));
+        const dW = (rr - waveR) / waveW;
+        rr += waveAmp * Math.exp(-dW * dW);
+        const sx = sp * Math.cos(th), sy = Math.cos(ph), sz = sp * Math.sin(th);
+        const k = 1 / (1 - 0.3 * sz);
+        pts.push({
+          x: cx + sx * rr * k,
+          y: cy + sy * rr * k * 0.96,
+          X: sx * rr, Y: sy * rr, Z: sz * rr,
+          depth: 0.25 + 0.75 * ((sz + 1) / 2),
+          p
+        });
+      }
+      // the pulse front itself, riding out through the lattice
+      if (waveAmp > 0.01) {
+        ctx.beginPath();
+        ctx.lineWidth = 1.6;
+        ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.32 * e * (1 - wPh) * (1 - wPh)).toFixed(3) + ')';
+        ctx.shadowBlur = 20; ctx.shadowColor = 'rgba(' + rgb + ',0.7)';
+        ctx.arc(cx, cy, waveR, 0, 6.2832);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+      // 3d lattice: link each node to its nearest neighbours in space
+      const link = Rw * 0.29, link2 = link * link;
+      for (let i = 0; i < pts.length; i++) {
+        const a1 = pts[i];
+        let made = 0;
+        for (let j = i + 1; j < pts.length && made < 3; j++) {
+          const b = pts[j];
+          const dx = a1.X - b.X, dy = a1.Y - b.Y, dz = a1.Z - b.Z;
+          const d2 = dx * dx + dy * dy + dz * dz;
+          if (d2 > link2) continue;
+          made++;
+          const fall = 1 - Math.sqrt(d2) / link;
+          const dep = (a1.depth + b.depth) * 0.5;
+          const a = Math.min(1, 0.42 * fall * fall * dep * e * (0.6 + 0.6 * sync));
+          if (a < 0.012) continue;
+          ctx.beginPath();
+          ctx.strokeStyle = 'rgba(' + rgb + ',' + a.toFixed(3) + ')';
+          ctx.lineWidth = 0.5 + 0.7 * dep;
+          ctx.moveTo(a1.x, a1.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+      for (const q of pts) {
+        const p = q.p;
+        const a = Math.min(1, (0.1 + 0.78 * q.depth * (0.4 + 0.6 * sync)) * e * p.br);
+        if (a < 0.015) continue;
+        const col = p.warm ? '255,227,168' : rgb;
+        ctx.shadowBlur = (3 + 9 * bloom) * q.depth;
+        ctx.shadowColor = 'rgba(' + col + ',' + (0.85 * a).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(' + col + ',' + a.toFixed(3) + ')';
+        ctx.arc(q.x, q.y, p.w * (0.45 + 0.5 * q.depth) * (1 + 0.4 * bloom), 0, 6.2832);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.globalCompositeOperation = 'source-over';
+
+    // the void the soma sits in
+    const lensA = 1 - env;
+    if (lensA > 0.004) {
+      const lens = ctx.createRadialGradient(cx, cy, coreR * 0.4, cx, cy, coreR * 0.78);
+      lens.addColorStop(0, 'rgba(0,0,0,' + lensA.toFixed(3) + ')');
+      lens.addColorStop(0.78, 'rgba(0,0,0,' + lensA.toFixed(3) + ')');
+      lens.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.arc(cx, cy, coreR * 0.78, 0, 6.2832);
+      ctx.fillStyle = lens;
+      ctx.fill();
+    }
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // white bloom while Apollo is speaking to LYLA
+    if (w > 0.004) {
+      const bl = ctx.createRadialGradient(cx, cy, coreR * 0.15, cx, cy, coreR * 1.7);
+      const flick = 0.82 + 0.18 * Math.sin(t * 0.026);
+      bl.addColorStop(0, 'rgba(255,255,255,' + (0.30 * w * flick).toFixed(3) + ')');
+      bl.addColorStop(0.42, 'rgba(255,248,232,' + (0.13 * w * flick).toFixed(3) + ')');
+      bl.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.beginPath();
+      ctx.arc(cx, cy, coreR * 1.7, 0, 6.2832);
+      ctx.fillStyle = bl;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.5 * w).toFixed(3) + ')';
+      ctx.shadowBlur = 40 * w; ctx.shadowColor = 'rgba(255,255,255,' + (0.8 * w).toFixed(3) + ')';
+      ctx.arc(cx, cy, coreR * 0.7, 0, 6.2832);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // nested rings of connected dots, each layer counter-rotating; listening expands them
+    const idle = 1;
+    const grow = 1;
+    const spread = 1;
+    if (idle > 0.004) {
+      const pulse = 0.82 + 0.18 * Math.sin(t * 0.0016) + 0.12 * env * Math.sin(t * 0.0052) + 0.25 * w;
+      const spd = 1 + 1.2 * env + 3.4 * w; // speaking spins the armature fast
+      const bloom = 1 + 1.5 * w;            // and blooms it
+      const layers = [
+        { r: 0.26, n: 6,  sp: 0.00046 },
+        { r: 0.44, n: 10, sp: 0.00034 },
+        { r: 0.62, n: 14, sp: 0.00025 },
+        { r: 0.80, n: 20, sp: 0.00019 },
+        { r: 0.98, n: 28, sp: 0.00014 }
+      ];
+      // shells projected in 3D: layers settle onto one sphere — a bubble, not a turning gyro
+      const d3 = 0; // flat rings; the scope takes over while listening
+      const tilt = 0.30 * d3;
+      const ct = Math.cos(tilt), st = Math.sin(tilt);
+      const breathe = 1 + 0.03 * d3 * Math.sin(t * 0.0012);
+      const persp = 8; // camera well back, so mirrored latitudes stay mirrored
+      const segs = [];
+      const proj = (x, y, z) => {
+        const y2 = y * ct - z * st, z2 = y * st + z * ct;
+        const sc = persp / (persp - z2 / coreR);
+        return { x: cx + x * sc, y: cy + y2 * sc, d: z2 / coreR, sc: sc };
+      };
+      const latOrder = [0, 4, 1, 3, 2]; // top pole, bottom pole, upper, lower, equator
+      for (let li = 0; li < layers.length; li++) {
+        const L = layers[li];
+        const dir = li % 2 === 0 ? 1 : -1;
+        const rot = t * L.sp * spd * dir + li * 0.4;
+        const lay = idle * (1 - li * 0.07) * (1 + 0.25 * env) * bloom;
+        const rFlat = coreR * L.r * breathe;
+        // sphere latitude this ring migrates to: evenly spread, symmetric about the equator
+        const th = ((latOrder[li] + 0.5) / layers.length) * Math.PI;
+        const rLat = coreR * breathe * Math.sin(th);
+        const yLat = coreR * breathe * Math.cos(th);
+        const pts = [];
+        for (let k = 0; k < L.n; k++) {
+          const ang = rot + (k / L.n) * 6.2832;
+          const jit = 1 + (0.018 + 0.04 * env) * Math.sin(t * 0.0022 * spd + k * 1.3 + li);
+          const ca = Math.cos(ang), sa = Math.sin(ang);
+          // blend the flat screen-plane circle into a horizontal latitude ring
+          const x1 = ca * (rFlat + (rLat - rFlat) * d3) * jit;
+          const y1 = (sa * rFlat * (1 - d3) + yLat * d3) * jit;
+          const z1 = sa * rLat * d3 * jit;
+          pts.push(proj(x1, y1, z1));
+        }
+        for (let k = 0; k < L.n; k++) {
+          const a = pts[k], b = pts[(k + 1) % L.n];
+          segs.push({ a: a, b: b, li: li, k: k, lay: lay, z: (a.d + b.d) * 0.5 });
+        }
+      }
+      // meridians stitch the latitudes into one surface once the bubble inflates
+      if (d3 > 0.03) {
+        const R = coreR * breathe * d3;
+        const mer = 8, steps = 16;
+        for (let m = 0; m < mer; m++) {
+          const phi = (m / mer) * Math.PI + t * 0.00005;
+          const cp = Math.cos(phi), sp = Math.sin(phi);
+          let prev = null;
+          for (let i = 0; i <= steps; i++) {
+            const th = (i / steps) * Math.PI;
+            const p = proj(R * Math.sin(th) * cp, R * Math.cos(th), R * Math.sin(th) * sp);
+            if (prev) segs.push({ a: prev, b: p, li: 0, k: i, lay: 0.8 * d3 * bloom, z: (prev.d + p.d) * 0.5, mer: true });
+            prev = p;
+          }
+        }
+      }
+      segs.sort((p, q) => p.z - q.z); // far segments first
+      // listening tints the lattice through a gradient instead of one flat amber
+      let lgrad = null;
+      let crtIn = null, crtOut = null;
+      if (env > 0.02) {
+        lgrad = ctx.createRadialGradient(cx, cy, coreR * 0.1, cx, cy, coreR * 1.02);
+        const BASE = [[90,215,255],[127,227,255],[255,227,168],[255,122,46]];
+        let stops = BASE;
+        if (res > 0.004) {
+          // P1 green -> P3 amber -> cyan-white -> P4 blue-white -> red-orange, drifting outward
+          const pal = [[51,255,102],[178,255,120],[255,176,0],[255,243,208],[120,220,255],[255,94,58]];
+          const u = (t * 0.000055) % 1;
+          const at = (f) => {
+            const x = ((u + f) % 1) * pal.length;
+            const i = Math.floor(x), k = x - i;
+            const A = pal[i % pal.length], B = pal[(i + 1) % pal.length];
+            return [A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k, A[2] + (B[2] - A[2]) * k];
+          };
+          const C = [at(0), at(0.14), at(0.3), at(0.5)];
+          stops = BASE.map((c, i) => c.map((v, j) => v + (C[i][j] - v) * res));
+          crtIn = C[0].map(v => Math.round(v)).join(',');
+          crtOut = C[3].map(v => Math.round(v)).join(',');
+        }
+        const cs = (c) => 'rgba(' + c.map(v => Math.round(v)).join(',') + ',1)';
+        lgrad.addColorStop(0, cs(stops[0]));
+        lgrad.addColorStop(0.38, cs(stops[1]));
+        lgrad.addColorStop(0.62, cs(stops[2]));
+        lgrad.addColorStop(1, cs(stops[3]));
+      }
+      const gmix = Math.min(1, env * 1.4);
+      for (let s = 0; s < segs.length; s++) {
+        const S = segs[s], a = S.a, b = S.b;
+        const dep = (1 - d3) + d3 * (0.42 + 0.58 * (0.5 + 0.5 * S.z)); // depth shading, only in 3D
+        const la = Math.min(1, (0.3 + 0.38 * env + 0.3 * w) * pulse * S.lay * dep * (S.mer ? 0.9 : 1));
+        ctx.lineWidth = (1 + 2.4 * env + 1.8 * w) * dep * a.sc * (S.mer ? 0.8 : 1);
+        // glow follows the gradient band the segment sits in, so it doesn't wash to amber
+        const near = Math.hypot(a.x - cx, a.y - cy) < coreR * 0.55;
+        const gcol = lgrad ? (near ? (crtIn || '127,227,255') : (crtOut || '255,150,60')) : rgb;
+        ctx.shadowBlur = (12 + 18 * env + 30 * w) * dep; ctx.shadowColor = 'rgba(' + gcol + ',' + Math.min(1, 0.7 * S.lay * dep).toFixed(3) + ')';
+        // flat amber under, CRT gradient over — the two cross-fade so the lattice never
+        // drops out while the envelope decays back to idle
+        const seg = (style, alpha) => {
+          if (alpha <= 0.004) return;
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = style;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        };
+        if (lgrad) {
+          seg('rgb(' + rgb + ')', la * (1 - gmix));
+          seg(lgrad, la * gmix);
+        } else seg('rgb(' + rgb + ')', la);
+        if (S.mer) continue; // meridians are surface lines only, no nodes
+        const fl = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.0024 * spd + S.k * 0.8 + S.li * 1.7));
+        const da = Math.min(1, 0.92 * fl * S.lay * dep);
+        const dr = (1.6 + 0.9 * fl) * (1 + 1.1 * env + 0.9 * w) * dep * a.sc;
+        ctx.shadowBlur = (14 + 16 * env + 34 * w) * dep; ctx.shadowColor = 'rgba(' + gcol + ',' + Math.min(1, 0.9 * S.lay * dep).toFixed(3) + ')';
+        const node = (style, alpha) => {
+          if (alpha <= 0.004) return;
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = style;
+          ctx.beginPath();
+          ctx.arc(a.x, a.y, dr, 0, 6.2832);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        };
+        if (lgrad) {
+          node('rgb(' + rgb + ')', da * (1 - gmix));
+          node(lgrad, da * gmix);
+        } else node('rgb(' + rgb + ')', da);
+      }
+      ctx.shadowBlur = 0;
+      // specular sheen on the bubble surface
+      if (d3 > 0.02) {
+        const sr = coreR * breathe * 1.04;
+        ctx.beginPath();
+        ctx.lineWidth = 2.4;
+        ctx.strokeStyle = 'rgba(255,244,216,' + (0.26 * d3).toFixed(3) + ')';
+        ctx.arc(cx, cy, sr, -2.5, -1.5);
+        ctx.stroke();
+      }
+    }
+
+    // 1960s vector scope — the ring lattice re-written on phosphor. it never switches off:
+    // idle holds a dim floor so the graticule and orbits carry through from search to idle
+    {
+      const sa = Math.min(1, Math.max(env, 0.24) * 1.4);
+      // graticule: bezel, crosshair, tick marks
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.2 * sa).toFixed(3) + ')';
+      ctx.beginPath(); ctx.arc(cx, cy, coreR * 0.94, 0, 6.2832); ctx.stroke();
+      ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.12 * sa).toFixed(3) + ')';
+      for (let g = -2; g <= 2; g++) {
+        const o = g * coreR * 0.3;
+        ctx.beginPath(); ctx.moveTo(cx - coreR * 0.86, cy + o); ctx.lineTo(cx + coreR * 0.86, cy + o); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx + o, cy - coreR * 0.86); ctx.lineTo(cx + o, cy + coreR * 0.86); ctx.stroke();
+      }
+      for (let k = 0; k < 36; k++) {
+        const a = (k / 36) * 6.2832, r0 = coreR * 0.94, r1 = r0 - coreR * (k % 3 ? 0.025 : 0.05);
+        ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.3 * sa).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+        ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+        ctx.stroke();
+      }
+      // the fast light rides an inclined orbit outside the lattice, like a ring around Saturn
+      // the plane rolls, the orbit opens and closes, and the light speeds up and coasts,
+      // so no two passes trace the same path
+      const roll = t * 0.00052;
+      const inc0 = -0.22 + Math.sin(roll) * 1.6 + Math.sin(roll * 0.37 + 2.1) * 0.8 + Math.sin(roll * 1.7) * 0.25;
+      const open = 0.5 + 0.5 * Math.sin(t * 0.00041 + 1.1);
+      // mains-hum flicker on the phosphor, so the beams breathe like a live tube
+      const bFlick = 0.84 + 0.11 * Math.sin(t * 0.047) + 0.06 * Math.sin(t * 0.133) + 0.04 * Math.sin(t * 0.31);
+      const phos = res > 0.004 ? '120,255,150' : '127,227,255';
+      const beams = [];
+      for (let bi = 0; bi < beams.length; bi++) {
+        const B = beams[bi];
+        const Rx = coreR * (B.rx + 0.12 * Math.sin(t * 0.00029 + bi * 2.1));
+        const Ry = coreR * B.ry;
+        const ci = Math.cos(B.inc), si = Math.sin(B.inc);
+        const pt = (u) => {
+          const th = u * 6.2832 * B.dir;
+          const ex = Math.cos(th) * Rx, ey = Math.sin(th) * Ry;
+          return [cx + ex * ci - ey * si, cy + ex * si + ey * ci];
+        };
+        const behind = () => false; // flat orbit, nothing is ever on a far side
+        // the orbit itself, faint
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(' + B.col + ',' + (0.5 * sa).toFixed(3) + ')';
+        ctx.beginPath();
+        for (let i = 0; i <= 120; i++) { const p = pt(i / 120); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }
+        ctx.strokeStyle = 'rgba(' + B.col + ',' + (0.14 * sa).toFixed(3) + ')';
+        ctx.stroke();
+        // the beam: a bright arc of decaying phosphor behind the writing head
+        let head = (t * 0.00052 * B.sp + bi * 0.47 + Math.sin(t * 0.00028 * B.sp) * 0.3 + Math.sin(t * 0.00011) * 0.14) % 1;
+        if (head < 0) head += 1;
+        const tail = B.tail, M = 54;
+        for (let i = 0; i < M; i++) {
+          const u0 = head - (i / M) * tail, u1 = head - ((i + 1) / M) * tail;
+          const g = 1 - i / M;
+          const uu0 = u0 < 0 ? u0 + 1 : u0, uu1 = u1 < 0 ? u1 + 1 : u1;
+          const aG = 0.95 * g * g * sa * bFlick * (behind(uu0) ? 0.38 : 1);
+          const p0 = pt(uu0), p1 = pt(uu1);
+          ctx.beginPath();
+          ctx.lineWidth = (1 + 2.4 * g) * (behind(uu0) ? 0.7 : 1);
+          ctx.strokeStyle = (g > 0.82 ? 'rgba(255,248,232,' : 'rgba(' + B.col + ',') + aG.toFixed(3) + ')';
+          ctx.shadowBlur = 26 * g; ctx.shadowColor = 'rgba(' + B.col + ',' + (0.9 * g * sa).toFixed(3) + ')';
+          ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]);
+          ctx.stroke();
+        }
+        // writing head: a slow bloom that guts and re-strikes like a loose filament
+        const hp = pt(head), far = behind(head);
+        const gut = 0.5 + 0.5 * Math.sin(t * 0.0013 + bi * 1.9);
+        const hFlick = Math.max(0.14, (0.62 + 0.38 * Math.sin(t * 0.011 + bi * 2.4))
+          * (0.72 + 0.28 * Math.sin(t * 0.043 + bi))
+          * (1 - 0.55 * gut * gut));
+        const hr = ((far ? 2.1 : 3.0) + 1.4 * Math.sin(t * 0.0026 + bi)) * (0.7 + 0.6 * hFlick);
+        const halo = ctx.createRadialGradient(hp[0], hp[1], 0, hp[0], hp[1], hr * 7);
+        halo.addColorStop(0, 'rgba(255,252,240,' + (0.5 * hFlick * sa).toFixed(3) + ')');
+        halo.addColorStop(0.3, 'rgba(' + B.col + ',' + (0.26 * hFlick * sa).toFixed(3) + ')');
+        halo.addColorStop(1, 'rgba(' + B.col + ',0)');
+        ctx.beginPath();
+        ctx.fillStyle = halo;
+        ctx.arc(hp[0], hp[1], hr * 7, 0, 6.2832);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(255,255,255,' + ((far ? 0.5 : 0.95) * sa * bFlick * hFlick).toFixed(3) + ')';
+        ctx.shadowBlur = (far ? 26 : 48) * hFlick; ctx.shadowColor = 'rgba(' + B.col + ',' + sa.toFixed(3) + ')';
+        ctx.arc(hp[0], hp[1], hr, 0, 6.2832);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      // slow scan bar drifting down the tube
+      const sy = cy - coreR * 0.94 + ((t * 0.055) % (coreR * 1.88));
+      const dx = Math.sqrt(Math.max(0, (coreR * 0.94) * (coreR * 0.94) - (sy - cy) * (sy - cy)));
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.14 * sa).toFixed(3) + ')';
+      ctx.moveTo(cx - dx, sy); ctx.lineTo(cx + dx, sy);
+      ctx.stroke();
+    }
+
+    // no nucleus light while listening — the lattice is the only thing lit
+    const period = env > 0.5 ? 1100 : 3400;
+
+    // action potential travelling outward
+    const wave = ((t % period) / period);
+    const wr = coreR * 0.3 + wave * (outer - coreR * 0.3);
+    ctx.beginPath();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(255,176,0,' + (0.3 * env * (1 - wave) * (1 - wave)).toFixed(3) + ')';
+    ctx.shadowBlur = 18; ctx.shadowColor = 'rgba(' + rgb + ',0.7)';
+    ctx.arc(cx, cy, wr, 0, 6.2832);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    if ((this.commTalk || 0) > 0.004) {
+      const bl = this.commTalk;
+      const g = ctx.createRadialGradient(cx, cy, coreR * 0.2, cx, cy, coreR * 2.1);
+      g.addColorStop(0, 'rgba(255,255,255,' + (0.30 * bl).toFixed(3) + ')');
+      g.addColorStop(0.45, 'rgba(255,250,235,' + (0.14 * bl).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(cx, cy, coreR * 2.1, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  initWisp() {
+    const N = 460;
+    this.wisp = Array.from({ length: N }, () => {
+      const u = Math.random() * 2 - 1;
+      return {
+        th: Math.random() * 6.2832,
+        ph2: Math.acos(u),
+        ph: Math.random() * 6.2832,
+        rj: 0.72 + Math.pow(Math.random(), 0.6) * 0.42,
+        sw: 0.5 + Math.random() * 1.5,
+        w: 0.6 + Math.random() * 1.5,
+        br: 0.55 + Math.pow(Math.random(), 2.2) * 1.1,
+        warm: Math.random() < 0.18
+      };
+    });
+  }
+
+  initNodes(cx, cy, inner, outer) {
+    const N = 38;
+    this.nodes = Array.from({ length: N }, () => {
+      const a = Math.random() * 6.2832;
+      const rr = inner + Math.random() * (outer - inner);
+      const sp = 0.12 + Math.random() * 0.26;
+      const dir = Math.random() * 6.2832;
+      return {
+        x: cx + Math.cos(a) * rr,
+        y: cy + Math.sin(a) * rr,
+        vx: Math.cos(dir) * sp,
+        vy: Math.sin(dir) * sp,
+        r: 1 + Math.pow(Math.random(), 1.8) * 1.9,
+        ph: Math.random() * 6.2832
+      };
+    });
+  }
+
+  hexRgb(hex) {
+    const h = String(hex).replace('#', '');
+    const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(',');
+  }
+
+  playHud() { this.sfx('hud'); }
+  playReveal() { this.sfx('rev'); }
+  playHeard() { this.sfx('heard'); }
+  playPress() { this.sfx('press'); }
+
+  initAudio() {
+    if (this.ac) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    this.ac = new AC();
+    this.buf = {};
+    const files = {
+      hud:   ['uploads/ES_User Interface, Motion, Bring Up Hud - Epidemic Sound - 0031-0749.wav', 0.55],
+      rev:   ['uploads/ES_User Interface, Click, UI Buttons, Select, Previous - Epidemic Sound.mp3', 0.5],
+      heard: ['uploads/ES_User Interface, Alert, Notification, Message, Text 01 - Epidemic Sound.mp3', 0.5],
+      press: ['uploads/mixkit-dry-pop-up-notification-alert-2356.mp3', 0.7],
+      ly1:   ['uploads/mixkit-alien-technology-button-3118.mp3', 0.45],
+      ly2:   ['uploads/mixkit-game-liquid-game-hit-3155.mp3', 0.45]
+    };
+    this.vol = {};
+    Object.entries(files).forEach(([k, [url, v]]) => {
+      this.vol[k] = v;
+      fetch(url).then(r => r.arrayBuffer())
+        .then(a => this.ac.decodeAudioData(a))
+        .then(b => { this.buf[k] = b; })
+        .catch(() => {});
+    });
+    this.unlock = () => { if (this.ac.state === 'suspended') this.ac.resume(); };
+    window.addEventListener('pointerdown', this.unlock, true);
+    window.addEventListener('keydown', this.unlock, true);
+  }
+
+  sfx(k) {
+    if (!this.ac || !this.buf || !this.buf[k]) return;
+    if (this.ac.state === 'suspended') this.ac.resume();
+    const s = this.ac.createBufferSource();
+    s.buffer = this.buf[k];
+    const g = this.ac.createGain();
+    g.gain.value = this.vol[k] ?? 0.5;
+    s.connect(g).connect(this.ac.destination);
+    s.start();
+  }
+
+  toggleListen(viaKey) {
+    clearTimeout(this.t1); clearTimeout(this.t2);
+    if (this.state.phase !== 'listening') this.sfx(viaKey ? 'press' : 'hud');
+    if (this.state.phase === 'listening') {
+      this.qi = ((this.qi == null ? -1 : this.qi) + 1) % this.scenes.length;
+      this.ask(this.scenes[this.qi]);
+    } else this.setState({ phase: 'listening', scene: null }, () => this.measureFit());
+  }
+
+  toggleResearch() {
+    clearTimeout(this.t1); clearTimeout(this.t2);
+    if (this.state.phase === 'research') { this.reset(); return; }
+    this.sfx('hud');
+    this.setState({ phase: 'research', scene: null }, () => this.measureFit());
+  }
+
+  reset() {
+    clearTimeout(this.t1); clearTimeout(this.t2); clearInterval(this.tick);
+    this.setState({ phase: 'idle', scene: null, fit: 1 });
+  }
+
+  ask(scene) {
+    clearTimeout(this.t1); clearTimeout(this.t2); clearInterval(this.tick);
+    this.setState({ phase: 'thinking', scene }, () => this.measureFit());
+    this.playHeard();
+    this.t1 = setTimeout(() => {
+      this.setState({ phase: 'response' }, () => this.measureFit());
+      this.playReveal();
+      if (scene.key === 'timer') {
+        this.setState({ timerLeft: 1500 });
+        this.tick = setInterval(() => this.setState(s => ({ timerLeft: Math.max(0, s.timerLeft - 1) })), 1000);
+      }
+      const hold = (this.props.holdSeconds ?? 9) * 1000;
+      this.t2 = setTimeout(() => this.reset(), hold);
+    }, 1150);
+  }
+
+  designRenderVals() {
+    const { phase, scene, now, edge, timerLeft, fit } = this.state;
+    const busy = phase !== 'idle';
+    const answering = phase === 'response' || phase === 'thinking';
+    const mm = String(Math.floor(timerLeft / 60)).padStart(2, '0');
+    const ss = String(timerLeft % 60).padStart(2, '0');
+    return {
+      starRef: this.starRef,
+      latBars: this.latBars,
+      // the deck hands the screen over to the answer — HUD clears out entirely so nothing overlaps
+      hudOpacity: (answering || phase === 'listening') ? 0 : 1,
+      loadTxtRef: this.loadTxtRef, loadBarRef: this.loadBarRef, loadStateRef: this.loadStateRef,
+      latRef: this.latRef, latTxtRef: this.latTxtRef, latPeakRef: this.latPeakRef,
+      tokTxtRef: this.tokTxtRef, tokBarRef: this.tokBarRef, tokRateRef: this.tokRateRef,
+      syncPctRef: this.syncPctRef, syncRowRef: this.syncRowRef,
+      procRef: this.procRef, procStageRef: this.procStageRef, procMsRef: this.procMsRef,
+      lylaIconRef: this.lylaIconRef, lylaHpRef: this.lylaHpRef, lylaPctRef: this.lylaPctRef,
+      wavRef: this.wavRef, txRef: this.txRef, txMetaRef: this.txMetaRef,
+      ringRef: this.ringRef,
+      wordRef: this.wordRef,
+      lylaOpacity: phase === 'idle' ? 1 : 0,
+      lylaShift: phase === 'idle' ? '0px' : '18px',
+      lylaRef: this.lylaRef,
+      lylaLabelRef: this.lylaLabelRef,
+      onCore: (e) => { e.stopPropagation(); this.toggleListen(); },
+      onResearch: (e) => { e.stopPropagation(); this.toggleResearch(); },
+      onBackdrop: () => { if (phase !== 'idle') this.reset(); },
+      clock: now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      dateLine: now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }),
+      statusLabel: phase === 'listening' ? 'Listening' : phase === 'research' ? 'Researching' : phase === 'thinking' ? 'Working' : 'Apollo online',
+      chromeOpacity: busy || edge ? 1 : 0,
+      hintOpacity: busy || edge ? 0 : 0.72,
+      coreFrame: answering ? 'clamp(150px, 22vh, 200px)' : busy ? 'min(360px, 38vh)' : 'min(600px, 64vh)',
+      // the collapsed core draws at ~26% of the canvas, so scale the art past the frame
+      // instead of reserving layout height the answer card needs
+      coreArt: answering ? '185%' : '100%',
+      stagePad: answering ? '34px 40px 104px' : '104px 40px 132px',
+      wordOpacity: answering ? '0' : '1',
+      fitScale: fit,
+      colRef: this.colRef,
+      dockOpacity: (phase === 'research' || (edge && !answering)) ? 1 : 0,
+      dockPE: (phase === 'research' || (edge && !answering)) ? 'auto' : 'none',
+      showTranscript: phase === 'thinking' || phase === 'response',
+      transcript: scene ? scene.say : '',
+      showThinking: phase === 'thinking',
+      showSimple: phase === 'response' && scene && scene.key === 'simple',
+      showStock: phase === 'response' && scene && scene.key === 'stock',
+      showWeather: phase === 'response' && scene && scene.key === 'weather',
+      showCalendar: phase === 'response' && scene && scene.key === 'calendar',
+      showEmail: phase === 'response' && scene && scene.key === 'email',
+      showSearch: phase === 'response' && scene && scene.key === 'search',
+      showTimer: phase === 'response' && scene && scene.key === 'timer',
+      timerLabel: mm + ':' + ss,
+      timerProgress: Math.round((timerLeft / 1500) * 100) + '%'
+    };
+  }
+
+  /* --- the real backend bridge ----------------------------------------
+     apollo.py drives the page through window.apollo.* (status / turn /
+     note / fatal). Everything the canvas used to answer itself with -
+     scenes, toggleListen, ask - stays above, unused, so a future feature
+     can wire the per-topic cards to live data. */
+
+  registerBridge() {
+    window.__apolloInstance = this;
+  }
+
+  /* --- what shape the window is ----------------------------------------
+     apollo.py sizes the window to one of three shapes and tells the page which
+     one it is wearing, so the page renders to fill it rather than scaling a
+     whole screen's worth of composition down into a corner.
+
+       orb    a small circle, the resting state - core only
+       panel  big enough to read a reply in - core, question, answer
+       full   the whole work area - everything, including Lyla and the HUD  */
+
+  isOrb()   { return this.state.mode === 'orb'; }
+  isFull()  { return this.state.mode === 'full'; }
+  isExpanded() { return !this.isOrb(); }
+
+  applyMode(name) {
+    if (name === this.state.mode) return;
+    if (name !== 'orb') this.sfx('hud');
+    this.setState({ mode: name }, () => { this.initStars(); this.measureFit(); });
+  }
+
+  applyStatus(state) {
+    clearTimeout(this.t1); clearTimeout(this.t2); clearInterval(this.tick);
+    const map = {
+      Waking: 'waking', Idle: 'idle', Listening: 'listening',
+      Thinking: 'thinking', Speaking: 'response', Error: 'idle'
+    };
+    const phase = map[state] || 'idle';
+    if (phase === 'listening') {
+      this.sfx('hud');
+      this.setState({ phase, scene: null, transcript: '', answerText: '' });
+    } else if (phase === 'thinking') {
+      // No chime here. Thinking is entered before the audio has been
+      // transcribed, so chiming on it means chiming at silence - at a cough,
+      // at a chord pressed by accident. The "heard you" sound belongs to the
+      // moment there is actually a transcript, which is applyTurn('You').
+      this.setState({ phase });
+    } else if (phase === 'response') {
+      this.playReveal();
+      this.setState({ phase });
+    } else {
+      this.setState({ phase });
+    }
+  }
+
+  applyTurn(speaker, text) {
+    if (speaker === 'You') { this.playHeard(); this.setState({ transcript: text }); }
+    else this.setState({ answerText: text });
+  }
+
+  applyNote(text, sticky) {
+    clearTimeout(this.noteTimer);
+    this.setState({ noteText: text, noteVisible: true });
+    if (!sticky) {
+      this.noteTimer = setTimeout(() => this.setState({ noteVisible: false }), 6000);
+    }
+  }
+
+  applyFatal(text) {
+    this.applyNote(text, true);
+    this.setState({ phase: 'idle' });
+  }
+
+  dismiss() {
+    this.setState({ noteVisible: false });
+  }
+
+  /* Long replies need a smaller display size, not a smaller fit-zoom - the
+     zoom floors at 0.72 and then simply overflows. */
+  answerLen(text) {
+    const n = (text || '').length;
+    return n > 620 ? 'xl' : n > 300 ? 'l' : n > 120 ? 'm' : 's';
+  }
+
+  renderVals() {
+    const v = this.designRenderVals();
+    const { phase, transcript, answerText, noteVisible, noteText } = this.state;
+    const orb = this.isOrb();
+    const full = this.isFull();
+    const answering = phase === 'thinking' || phase === 'response';
+
+    return Object.assign(v, {
+      // The window itself carries the translucency (a uniform alpha; see
+      // apollo.py), so the page only decides how dark its own ground is. The
+      // orb paints none at all, the panel just enough for amber text to hold
+      // against a bright game behind it, the full display a solid ground.
+      scrimAlpha: orb ? 0 : full ? 1 : 0.34,
+
+      // The orb is a 210px circle. Nothing but the core fits, and nothing
+      // else belongs: this is the shape Apollo wears while you work.
+      // The panel is only a little bigger than the orb, so it gets its own
+      // tight padding and a small core rather than the full display's.
+      stagePad: orb ? '0px'
+        : full ? (answering ? '34px 40px 104px' : '104px 40px 132px')
+        : '14px 18px 16px',
+      coreFrame: orb ? 'min(100vw, 100vh)'
+        : full ? (answering ? 'clamp(150px, 22vh, 200px)' : 'min(360px, 38vh)')
+        : (answering ? 'clamp(48px, 17vh, 70px)' : 'min(120px, 34vh)'),
+      coreArt: answering && !orb ? '185%' : '100%',
+      fitScale: orb ? 1 : v.fitScale,
+      answerScale: full ? 'full' : 'panel',
+      stageWrapRef: this.stageWrapRef,
+      coreBoxRef: this.coreBoxRef,
+
+      // Atmosphere belongs to the shapes that have room for it.
+      fieldOpacity: orb ? 0 : 1,
+      crtOpacity: orb ? 0 : 1,
+
+      // Lyla and the telemetry are the reason to open the full display, and
+      // they stand aside while there is an answer to read.
+      hudOpacity: full && !answering ? 1 : 0,
+      lylaOpacity: full && !answering ? 1 : 0,
+      lylaShift: full && !answering ? '0px' : '18px',
+      chromeOpacity: orb ? 0 : 1,
+      wordOpacity: !orb && !answering ? '1' : '0',
+      hintOpacity: full && !answering && phase === 'idle' ? 0.72 : 0,
+
+      // The dock is the canvas's demo prompts, wired to nothing, and the
+      // window does not take clicks. Controls that cannot be used are worse
+      // than no controls.
+      dockOpacity: 0,
+      dockPE: 'none',
+
+      statusLabel: phase === 'waking' ? 'Waking'
+        : phase === 'listening' ? 'Listening'
+        : phase === 'thinking' ? 'Working'
+        : phase === 'response' ? 'Speaking'
+        : 'Apollo online',
+
+      onCore: (e) => { e.stopPropagation(); },
+      onBackdrop: () => this.dismiss(),
+
+      showTranscript: !orb && answering && !!transcript,
+      transcript: transcript || '',
+      showThinking: !orb && phase === 'thinking',
+      showSimple: !orb && phase === 'response' && !!answerText,
+      answerText: answerText || '',
+      answerLen: this.answerLen(answerText),
+      showStock: false, showWeather: false, showCalendar: false,
+      showEmail: false, showSearch: false, showTimer: false,
+
+      noteOpacity: noteVisible && !orb ? 1 : 0,
+      noteText: noteText || ''
+    });
+  }
+}
+
+window.apollo = {
+  status: (state) => { window.__apolloInstance && window.__apolloInstance.applyStatus(state); },
+  turn: (speaker, text) => { window.__apolloInstance && window.__apolloInstance.applyTurn(speaker, text); },
+  note: (text) => { window.__apolloInstance && window.__apolloInstance.applyNote(text, false); },
+  fatal: (text) => { window.__apolloInstance && window.__apolloInstance.applyFatal(text); },
+  mode: (name) => { window.__apolloInstance && window.__apolloInstance.applyMode(name); },
+};
+</script>
+</body>
+</html>

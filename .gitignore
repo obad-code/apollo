@@ -1,0 +1,26 @@
+# Secrets. The whole point of this file.
+.env
+.env.*
+!.env.example
+
+# Virtual environment
+.venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Downloaded models and generated audio - big, and re-fetchable.
+voices/
+voicebox_samples/
+
+# Screenshot harness output
+_frames/
+
+# Windows shell cruft
+Thumbs.db
+desktop.ini
+
+# Local runtime state
+reminders.json
+.thumbnail
