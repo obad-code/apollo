@@ -585,10 +585,23 @@ class WebReporter:
             self.on_visual(visual)
 
     def activity(self, text):
-        """What Apollo is doing right now, in a few words ("fetching NVDA")."""
+        """What Apollo is doing right now, in a few words ("fetching NVDA").
+
+        Native overlay only. This can be called on Gemini's event-loop thread
+        (a search is noticed there), and a page call blocks until the page
+        answers - which would stall the loop that is receiving the voice.
+        """
         if self.on_activity is not None and text:
             self.on_activity(text)
-        self._call("note", text)
+
+    def stream_reply(self, text):
+        """Apollo's answer so far, while it is being spoken.
+
+        Native overlay only, for the same reason as `activity`: fragments
+        arrive on Gemini's event-loop thread. The page gets the finished
+        answer through `turn` once the turn is over.
+        """
+        self.on_turn("Apollo", text, None)
 
     def note(self, text):
         self._call("note", text)
@@ -978,7 +991,7 @@ class Apollo:
             ui, on_level=self.on_level,
             on_user_text=assistant.agent_interrupt(ui),
             on_heard=ui.partial,
-            on_reply=lambda text: ui.turn("Apollo", text),
+            on_reply=ui.stream_reply,
             on_activity=ui.activity,
             run_tool=assistant.tool_runner(ui))
         self.voice.open(auto_vad=False)

@@ -46,3 +46,18 @@ def test_idle_after_quiet_period_reaches_page():
     ui.quiet = False
     ui.status("Idle")
     assert ui.window.calls[-1] == 'window.apollo.status("Idle")'
+
+
+def test_streaming_updates_never_block_on_the_page():
+    """Reply fragments and activity arrive on Gemini's event loop thread; a
+    page call there (evaluate_js blocks until the page answers) would stall
+    the loop that is receiving the voice's audio."""
+    turns, doing = [], []
+    ui = apollo.WebReporter(FakeWindow(), FakeOverlay(), on_status=lambda s: None,
+                            on_turn=lambda *a: turns.append(a), on_level=lambda v: None,
+                            on_partial=lambda t: None, on_activity=doing.append)
+    ui.quiet = False
+    ui.stream_reply("Opening Chr")
+    ui.activity("searching the web")
+    assert ui.window.calls == []
+    assert turns == [("Apollo", "Opening Chr", None)] and doing == ["searching the web"]
