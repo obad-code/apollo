@@ -304,6 +304,25 @@ logging.getLogger("anthropic.lib.credentials._auth").setLevel(logging.ERROR)
 # rather than sharing the root logger with every library in the process.
 # Nothing is configured on the root logger deliberately: under pythonw.exe
 # there is no console at all, and this must stay silent rather than fail.
+def _utf8_console():
+    """Make the console take Arabic.
+
+    Windows hands Python a cp1252 console here, and the first Arabic line -
+    your words, Apollo's answer, a router log - raised UnicodeEncodeError.
+    Under pythonw there is no console at all (the streams are None), which is
+    why every step is guarded.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
+_utf8_console()
+
+
 def _log_to_console(level=logging.INFO):
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter("  [%(name)s] %(message)s"))

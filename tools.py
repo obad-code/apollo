@@ -116,7 +116,13 @@ def coerce(tool, args):
             continue
         value, kind = clean[key], spec.get("type")
         try:
-            if kind == "string" and not isinstance(value, str):
+            if kind == "string" and isinstance(value, list):
+                # Measured: asked for one chart the model sent `symbols:
+                # ["NVDA"]`. str() of that is "['NVDA']", which a name search
+                # resolved to a leveraged NVDA fund - a wrong chart, spoken
+                # with confidence. One item means that item.
+                value = str(value[0]) if len(value) == 1 else ", ".join(map(str, value))
+            elif kind == "string" and not isinstance(value, str):
                 value = str(value)
             elif kind == "integer":
                 value = int(round(float(value)))
@@ -288,9 +294,10 @@ def _media(ctx, action):
 @_tool("volume", "volume",
        "Read or change the PC's volume. level is 0-100 for set, or the step for up/down "
        "(default 10).",
-       _obj({"action": _enum(["get", "set", "up", "down", "mute", "unmute"], "What to do"),
-             "level": {"type": "integer", "description": "0-100"}}, ["action"]))
-def _volume(ctx, action, level=None):
+       _obj({"action": _enum(["get", "set", "up", "down", "mute", "unmute"],
+                             "What to do (default get)"),
+             "level": {"type": "integer", "description": "0-100"}}))
+def _volume(ctx, action="get", level=None):
     return pc_control.volume(action, level)
 
 

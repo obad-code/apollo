@@ -98,7 +98,7 @@ def _ttl():
 
 def resolve(text):
     """A name or ticker as spoken -> a Yahoo symbol."""
-    raw = (text or "").strip()
+    raw = (text or "").strip().strip("[]").strip().strip("'\"").strip()
     if not raw:
         raise MarketError("No stock was named.")
     key = raw.lower().removeprefix("the ").strip()
