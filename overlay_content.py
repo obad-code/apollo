@@ -138,6 +138,11 @@ def _clean(data):
     return {"chart": chart, "cards": cards}
 
 
+# The same validation, for visuals built in code rather than parsed from a
+# reply: a tool's chart still has to clear every cap a model's would.
+clean_visual = _clean
+
+
 def _clean_chart(chart):
     if not isinstance(chart, dict):
         return None
