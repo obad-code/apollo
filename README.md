@@ -5,15 +5,17 @@ streams to Gemini Live and Apollo answers out loud in Puck's voice.
 
 ```
   [Ctrl+Alt held]  ->  mic  ->  Gemini Live (audio in, audio out)  ->  Puck
-   or always-on            \
-                            `->  Whisper (local)  ->  was an agent called by name?
+   or always-on                  |        |        \
+                                 |     tools     Google Search
+                                 |   (tools.py: apps, sites, keys, media,
+                                 |    volume, windows, reminders, markets)
+                                 |
+                  its transcript of you  ->  was an agent called by name?
                                                           |
                                              LYLA / ATLAS / ECHO / NOVA /
                                              THE WORKSHOP / OPTIMO / HERMES
                                                           |
-                                          Claude API  ->  Fish Audio (cloud)
-                                                          |
-                                            open apps / search the web
+                                     Claude API (same tools)  ->  Fish Audio
 ```
 
 **One assistant, one voice.** Everything you say — chat, a quick command, a
@@ -22,12 +24,13 @@ still has the tools, but it belongs to the seven agents now and answers only
 when you call one by name. See [One voice, and the door Claude is behind](#one-voice-and-the-door-claude-is-behind).
 
 Your *audio* goes to Google while you speak, and an agent's reply text goes to
-Anthropic and to Fish Audio. Whisper still runs locally.
+Anthropic and to Fish Audio. A local Whisper is kept only as a backup
+transcriber.
 
-It does more than answer questions. Ask it to open Chrome and it opens Chrome;
-ask it something about this week and it searches the web; ask it to *research*
-something and it goes away and reads a dozen sources first. See
-[What it can do](#what-it-can-do).
+It does more than answer questions, and it does it in the same voice: ask it
+to open Chrome and it opens Chrome; ask how Nvidia did this week and it draws
+the chart; ask what's new with GTA 6 and it searches. Speak Arabic and it
+answers in Arabic. See [What it can do](#what-it-can-do).
 
 ---
 
@@ -355,42 +358,41 @@ WebView2 composites unreliably outside the normal window hierarchy.
 
 ## What it can do
 
-Three things beyond conversation. You don't switch modes or say a magic word —
-Claude decides from what you asked, using tool calling.
+You don't switch modes or say a magic word: whichever model is answering -
+Gemini for conversation, Claude when you summon an agent - decides from what
+you asked, and both have exactly the same tools (`tools.py` declares them once
+for both). Apollo does the thing first and then confirms it in a few words.
 
-**Open things on your PC.** *"Open Chrome."* *"Open Spotify."* *"Open my
-downloads folder."* *"Open the readme."* Apollo says what it's doing —
-"Opening Chrome" — and does it.
+| Ask | What happens |
+|---|---|
+| *"Open Spotify"*, *"close Notepad"* | Launches or switches to the app; closing sends a normal close, so the app still asks about unsaved work. |
+| *"Open YouTube"*, *"open github.com"* | Opens the site in your browser. An unknown phrase becomes a Google search. |
+| *"Open my Downloads folder"*, *"open the readme"* | Files and folders by path, standard folder name, or a search of your user folders. |
+| *"Pause the music"*, *"next song"* | Media keys, so it works with Spotify, YouTube and anything else playing. |
+| *"Volume to 30"*, *"turn it down"*, *"what's my volume?"* | Real volume control and read-back. |
+| *"Minimize this"*, *"snap Chrome left"*, *"show the desktop"* | Window control; with no app named it acts on the window in front of you. |
+| *"Type: see you at nine"*, *"press ctrl+t"* | Types into (or sends a shortcut to) whatever window you're working in - Arabic too. |
+| *"Remind me in 20 minutes to stretch"* | Reminders are spoken back in Apollo's voice when due, and wait for you to finish talking first. |
+| *"How's Nvidia doing?"*, *"chart Tesla for a month"* | Live prices from Yahoo Finance; a chart and readouts appear under the mesh, and Apollo speaks only the numbers the feed returned. |
+| *"Open it in TradingView"* | Opens the full interactive TradingView chart for that symbol. |
+| *"Lock the PC"* | Locks at once. **Sleep, restart, shut down and sign out** always ask first, and only a "yes" in your *next* turn goes through - the model cannot approve its own request. Restart and shutdown wait 10 s; *"cancel the shutdown"* stops them. |
+| Anything current | Gemini uses Google Search rather than answering from memory. |
 
-Known apps (Chrome, Spotify, Notepad, Word, VS Code, and a couple of dozen
-more) are launched by name. Anything else falls back to a `PATH` lookup and
-then a search of your Start Menu shortcuts, so most installed software works
-without being listed. Files and folders are found by exact path if you give
-one, otherwise by searching Desktop, Documents, Downloads, Pictures, Music and
-Videos. Standard folders resolve by name, so *"open Desktop"* opens your
-Desktop and not something that merely has "Desktop" in its name.
+**Language.** Apollo answers in the language you spoke - Arabic (in a Saudi
+dialect) or English - because what you say is transcribed by Gemini itself,
+which understands both. The live words under the mesh stream as you talk.
 
-If it can't find what you asked for it says so rather than opening something
-random.
+**Research properly.** Summon an agent (*"Hey ATLAS, research ..."*) and Claude
+runs a much heavier pass: around a dozen searches, fetching the important
+sources in full, cross-referencing numeric claims. It takes a minute or two and
+**costs meaningfully more than a normal question** - see [Cost](#cost).
 
-**Search the web.** Anything that depends on current information — news,
-prices, scores, releases — is searched rather than answered from memory. This
-runs on Anthropic's servers, so there's no search API key to set up. Sources
-are named out loud the way a person would ("according to Reuters"); URLs are
-never read aloud, because hearing a URL spoken is miserable.
-
-**Research properly.** Say *"research..."*, *"dig deeper"*, or *"look properly
-into..."* and it runs a much heavier pass: around a dozen searches, fetching
-the important sources in full rather than skimming search snippets, and
-cross-referencing at least two independent sources for any contested or
-numeric claim. It tells you when sources disagree or when it couldn't confirm
-something, instead of papering over it.
-
-This takes a minute or two, so Apollo warns you out loud before it goes quiet,
-and the overlay shows each search as it runs. The research happens in a
-conversation of its own, so a long session doesn't drag all that source
-material behind it — only the finished answer comes back. **It also costs
-meaningfully more than a normal question** — see [Cost](#cost).
+**The voice model.** Apollo connects to the first model in
+`gemini_live.MODELS` that answers - `gemini-2.5-flash-native-audio-latest`,
+then the September 2025 preview - and says which in the log. Set
+`APOLLO_GEMINI_MODEL` to try another first. `gemini-3.8-live` exists but needs
+billing enabled on the Gemini key (it currently reports "exceeded your current
+quota").
 
 ---
 
@@ -398,7 +400,7 @@ meaningfully more than a normal question** — see [Cost](#cost).
 
 - Virtual environment created at `.venv` with all dependencies installed
 - Verified your mic works (`Microphone (picun G2)`) and two TTS voices exist
-- Whisper `base.en` model downloaded and cached, so the first run is fast
+- Whisper `small` (multilingual) downloads in the background on first run; it is only a backup
 - VoiceBox running on `127.0.0.1:17493` with the `Apollo George` voice profile,
   and Piper `en_US-lessac-medium` in `voices/` as the fallback
 
@@ -414,7 +416,13 @@ The only thing left is your API key.
 | `gemini_live.py` | Apollo's voice. Owns the only microphone Apollo opens and streams it to Gemini's native-audio model, which answers in the Puck voice as audio rather than as text to be synthesised. Holds both listening modes. |
 | `router.py` | Which backend answers this turn. One question: was an agent called by name? Everything else is conversation. |
 | `agents.py` | The seven agents, and the only module that touches `ask_claude`. Placeholders for now — the boundary exists before they do, on purpose. |
-| `pc_control.py` | The Windows half of the `control_pc` tool — launching apps, finding files and folders. Talks to Windows, never to Claude. |
+| `tools.py` | Every tool Apollo has, declared once for both Gemini and Claude, and the only place tool errors are caught. Also the confirmation rule for power actions. |
+| `pc_control.py` | The Windows side of the tools: apps, sites, files, keyboard, media, volume, windows, power. Talks to Windows, never to a model. |
+| `market.py` | Live prices, history, NYSE hours and TradingView links, from Yahoo Finance's public feed. |
+| `turnview.py` | What the overlay shows for the turn in progress, as your words, the reply and any chart arrive from different threads. |
+| `presence.py` | When the full display is open (Ctrl+` is sticky; away-from-keyboard closes on input), and what a phase change does to the overlay. |
+| `reminders.py` | Reminder storage and the watcher that fires them. |
+| `probes/` | Live checks against the real APIs and PC: which Gemini model to use, transcript timing, and an end-to-end tool run. |
 | `apollo.py` | The overlay host. Owns the window shapes, the tray icon, the presence watcher and the single-instance lock, and drives the page from `assistant`. |
 | `orb.py` | The overlay itself, drawn natively into a layered window so it can be genuinely transparent: the mesh, and the words, sparkline and cards that grow downward under it. |
 | `overlay_content.py` | What an answer actually contains and how tall that makes the overlay — reply parsing and layout, with no drawing code in it. |

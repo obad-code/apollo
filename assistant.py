@@ -70,6 +70,10 @@ def load_env(path=None):
 
 load_env()
 
+# huggingface_hub warns on every download that Windows without Developer Mode
+# can't symlink its cache. It works regardless; the warning is only noise.
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+
 # Four voices, tried in order: Fish Audio in the cloud, then VoiceBox over its
 # local REST API, then Piper, then Windows SAPI (pyttsx3). Each fallback is a
 # step down in quality, not a failure - a missing engine, a dead server or an
