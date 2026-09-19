@@ -52,6 +52,7 @@ import logging
 import os
 import queue
 import threading
+import time
 
 import sounddevice as sd
 from google import genai
@@ -230,6 +231,7 @@ class LiveSession:
         self._in_flight = False
         self._discarded = False
         self._false_start = False   # the model was cut off mid-reply
+        self._last_write = 0.0      # monotonic time of the last block played
 
         self._reply = []        # Gemini's own words, as it speaks them
         self._heard = []        # ...and yours, when the model is transcribing
@@ -409,6 +411,31 @@ class LiveSession:
         voice by a fragment and is only worth reading once the turn is over.
         """
         return "".join(self._reply).strip()
+
+    # How long after the last block was written the speakers are still
+    # sounding it: PortAudio buffers roughly this much ahead of the DAC.
+    PLAY_TAIL = 0.35
+
+    @property
+    def playing(self):
+        """True while reply audio is queued or still coming out of the speakers."""
+        q = self._play_q
+        queued = q is not None and not q.empty()
+        return queued or (time.monotonic() - self._last_write) < self.PLAY_TAIL
+
+    def wait_until_quiet(self, timeout=REPLY_TIMEOUT):
+        """Block until the reply has finished playing. True if it did.
+
+        Always-listening's counterpart to `wait_for_reply`: there the turn is
+        already over by the time the caller hears of it, and the only thing
+        left to wait for is the sound.
+        """
+        deadline = time.monotonic() + timeout
+        while self.playing and not self._closing.is_set():
+            if time.monotonic() > deadline:
+                return False
+            time.sleep(0.05)
+        return True
 
     def wait_for_reply(self, timeout=REPLY_TIMEOUT):
         """Block until Gemini has finished speaking. True if it finished."""
@@ -720,3 +747,4 @@ class LiveSession:
             # Blocking in C: off the loop, or the receive loop stalls behind
             # the sound card and the reply arrives in stutters.
             await asyncio.to_thread(self._speaker.write, chunk)
+            self._last_write = time.monotonic()

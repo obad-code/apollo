@@ -1614,11 +1614,20 @@ def always_listening_turn(ui, voice):
 
     if route.name == router.AGENT:
         ui.status(THINKING)
-        answer_with_agent(route.agent, said, ui)
+        try:
+            answer_with_agent(route.agent, said, ui)
+        finally:
+            ui.status(LISTENING)
         return
 
     if reply:
         ui.turn("Apollo", reply)
+        # Gemini has already answered - the audio is playing now - so this
+        # is the one moment the overlay should say so. Back to LISTENING once
+        # it has finished, which is what starts the answer's linger.
+        ui.status(SPEAKING)
+        voice.live.wait_until_quiet()
+        ui.status(LISTENING)
 
 
 def run_loop(ui, whisper, stop=None, esc_quits=False, voice=None, toggle=None):
@@ -1688,12 +1697,10 @@ def run_loop(ui, whisper, stop=None, esc_quits=False, voice=None, toggle=None):
             continue
 
         if voice.ready and voice.auto_vad:
-            try:
-                always_listening_turn(ui, voice)
-            finally:
-                # Back to the held "listening" state rather than idle: the
-                # microphone is still open, and the overlay should say so.
-                ui.status(LISTENING)
+            # Reports its own transitions. It used to be followed by an
+            # unconditional LISTENING after every 250ms poll, which chimed
+            # the page four times a second and wiped every answer.
+            always_listening_turn(ui, voice)
             continue
 
         # Push-to-talk. Nothing happens until the chord goes down.
