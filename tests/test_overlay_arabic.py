@@ -1,3 +1,4 @@
+import orb
 import overlay_content as oc
 
 
@@ -39,3 +40,38 @@ def test_lines_carry_word_ends_for_the_reveal():
     line = plan["blocks"][0]["lines"][0]
     assert line["words"][-1] == len(line["text"])
     assert line["words"][0] == 3                      # "one"
+
+
+def test_arabic_is_revealed_a_line_at_a_time_not_a_word(monkeypatch):
+    """Arabic letters join, and the layout measures spans left to right.
+
+    An RTL line is drawn from its right edge, so a span taken off the left
+    cuts the wrong piece out of the rendered line - and because the letters
+    join, what it shows are shapes that do not exist in the word. The reveal
+    steps a whole line at a time instead.
+    """
+    drawn = []
+
+    class Fake(orb.Orb):
+        def __init__(self):
+            pass
+
+        def top_row_height(self):
+            return 0
+
+        def _blit(self, g, bitmap, dx, dy, sx, sy, sw, sh, attrs):
+            drawn.append((sx, sw))
+
+        def _fade_attrs(self, scale):
+            return None
+
+    plan = {"width": 400, "blocks": [{
+        "kind": "text", "rtl": True,
+        "lines": [{"text": "سهم إنفيديا أغلق اليوم", "x": 0, "y": 0,
+                   "width": 300, "spans": [(0, 60), (60, 150), (150, 220), (220, 300)]}],
+    }]}
+    view = Fake()
+    view._content = {"bitmap": None, "layout": plan, "at": 0.0}
+    view._draw_body(None, 0, 0, 400, now=99.0, fade=1.0)
+
+    assert drawn == [(0, 300)], f"an RTL line was cut into pieces: {drawn}"

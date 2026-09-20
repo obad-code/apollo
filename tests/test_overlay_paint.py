@@ -29,10 +29,21 @@ def pixel(bitmap, x, y):
 
 
 def test_palette_has_the_approved_colours():
-    assert overlay_paint.PALETTE["amber"] == (232, 185, 88)
-    assert overlay_paint.PALETTE["you"] == (210, 238, 243)
-    assert overlay_paint.PALETTE["up"] == (95, 227, 154)
-    assert overlay_paint.PALETTE["down"] == (255, 107, 122)
+    """The card's own colours, straight off the design."""
+    assert overlay_paint.PALETTE["card"] == (244, 244, 242)
+    assert overlay_paint.PALETTE["ink"] == (21, 23, 28)
+    assert overlay_paint.PALETTE["you"] == (74, 79, 89)
+    assert overlay_paint.PALETTE["warm"] == (255, 207, 110)
+    assert overlay_paint.PALETTE["rose"] == (255, 111, 156)
+    assert overlay_paint.PALETTE["sky"] == (79, 195, 247)
+    assert overlay_paint.PALETTE["lilac"] == (196, 181, 255)
+
+
+def test_the_ink_is_dark_enough_to_read_on_the_card():
+    """A light card needs dark type; the old palette's amber vanishes on it."""
+    card = sum(overlay_paint.PALETTE["card"])
+    for name in ("ink", "you", "caption", "amber", "up", "down", "cyan"):
+        assert sum(overlay_paint.PALETTE[name]) < card - 200, name
 
 
 def test_panel_fills_inside_and_leaves_the_outside_clear(draw, surface):
@@ -51,12 +62,27 @@ def test_the_bottom_corners_are_round_and_the_top_is_not(draw, surface):
     assert pixel(bitmap, 32, 198)[0] < 60            # rounded at the bottom
 
 
-def test_the_gradient_is_darker_at_the_bottom(draw, surface):
+def test_the_top_is_clean_paper_and_the_colour_is_at_the_foot(draw, surface):
+    """The veil's whole job: plain cream up top, colour down below.
+
+    The card's upper quarter hides above the screen's edge, and the part just
+    under it carries the text - so colour up there is both invisible and in
+    the way of reading.
+    """
     bitmap, graphics = surface
     overlay_paint.Backdrop(draw).panel(graphics, 30, 0, 500, 200, t=0.0)
-    top = sum(pixel(bitmap, 250, 10)[1:])
-    bottom = sum(pixel(bitmap, 250, 190)[1:])
-    assert bottom < top, f"panel is not darker at the bottom: {top} -> {bottom}"
+    top = pixel(bitmap, 250, 10)[1:]
+    bottom = pixel(bitmap, 250, 190)[1:]
+    assert top == overlay_paint.PALETTE["card"], f"the top is not plain paper: {top}"
+    assert bottom != overlay_paint.PALETTE["card"], "no colour reaches the foot"
+
+
+def test_the_card_is_opaque_all_the_way_down(draw, surface):
+    """Paper, not a tint. The veil fading out must not thin the card itself."""
+    bitmap, graphics = surface
+    overlay_paint.Backdrop(draw).panel(graphics, 30, 0, 500, 200, t=0.0)
+    for y in (6, 60, 120, 170, 190):
+        assert pixel(bitmap, 250, y)[0] > 250, f"see-through at y={y}"
 
 
 def test_the_colour_moves_over_time(draw, surface):

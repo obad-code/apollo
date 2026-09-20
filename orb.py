@@ -65,6 +65,7 @@ RTL_FONT_STACK = ("Segoe UI", "Tahoma", "Arial")
 FONT_PT = 10.5
 FONT_SMALL_PT = 8.0
 CAPTION_PT = 8.0
+NAME_PT = 10.0            # the name on the card, in the proportional face
 
 _user32 = ctypes.windll.user32
 _gdi32 = ctypes.windll.gdi32
@@ -155,21 +156,27 @@ class Orb:
     TICK_MS = 16       # the timer never changes rate; see `_tick`
     REST_EVERY = 3     # so ~20fps at rest, ~60fps while anything is moving
 
-    # The panel, in the proportions of the approved design.
+    # The card, in the proportions of the approved design.
     PANEL_W = overlay_state.PANEL_W
-    PANEL_PAD = 22
-    ORB_BOX = 62
-    ROW_GAP = 18
-    BODY_GAP = 16
-    SPARKLE_H = overlay_state.SPARKLE_H
-    WINDOW_MARGIN = 30          # room around the panel for the glow and dome
+    PAD_X = 26
+    PAD_TOP = 22
+    PAD_BOTTOM = 20
+    ORB_BOX = 44                # Apollo's mark, in the footer row
+    ROW_GAP = 14                # between the mark and the name beside it
+    BODY_GAP = 13               # between what Apollo said and that row
+    FOOT_H = 44
+    SHADOW_ROOM = 46
+    WINDOW_MARGIN = 30          # room around the card for its shadow
     TRANSCRIPT_LINES = 2
     MAX_CONTENT_H = 420         # no answer may take more of the screen
 
-    # A line of the body rises this far as it fades in, one after another.
-    LINE_RISE = 6.0
-    LINE_STAGGER = 0.06
-    LINE_FADE = 0.22
+    # A word of the body rises this far as it fades in, one after another,
+    # arriving out of a blur: the reveal from the design brief, at its own
+    # numbers. `RISE` is the brief's y: 24, scaled to this card's type.
+    WORD_RISE = 11.0
+    WORD_STAGGER = 0.045
+    WORD_FADE = 0.34
+    WORD_BLUR = 5.0             # how far the ghost copies sit from the word
 
     CARET_BLINK = 1.05
     CARET_DUTY = 0.62
@@ -204,7 +211,7 @@ class Orb:
 
         self.view = overlay_state.OverlayState()
         self._height = overlay_state.Spring(float(size), response=0.40)
-        self.paint = self.rings = self.sparkles = None
+        self.paint = self.rings = None
 
         # What is on screen: your words, Apollo's body, and what it is doing.
         self._heard = ""
@@ -220,6 +227,7 @@ class Orb:
         self._h = float(size)
         self._fonts = None
         self._char_w = 8.0
+        self._heard_cache = (None, [])
 
     # -- lifecycle ----------------------------------------------------------
 
@@ -235,7 +243,6 @@ class Orb:
         self._D, self._WF, self._IntPtr = D, WF, IntPtr
         self.paint = overlay_paint.Backdrop(D)
         self.rings = overlay_paint.Rings(D)
-        self.sparkles = overlay_paint.Sparkles(D)
 
         def build():
             try:
@@ -421,14 +428,53 @@ class Orb:
         return int((width - self.PANEL_W) / 2)
 
     def top_row_height(self):
-        return overlay_state.PANEL_MIN_H
+        """What sits above the body: the hidden paper, and your own words."""
+        return self.hidden_height() + self.PAD_TOP + self._heard_height()
+
+    def foot_height(self):
+        return self.FOOT_H + self.PAD_BOTTOM
+
+    def _heard_lines(self):
+        """Your words, wrapped - cached, because both the height and the
+        drawing need them and wrapping measures every prefix."""
+        text_w = self.PANEL_W - self.PAD_X * 2
+        key = (self._heard, text_w)
+        if self._heard_cache[0] != key:
+            rtl = overlay_content.is_rtl(self._heard)
+            metrics = Metrics(self._char_w, lambda s: self._measure(s, rtl))
+            lines = overlay_content.wrap(self._heard, 0, metrics, text_w)
+            self._heard_cache = (key, lines[-self.TRANSCRIPT_LINES:])
+        return self._heard_cache[1]
+
+    def _heard_height(self):
+        """As tall as your words actually are. Reserving the maximum left a
+        band of empty paper under a single line."""
+        if not self._heard:
+            return 0
+        return overlay_content.LINE_H * len(self._heard_lines()) + 6
 
     def _body_height(self):
         return self._content["layout"]["height"] if self._content else 0
 
-    def panel_height(self):
+    def content_height(self):
+        """Everything that has to be read, plus the padding around it."""
         body = self._body_height()
-        return self.top_row_height() + (self.BODY_GAP + body if body else 0)
+        return (self.PAD_TOP + self._heard_height()
+                + (body + self.BODY_GAP if body else 0)
+                + self.foot_height())
+
+    def hidden_height(self):
+        """The paper above the screen's edge: a quarter of the whole card.
+
+        It is the empty top of the design's card. Keeping it means the card
+        still reads as a card hanging off the edge; putting it above the
+        screen means none of it is empty space you have to look at.
+        """
+        return int(round(self.panel_height() * overlay_paint.HIDDEN))
+
+    def panel_height(self):
+        """The card's full height, hidden quarter included."""
+        return int(round(self.content_height() / (1.0 - overlay_paint.HIDDEN)))
 
     def _targets(self):
         """The size the window is heading for: (width, height).
@@ -440,7 +486,8 @@ class Orb:
         if self.view.panel_open <= 0.005 and self._content is None and not self._heard:
             return float(self.art), float(self.art)
         width = float(max(self.art, self.PANEL_W + self.WINDOW_MARGIN * 2))
-        height = self.overhang + self.panel_height() + self.SPARKLE_H
+        height = (self.overhang - self.hidden_height() + self.panel_height()
+                  + self.SHADOW_ROOM)
         return width, float(max(self.art, height))
 
     def _advance(self, dt):
@@ -488,6 +535,9 @@ class Orb:
         rtl = D.Font(rtl_name, FONT_PT, D.FontStyle.Regular, D.GraphicsUnit.Point)
         small = D.Font(name, FONT_SMALL_PT, D.FontStyle.Regular, D.GraphicsUnit.Point)
         caption = D.Font(name, CAPTION_PT, D.FontStyle.Regular, D.GraphicsUnit.Point)
+        # The name in the footer is the one thing on the card set in a
+        # proportional face and a weight: it is a label, not a readout.
+        name_font = D.Font(rtl_name, NAME_PT, D.FontStyle.Bold, D.GraphicsUnit.Point)
 
         fmt = D.StringFormat(D.StringFormat.GenericTypographic)
         fmt.FormatFlags = fmt.FormatFlags | D.StringFormatFlags.MeasureTrailingSpaces
@@ -508,7 +558,7 @@ class Orb:
             probe.Dispose()
 
         self._fonts = {"body": body, "rtl": rtl, "small": small, "caption": caption,
-                       "fmt": fmt, "rtl_fmt": rtl_fmt}
+                       "name": name_font, "fmt": fmt, "rtl_fmt": rtl_fmt}
         return self._fonts
 
     def _measure(self, text, rtl=False):
@@ -614,7 +664,7 @@ class Orb:
                 # The format draws from the right edge of the box it is given.
                 x = line["x"] + line.get("width", 0)
             self._string(g, line["text"], font, fmt, x, line["y"],
-                         PALETTE["amber"], 235, (255, 150, 0))
+                         PALETTE["ink"], 255)
 
     def _render_chart(self, g, block, fonts):
         """A sparkline: violet into cyan into amber, over a soft fill.
@@ -771,111 +821,165 @@ class Orb:
             _gdi32.DeleteObject(hbmp)   # is ours, so we free it ourselves
 
     def _draw_panel(self, g, width, t, now):
-        """The panel and everything in it, as far as it has opened."""
+        """The card and everything on it, as far as it has dropped."""
         open_amount = self.view.panel_open
         panel_h = self.panel_height()
+        hidden = self.hidden_height()
         left = self.panel_left(width)
-        # It drops from above the screen's edge rather than fading in place:
-        # the top edge of the panel is the top edge of the screen once open.
-        top = self.overhang - panel_h * (1.0 - open_amount)
+        # It drops out of the screen's top edge rather than fading in place.
+        # Once open, the card's own top sits `hidden` above that edge, which
+        # is what takes its upper corners out of sight.
+        top = self.overhang - hidden - panel_h * (1.0 - open_amount)
 
         self.paint.panel(g, left, top, self.PANEL_W, panel_h, t, open_amount)
 
-        orb_x = left + self.PANEL_PAD + self.ORB_BOX / 2
-        orb_y = top + self.PANEL_PAD + self.ORB_BOX / 2
+        # Apollo's mark and his name sit at the foot of the card, as in the
+        # design; what he said is above them.
+        foot_top = top + panel_h - self.foot_height()
+        orb_x = left + self.PAD_X + self.ORB_BOX / 2
+        orb_y = foot_top + self.ORB_BOX / 2
         spinning = self.view.state == overlay_state.SEARCHING
         self.rings.draw_at(g, orb_x, orb_y, self.ORB_BOX / 2,
                            t * (5.0 if spinning else 1.0),
                            level=self._level, fade=open_amount)
 
-        self._draw_lines(g, left, top, now, open_amount)
+        self._draw_foot(g, left, foot_top, now, open_amount)
+        self._draw_lines(g, left, top + hidden, now, open_amount)
         self._draw_body(g, left, top, panel_h, now, open_amount)
 
-        edge = top + panel_h
-        overlay_paint.horizon(g, self._D, left, edge, self.PANEL_W, open_amount)
-        self.sparkles.advance(1 / 60.0, self._level)
-        self.sparkles.draw_at(g, left, edge, self.PANEL_W, self.SPARKLE_H,
-                              open_amount * 0.9)
-
-    def _draw_lines(self, g, left, top, now, fade):
-        """Your words as they arrive, and what Apollo is doing under them."""
+    def _draw_foot(self, g, left, top, now, fade):
+        """The design's bottom row: the mark, the name, and what he is doing."""
         fonts = self._font_set()
-        text_x = left + self.PANEL_PAD + self.ORB_BOX + self.ROW_GAP
-        text_w = self.PANEL_W - self.PANEL_PAD * 2 - self.ORB_BOX - self.ROW_GAP
-        rtl = overlay_content.is_rtl(self._heard)
-        font = fonts["rtl"] if rtl else fonts["body"]
-        fmt = fonts["rtl_fmt"] if rtl else fonts["fmt"]
-
-        y = top + self.PANEL_PAD + 6
-        if self._heard:
-            metrics = Metrics(self._char_w, lambda s: self._measure(s, rtl))
-            lines = overlay_content.wrap(self._heard, 0, metrics, text_w)
-            lines = lines[-self.TRANSCRIPT_LINES:]
-            for line in lines:
-                x = text_x + (text_w if rtl else 0)
-                self._string(g, line, font, fmt, x, y, PALETTE["you"],
-                             225 * fade, (60, 110, 140))
-                y += overlay_content.LINE_H
-            # The caret sits where the next word will land, and blinks only
-            # when nothing is arriving - which is how it says "still
-            # listening" while you pause for breath.
-            if self.view.state in (overlay_state.LISTENING, overlay_state.SEARCHING):
-                lit = (now % self.CARET_BLINK) < self.CARET_BLINK * self.CARET_DUTY
-                if lit and not rtl:
-                    caret_x = text_x + self._measure(lines[-1], rtl) + 3
-                    g.FillRectangle(self._brush(PALETTE["cyan"], 190 * fade),
-                                    float(caret_x), float(y - overlay_content.LINE_H + 2),
-                                    2.0, float(overlay_content.LINE_H - 6))
-        else:
-            y += overlay_content.LINE_H
-
+        text_x = left + self.PAD_X + self.ORB_BOX + self.ROW_GAP
+        self._string(g, "Apollo", fonts["name"], fonts["fmt"],
+                     text_x, top + 4, PALETTE["ink"], 255 * fade)
         caption = self._activity or self._status_word()
         if caption:
-            self._string(g, caption.upper(), fonts["caption"], fonts["fmt"],
-                         text_x, y + 4, self._caption_colour(), 165 * fade)
+            self._string(g, caption, fonts["caption"], fonts["fmt"],
+                         text_x, top + 23, self._caption_colour(), 220 * fade)
+
+    def _draw_lines(self, g, left, top, now, fade):
+        """Your own words, above whatever Apollo made of them."""
+        if not self._heard:
+            return
+        fonts = self._font_set()
+        text_x = left + self.PAD_X
+        text_w = self.PANEL_W - self.PAD_X * 2
+        rtl = overlay_content.is_rtl(self._heard)
+        font = fonts["rtl"] if rtl else fonts["caption"]
+        fmt = fonts["rtl_fmt"] if rtl else fonts["fmt"]
+
+        y = top + self.PAD_TOP
+        lines = self._heard_lines()
+        for line in lines:
+            x = text_x + (text_w if rtl else 0)
+            self._string(g, line, font, fmt, x, y, PALETTE["you"], 205 * fade)
+            y += overlay_content.LINE_H
+        # The caret sits where the next word will land, and blinks only when
+        # nothing is arriving - which is how it says "still listening" while
+        # you pause for breath.
+        if self.view.state in (overlay_state.LISTENING, overlay_state.SEARCHING):
+            lit = (now % self.CARET_BLINK) < self.CARET_BLINK * self.CARET_DUTY
+            if lit and not rtl:
+                caret_x = text_x + self._measure(lines[-1], rtl) + 3
+                g.FillRectangle(self._brush(PALETTE["cyan"], 190 * fade),
+                                float(caret_x), float(y - overlay_content.LINE_H + 2),
+                                2.0, float(overlay_content.LINE_H - 6))
 
     def _status_word(self):
-        return {overlay_state.LISTENING: "listening",
-                overlay_state.SEARCHING: "searching",
-                overlay_state.RESULT: "done",
-                overlay_state.REPLY: ""}.get(self.view.state, "")
+        return {overlay_state.LISTENING: "Listening",
+                overlay_state.SEARCHING: "Looking it up",
+                overlay_state.RESULT: "Done",
+                overlay_state.REPLY: "Speaking"}.get(self.view.state, "")
 
     def _caption_colour(self):
+        # Grey by default, as the design has it. Colour is kept for the two
+        # states where it says something: working, and finished working.
         if self.view.state == overlay_state.SEARCHING:
             return PALETTE["violet"]
         if self.view.state == overlay_state.RESULT:
             return PALETTE["up"]
-        return PALETTE["cyan"]
+        return PALETTE["caption"]
 
     def _draw_body(self, g, left, top, panel_h, now, fade):
-        """The reply, its cards and its chart, rising in line by line."""
+        """The reply, its cards and its chart, arriving a word at a time.
+
+        The reveal from the design brief: each word starts low, blurred and
+        invisible, and lands sharp, on a 45 ms stagger. GDI+ has no blur, so
+        a word that has not arrived yet is drawn as a few faint copies of
+        itself, spread apart and closing in as it settles - which is what a
+        blur looks like from a distance, for four more DrawImage calls.
+
+        Charts and cards still come in whole: there are no words in them to
+        stagger, and a chart sliding in piecewise would read as a fault.
+        """
         content = self._content
         if content is None:
             return
         bitmap = content["bitmap"]
         plan = content["layout"]
-        body_top = top + self.top_row_height() + self.BODY_GAP
-        x = left
+        body_top = top + self.top_row_height()
         age = now - content["at"]
 
         drawn = 0
         for block in plan["blocks"]:
-            pieces = (block["lines"] if block["kind"] == "text"
-                      else block["rows"] if block["kind"] == "cards" else [block])
+            if block["kind"] == "text":
+                for line in block["lines"]:
+                    # Arabic is laid out from the right and its letters join,
+                    # so a span measured left to right cuts the wrong piece
+                    # and shows half-formed shapes. RTL arrives a line at a
+                    # time instead - the same reveal, a larger step.
+                    spans = ([(0, line["width"])] if block.get("rtl")
+                             else line["spans"])
+                    for x0, x1 in spans:
+                        drawn = self._draw_word(g, bitmap, left, body_top, line,
+                                                x0, x1, drawn, age, fade)
+                continue
+            pieces = block["rows"] if block["kind"] == "cards" else [block]
             for piece in pieces:
-                start = drawn * self.LINE_STAGGER
+                progress = self._arrival(drawn, age)
                 drawn += 1
-                progress = max(0.0, min(1.0, (age - start) / self.LINE_FADE))
                 if progress <= 0.0:
                     continue
-                rise = self.LINE_RISE * (1.0 - progress)
-                height = (overlay_content.LINE_H if block["kind"] == "text"
-                          else piece.get("h", block.get("h", overlay_content.LINE_H)))
+                rise = self.WORD_RISE * (1.0 - progress)
+                height = piece.get("h", block.get("h", overlay_content.LINE_H))
                 source_y = piece.get("y", 0)
-                self._blit(g, bitmap,
-                           x, body_top + source_y - rise,
+                self._blit(g, bitmap, left, body_top + source_y - rise,
                            0, source_y, plan["width"], height,
                            self._fade_attrs(progress * fade))
+
+    def _arrival(self, index, age):
+        """How far along the reveal one piece is, 0 before it starts to 1."""
+        start = index * self.WORD_STAGGER
+        return max(0.0, min(1.0, (age - start) / self.WORD_FADE))
+
+    def _draw_word(self, g, bitmap, left, body_top, line, x0, x1, index, age, fade):
+        progress = self._arrival(index, age)
+        if progress <= 0.0:
+            return index + 1
+        source_x = line["x"] + x0
+        width = x1 - x0
+        source_y = line["y"]
+        rise = self.WORD_RISE * (1.0 - progress)
+        dx = left + source_x
+        dy = body_top + source_y - rise
+
+        # The blur, while it is still arriving: two faint copies either side,
+        # drawing together as the word settles. Two rather than four, and only
+        # while the spread is wide enough to see - with four, and a ghost on
+        # every word still in flight, the worst frame measured 18.3 ms against
+        # a 16.7 ms budget.
+        spread = self.WORD_BLUR * (1.0 - progress)
+        if spread > 1.2:
+            ghost = self._fade_attrs(progress * fade * 0.28)
+            for ox in (-spread, spread):
+                self._blit(g, bitmap, dx + ox, dy, source_x, source_y,
+                           width, overlay_content.LINE_H, ghost)
+
+        self._blit(g, bitmap, dx, dy, source_x, source_y,
+                   width, overlay_content.LINE_H,
+                   self._fade_attrs(progress * fade))
+        return index + 1
 
     def _blit(self, g, bitmap, dx, dy, sx, sy, sw, sh, attrs):
         """One clipped copy out of the content bitmap onto the frame."""

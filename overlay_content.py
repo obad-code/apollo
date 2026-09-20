@@ -388,22 +388,30 @@ def layout(role, text, visual, metrics, width, max_height=None):
         start = 0
         laid = []
         for line in lines:
-            # Centred on the same axis as the mesh above it, the way the full
-            # display centres its transcript and its answer. Left-aligned in a
-            # column this wide reads as a stray paragraph rather than as
-            # something hanging off the figure.
+            # Ranged left, against the same edge as your own words above it
+            # and Apollo's name below. The card is a card, not a poster:
+            # centred paragraphs on it read as a quotation.
             line_width = metrics.width_of(line)
-            x = int(round((width - line_width) / 2.0))
+            x = 0
             # Where each word ends, so the typing reveal can step a word at a
             # time. Arabic joins its letters, so revealing part of a word
             # would show shapes that do not exist.
             ends, seen = [], 0
+            spans = []
             for word in line.split(" "):
+                # Where the word sits along the line, in pixels, so the
+                # painter can cut exactly that word out of the rendered line
+                # and bring it in on its own. Measured against the prefix
+                # rather than the word alone: a word's width depends on what
+                # precedes it once kerning and Arabic shaping are involved.
+                x0 = metrics.width_of(line[:seen]) if seen else 0
                 seen += len(word)
                 ends.append(seen)
+                spans.append((int(round(x0)), int(round(metrics.width_of(line[:seen])))))
                 seen += 1
             laid.append({"text": line, "x": max(PAD_X, x), "y": y,
-                         "start": start, "width": line_width, "words": ends})
+                         "start": start, "width": line_width,
+                         "words": ends, "spans": spans})
             # +1 for the space the wrap consumed, so the reveal advances
             # through the gap between lines at the same rate as through a
             # word. Without it the caret pauses at every line end.

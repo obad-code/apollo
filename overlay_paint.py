@@ -6,46 +6,65 @@ desktop whatever you ask it (see `apollo.py`'s docstring and
 instead. What matters most is the frame budget: the overlay redraws sixty
 times a second while you are speaking, and GDI+ gradients are far too slow to
 build per frame. So anything that does not change every frame is rendered
-once into a bitmap and blitted: the panel's gradient, the soft colour clouds
-that drift across it, the scanlines. What is left per frame is a handful of
-DrawImage calls and the things that genuinely move.
+once into a bitmap and blitted: the card's stock, the veil over it, the dot
+grid, and the four soft colours that drift underneath. What is left per frame
+is a handful of DrawImage calls and the things that genuinely move.
 
-Colours are the ones from the approved mockup, and they are dim on purpose:
-this sits on top of whatever you are working in.
+The design is a cream card that hangs out of the top edge of the screen, so
+its top corners are square - that edge is above the screen - and its ink is
+dark. Only Apollo's own mark kept its colours.
 """
 
 import math
 import random
 
 PALETTE = {
-    "top": (18, 27, 49),          # the panel's gradient, top to bottom
-    "upper": (11, 18, 38),
-    "lower": (6, 9, 19),
-    "bottom": (4, 6, 12),
-    "violet": (140, 95, 190),     # the clouds that drift across it
+    # The card itself: paper, and the ink on it.
+    "card": (244, 244, 242),
+    "ink": (21, 23, 28),          # Apollo's own words
+    "you": (74, 79, 89),          # yours, and the line under them
+    "caption": (106, 112, 124),
+    # The four colours that drift across its lower half.
+    "warm": (255, 207, 110),
+    "rose": (255, 111, 156),
+    "sky": (79, 195, 247),
+    "lilac": (196, 181, 255),
+    # Kept for the ring, the charts and the cards, which did not change.
+    "amber": (184, 130, 36),
+    "up": (34, 150, 96),
+    "down": (198, 52, 70),
+    "cyan": (46, 138, 168),
+    "violet": (140, 95, 190),
     "teal": (50, 160, 170),
-    "rose": (190, 110, 150),
-    "amber": (232, 185, 88),      # Apollo's own words
-    "you": (210, 238, 243),       # yours
-    "caption": (200, 185, 240),   # the line under them
-    "up": (95, 227, 154),
-    "down": (255, 107, 122),
-    "cyan": (127, 224, 238),
     "white": (255, 246, 224),
 }
 
-# Each cloud: colour, where it sits (as a fraction of the panel), how far it
-# wanders from there, how long one loop takes, and how strong it is. Violet
-# hangs at the top left and teal at the top right, as in the design; the rose
-# one sits low and is barely there. The periods are deliberately unrelated,
-# so the panel never repeats a pose.
-NEBULAS = (("violet", (0.20, 0.04), (0.10, 0.07), 16.0, 0.34),
-           ("teal", (0.80, 0.06), (0.09, 0.06), 21.0, 0.28),
-           ("rose", (0.50, 0.72), (0.12, 0.05), 26.0, 0.14))
+# Each blob: colour, where it rests (as a fraction of the card), how far it
+# wanders, how long one loop takes, and how strong it is. All four sit low,
+# because the mask above keeps colour out of the card's upper half - which is
+# the part that hides above the screen's edge.
+BLOBS = (("warm", (0.14, 1.12), (0.26, 0.12), 9.0, 0.40),
+         ("rose", (0.46, 1.16), (0.30, 0.13), 11.0, 0.36),
+         ("sky", (0.86, 1.14), (0.28, 0.12), 10.0, 0.38),
+         ("lilac", (0.66, 1.04), (0.22, 0.10), 13.0, 0.28))
 
-RADIUS = 20              # the panel's bottom corners
-SCAN_ALPHA = 6           # the CRT lines: barely there, but not nothing
-SCAN_EVERY = 3
+# Where the paper stops covering the colour, as fractions of the card's
+# height: opaque paper down to the first, clear by the second.
+SCRIM = (0.24, 0.82)
+
+DOT_ALPHA = 41           # rgba(20, 22, 28, .16)
+DOT_EVERY = 9
+DOT_INK = (20, 22, 28)
+# The design lays a noise tile over the card as well. It is left out: in GDI+
+# it costs a SetPixel per pixel to build, and at the card's size the dot grid
+# carries the same texture for the price of one blit.
+
+RADIUS = 28              # the card's bottom corners; the top ones are square
+                         # because that edge sits above the screen
+EDGE = (255, 255, 255, 72)   # the hairline around it, over a dark desktop
+# How much of the card hides above the screen's edge. The part that hides is
+# paper the content does not need, so nothing readable is ever cut off.
+HIDDEN = 0.25
 
 
 def alpha(colour, a):
@@ -112,78 +131,123 @@ def nebula(draw, size, colour, strength):
     return bitmap
 
 
-def scanlines(draw, w, h):
-    """The CRT's own texture, one bitmap, tiled by nobody - it is exact."""
+def dot_grid(draw, w, h):
+    """The card's printed texture: one ink dot every nine pixels.
+
+    Drawn once into a bitmap the size of the card and blitted, like everything
+    else here - a few thousand FillEllipse calls per frame would cost more
+    than the whole rest of the overlay.
+    """
     bitmap = draw.Bitmap(w, h, draw.Imaging.PixelFormat.Format32bppPArgb)
     graphics = draw.Graphics.FromImage(bitmap)
     try:
-        pen = draw.Pen(draw.Color.FromArgb(SCAN_ALPHA, 255, 255, 255), 1.0)
-        for y in range(0, h, SCAN_EVERY):
-            graphics.DrawLine(pen, 0, y, w, y)
-        pen.Dispose()
+        graphics.SmoothingMode = draw.Drawing2D.SmoothingMode.AntiAlias
+        brush = draw.SolidBrush(draw.Color.FromArgb(DOT_ALPHA, *DOT_INK))
+        for y in range(4, h, DOT_EVERY):
+            for x in range(4, w, DOT_EVERY):
+                graphics.FillEllipse(brush, float(x), float(y), 1.6, 1.6)
+        brush.Dispose()
+    finally:
+        graphics.Dispose()
+    return bitmap
+
+
+def paper(draw, w, h, colour):
+    """The card's stock: opaque, edge to edge.
+
+    It has to be solid everywhere. The colour goes on top of it and the veil
+    on top of that; paper that thinned out where the veil ends would leave the
+    card see-through in its lower half, because soft blobs do not cover.
+    """
+    bitmap = draw.Bitmap(w, h, draw.Imaging.PixelFormat.Format32bppPArgb)
+    graphics = draw.Graphics.FromImage(bitmap)
+    try:
+        brush = draw.SolidBrush(draw.Color.FromArgb(*alpha(colour, 1.0)))
+        graphics.FillRectangle(brush, draw.Rectangle(0, 0, w, h))
+        brush.Dispose()
+    finally:
+        graphics.Dispose()
+    return bitmap
+
+
+def veil(draw, w, h, colour):
+    """Paper laid back over the colour: solid at the top, gone by the bottom.
+
+    This is the design's scrim and its blob mask in one pass - both are the
+    same cream fading downward, and one gradient does the work of two.
+    """
+    bitmap = draw.Bitmap(w, h, draw.Imaging.PixelFormat.Format32bppPArgb)
+    graphics = draw.Graphics.FromImage(bitmap)
+    try:
+        rectangle = draw.Rectangle(0, 0, w, h)
+        brush = draw.Drawing2D.LinearGradientBrush(
+            rectangle, draw.Color.FromArgb(*alpha(colour, 1.0)),
+            draw.Color.FromArgb(0, *colour),
+            draw.Drawing2D.LinearGradientMode.Vertical)
+        # A ColorBlend has to run all the way to 1.0, so the last stop repeats
+        # the clear one at the card's foot rather than stopping at the scrim.
+        blend = draw.Drawing2D.ColorBlend(5)
+        blend.Colors = [draw.Color.FromArgb(*alpha(colour, 1.0)),
+                        draw.Color.FromArgb(*alpha(colour, 0.96)),
+                        draw.Color.FromArgb(*alpha(colour, 0.42)),
+                        draw.Color.FromArgb(0, *colour),
+                        draw.Color.FromArgb(0, *colour)]
+        blend.Positions = [0.0, SCRIM[0], (SCRIM[0] + SCRIM[1]) / 2.0, SCRIM[1], 1.0]
+        brush.InterpolationColors = blend
+        graphics.FillRectangle(brush, rectangle)
+        brush.Dispose()
     finally:
         graphics.Dispose()
     return bitmap
 
 
 class Backdrop:
-    """The panel: a gradient, three drifting clouds, scanlines, round below.
+    """The card: paper, four colours drifting under it, and a printed grid.
 
-    Everything except the clouds' positions is cached, so a frame costs three
-    DrawImage calls and a clip. The cache is keyed on size alone; the clouds
-    move by being drawn at a different offset, not by being rebuilt.
+    The order is the design's: blobs at the bottom, a mask that keeps them out
+    of the upper half, the paper's scrim over them, then the dot grid on top.
+    Everything except the blobs' positions is cached and blitted, so a frame
+    costs six DrawImage calls and a clip; the blobs move by being drawn
+    somewhere else, never by being rebuilt.
+
+    Its top corners are square on purpose. That edge lives above the top of
+    the screen, so rounding it would round something nobody can see.
     """
 
     def __init__(self, draw):
         self.draw = draw
         self.cached_size = None
-        self._base = None
-        self._scan = None
-        self._clouds = []
+        self._paper = None
+        self._veil = None
+        self._dots = None
+        self._blobs = []
 
     def invalidate(self):
-        for bitmap in [self._base, self._scan] + [c for _, c in self._clouds]:
+        for bitmap in ([self._paper, self._veil, self._dots]
+                       + [b for _, b in self._blobs]):
             try:
                 bitmap.Dispose()
             except Exception:
                 pass
-        self._base = self._scan = None
-        self._clouds = []
+        self._paper = self._veil = self._dots = None
+        self._blobs = []
         self.cached_size = None
 
     def _build(self, w, h):
         draw = self.draw
         self.invalidate()
         self.cached_size = (w, h)
-
-        base = draw.Bitmap(w, h, draw.Imaging.PixelFormat.Format32bppPArgb)
-        graphics = draw.Graphics.FromImage(base)
-        try:
-            graphics.SmoothingMode = draw.Drawing2D.SmoothingMode.AntiAlias
-            # One brush for the whole height. Four separate ones left a seam
-            # at every boundary, which on a dark panel reads as a scratch.
-            rectangle = draw.Rectangle(0, 0, w, h)
-            brush = draw.Drawing2D.LinearGradientBrush(
-                rectangle, draw.Color.FromArgb(*alpha(PALETTE["top"], 1.0)),
-                draw.Color.FromArgb(*alpha(PALETTE["bottom"], 1.0)),
-                draw.Drawing2D.LinearGradientMode.Vertical)
-            blend = draw.Drawing2D.ColorBlend(4)
-            blend.Colors = [draw.Color.FromArgb(*alpha(PALETTE[name], 1.0))
-                            for name in ("top", "upper", "lower", "bottom")]
-            blend.Positions = [0.0, 0.40, 0.80, 1.0]
-            brush.InterpolationColors = blend
-            graphics.FillRectangle(brush, rectangle)
-            brush.Dispose()
-        finally:
-            graphics.Dispose()
-        self._base = base
-        self._scan = scanlines(draw, w, h)
-        size = int(max(w, h) * 0.95)
-        self._clouds = [(spec, nebula(draw, size, PALETTE[spec[0]], spec[4]))
-                        for spec in NEBULAS]
+        self._paper = paper(draw, w, h, PALETTE["card"])
+        self._veil = veil(draw, w, h, PALETTE["card"])
+        self._dots = dot_grid(draw, w, h)
+        # Wider than the card: a blob that only just reaches the edge reads as
+        # a disc, and the design's blobs all spill past it.
+        size = int(max(w, h) * 1.25)
+        self._blobs = [(spec, nebula(draw, size, PALETTE[spec[0]], spec[4]))
+                       for spec in BLOBS]
 
     def panel(self, g, x, y, w, h, t, alpha_scale=1.0):
-        """Paint the panel at (x, y). `t` is seconds; the clouds drift on it."""
+        """Paint the card at (x, y). `t` is seconds; the blobs drift on it."""
         w, h = int(w), int(h)
         if h <= 0 or w <= 0:
             return
@@ -196,17 +260,26 @@ class Backdrop:
         try:
             g.SetClip(path)
             attributes = self._fade(alpha_scale)
-            self._blit(g, self._base, x, y, w, h, attributes)
-            for spec, cloud in self._clouds:
+            # The stock first, at full strength, so the card is opaque paper
+            # rather than a tint over the desktop.
+            self._blit(g, self._paper, x, y, w, h, attributes)
+            for spec, blob in self._blobs:
                 _, (home_x, home_y), (drift_x, drift_y), period, _ = spec
                 phase = 2 * math.pi * (t % period) / period
-                offset_x = (x + w * home_x - cloud.Width / 2
+                offset_x = (x + w * home_x - blob.Width / 2
                             + math.cos(phase) * w * drift_x)
-                offset_y = (y + h * home_y - cloud.Height / 2
+                offset_y = (y + h * home_y - blob.Height / 2
                             + math.sin(phase * 1.3) * h * drift_y)
-                self._blit(g, cloud, offset_x, offset_y, cloud.Width, cloud.Height,
+                self._blit(g, blob, offset_x, offset_y, blob.Width, blob.Height,
                            attributes)
-            self._blit(g, self._scan, x, y, w, h, attributes)
+            self._blit(g, self._veil, x, y, w, h, attributes)
+            self._blit(g, self._dots, x, y, w, h, attributes)
+            # The hairline the design draws around the card, which is what
+            # separates cream paper from a bright desktop behind it.
+            pen = draw.Pen(draw.Color.FromArgb(
+                int(EDGE[3] * max(0.0, min(1.0, alpha_scale))), *EDGE[:3]), 1.0)
+            g.DrawPath(pen, path)
+            pen.Dispose()
         finally:
             g.Restore(state)
             path.Dispose()
@@ -239,6 +312,15 @@ class Backdrop:
 RING_SPEC = ((1.00, 22, 0.026, (255, 193, 94)),
              (0.85, 18, -0.034, (255, 176, 0)),
              (0.70, 14, 0.045, (86, 197, 214)))
+
+# The same mark at the size it sits in the card's footer. Twenty-two points
+# around a 22-pixel radius are three pixels apart and read as a smudge, so the
+# small mark keeps the three counter-turning rings and drops the point count
+# until each one is a point again. Its colours are darkened for cream paper.
+RING_SPEC_SMALL = ((1.00, 11, 0.026, (184, 130, 36)),
+                   (0.72, 8, -0.034, (205, 141, 26)),
+                   (0.44, 5, 0.045, (46, 138, 168)))
+SMALL_BELOW = 34         # outer radius, in pixels
 
 # One point's glow: concentric discs, widest first. Eight closely spaced
 # steps rather than four wide ones - with wide steps each disc's own edge
@@ -303,18 +385,20 @@ class Glow:
 
     PAD = 1.15          # the sprite is a little wider than the widest disc
 
-    def __init__(self, draw, colour, dot, spread=1.0):
+    def __init__(self, draw, colour, dot, spread=1.0, bloom=True):
         self.draw = draw
         self.colour = colour
         self.dot = dot
-        radius = dot * BLOOM[0][0] * spread * self.PAD
+        # Without a bloom the sprite is the point itself and nothing more.
+        self.bloom = BLOOM if bloom else ((1.0, 1.0),)
+        radius = dot * self.bloom[0][0] * spread * self.PAD
         self.size = max(4, int(radius * 2) + 2)
         self.centre = self.size / 2.0
         bitmap = draw.Bitmap(self.size, self.size, draw.Imaging.PixelFormat.Format32bppPArgb)
         graphics = draw.Graphics.FromImage(bitmap)
         try:
             graphics.SmoothingMode = draw.Drawing2D.SmoothingMode.AntiAlias
-            for multiple, weight in BLOOM:
+            for multiple, weight in self.bloom:
                 strength = 255 * weight
                 if strength <= 1.0:
                     continue
@@ -363,12 +447,16 @@ class RingSprite:
 
     VARIANTS = 6
 
-    def __init__(self, draw, colour, count, radius, dot, spread=1.0):
+    def __init__(self, draw, colour, count, radius, dot, spread=1.0, bloom=True):
         self.draw = draw
         self.count = count
-        self.size = int((radius + dot * BLOOM[0][0] * spread) * 2) + 4
+        reach = dot * BLOOM[0][0] * spread if bloom else dot
+        self.size = int((radius + reach) * 2) + 4
         centre = self.size / 2.0
-        glow = Glow(draw, colour, dot, spread)
+        # On cream paper a bloom has nothing to bloom into: the halos merge
+        # and the mark reads as one fuzzy disc instead of three rings. The
+        # small mark is drawn as plain points.
+        glow = Glow(draw, colour, dot, spread, bloom=bloom)
         self.frames = []
         for variant in range(self.VARIANTS):
             bitmap = draw.Bitmap(self.size, self.size, draw.Imaging.PixelFormat.Format32bppPArgb)
@@ -421,18 +509,20 @@ class Rings:
     """Apollo itself: the three-ring searching orb from the mockup."""
 
     DOT = 0.037            # point radius as a fraction of the outer radius
+    DOT_SMALL = 0.115      # ...and at the size it sits on the card
     BREATH = 0.035         # how much the rings widen at full voice
 
     def __init__(self, draw):
         self.draw = draw
         self._sprites = {}
 
-    def _sprite(self, colour, count, radius, dot, spread):
+    def _sprite(self, colour, count, radius, dot, spread, bloom=True):
         # Quantised, or a new sprite would be built on every pixel of voice.
-        key = (colour, count, int(radius), round(dot, 1), round(spread, 1))
+        key = (colour, count, int(radius), round(dot, 1), round(spread, 1), bloom)
         found = self._sprites.get(key)
         if found is None:
-            found = RingSprite(self.draw, colour, count, radius, dot, spread)
+            found = RingSprite(self.draw, colour, count, radius, dot, spread,
+                               bloom=bloom)
             self._sprites[key] = found
         return found
 
@@ -440,11 +530,14 @@ class Rings:
         if fade <= 0.01:
             return
         radius = radius * (1.0 + self.BREATH * level)
-        dot = max(1.2, radius * self.DOT)
+        small = radius <= SMALL_BELOW
+        spec = RING_SPEC_SMALL if small else RING_SPEC
+        dot = max(1.2, radius * (self.DOT_SMALL if small else self.DOT))
         spread = round(1.0 + 0.5 * level, 1)
         glow = min(1.0, fade * (1.0 + 0.6 * level))
-        for fraction, count, turns, colour in RING_SPEC:
-            sprite = self._sprite(colour, count, radius * fraction, dot, spread)
+        for fraction, count, turns, colour in spec:
+            sprite = self._sprite(colour, count, radius * fraction, dot, spread,
+                                  bloom=not small)
             sprite.draw_at(g, cx, cy, t * turns * 360.0, t, glow)
 
 

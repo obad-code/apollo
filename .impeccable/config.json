@@ -29,6 +29,33 @@
         ],
         "createdAt": "2026-09-20T09:51:10.332Z",
         "reason": "user confirmed: Apollo's whole look is a CRT terminal, asked for repeatedly ('same crt style', 'crt gredient colored style'); the amber phosphor bleed matches orb.py's native overlay and ui/legacy"
+      },
+      {
+        "rule": "clipped-overflow-container",
+        "value": "*",
+        "files": [
+          "ui/mock-card.html"
+        ],
+        "createdAt": "2026-09-20T16:30:24.496Z",
+        "reason": "the card's rounded overflow:hidden clipping its blob layer IS the design being reproduced; no tooltips or popovers exist on this page"
+      },
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "files": [
+          "ui/mock-card.html"
+        ],
+        "createdAt": "2026-09-20T16:33:42.721Z",
+        "reason": "the face is specified by the design the user supplied (cardddd.html); the mock reproduces it deliberately, and the native overlay it ports to uses Segoe UI / IBM Plex Mono"
+      },
+      {
+        "rule": "marquee",
+        "value": "*",
+        "files": [
+          "ui/mock-card.html"
+        ],
+        "createdAt": "2026-09-20T16:33:42.961Z",
+        "reason": "these are the design's drifting colour blobs and the spinning mark, not scrolling content - the motion IS the thing being reproduced from the user's cardddd.html"
       }
     ]
   }
