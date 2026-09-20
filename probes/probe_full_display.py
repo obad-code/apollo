@@ -32,6 +32,9 @@ CHECKS = """
   const box = lyla.getBoundingClientRect();
   const roomIsTheWindow = Math.round(box.width) === innerWidth
                        && Math.round(box.height) === innerHeight;
+  // The bundled face has to actually load: a @font-face that 404s falls back
+  // silently, and the display looks almost right in the wrong typeface.
+  const thmanyah = document.fonts.check('16px Thmanyah');
   const rows = document.querySelectorAll('.stock').length;
   const sparks = document.querySelectorAll('.stock svg path').length;
   const panels = [...document.querySelectorAll('.rise')]
@@ -39,7 +42,7 @@ CHECKS = """
   return JSON.stringify({
     bridge, webgl: !!gl, lylaCanvas: [lyla.width, lyla.height], roomIsTheWindow,
     lylaBox: [Math.round(box.width), Math.round(box.height)],
-    viewport: [innerWidth, innerHeight],
+    viewport: [innerWidth, innerHeight], thmanyah,
     rows, sparks, panelsVisible: panels.filter(o => o > 0.9).length,
     panelCount: panels.length,
     label: document.getElementById('lyla-label').textContent,

@@ -295,6 +295,27 @@ quit, because it is the foreground app):
 
 ---
 
+## A note on the typeface
+
+Apollo sets both Arabic and English in **Thmanyah Sans**, carried in the
+repository rather than expected from Windows: the overlay loads the OTFs into
+a private GDI+ collection, and the display loads the WOFF2s with `@font-face`.
+One family for both scripts is the whole reason for it.
+
+**Its licence permits this and forbids publishing it.** Embedding the font in
+an application you build is expressly allowed; redistributing the files, or
+hosting them anywhere a third party can download them, is not — and that
+includes pushing this repository to a public remote with `ui/fonts/` and
+`ui/full/fonts/` in it. The repository has no remote today. If one is ever
+added, remove those two directories from the history first, or ask thmanyah
+(ask@thmanyah.com) for the extended rights. The full licence is at
+`ui/fonts/thmanyah/LICENSE.pdf`.
+
+If the files are missing, both halves fall back: the overlay to Segoe UI, the
+page to the system sans. `tests/test_fonts.py` and `tests/test_page_assets.py`
+fail when a weight goes missing, because that fallback is silent and the
+result looks almost right.
+
 ## How the window works
 
 Apollo is two always-on-top, non-focusable windows, and only one of them is on
@@ -486,6 +507,8 @@ The only thing left is your API key.
 | `ui/full/app.css` | Its skin: the overlay's palette, the CRT surface, the grid. |
 | `ui/full/shader.js` | The ring shader, in plain WebGL at half resolution. |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
+| `ui/fonts/thmanyah/` | Thmanyah Sans, as OTFs — what the overlay loads privately at runtime. |
+| `ui/full/fonts/` | The same weights as WOFF2, under the page because pywebview's server roots there. |
 | `ui/legacy/index.html` | The old generated design, frozen. Nothing in the run reads it. |
 | `build_ui.py` | Builds `ui/legacy/index.html` from the Claude Design export. **Not part of the run.** |
 | `ADD A CITY.dc.html` | The old design source, as exported from the canvas. |

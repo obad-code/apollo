@@ -32,6 +32,7 @@ still moving, because live speech re-wraps on every word.
 
 import ctypes
 import math
+import os
 import threading
 import time
 
@@ -50,17 +51,31 @@ WS_EX_TOPMOST = 0x00000008
 
 SW_HIDE, SW_SHOWNOACTIVATE = 0, 8
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+
 PALETTE = overlay_paint.PALETTE
 
 # The resting ring's own amber, kept exactly as it was tuned.
 AMBER = (255, 176, 0)
 AMBER_WARM = (255, 193, 94)
 
-# The monospace face, in preference order: what the rest of Apollo renders in.
-FONT_STACK = ("IBM Plex Mono", "Consolas", "Cascadia Mono", "Courier New")
-# ...and what Arabic is drawn in. Consolas has no Arabic of its own and
-# Windows falls back to something that fits badly; Segoe UI shapes it
-# properly, and a monospace Arabic (Courier New) reads like a typewriter.
+# Thmanyah, which Apollo carries with him rather than expecting Windows to
+# have it. One family sets both scripts, so Arabic and English are no longer
+# in different faces. GDI+ exposes each weight as its own family name.
+FONT_FILES = {"light": "thmanyahsans-Light.otf",
+              "regular": "thmanyahsans-Regular.otf",
+              "medium": "thmanyahsans-Medium.otf",
+              "bold": "thmanyahsans-Bold.otf",
+              "black": "thmanyahsans-Black.otf"}
+FONT_FAMILIES = {"light": "thmanyah sans Light",
+                 "regular": "thmanyah sans",
+                 "medium": "thmanyah sans Med",
+                 "bold": "thmanyah sans",
+                 "black": "thmanyah sans Black"}
+
+# What is used if the font files are not there - a checkout without them still
+# has to draw something.
+FONT_STACK = ("Segoe UI", "IBM Plex Mono", "Consolas", "Tahoma")
 RTL_FONT_STACK = ("Segoe UI", "Tahoma", "Arial")
 FONT_PT = 10.5
 FONT_SMALL_PT = 8.0
@@ -228,6 +243,8 @@ class Orb:
         self._fonts = None
         self._char_w = 8.0
         self._heard_cache = (None, [])
+        self._private = None
+        self._collection = None
 
     # -- lifecycle ----------------------------------------------------------
 
@@ -511,8 +528,53 @@ class Orb:
 
     # -- fonts and text -----------------------------------------------------
 
+    def _private_faces(self):
+        """Thmanyah, loaded from the repository rather than from Windows.
+
+        One family draws both scripts, so Apollo no longer sets Arabic in a
+        different face from English. Loading it privately means it works on a
+        machine where nobody installed it - and the collection must outlive
+        every Font built from it, or GDI+ draws from freed memory, so it is
+        held on the instance rather than dropped here.
+        """
+        if self._private is not None:
+            return self._private
+        D = self._D
+        faces = {}
+        collection = D.Text.PrivateFontCollection()
+        loaded = 0
+        for weight, filename in FONT_FILES.items():
+            path = os.path.join(HERE, "ui", "fonts", "thmanyah", filename)
+            if os.path.exists(path):
+                collection.AddFontFile(path)
+                loaded += 1
+        if loaded:
+            self._collection = collection          # kept alive on purpose
+            faces = {family.Name: family for family in collection.Families}
+        self._private = faces
+        return faces
+
+    def _face(self, weight, size, style=None):
+        """One font in Thmanyah if it is there, in the old stack if not.
+
+        Bold is a style of the regular family here, not a family of its own -
+        the Light, Medium and Black weights are separate families, which is
+        how GDI+ exposes a family with more than four weights.
+        """
+        D = self._D
+        if style is None:
+            style = D.FontStyle.Bold if weight == "bold" else D.FontStyle.Regular
+        family = self._private_faces().get(FONT_FAMILIES[weight])
+        if family is not None:
+            return D.Font(family, size, style, D.GraphicsUnit.Point)
+        installed = {f.Name for f in D.FontFamily.Families}
+        stack = RTL_FONT_STACK if weight == "name" else FONT_STACK
+        fallback = next((n for n in stack if n in installed),
+                        D.FontFamily.GenericSansSerif.Name)
+        return D.Font(fallback, size, style, D.GraphicsUnit.Point)
+
     def _font_set(self):
-        """Two faces, built once: the monospace one, and one that knows Arabic.
+        """Every face the card needs, built once.
 
         GenericTypographic for both measuring and drawing: the default format
         pads around a string, so measuring with one and drawing with the other
@@ -523,21 +585,13 @@ class Orb:
             return self._fonts
 
         D = self._D
-        installed = {family.Name for family in D.FontFamily.Families}
-
-        def pick(stack, fallback):
-            return next((name for name in stack if name in installed), fallback)
-
-        name = pick(FONT_STACK, D.FontFamily.GenericMonospace.Name)
-        rtl_name = pick(RTL_FONT_STACK, D.FontFamily.GenericSansSerif.Name)
-
-        body = D.Font(name, FONT_PT, D.FontStyle.Regular, D.GraphicsUnit.Point)
-        rtl = D.Font(rtl_name, FONT_PT, D.FontStyle.Regular, D.GraphicsUnit.Point)
-        small = D.Font(name, FONT_SMALL_PT, D.FontStyle.Regular, D.GraphicsUnit.Point)
-        caption = D.Font(name, CAPTION_PT, D.FontStyle.Regular, D.GraphicsUnit.Point)
-        # The name in the footer is the one thing on the card set in a
-        # proportional face and a weight: it is a label, not a readout.
-        name_font = D.Font(rtl_name, NAME_PT, D.FontStyle.Bold, D.GraphicsUnit.Point)
+        body = self._face("regular", FONT_PT)
+        # The same family for Arabic: that is the whole point of it.
+        rtl = self._face("regular", FONT_PT)
+        small = self._face("light", FONT_SMALL_PT)
+        caption = self._face("regular", CAPTION_PT)
+        # The name in the footer carries a weight: it is a label, not a readout.
+        name_font = self._face("bold", NAME_PT)
 
         fmt = D.StringFormat(D.StringFormat.GenericTypographic)
         fmt.FormatFlags = fmt.FormatFlags | D.StringFormatFlags.MeasureTrailingSpaces

@@ -2,6 +2,21 @@
    that holds at 2560x1440 and at 1920x1080. Nothing here paints a background
    except the shader behind it - the panels are glass. */
 
+/* Thmanyah, carried with Apollo rather than expected from the system, and
+   served from under this page because pywebview roots its server here. One
+   family sets both scripts, so a reply in Arabic is in the same face as one
+   in English - which is the whole reason for it. */
+@font-face { font-family: "Thmanyah"; font-weight: 300; font-display: block;
+             src: url("fonts/thmanyahsans-Light.woff2") format("woff2"); }
+@font-face { font-family: "Thmanyah"; font-weight: 400; font-display: block;
+             src: url("fonts/thmanyahsans-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Thmanyah"; font-weight: 500; font-display: block;
+             src: url("fonts/thmanyahsans-Medium.woff2") format("woff2"); }
+@font-face { font-family: "Thmanyah"; font-weight: 700; font-display: block;
+             src: url("fonts/thmanyahsans-Bold.woff2") format("woff2"); }
+@font-face { font-family: "Thmanyah"; font-weight: 900; font-display: block;
+             src: url("fonts/thmanyahsans-Black.woff2") format("woff2"); }
+
 :root {
   --amber: #e8b958;
   --amber-bright: #f0d9a0;
@@ -18,7 +33,7 @@
   /* Her floor is 88px up, and her tallest station (the porthole) reaches
      another 168px above that. */
   --room: 272px;
-  --mono: "IBM Plex Mono", Consolas, "Cascadia Mono", monospace;
+  --mono: "Thmanyah", "Segoe UI", system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -127,6 +142,9 @@ html, body {
 .index .move { font-size: 14px; margin-left: 6px; }
 
 .stock { display: flex; align-items: center; height: 38px; font-size: 15px; }
+.stock .price, .stock .move, .index .value, #hhmm, #seconds, #tokens {
+  font-variant-numeric: tabular-nums;   /* a proportional face wanders */
+}
 .stock .ticker { width: 76px; color: var(--amber); }
 .stock svg { width: 96px; height: 26px; margin-right: 10px; }
 
@@ -193,7 +211,6 @@ body.answering #core { transition: transform .6s cubic-bezier(.32,.72,0,1); }
 #answer.show { opacity: 1; }
 #you { font-size: 15px; color: var(--you); margin-bottom: 10px; opacity: .8; }
 #reply { font-size: 26px; line-height: 1.4; color: var(--amber); }
-#reply[dir="rtl"] { font-family: "Segoe UI", Tahoma, sans-serif; }
 #visual { margin-top: 18px; }
 #visual svg { width: 100%; height: 170px; }
 
