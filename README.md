@@ -185,9 +185,18 @@ one is a number Apollo actually has.
 
 ### The full display
 
-The full display is where the design actually lives — LYLA and her
-environments, the telemetry panels, the process ladder, the starfield. It opens
-two ways:
+The full display is the whole screen: a shader rippling behind everything, the
+clock with the date in both calendars, Riyadh's weather, your watchlist with
+sparklines, headlines on what you follow, Trump's posts with the
+market-moving ones flagged, what Apollo has cost today, what the machine is
+doing — and LYLA still in her room along the bottom.
+
+Nothing on it is invented. Every number comes from `dataservice.DataService`
+through `window.apollo.data(snapshot)`, and the service stamps each reader
+separately: when one fails, its panel keeps the last good value and wears its
+age in the heading rather than going blank and implying the world went quiet.
+
+It opens two ways:
 
 - **By itself, when you are away.** After **40 minutes** with no keyboard or
   mouse input anywhere in Windows, Apollo opens the full display like a
@@ -472,9 +481,14 @@ The only thing left is your API key.
 | `overlay_paint.py` | Its paint box: the drifting CRT panel, the three-ring orb, the sparkle field and the horizon, each pre-rendered where a per-frame redraw would cost too much. |
 | `overlay_state.py` | The springs and the state machine, with no window in sight. |
 | `overlay_content.py` | What an answer actually contains and how tall that makes the overlay — reply parsing and layout, with no drawing code in it. |
-| `ui/index.html` | The front end. **Generated — do not edit by hand.** |
-| `build_ui.py` | Builds `ui/index.html` from the Claude Design export. Re-run it whenever a new design lands. |
-| `ADD A CITY.dc.html` | The design source, as exported from the canvas. This is the file to edit or replace. |
+| `ui/full/index.html` | The full display. Written by hand — edit it directly. |
+| `ui/full/app.js` | Its panels, its bridge (`window.apollo.*`) and its motion. |
+| `ui/full/app.css` | Its skin: the overlay's palette, the CRT surface, the grid. |
+| `ui/full/shader.js` | The ring shader, in plain WebGL at half resolution. |
+| `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
+| `ui/legacy/index.html` | The old generated design, frozen. Nothing in the run reads it. |
+| `build_ui.py` | Builds `ui/legacy/index.html` from the Claude Design export. **Not part of the run.** |
+| `ADD A CITY.dc.html` | The old design source, as exported from the canvas. |
 | `start.bat` | Double-click launcher. Runs `pythonw.exe`, so there is no console window. |
 | `install-startup.bat` | Adds Apollo to Windows startup. `uninstall-startup.bat` removes it. |
 | `voices/` | The downloaded Piper *fallback* voice (~63MB). Only used when VoiceBox is down. Delete it and it re-downloads. |
@@ -539,21 +553,25 @@ Anything slow — the mic, Whisper, the API call, TTS — runs on a worker threa
 and that thread only starts once the page has loaded, so there is always
 something on the other end to report to.
 
-### Changing the design
+### Changing the display
 
-`ui/index.html` is generated, so edits to it are lost on the next build. Edit
-the `.dc.html` design instead, then:
+Edit `ui/full/` directly — plain ES modules, no build step. To look at it
+without running Apollo, serve `ui/` and open `full/index.html`; a sample
+snapshot is baked into `app.js` so every panel has something in it. To check
+it in the window Apollo actually uses:
 
 ```powershell
-.\.venv\Scripts\python.exe build_ui.py "ADD A CITY.dc.html"
+.\.venv\Scripts\python.exe probes\probe_full_display.py
 ```
 
-`build_ui.py` adds React, swaps the canvas's self-answering demo for the real
-backend bridge, wraps the composition in the overlay transform, and applies the
-app-level polish pass (easing curves, contrast floors, long-answer type scale).
-Every edit asserts its own hit count, so a design that has drifted far enough
-to break an assumption fails loudly at build time instead of rendering wrong at
-runtime.
+One trap worth knowing: pywebview roots its HTTP server at the page's own
+directory, so anything the page references has to live under `ui/full/` —
+`../anything` resolves in a browser and 404s in the window, silently.
+`tests/test_page_assets.py` fails on any reference that climbs out.
+
+`ui/legacy/index.html` is the design this replaced, kept because LYLA was
+lifted out of it. `build_ui.py` still regenerates it from the `.dc.html`
+export, and nothing in the run reads either one.
 
 Tools follow the same principle. `assistant.py` owns the conversation with
 Claude and decides nothing about Windows; `pc_control.py` owns Windows and
