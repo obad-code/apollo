@@ -393,6 +393,38 @@ machine) at 1080p30. The tray menu has a **Pause replay buffer** switch.
 > GIL*, which freezes every thread in Apollo - so it is opt-in only, with
 > `APOLLO_CAPTURE=ddagrab`, on a machine where it has been proven.
 
+## What Apollo knows
+
+Apollo keeps a picture of your day up to date in the background, so a question
+about it is answered from something read seconds ago rather than from a model's
+memory:
+
+| | Source | Refreshed |
+|---|---|---|
+| Your watchlist and the indices | Yahoo Finance | every minute while New York trades, else every 15 |
+| Headlines on gaming, Marvel, movies and markets | Google News feeds | every 10 minutes |
+| Trump's posts, market-moving ones flagged | trumpstruth.org | every 5 minutes |
+| Riyadh's weather | Open-Meteo | every 15 minutes |
+| CPU, memory and the GPU | the machine itself | every 5 seconds |
+
+None of them needs a key or an account, and none of them can break a
+conversation: a feed that is down gives its last answer with an honest age on
+it, or nothing at all.
+
+**The daily recap.** The first time you are actually at the PC each day, Apollo
+opens the full display and reads you the day: the date (Gregorian and Hijri),
+the weather, where the market stands and what your stocks did, the two or three
+stories that matter to you, anything market-moving Trump posted, and your
+reminders. About 40 seconds. Say *"brief me"* or *"what did I miss"* for the
+same thing any time. It is spoken in whatever language you last used.
+
+**What it costs.** Neither provider tells an ordinary API key what it has
+spent, so Apollo counts its own tokens as they are reported and keeps a daily
+ledger in `%LOCALAPPDATA%\Apollo\usage.json`. The figures on screen are
+**estimates** from the price table in `usage.py` — edit it to match your bill.
+
+---
+
 **Language.** Apollo answers in the language you spoke - Arabic (in a Saudi
 dialect) or English - because what you say is transcribed by Gemini itself,
 which understands both. The live words under the mesh stream as you talk.
@@ -434,6 +466,12 @@ The only thing left is your API key.
 | `tools.py` | Every tool Apollo has, declared once for both Gemini and Claude, and the only place tool errors are caught. Also the confirmation rule for power actions. |
 | `pc_control.py` | The Windows side of the tools: apps, sites, files, keyboard, media, volume, windows, power. Talks to Windows, never to a model. |
 | `market.py` | Live prices, history, NYSE hours and TradingView links, from Yahoo Finance's public feed. |
+| `feeds.py` | Headlines and posts, from keyless RSS feeds, cached and total. |
+| `weather.py` | Riyadh's weather from Open-Meteo. |
+| `sysinfo.py` | CPU, memory and the NVIDIA card, through NVML. |
+| `usage.py` | The day's token ledger and an estimated cost. |
+| `briefing.py` | What the recap contains, and whether today's has happened. |
+| `dataservice.py` | The one background thread that keeps all of it fresh. |
 | `clips.py` | The replay buffer: the last minute of the screen and system audio, in memory, and the MP4 a save writes. |
 | `turnview.py` | What the overlay shows for the turn in progress, as your words, the reply and any chart arrive from different threads. |
 | `presence.py` | When the full display is open (Ctrl+` is sticky; away-from-keyboard closes on input), and what a phase change does to the overlay. |
