@@ -110,6 +110,7 @@ import clips  # noqa: E402
 import dataservice  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
+import overlay_state  # noqa: E402
 import presence  # noqa: E402
 import reminders  # noqa: E402
 import tools  # noqa: E402
@@ -752,7 +753,8 @@ class Apollo:
         if self.orb is not None:
             return
         x, y, w, _h = self.overlay.box_for(Overlay.ORB)
-        self.orb = orb_module.Orb(size=w, position=(x, y))
+        self.orb = orb_module.Orb(size=w, position=(x, y),
+                                  overhang=self.overlay.orb_overhang())
         self.orb.start_on(self.window.native)
 
     def start_watcher(self):
@@ -880,7 +882,7 @@ class Apollo:
             # Back from the full display, which had the whole screen: the
             # overlay starts again from its resting footprint, with nothing
             # under the mesh.
-            orb.place(self.overlay.box_for(Overlay.ORB))
+            orb.place(self.overlay.box_for(Overlay.ORB), self.overlay.orb_overhang())
             orb.set_visible(True)
             self.overlay.hide_page()
         else:
@@ -907,11 +909,13 @@ class Apollo:
         self.last_status = state
         if delay == 0.0:
             self.view.reset()          # a fresh turn: nothing carries over
+            if self.orb is not None:
+                self.orb.set_activity("")
         if delay is not None and self.orb is not None:
             self.orb.clear_content(after=delay)
         self.turn_busy = state in WebReporter.ENGAGED
         if self.orb is not None:
-            self.orb.set_active(self.turn_busy)
+            self.orb.set_state(self.overlay_state_for(state))
         self.apply_mode()
 
         # The ring can lose topmost status to any other window that asserts
@@ -929,6 +933,24 @@ class Apollo:
         role, text, visual = frame
         if text or visual:
             self.orb.set_content(role, text, visual)
+
+    def overlay_state_for(self, phase):
+        """Which face the overlay wears for a phase of the turn.
+
+        Speaking is two different pictures: an answer that is a row of
+        readouts is the RESULT state, and one that is words (with or without
+        a chart) is the REPLY state.
+        """
+        if phase == assistant.LISTENING:
+            return overlay_state.LISTENING
+        if phase == assistant.THINKING:
+            return overlay_state.SEARCHING
+        if phase == assistant.SPEAKING:
+            visual = self.view.visual or {}
+            if visual.get("cards") and not self.view.reply:
+                return overlay_state.RESULT
+            return overlay_state.REPLY
+        return overlay_state.REST
 
     def on_turn(self, speaker, text, visual=None):
         """A line of the transcript arrived: yours, or Apollo's reply.
@@ -957,8 +979,10 @@ class Apollo:
         self._render(self.view.show(visual))
 
     def on_activity(self, text):
-        """What Apollo is doing ("fetching NVDA"). Shown by the new overlay (P5)."""
+        """What Apollo is doing ("fetching NVDA"), under your words."""
         self.view.doing(text)
+        if self.orb is not None:
+            self.orb.set_activity(text)
 
     def toggle_peek(self):
         """CTRL+`: open the full display by hand, or put it away."""
