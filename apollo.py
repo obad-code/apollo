@@ -118,7 +118,9 @@ import turnview  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-INDEX = os.path.join(HERE, "ui", "index.html")
+# The hand-written display. `ui/legacy/` holds the generated page this one
+# replaced; `build_ui.py` still builds that, and nothing in the run reads it.
+INDEX = os.path.join(HERE, "ui", "full", "index.html")
 
 STARTING = "Waking"          # shown while the API check and model load run
 MUTEX_NAME = "Local\\ApolloVoiceAssistantSingleton"
@@ -873,6 +875,13 @@ class Apollo:
         ui = getattr(self, "ui", None)
         if ui is not None and ui.alive:
             ui.mode(mode)
+            if mode == Overlay.FULL:
+                # on_data only reaches the page while the display is up, so
+                # without this the first thing it shows after a quiet stretch
+                # is the last snapshot it happened to catch - or nothing.
+                data = getattr(self, "data", None)
+                if data is not None:
+                    ui.data(data.snapshot)
 
         if orb is None:                   # no native layer yet: just cut
             self.overlay.show_page(mode)
@@ -1192,7 +1201,9 @@ def die(message):
 
 def main():
     if not os.path.exists(INDEX):
-        die("Missing front end: " + INDEX + "\n\nRun: python build_ui.py")
+        # Not a build step any more - this page is written by hand and lives
+        # in the repository, so a missing one means a broken checkout.
+        die("Missing front end: " + INDEX)
 
     lock = single_instance()
     if lock is None:

@@ -1,0 +1,35 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "ui/full/index.html"
+        ],
+        "createdAt": "2026-09-20T09:51:09.922Z",
+        "reason": "user confirmed: Apollo's whole look is a CRT terminal, asked for repeatedly ('same crt style', 'crt gredient colored style'); the amber phosphor bleed matches orb.py's native overlay and ui/legacy"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "ui/full/app.css"
+        ],
+        "createdAt": "2026-09-20T09:51:10.123Z",
+        "reason": "user confirmed: Apollo's whole look is a CRT terminal, asked for repeatedly ('same crt style', 'crt gredient colored style'); the amber phosphor bleed matches orb.py's native overlay and ui/legacy"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "ui/full/lyla.js"
+        ],
+        "createdAt": "2026-09-20T09:51:10.332Z",
+        "reason": "user confirmed: Apollo's whole look is a CRT terminal, asked for repeatedly ('same crt style', 'crt gredient colored style'); the amber phosphor bleed matches orb.py's native overlay and ui/legacy"
+      }
+    ]
+  }
+}

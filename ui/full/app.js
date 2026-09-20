@@ -14,10 +14,14 @@ import { Shader } from './shader.js';
 import { Lyla } from './lyla.js';
 
 const Motion = window.Motion || {};
-const animate = Motion.animate || ((el, props, opts) => {
-  // Motion is vendored; if it is missing the page must still render, just
-  // without the choreography.
-  Object.assign(el.style, props);
+// Motion is vendored beside this page. If it ever fails to load, the page must
+// still be readable - so the fallback puts every element in its RESTING state
+// rather than trying to apply keyframe arrays as styles, which silently leaves
+// opacity at 0 and the display blank.
+const animate = Motion.animate || ((el, props) => {
+  for (const [name, value] of Object.entries(props)) {
+    el.style[name] = Array.isArray(value) ? value[value.length - 1] : value;
+  }
   return { finished: Promise.resolve() };
 });
 

@@ -1,4 +1,10 @@
-"""Turn a Claude Design canvas export into the front end Apollo actually runs.
+"""Turn a Claude Design canvas export into the OLD front end.
+
+NOT PART OF THE RUN. Apollo's display is `ui/full/`, written by hand: see
+`apollo.INDEX`. This script builds `ui/legacy/index.html`, the generated page
+it replaced, which is kept because LYLA was lifted out of it and
+`tests/test_lyla_port.py` pins her module to it. Run it only to regenerate
+that reference copy.
 
 The design is authored in `<name>.dc.html`: markup with `{{ binding }}` holes and
 a `class Component extends DCLogic` that fills them. That file is a *demo* - it
@@ -27,7 +33,7 @@ import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "ui", "index.html")
+OUT = os.path.join(HERE, "ui", "legacy", "index.html")
 DEFAULT_DESIGN = "ADD A CITY.dc.html"
 
 # Assets the design references by relative path. pywebview's HTTP server roots
@@ -604,9 +610,19 @@ def main():
             shutil.copy2(s, d)
 
     p = build(design_path)
+
+    # The page now sits one directory deeper than the assets it shares with
+    # the current display, so its relative references climb out of ui/legacy/.
+    text = p.text
+    for old, new in (('"./support.js"', '"../support.js"'),
+                     ('"fonts/', '"../fonts/'),
+                     ('"uploads/', '"../uploads/'),
+                     ("'uploads/", "'../uploads/")):
+        text = text.replace(old, new)
+
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:
-        f.write(p.text)
+        f.write(text)
 
     print(f"built {os.path.relpath(OUT, HERE)} from {os.path.basename(design_path)}")
     for line in p.log:

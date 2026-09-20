@@ -14,7 +14,7 @@ window.addEventListener('unhandledrejection', (e) => {
   window.__apErrs.push('unhandled rejection: ' + String(e.reason));
 });
 </script>
-<script src="./support.js"></script>
+<script src="../support.js"></script>
 </head>
 <body>
 <x-dc>
@@ -23,7 +23,7 @@ window.addEventListener('unhandledrejection', (e) => {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@200;300;400;500;600&display=swap">
 <style>
-  @font-face { font-family:"Melete"; src:url("fonts/Melete-Medium.otf") format("opentype"); font-weight:500; font-display:swap; }
+  @font-face { font-family:"Melete"; src:url("../fonts/Melete-Medium.otf") format("opentype"); font-weight:500; font-display:swap; }
   html, body { margin:0; padding:0; background:#000; overflow:hidden; height:100%; }
   body { font-family:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; -webkit-font-smoothing:antialiased; text-shadow:0 0 7px rgba(255,150,0,0.55); }
   a { color:#FFB000; text-decoration:none; }
@@ -3022,12 +3022,12 @@ class Component extends DCLogic {
     this.ac = new AC();
     this.buf = {};
     const files = {
-      hud:   ['uploads/ES_User Interface, Motion, Bring Up Hud - Epidemic Sound - 0031-0749.wav', 0.55],
-      rev:   ['uploads/ES_User Interface, Click, UI Buttons, Select, Previous - Epidemic Sound.mp3', 0.5],
-      heard: ['uploads/ES_User Interface, Alert, Notification, Message, Text 01 - Epidemic Sound.mp3', 0.5],
-      press: ['uploads/mixkit-dry-pop-up-notification-alert-2356.mp3', 0.7],
-      ly1:   ['uploads/mixkit-alien-technology-button-3118.mp3', 0.45],
-      ly2:   ['uploads/mixkit-game-liquid-game-hit-3155.mp3', 0.45]
+      hud:   ['../uploads/ES_User Interface, Motion, Bring Up Hud - Epidemic Sound - 0031-0749.wav', 0.55],
+      rev:   ['../uploads/ES_User Interface, Click, UI Buttons, Select, Previous - Epidemic Sound.mp3', 0.5],
+      heard: ['../uploads/ES_User Interface, Alert, Notification, Message, Text 01 - Epidemic Sound.mp3', 0.5],
+      press: ['../uploads/mixkit-dry-pop-up-notification-alert-2356.mp3', 0.7],
+      ly1:   ['../uploads/mixkit-alien-technology-button-3118.mp3', 0.45],
+      ly2:   ['../uploads/mixkit-game-liquid-game-hit-3155.mp3', 0.45]
     };
     this.vol = {};
     Object.entries(files).forEach(([k, [url, v]]) => {

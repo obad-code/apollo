@@ -76,7 +76,9 @@
   </section>
 </main>
 
-<script src="../vendor/motion.js"></script>
+<!-- Under this page's own directory on purpose: pywebview roots its HTTP
+     server at the page, so anything above it is unreachable at runtime. -->
+<script src="vendor/motion.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>
