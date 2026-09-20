@@ -41,6 +41,14 @@ Measured, on this machine, against a known window underneath:
                               owns window creation
   * SetWindowRgn              clips the form, but the backdrop still paints,
                               so a faint square survives around the circle
+  * DwmEnableBlurBehindWindow with an empty region - the winit/tao trick for
+                              transparent windows - no effect either, alone or
+                              with the WebView2 control's own
+                              DefaultBackgroundColor cleared, with or without
+                              WS_EX_LAYERED. Measured 2026-09-20 by
+                              probes/probe_transparent_matrix.py: the desktop
+                              behind the window changed in 81% of pixels every
+                              time, i.e. the window painted over it.
 
 So per-pixel transparency - a genuinely round orb with nothing behind it - is
 not reachable while the orb is an HTML page in this host. What is reachable is
