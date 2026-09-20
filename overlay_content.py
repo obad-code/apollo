@@ -236,6 +236,30 @@ def infer_visual(text):
             "cards": []}
 
 
+# Arabic, Hebrew, and the Arabic presentation forms. Apollo answers in the
+# language you spoke, so a reply can arrive in either direction and the
+# overlay has to lay it out accordingly.
+_RTL_RANGES = ((0x0590, 0x08FF), (0xFB1D, 0xFDFF), (0xFE70, 0xFEFF))
+
+
+def is_rtl(text):
+    """True if the text is mostly right-to-left.
+
+    Counted rather than sniffed from the first character: a reply like
+    "NVDA: سهم إنفيديا صعد" starts with a ticker and is still an Arabic
+    sentence, and a line of digits in an Arabic answer is not a change of
+    direction.
+    """
+    rtl = ltr = 0
+    for ch in text or "":
+        code = ord(ch)
+        if any(low <= code <= high for low, high in _RTL_RANGES):
+            rtl += 1
+        elif ch.isalpha():
+            ltr += 1
+    return rtl > ltr
+
+
 # --- laying it out ---------------------------------------------------------
 
 # Every measurement below is in pixels at the overlay's own scale. They are
@@ -267,8 +291,46 @@ class Metrics:
         self.char_w = float(char_w)
         self.line_h = int(line_h)
 
+    def width_of(self, text):
+        """How wide this text really is.
 
-def wrap(text, columns):
+        Monospace arithmetic by default, because that is what the overlay's
+        face is and it keeps the typing reveal a multiplication. The painter
+        overrides this with a real measurement for Arabic, which is not
+        monospace in any face.
+        """
+        return len(text or "") * self.char_w
+
+
+def wrap(text, columns, metrics=None, width=None):
+    """Wrap to a pixel width when one is given, else to a character count.
+
+    Arabic is not monospace even in a monospace face, so wrapping it by
+    character count runs past the panel. When the painter passes real metrics
+    the wrap measures instead.
+    """
+    if metrics is not None and width is not None:
+        return _wrap_by_width(text, metrics, width)
+    return _wrap_by_columns(text, columns)
+
+
+def _wrap_by_width(text, metrics, width):
+    lines, current = [], ""
+    for paragraph in (text or "").split("\n"):
+        for word in paragraph.split():
+            candidate = f"{current} {word}".strip()
+            if current and metrics.width_of(candidate) > width:
+                lines.append(current)
+                current = word
+            else:
+                current = candidate
+        if current:
+            lines.append(current)
+            current = ""
+    return lines
+
+
+def _wrap_by_columns(text, columns):
     """Wrap to `columns` characters, breaking a word only if it cannot fit."""
     if columns < 1:
         return []
@@ -320,8 +382,9 @@ def layout(role, text, visual, metrics, width, max_height=None):
     blocks = []
     y = 0
 
-    lines = wrap(text, columns)
+    lines = wrap(text, columns, metrics, inner)
     if lines:
+        rtl = is_rtl(text)
         start = 0
         laid = []
         for line in lines:
@@ -329,15 +392,24 @@ def layout(role, text, visual, metrics, width, max_height=None):
             # display centres its transcript and its answer. Left-aligned in a
             # column this wide reads as a stray paragraph rather than as
             # something hanging off the figure.
-            x = int(round((width - len(line) * metrics.char_w) / 2.0))
+            line_width = metrics.width_of(line)
+            x = int(round((width - line_width) / 2.0))
+            # Where each word ends, so the typing reveal can step a word at a
+            # time. Arabic joins its letters, so revealing part of a word
+            # would show shapes that do not exist.
+            ends, seen = [], 0
+            for word in line.split(" "):
+                seen += len(word)
+                ends.append(seen)
+                seen += 1
             laid.append({"text": line, "x": max(PAD_X, x), "y": y,
-                         "start": start})
+                         "start": start, "width": line_width, "words": ends})
             # +1 for the space the wrap consumed, so the reveal advances
             # through the gap between lines at the same rate as through a
             # word. Without it the caret pauses at every line end.
             start += len(line) + 1
             y += metrics.line_h
-        blocks.append({"kind": "text", "role": role, "lines": laid})
+        blocks.append({"kind": "text", "role": role, "lines": laid, "rtl": rtl})
 
     chars = len(text)
     visual = visual or {}
