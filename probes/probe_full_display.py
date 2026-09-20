@@ -45,6 +45,16 @@ CHECKS = """
 """
 
 
+# A cheap fingerprint of each animated canvas: if a loop is still running these
+# change between two reads a second and a half apart.
+SAMPLE_CANVASES = """
+JSON.stringify(['ring', 'lyla', 'shader'].map((id) => {
+  const c = document.getElementById(id);
+  try { return c.toDataURL().length; } catch (e) { return 'blocked'; }
+}))
+"""
+
+
 def main():
     window = webview.create_window("Apollo probe", apollo.INDEX,
                                    width=1600, height=900, frameless=True,
@@ -59,6 +69,31 @@ def main():
                                "window.apollo.turn('You', 'how is nvidia doing');"
                                "window.apollo.turn('Apollo', 'NVIDIA is at 222.27, up 1.34%.')")
             time.sleep(2)
+            # A headline that tries to run: it must land as text, not markup.
+            window.evaluate_js("""
+              window.apollo.data({market:{indices:[],watchlist:[],status:''},
+                news:{gaming:[{title:"<img src=x onerror=\\"window.__pwned=1\\">boom",
+                               source:"<b>src</b>", age:"1h ago"}]},
+                posts:[], weather:{}, system:{}, usage:{}, updated:0, stamps:{}});
+            """)
+            time.sleep(0.5)
+            print("escaping:", window.evaluate_js(
+                "JSON.stringify({pwned: !!window.__pwned,"
+                " imgs: document.querySelectorAll('#stories img').length,"
+                " shown: document.querySelector('#stories .story').textContent.slice(0,22)})"))
+            # Closing the display must stop the ring, the shader and LYLA:
+            # Apollo's window is hidden by Win32, so nothing throttles them.
+            window.evaluate_js("window.apollo.mode('orb')")
+            before = window.evaluate_js(SAMPLE_CANVASES)
+            time.sleep(1.5)
+            after = window.evaluate_js(SAMPLE_CANVASES)
+            print("stopped while hidden:", before == after, before, after)
+
+            # ...and start again when it opens, or the stop is just a break.
+            window.evaluate_js("window.apollo.mode('full')")
+            woke = window.evaluate_js(SAMPLE_CANVASES)
+            time.sleep(1.5)
+            print("running again:", woke != window.evaluate_js(SAMPLE_CANVASES))
             print("answering:", window.evaluate_js(
                 "JSON.stringify({body: document.body.className,"
                 " answer: getComputedStyle(document.getElementById('answer')).opacity})"))

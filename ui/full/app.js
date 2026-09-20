@@ -26,6 +26,16 @@ const animate = Motion.animate || ((el, props) => {
 });
 
 const $ = (id) => document.getElementById(id);
+
+/* Headlines come from Google News and posts come from Truth Social. Neither is
+ * Apollo's to trust: a title carrying `<img src=x onerror=...>` written into
+ * innerHTML would run as script in the window that holds your watchlist, your
+ * usage and a bridge back into the app. The old page was React, which escaped
+ * everything it rendered; this one builds its own markup, so every value that
+ * Apollo did not write itself goes through here first.
+ * tests/test_page_escapes_feeds.py fails if one ever does not. */
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g,
+  (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const RISE = { opacity: [0, 1], transform: ['translateY(16px)', 'translateY(0px)'] };
 const SPRING = { type: 'spring', stiffness: 220, damping: 26 };
 
@@ -96,6 +106,7 @@ const RINGS = [[1.0, 22, 0.026, '255,193,94'], [0.85, 18, -0.034, '255,176,0'],
                [0.7, 14, 0.045, '86,197,214']];
 let ringClock = 0;
 let lastFrame = performance.now();
+let ringFrame = null;
 
 function drawRing(now) {
   const dt = Math.min(0.05, (now - lastFrame) / 1000);
@@ -129,9 +140,26 @@ function drawRing(now) {
     }
     ring.shadowBlur = 0;
   }
-  requestAnimationFrame(drawRing);
+  ringFrame = requestAnimationFrame(drawRing);
 }
-requestAnimationFrame(drawRing);
+
+/* The ring stops with the shader and with LYLA. Apollo's window is hidden by
+ * Win32, not by the browser, so nothing throttles it on our behalf: left
+ * running it would keep compositing a blurred canvas behind a window nobody
+ * can see, for as long as Apollo is up. */
+function ringStart() {
+  if (ringFrame === null) {
+    lastFrame = performance.now();
+    ringFrame = requestAnimationFrame(drawRing);
+  }
+}
+
+function ringStop() {
+  if (ringFrame !== null) cancelAnimationFrame(ringFrame);
+  ringFrame = null;
+}
+
+ringStart();
 
 /* --- the clock ------------------------------------------------------------ */
 
@@ -209,7 +237,7 @@ function renderMarkets(market) {
   $('markets-head').innerHTML = 'Markets' + stale('market');
   $('indices').innerHTML = (market.indices || []).map((quote) => `
     <div class="index">
-      <div class="name">${quote.name || quote.symbol}</div>
+      <div class="name">${esc(quote.name || quote.symbol)}</div>
       <div class="value"><span class="figure">${money(quote.price)}</span><span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span></div>
     </div>`).join('');
 
@@ -223,44 +251,44 @@ function renderMarkets(market) {
   const list = $('watchlist');
   list.classList.toggle('drawing', !state.entered);
   list.innerHTML = (market.watchlist || []).map((quote) => `
-    <div class="stock" data-symbol="${quote.symbol}">
-      <span class="ticker">${quote.symbol}</span>
+    <div class="stock" data-symbol="${esc(quote.symbol)}">
+      <span class="ticker">${esc(quote.symbol)}</span>
       ${sparkline(quote.spark)}
       <span class="price">${money(quote.price)}</span>
       <span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span>
     </div>`).join('');
 
   // A price that moved since the last snapshot flashes its row; one that did
-  // not stays still, or the whole column would blink every minute.
-  for (const quote of market.watchlist || []) {
+  // not stays still, or the whole column would blink every minute. Rows are
+  // found by position rather than by a selector built from a ticker, which
+  // would be one more piece of feed data steering the page.
+  (market.watchlist || []).forEach((quote, i) => {
     const previous = state.prices.get(quote.symbol);
-    if (previous !== undefined && previous !== quote.price) {
-      const row = list.querySelector(`[data-symbol="${quote.symbol}"]`);
-      if (row) {
-        row.classList.add(quote.price > previous ? 'flash-up' : 'flash-down');
-        setTimeout(() => row.classList.remove('flash-up', 'flash-down'), 700);
-      }
+    const row = list.children[i];
+    if (previous !== undefined && previous !== quote.price && row) {
+      row.classList.add(quote.price > previous ? 'flash-up' : 'flash-down');
+      setTimeout(() => row.classList.remove('flash-up', 'flash-down'), 700);
     }
     state.prices.set(quote.symbol, quote.price);
-  }
+  });
 }
 
 function renderHeadlines(news) {
   $('headlines-head').innerHTML = 'Headlines' + stale('news');
   $('topics').innerHTML = TOPICS.map((topic, i) =>
-    `<span class="chip ${i === state.topic ? 'on' : ''}">${topic}</span>`).join('');
+    `<span class="chip ${i === state.topic ? 'on' : ''}">${esc(topic)}</span>`).join('');
   const chosen = TOPICS[state.topic];
   const stories = (news && news[chosen]) || [];
   $('stories').innerHTML = stories.slice(0, 4).map((story) => `
-    <div class="story">${story.title}<span>${story.source} · ${story.age}</span></div>`).join('')
+    <div class="story">${esc(story.title)}<span>${esc(story.source)} · ${esc(story.age)}</span></div>`).join('')
     || '<div class="story">Nothing came back for this topic<span>the feed is quiet</span></div>';
 }
 
 function renderPosts(posts) {
   $('posts-head').innerHTML = 'Trump · Truth Social' + stale('posts');
   $('post-list').innerHTML = (posts || []).slice(0, 3).map((post) => `
-    <div class="post">${post.text.slice(0, 160)}${post.text.length > 160 ? '…' : ''}
-      <span>${post.age}${post.market ? ' · <b class="moving">market-moving</b>' : ''}</span>
+    <div class="post">${esc(post.text.slice(0, 160))}${post.text.length > 160 ? '…' : ''}
+      <span>${esc(post.age)}${post.market ? ' · <b class="moving">market-moving</b>' : ''}</span>
     </div>`).join('') || '<div class="post">No posts in the last day</div>';
 }
 
@@ -289,7 +317,7 @@ function renderWeather(weather) {
     { day: 'numeric', month: 'long', year: 'numeric' }).format(now);
   $('date-extra').textContent = `Day ${day} · Week ${week} · ${hijri}`;
   $('weather').innerHTML = weather && weather.temp !== undefined
-    ? `Riyadh ${weather.temp}° · ${weather.text} · high ${weather.high}° low ${weather.low}°${stale('weather')}`
+    ? `Riyadh ${weather.temp}° · ${esc(weather.text)} · high ${weather.high}° low ${weather.low}°${stale('weather')}`
     : 'Riyadh · weather unavailable';
 }
 
@@ -404,8 +432,8 @@ window.apollo = {
   mode(name) {
     // The overlay has the screen while Apollo is at rest; a shader drawing to
     // a window nobody can see is a GPU burning for nothing.
-    if (name === 'full') { shader.start(); lyla.start(); enter(); }
-    else { shader.stop(); lyla.stop(); }
+    if (name === 'full') { shader.start(); lyla.start(); ringStart(); enter(); }
+    else { shader.stop(); lyla.stop(); ringStop(); }
   },
   level() {},
   briefing(payload) { if (payload) render(payload); },
