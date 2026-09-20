@@ -87,6 +87,7 @@ const state = {
   phase: 'idle',
   entered: false,
   topic: 0,
+  settleTimer: null,
 };
 
 /* --- the shader, the ring and LYLA --------------------------------------- */
@@ -356,6 +357,12 @@ function enter() {
   [...document.querySelectorAll('.rise')].forEach((panel, i) => {
     animate(panel, RISE, { ...SPRING, delay: i * 0.04 });
   });
+  // Timers still run where animation frames do not. If the entrance has not
+  // landed by now - frames throttled, Motion missing, anything - the panels
+  // go to their resting state anyway. A display that opens blank is a worse
+  // failure than one that opens without its flourish.
+  clearTimeout(state.settleTimer);
+  state.settleTimer = setTimeout(settle, 1200);
   // The first paint's flourishes are spent; re-render so they are not
   // repeated and the rows settle into their resting form.
   if (state.snapshot) render(state.snapshot);

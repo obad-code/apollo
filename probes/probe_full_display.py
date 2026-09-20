@@ -6,7 +6,7 @@ other - ES modules over that server, WebGL for the shader, and the bridge
 registering on `window` - so this loads the actual page in the actual window
 and asks it.
 
-Run:  .venv/Scripts/python.exe probes/probe_full_display.py [shot.png]
+Run:  .venv/Scripts/python.exe probes/probe_full_display.py
 """
 
 import os
@@ -21,20 +21,25 @@ import webview  # noqa: E402
 
 import apollo  # noqa: E402
 
-SHOT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "full_display.png")
-
 CHECKS = """
 (() => {
   const bridge = Object.keys(window.apollo || {});
   const gl = document.getElementById('shader').getContext('webgl');
   const lyla = document.getElementById('lyla');
+  // Her room is the window. A stylesheet that gives this canvas a height -
+  // a leftover from when she sat in a grid cell - squashes the whole room
+  // into a strip, and it only shows at the width the rule applies to.
+  const box = lyla.getBoundingClientRect();
+  const roomIsTheWindow = Math.round(box.width) === innerWidth
+                       && Math.round(box.height) === innerHeight;
   const rows = document.querySelectorAll('.stock').length;
   const sparks = document.querySelectorAll('.stock svg path').length;
   const panels = [...document.querySelectorAll('.rise')]
     .map(p => Number(getComputedStyle(p).opacity));
   return JSON.stringify({
-    bridge, webgl: !!gl, lylaCanvas: [lyla.width, lyla.height],
+    bridge, webgl: !!gl, lylaCanvas: [lyla.width, lyla.height], roomIsTheWindow,
+    lylaBox: [Math.round(box.width), Math.round(box.height)],
+    viewport: [innerWidth, innerHeight],
     rows, sparks, panelsVisible: panels.filter(o => o > 0.9).length,
     panelCount: panels.length,
     label: document.getElementById('lyla-label').textContent,
@@ -103,7 +108,9 @@ def main():
             window.destroy()
 
     threading.Thread(target=drive, daemon=True).start()
-    webview.start(private_mode=False)
+    # A private profile means no cache: the probe always sees the files
+    # as they are on disk, not as they were the last time it ran.
+    webview.start(private_mode=True)
 
 
 if __name__ == "__main__":

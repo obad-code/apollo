@@ -227,10 +227,11 @@ body.answering #lyla { opacity: .18; transition: opacity .45s ease-in-out; }
 body.answering #core { transform: translateY(-64px) scale(.78); }
 body.answering #hint { opacity: 0; }
 
+/* #lyla is deliberately absent here: her canvas is the window at every size,
+   and her room is measured in pixels from the bottom, not in proportions. */
 @media (max-width: 1920px) {
   :root { --gutter: 34px; }
   #clock { font-size: 54px; }
   #wordmark { font-size: 26px; }
   #ring { width: 200px; height: 200px; }
-  #lyla { height: 120px; }
 }
