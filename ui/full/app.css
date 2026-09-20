@@ -1,0 +1,196 @@
+/* The full display's skin: the overlay's palette, a CRT surface, and a grid
+   that holds at 2560x1440 and at 1920x1080. Nothing here paints a background
+   except the shader behind it - the panels are glass. */
+
+:root {
+  --amber: #e8b958;
+  --amber-bright: #f0d9a0;
+  --you: #d2eef3;
+  --caption: rgba(200, 185, 240, 0.7);
+  --cyan: #7fe0ee;
+  --violet: #b996f0;
+  --up: #5fe39a;
+  --down: #ff6b7a;
+  --panel: rgba(10, 14, 30, 0.42);
+  --panel-soft: rgba(255, 255, 255, 0.045);
+  --gutter: 48px;
+  --radius: 22px;
+  --mono: "IBM Plex Mono", Consolas, "Cascadia Mono", monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #04060c;
+  font-family: var(--mono);
+  color: var(--amber);
+  -webkit-font-smoothing: antialiased;
+}
+
+#shader { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+.vignette {
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, 0.72) 100%);
+}
+
+.scanlines {
+  position: fixed; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg,
+    rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px);
+}
+
+#stage {
+  position: relative;
+  height: 100%;
+  padding: var(--gutter);
+  display: grid;
+  grid-template-columns: 30% 1fr 30%;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 24px 32px;
+  grid-template-areas:
+    "clock   core     status"
+    "markets core     headlines"
+    "markets lyla     posts"
+    "strip   strip    strip";
+}
+
+/* --- the panels ---------------------------------------------------------- */
+
+.panel {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  backdrop-filter: blur(2px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel h2 {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--caption);
+  margin-bottom: 14px;
+}
+
+.rise { opacity: 0; }          /* Motion brings them in; see app.js */
+
+.caption { font-size: 13px; color: var(--caption); letter-spacing: 0.04em; }
+.line { font-size: 16px; color: var(--amber); }
+.tag { color: var(--violet); letter-spacing: 0.14em; text-transform: uppercase;
+       font-size: 12px; margin-right: 10px; }
+
+/* --- clock --------------------------------------------------------------- */
+
+#clock-block { grid-area: clock; }
+#clock { font-size: 68px; line-height: 1; letter-spacing: -0.02em; color: var(--amber-bright); }
+#seconds { font-size: 26px; color: rgba(232, 185, 88, 0.55); margin-left: 4px; }
+#date { margin-top: 10px; }
+#date-extra, #weather { margin-top: 6px; }
+
+/* --- status -------------------------------------------------------------- */
+
+#status-block { grid-area: status; text-align: right; }
+#dots { font-size: 13px; color: rgba(216, 210, 196, 0.75); letter-spacing: 0.04em; }
+#dots span { margin-left: 16px; }
+#dots i { font-style: normal; margin-right: 6px; }
+.ok { color: var(--up); }
+.off { color: var(--down); }
+#market-clock { margin-top: 10px; }
+.note { margin-top: 12px; font-size: 12px; color: var(--cyan); opacity: 0; transition: opacity .3s; }
+.note.show { opacity: .85; }
+
+/* --- markets ------------------------------------------------------------- */
+
+#markets { grid-area: markets; }
+#indices { display: flex; gap: 28px; margin-bottom: 16px; }
+.index .name { font-size: 12px; color: rgba(216, 210, 196, 0.6); letter-spacing: 0.1em; }
+.index .value { font-size: 26px; color: var(--amber-bright); }
+.index .move { font-size: 14px; margin-left: 6px; }
+
+.stock { display: flex; align-items: center; height: 38px; font-size: 15px; }
+.stock .ticker { width: 76px; color: var(--amber); }
+.stock svg { width: 96px; height: 26px; margin-right: 10px; }
+.stock .price { flex: 1; text-align: right; color: #d8d2c4; }
+.stock .move { width: 86px; text-align: right; }
+.up { color: var(--up); }
+.down { color: var(--down); }
+
+@keyframes flash-up { from { background: rgba(95, 227, 154, 0.16); } to { background: transparent; } }
+@keyframes flash-down { from { background: rgba(255, 107, 122, 0.16); } to { background: transparent; } }
+.flash-up { animation: flash-up .6s ease-out; border-radius: 8px; }
+.flash-down { animation: flash-down .6s ease-out; border-radius: 8px; }
+
+/* --- headlines and posts -------------------------------------------------- */
+
+#headlines { grid-area: headlines; }
+#posts { grid-area: posts; }
+.chips { margin-bottom: 14px; }
+.chip {
+  display: inline-block; font-size: 12px; padding: 4px 14px; border-radius: 999px;
+  background: var(--panel-soft); color: rgba(216, 210, 196, 0.7); margin-right: 8px;
+}
+.chip.on { background: rgba(127, 224, 238, 0.14); color: var(--cyan); }
+
+.story { font-size: 14px; color: #d8d2c4; line-height: 1.35; margin-bottom: 13px;
+         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.story span { display: block; font-size: 12px; color: rgba(127, 224, 238, 0.6); }
+.post { font-size: 14px; color: #d8d2c4; line-height: 1.4; margin-bottom: 14px; }
+.post span { display: block; font-size: 12px; color: rgba(127, 224, 238, 0.6); margin-top: 3px; }
+.post .moving { color: var(--down); }
+
+/* --- the bottom strip ----------------------------------------------------- */
+
+#strip { grid-area: strip; display: flex; align-items: center; gap: 44px;
+         padding: 16px 26px; font-size: 13px; color: rgba(216, 210, 196, 0.75); }
+.strip-item.right { margin-left: auto; }
+
+/* --- the core ------------------------------------------------------------- */
+
+#core { grid-area: core; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; transition: transform .6s cubic-bezier(.32,.72,0,1); }
+#ring { width: 260px; height: 260px; }
+#wordmark { font-size: 34px; letter-spacing: 0.62em; margin-left: 0.62em;
+            color: var(--amber-bright); margin-top: 6px; }
+#hint { margin-top: 14px; color: rgba(127, 224, 238, 0.6); transition: opacity .35s; }
+
+/* --- the answer ----------------------------------------------------------- */
+
+#answer {
+  position: absolute; left: 50%; top: 58%; width: min(900px, 62vw);
+  transform: translateX(-50%); text-align: center; pointer-events: none;
+  opacity: 0; transition: opacity .4s;
+}
+#answer.show { opacity: 1; }
+#you { font-size: 15px; color: var(--you); margin-bottom: 10px; opacity: .8; }
+#reply { font-size: 26px; line-height: 1.4; color: var(--amber); }
+#reply[dir="rtl"] { font-family: "Segoe UI", Tahoma, sans-serif; }
+#visual { margin-top: 18px; }
+#visual svg { width: 100%; height: 170px; }
+
+/* --- LYLA ----------------------------------------------------------------- */
+
+#lyla-block { grid-area: lyla; align-self: end; text-align: center; }
+#lyla { width: 100%; max-width: 900px; height: 150px; image-rendering: pixelated; }
+#lyla-label { margin-top: 6px; letter-spacing: 0.1em; color: rgba(232, 185, 88, 0.9); }
+
+/* --- dimmed while Apollo answers ------------------------------------------ */
+
+body.answering .panel,
+body.answering #clock-block,
+body.answering #status-block,
+body.answering #lyla-block { opacity: .18; transition: opacity .45s; }
+body.answering #core { transform: translateY(-64px) scale(.78); }
+body.answering #hint { opacity: 0; }
+
+@media (max-width: 1920px) {
+  :root { --gutter: 34px; }
+  #clock { font-size: 54px; }
+  #wordmark { font-size: 26px; }
+  #ring { width: 200px; height: 200px; }
+  #lyla { height: 120px; }
+}
