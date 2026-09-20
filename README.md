@@ -125,73 +125,63 @@ real per-pixel alpha rather than being an HTML page in a rectangle (see
 [below](#why-the-overlay-is-not-html)). It never takes focus either, so your caret
 stays where you left it, and clicks pass straight through.
 
-Hold `Ctrl+Alt` from **any** application, say *"What's the tallest mountain in
-Japan?"*, release. Everything that follows happens **in that same overlay,
-underneath that same mesh**, which never moves a pixel:
+Hold `Ctrl+Alt` from **any** application, say *"What's Nvidia doing?"*, and
+release. Everything that follows happens in a panel that drops from the top
+edge of the screen and retracts when it is done:
 
-- **While you talk**, your words appear under the mesh as you say them, in a
-  dim grey-blue — cooler than Apollo's own amber, so a transcript is never
-  mistaken for an answer. They type themselves on as Whisper gets further
-  through the sentence, with a caret blinking at the end, and the overlay
-  grows down a line to hold them. Stop without saying anything and it shrinks
-  straight back.
-- **While it thinks**, nothing is added: the mesh switches to its listening
-  pattern and your line stays put. A whole deep-research pass, which is mostly
-  you waiting on searches, puts up no box at all — there is nothing to read
-  yet.
-- **When the answer comes**, it replaces your words in amber, and the overlay
-  grows downward by **exactly** as much as that particular answer needs. A
-  one-word reply barely moves it. A long one wraps to a few lines. An answer
-  that rests on real numbers brings a sparkline with it, sized to the data; an
-  answer that is really two to six figures brings small cards instead, the
-  same thin-amber-on-dark ones the full display uses.
-- **A few seconds after it stops speaking**, it collapses back to the bare
-  mesh, fading as it goes.
+| | What you see |
+|---|---|
+| **At rest** | The amber ring, hanging off the top edge with a quarter of it in view. Your wallpaper shows through it and through its glow. |
+| **While you talk** | The panel drops down: Apollo's three-ring orb on the left, your words in cyan as they are transcribed, and a word underneath saying it is listening. Under the panel's edge, a glowing horizon and a dome of sparkles that brighten and speed up with your voice. |
+| **While it works** | The orb spins up, and the line under your words says what it is doing - *searching the web*, *fetching NVDA*, *saving the clip*. |
+| **When it answers** | The reply in amber, rising in line by line. An answer that rests on real numbers brings a chart with it - violet into cyan into amber, with the last reading marked - and one that is two to six figures brings borderless cards instead. |
+| **Afterwards** | It retracts into the ring, quicker than it came. |
 
-There is no panel, no border and no background behind any of it at any point.
-The words, the chart and the cards sit directly on your desktop the way the
-mesh does, and the top edge never moves — every bit of growth is downward, and
-it is eased rather than jumped.
+Arabic answers are laid out right to left, in a face that shapes them
+properly. The panel is a deep navy with violet and teal light drifting across
+it on loops of sixteen, twenty-one and twenty-six seconds, so it never sits
+still and never repeats.
 
 ```
-      /\/\                   resting - the mesh alone
+      /\/\                   resting - the ring alone
        |   Ctrl+Alt (hold)
        v
-      /\/\                   listening - your words type in underneath,
-    your words                 grey-blue, caret blinking
+    +--------------+         listening - your words in cyan, the orb turning,
+    | (o)  words   |           sparkles under the panel's edge
+    +--------------+
        |
        v
-      /\/\                   thinking - nothing added, no box
-    your words
+    +--------------+         searching - the orb spins up and the line
+    | (O)  words   |           underneath says what it is doing
+    |  searching   |
+    +--------------+
        |
-       v   the reply arrives
-      /\/\                   speaking - the answer in amber, and only if
-    the answer                 the answer really contains data:
-    [ sparkline ]              a sparkline sized to the series,
-    [card] [card]              or a row of small cards
+       v
+    +--------------+         answering - the reply in amber, with a chart
+    | (o)  words   |           or a row of cards if the answer has figures
+    |  the answer  |
+    |  [ chart ]   |
+    +--------------+
        |
        v   ~4s after it stops
       /\/\                   back to resting
 ```
 
-**Where a chart comes from.** Not from guessing at the prose. Apollo may append
-one machine-readable line to a reply, which is stripped off before the reply is
-spoken or displayed and parsed into a chart or cards (`overlay_content.py`).
-Most answers carry no such line and render as text alone. Every number in one
-has to be a number Apollo actually has, from a search result or from you — the
-system prompt is explicit that inventing a series to make a chart appear is
-worse than showing no chart, and in practice it will tell you it could not pin
-the figures down rather than draw them.
+**Why it is drawn by hand.** The panel is not a web page. A WebView2 window
+here cannot be made see-through: its own background colour, the blur-behind
+trick that winit and tao use, the layered style and click-through were each
+applied in turn and together, and the desktop behind the window still changed
+in 81% of pixels (`probes/probe_transparent_matrix.py`). So the overlay is
+GDI+ on a layered window, which is the one path on Windows to real per-pixel
+alpha. A frame costs about 4.5 ms of the 16.7 ms a 60 fps frame has, because
+everything that does not change shape - the panel's gradient, the drifting
+light, the orb's glowing points, the sparkle field - is rendered once and
+blitted (`probes/probe_overlay_frames.py`).
 
-You never have to switch windows, click into Apollo, or bring anything to the
-front. The hotkey is a global Windows hook, so it fires wherever you are.
-
-> Two caveats worth knowing. `Ctrl+Alt` is not swallowed — it also reaches
-> whatever app you are in. That is why it is tested *exclusively* (see the
-> hotkey note above): the moment a third key joins it, it is that app's chord
-> and not Apollo's. And Windows does not deliver hotkeys to a normal program
-> from an elevated window, so it will not fire over Task Manager or an admin
-> terminal.
+**Where a chart comes from.** Not from guessing at the prose: Apollo's market
+tools draw what they fetched, and a reply can carry one machine-readable line
+that is stripped before it is spoken (`overlay_content.py`). Every number in
+one is a number Apollo actually has.
 
 ### The full display
 
@@ -478,7 +468,9 @@ The only thing left is your API key.
 | `reminders.py` | Reminder storage and the watcher that fires them. |
 | `probes/` | Live checks against the real APIs and PC: which Gemini model to use, transcript timing, and an end-to-end tool run. |
 | `apollo.py` | The overlay host. Owns the window shapes, the tray icon, the presence watcher and the single-instance lock, and drives the page from `assistant`. |
-| `orb.py` | The overlay itself, drawn natively into a layered window so it can be genuinely transparent: the mesh, and the words, sparkline and cards that grow downward under it. |
+| `orb.py` | The overlay itself: the window, the states, and the composition - ring, panel, your words, the answer, cards and chart. |
+| `overlay_paint.py` | Its paint box: the drifting CRT panel, the three-ring orb, the sparkle field and the horizon, each pre-rendered where a per-frame redraw would cost too much. |
+| `overlay_state.py` | The springs and the state machine, with no window in sight. |
 | `overlay_content.py` | What an answer actually contains and how tall that makes the overlay — reply parsing and layout, with no drawing code in it. |
 | `ui/index.html` | The front end. **Generated — do not edit by hand.** |
 | `build_ui.py` | Builds `ui/index.html` from the Claude Design export. Re-run it whenever a new design lands. |
