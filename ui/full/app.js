@@ -341,10 +341,15 @@ function render(snapshot) {
  * opacity: 0 it starts from, and the display would open empty. So it waits
  * for the page to be shown - which is also when the count-up and the
  * sparkline draw are worth spending. */
+/* Put the panels in their resting state and hand opacity back to the
+ * stylesheet. The inline styles Motion writes while it animates would
+ * otherwise outrank every rule that comes later - including the dim that
+ * clears the room while Apollo is answering. */
 function settle() {
   document.querySelectorAll('.rise').forEach((panel) => {
-    panel.style.opacity = '1';
-    panel.style.transform = 'none';
+    panel.style.removeProperty('opacity');
+    panel.style.removeProperty('transform');
+    panel.classList.add('assembled');
   });
 }
 

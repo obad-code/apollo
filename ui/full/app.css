@@ -84,7 +84,11 @@ html, body {
   margin-bottom: 14px;
 }
 
-.rise { opacity: 0; }          /* Motion brings them in; see app.js */
+/* Motion brings them in; see app.js. `assembled` is their resting state, held
+   by a class rather than by the inline styles the animation leaves behind -
+   an inline opacity beats every rule below, including the answering dim. */
+.rise { opacity: 0; }
+.rise.assembled { opacity: 1; transform: none; }
 
 /* The age a panel wears when its reader could not refresh it. */
 .age { font-weight: 400; color: var(--down); margin-left: 10px; letter-spacing: 0.08em; }
@@ -179,8 +183,10 @@ body.answering #core { transition: transform .6s cubic-bezier(.32,.72,0,1); }
 
 /* --- the answer ----------------------------------------------------------- */
 
+/* High enough that a reply with a chart under it clears LYLA's status line
+   and the strip rather than sitting across them. */
 #answer {
-  position: absolute; left: 50%; top: 58%; width: min(900px, 62vw);
+  position: absolute; left: 50%; top: 48%; width: min(900px, 62vw);
   transform: translateX(-50%); text-align: center; pointer-events: none;
   opacity: 0; transition: opacity .4s;
 }
