@@ -83,3 +83,58 @@ def test_alpha_puts_the_channels_in_the_order_gdi_plus_takes():
     """Color.FromArgb reads alpha first; the colour must follow it."""
     assert overlay_paint.alpha((10, 20, 30), 0.5) == (128, 10, 20, 30)
     assert overlay_paint.alpha((10, 20, 30), 1.0) == (255, 10, 20, 30)
+
+
+def test_rings_draw_inside_their_radius(draw, surface):
+    bitmap, graphics = surface
+    overlay_paint.Rings(draw).draw_at(graphics, 100, 100, 46, t=0.0)
+    lit = [(x, y) for x in range(0, 300, 3) for y in range(0, 300, 3)
+           if pixel(bitmap, x, y)[0] > 12]
+    assert lit, "the rings drew nothing"
+    assert all((x - 100) ** 2 + (y - 100) ** 2 < 75 ** 2 for x, y in lit)
+
+
+def test_rings_turn_over_time(draw, surface):
+    bitmap, graphics = surface
+    rings = overlay_paint.Rings(draw)
+    rings.draw_at(graphics, 100, 100, 46, t=0.0)
+    early = [pixel(bitmap, x, 100) for x in range(40, 160, 6)]
+    graphics.Clear(draw.Color.FromArgb(0, 0, 0, 0))
+    rings.draw_at(graphics, 100, 100, 46, t=4.0)
+    assert [pixel(bitmap, x, 100) for x in range(40, 160, 6)] != early
+
+
+def test_sparkles_wrap_inside_their_field(draw):
+    sparkles = overlay_paint.Sparkles(draw, count=60)
+    for _ in range(400):
+        sparkles.advance(0.05, level=1.0)
+    assert all(0 <= p["x"] <= 1 and 0 <= p["y"] <= 1 for p in sparkles.particles)
+
+
+def test_sparkles_speed_up_with_your_voice(draw):
+    quiet = overlay_paint.Sparkles(draw, count=40)
+    loud = overlay_paint.Sparkles(draw, count=40)
+    loud.particles = [dict(p) for p in quiet.particles]
+    quiet.advance(0.2, level=0.0)
+    loud.advance(0.2, level=1.0)
+    moved_quiet = sum(abs(a["y"] - b["y"]) for a, b in zip(quiet.particles, loud.particles))
+    assert moved_quiet > 0
+
+
+def test_sparkles_follow_the_panel_edge(draw, surface):
+    bitmap, graphics = surface
+    sparkles = overlay_paint.Sparkles(draw, count=200)
+    sparkles.advance(0.1, level=0.5)
+    sparkles.draw_at(graphics, 30, 220, 500, 150)
+    lit = [(x, y) for x in range(0, 560, 2) for y in range(0, 400, 2)
+           if pixel(bitmap, x, y)[0] > 8]
+    assert lit, "no sparkles drawn"
+    assert all(215 <= y <= 375 for _, y in lit)
+
+
+def test_horizon_is_brightest_in_the_middle(draw, surface):
+    bitmap, graphics = surface
+    overlay_paint.horizon(graphics, draw, 30, 200, 500)
+    middle = max(pixel(bitmap, 280, y)[0] for y in range(197, 204))
+    edge = max(pixel(bitmap, 40, y)[0] for y in range(197, 204))
+    assert middle > edge
