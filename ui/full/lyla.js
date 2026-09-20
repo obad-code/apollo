@@ -35,8 +35,15 @@ export class Lyla {
     const tick = (t) => {
       const dt = Math.min(64, t - (this.last || t));
       this.last = t;
-      this.drawLyla(t);
-      this.drawLylaHealth(t, dt, 0);
+      // One bad frame must not end her. Without this the exception escapes
+      // rAF, nothing reschedules, and she is gone for the rest of the session
+      // with an empty room where she used to be.
+      try {
+        this.drawLyla(t);
+        this.drawLylaHealth(t, dt, 0);
+      } catch (err) {
+        if (!this.complained) { this.complained = true; console.error('LYLA', err); }
+      }
       this.frame = requestAnimationFrame(tick);
     };
     this.frame = requestAnimationFrame(tick);

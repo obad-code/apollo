@@ -26,7 +26,11 @@ const RISE = { opacity: [0, 1], transform: ['translateY(16px)', 'translateY(0px)
 const SPRING = { type: 'spring', stiffness: 220, damping: 26 };
 
 const TOPICS = ['gaming', 'marvel', 'movies', 'markets'];
-const HIDE_AFTER = { market: 180, news: 1800, posts: 900, weather: 2700 };
+
+// dataservice.INTERVALS x 3. Past this a panel is showing something it could
+// not refresh, and it has to say so - a price from an hour ago that looks
+// current is worse than no price at all.
+const STALE_AFTER = { market: 180, news: 1800, posts: 900, weather: 2700, system: 15 };
 
 const SAMPLE = {
   market: {
@@ -59,6 +63,8 @@ const SAMPLE = {
   usage: { tokens: 839, cost: 0.02, estimated: true, turns: 1 },
   clips: { saved_today: 0, seconds: 60 },
   updated: Date.now() / 1000,
+  stamps: { market: Date.now() / 1000, news: Date.now() / 1000, posts: Date.now() / 1000,
+            weather: Date.now() / 1000, system: Date.now() / 1000 },
 };
 
 const state = {
@@ -147,6 +153,38 @@ function money(value) {
 function moveClass(pct) { return pct >= 0 ? 'up' : 'down'; }
 function moveText(pct) { return `${pct >= 0 ? '▲' : '▼'}${Math.abs(pct).toFixed(2)}%`; }
 
+function words(seconds) {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+  return `${Math.floor(seconds / 86400)}d`;
+}
+
+/* A panel whose reader last succeeded longer ago than its interval allows
+ * carries its age in the heading. Everything else says nothing, because a
+ * timestamp on fresh data is noise. */
+function stale(key) {
+  const stamps = (state.snapshot && state.snapshot.stamps) || {};
+  if (!stamps[key]) return '';
+  const age = Date.now() / 1000 - stamps[key];
+  return age > (STALE_AFTER[key] || Infinity) ? ` <b class="age">${words(age)} old</b>` : '';
+}
+
+/* Numbers arrive at their value instead of appearing at it, once, on the
+ * first paint. Later snapshots just set the text - a price counting up from
+ * zero every minute would be theatre, not information. */
+function countUp(el, value, format) {
+  const from = 0;
+  const started = performance.now();
+  const step = (now) => {
+    const at = Math.min(1, (now - started) / 600);
+    const eased = 1 - Math.pow(1 - at, 3);
+    el.textContent = format(from + (value - from) * eased);
+    if (at < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 function sparkline(points) {
   if (!points || points.length < 2) return '';
   const low = Math.min(...points), high = Math.max(...points);
@@ -155,20 +193,31 @@ function sparkline(points) {
   const path = points.map((value, i) =>
     `${i ? 'L' : 'M'}${(i * step).toFixed(1)},${(24 - ((value - low) / span) * 22).toFixed(1)}`).join('');
   const rising = points[points.length - 1] >= points[0];
+  // pathLength="1" normalises the dash units, so one CSS rule can draw every
+  // sparkline on first paint whatever shape it happens to be.
   return `<svg viewBox="0 0 96 26" preserveAspectRatio="none"><path d="${path}" fill="none"
-    stroke="${rising ? 'var(--up)' : 'var(--down)'}" stroke-width="1.6"
+    pathLength="1" stroke="${rising ? 'var(--up)' : 'var(--down)'}" stroke-width="1.6"
     stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
 function renderMarkets(market) {
   $('market-clock').textContent = market.status || '';
+  $('markets-head').innerHTML = 'Markets' + stale('market');
   $('indices').innerHTML = (market.indices || []).map((quote) => `
     <div class="index">
       <div class="name">${quote.name || quote.symbol}</div>
-      <div class="value">${money(quote.price)}<span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span></div>
+      <div class="value"><span class="figure">${money(quote.price)}</span><span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span></div>
     </div>`).join('');
 
+  if (!state.entered) {
+    const figures = $('indices').querySelectorAll('.figure');
+    (market.indices || []).forEach((quote, i) => {
+      if (figures[i]) countUp(figures[i], quote.price, money);
+    });
+  }
+
   const list = $('watchlist');
+  list.classList.toggle('drawing', !state.entered);
   list.innerHTML = (market.watchlist || []).map((quote) => `
     <div class="stock" data-symbol="${quote.symbol}">
       <span class="ticker">${quote.symbol}</span>
@@ -193,6 +242,7 @@ function renderMarkets(market) {
 }
 
 function renderHeadlines(news) {
+  $('headlines-head').innerHTML = 'Headlines' + stale('news');
   $('topics').innerHTML = TOPICS.map((topic, i) =>
     `<span class="chip ${i === state.topic ? 'on' : ''}">${topic}</span>`).join('');
   const chosen = TOPICS[state.topic];
@@ -203,6 +253,7 @@ function renderHeadlines(news) {
 }
 
 function renderPosts(posts) {
+  $('posts-head').innerHTML = 'Trump · Truth Social' + stale('posts');
   $('post-list').innerHTML = (posts || []).slice(0, 3).map((post) => `
     <div class="post">${post.text.slice(0, 160)}${post.text.length > 160 ? '…' : ''}
       <span>${post.age}${post.market ? ' · <b class="moving">market-moving</b>' : ''}</span>
@@ -216,7 +267,8 @@ function renderStrip(snapshot) {
   $('tokens').textContent = usage.tokens
     ? `${usage.tokens.toLocaleString()} · approx $${(usage.cost || 0).toFixed(2)}`
     : '—';
-  $('system').textContent = `CPU ${system.cpu ?? '—'}% · GPU ${system.gpu ?? '—'}% · RAM ${system.ram ?? '—'}%`;
+  $('system').innerHTML =
+    `CPU ${system.cpu ?? '—'}% · GPU ${system.gpu ?? '—'}% · RAM ${system.ram ?? '—'}%${stale('system')}`;
   $('clips').textContent = clips.saved_today !== undefined
     ? `${clips.saved_today} today · last ${clips.seconds || 60}s buffered` : '—';
   const age = snapshot.updated ? Math.max(0, Date.now() / 1000 - snapshot.updated) : null;
@@ -232,8 +284,8 @@ function renderWeather(weather) {
   const hijri = new Intl.DateTimeFormat('en-TN-u-ca-islamic-umalqura',
     { day: 'numeric', month: 'long', year: 'numeric' }).format(now);
   $('date-extra').textContent = `Day ${day} · Week ${week} · ${hijri}`;
-  $('weather').textContent = weather && weather.temp !== undefined
-    ? `Riyadh ${weather.temp}° · ${weather.text} · high ${weather.high}° low ${weather.low}°`
+  $('weather').innerHTML = weather && weather.temp !== undefined
+    ? `Riyadh ${weather.temp}° · ${weather.text} · high ${weather.high}° low ${weather.low}°${stale('weather')}`
     : 'Riyadh · weather unavailable';
 }
 
@@ -244,18 +296,40 @@ function render(snapshot) {
   renderPosts(snapshot.posts);
   renderStrip(snapshot);
   renderWeather(snapshot.weather);
-  if (!state.entered) enter();
+  enter();
 }
 
 /* --- the choreography ------------------------------------------------------ */
 
-function enter() {
-  state.entered = true;
-  const panels = [...document.querySelectorAll('.rise')];
-  panels.forEach((panel, i) => {
-    animate(panel, RISE, { ...SPRING, delay: i * 0.04 });
+/* The panels rise in once, the first time anyone can actually see them.
+ *
+ * A hidden page gets no animation frames at all, so an entrance started while
+ * Apollo is still an orb would never move: every panel would sit at the
+ * opacity: 0 it starts from, and the display would open empty. So it waits
+ * for the page to be shown - which is also when the count-up and the
+ * sparkline draw are worth spending. */
+function settle() {
+  document.querySelectorAll('.rise').forEach((panel) => {
+    panel.style.opacity = '1';
+    panel.style.transform = 'none';
   });
 }
+
+function enter() {
+  if (state.entered) return;
+  // Hidden: no frames, so assemble the page outright. If it is shown later
+  // the entrance plays then; if it is never shown, nothing was wasted.
+  if (document.hidden) { settle(); return; }
+  state.entered = true;
+  [...document.querySelectorAll('.rise')].forEach((panel, i) => {
+    animate(panel, RISE, { ...SPRING, delay: i * 0.04 });
+  });
+  // The first paint's flourishes are spent; re-render so they are not
+  // repeated and the rows settle into their resting form.
+  if (state.snapshot) render(state.snapshot);
+}
+
+document.addEventListener('visibilitychange', () => enter());
 
 function setPhase(phase) {
   state.phase = phase;
@@ -326,7 +400,7 @@ window.apollo = {
   mode(name) {
     // The overlay has the screen while Apollo is at rest; a shader drawing to
     // a window nobody can see is a GPU burning for nothing.
-    if (name === 'full') { shader.start(); lyla.start(); }
+    if (name === 'full') { shader.start(); lyla.start(); enter(); }
     else { shader.stop(); lyla.stop(); }
   },
   level() {},
