@@ -11,6 +11,7 @@
  */
 
 import { Shader } from './shader.js';
+import { Lyla } from './lyla.js';
 
 const Motion = window.Motion || {};
 const animate = Motion.animate || ((el, props, opts) => {
@@ -73,6 +74,12 @@ const state = {
 const shader = new Shader($('shader'));
 shader.start();
 window.addEventListener('resize', () => shader.resize());
+
+const lyla = new Lyla($('lyla'), {
+  label: $('lyla-label'), icon: $('lyla-icon'),
+  bar: $('lyla-bar'), pct: $('lyla-pct'), ring: $('ring'),
+});
+lyla.start();
 
 const ring = $('ring').getContext('2d');
 const RINGS = [[1.0, 22, 0.026, '255,193,94'], [0.85, 18, -0.034, '255,176,0'],
@@ -252,6 +259,7 @@ function enter() {
 
 function setPhase(phase) {
   state.phase = phase;
+  lyla.setPhase(phase);
   const answering = phase === 'thinking' || phase === 'speaking';
   document.body.classList.toggle('answering', answering);
   $('answer').classList.toggle('show', answering);
@@ -318,8 +326,8 @@ window.apollo = {
   mode(name) {
     // The overlay has the screen while Apollo is at rest; a shader drawing to
     // a window nobody can see is a GPU burning for nothing.
-    if (name === 'full') shader.start();
-    else shader.stop();
+    if (name === 'full') { shader.start(); lyla.start(); }
+    else { shader.stop(); lyla.stop(); }
   },
   level() {},
   briefing(payload) { if (payload) render(payload); },

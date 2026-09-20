@@ -10,6 +10,12 @@
      on top of it; nothing else paints a background. -->
 <canvas id="shader"></canvas>
 <div class="vignette"></div>
+
+<!-- LYLA's room is the whole window, the way it always was: her stations are
+     laid out across its width and her floor sits 88px up from the bottom.
+     The panels leave that band clear for her. -->
+<canvas id="lyla"></canvas>
+
 <div class="scanlines"></div>
 
 <main id="stage">
@@ -63,8 +69,10 @@
   </section>
 
   <section id="lyla-block" class="rise">
-    <canvas id="lyla" width="900" height="150"></canvas>
+    <canvas id="lyla-icon" width="48" height="72"></canvas>
     <div id="lyla-label" class="caption">LYLA // BOOTING</div>
+    <div id="lyla-battery"><div id="lyla-bar"></div></div>
+    <div id="lyla-pct" class="caption">88%</div>
   </section>
 </main>
 

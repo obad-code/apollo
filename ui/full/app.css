@@ -15,6 +15,9 @@
   --panel-soft: rgba(255, 255, 255, 0.045);
   --gutter: 48px;
   --radius: 22px;
+  /* Her floor is 88px up, and her tallest station (the porthole) reaches
+     another 168px above that. */
+  --room: 272px;
   --mono: "IBM Plex Mono", Consolas, "Cascadia Mono", monospace;
 }
 
@@ -46,6 +49,8 @@ html, body {
   position: relative;
   height: 100%;
   padding: var(--gutter);
+  /* LYLA's room runs along the bottom of the window; nothing is laid over it. */
+  padding-bottom: var(--room);
   display: grid;
   grid-template-columns: 30% 1fr 30%;
   grid-template-rows: auto 1fr auto auto;
@@ -174,9 +179,25 @@ html, body {
 
 /* --- LYLA ----------------------------------------------------------------- */
 
-#lyla-block { grid-area: lyla; align-self: end; text-align: center; }
-#lyla { width: 100%; max-width: 900px; height: 150px; image-rendering: pixelated; }
-#lyla-label { margin-top: 6px; letter-spacing: 0.1em; color: rgba(232, 185, 88, 0.9); }
+/* Her canvas is the window, behind every panel and in front of the shader. */
+#lyla {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; image-rendering: pixelated;
+}
+
+/* The line that says what she is doing, with her portrait and her battery. */
+#lyla-block {
+  grid-area: lyla; align-self: end; justify-self: center;
+  display: flex; align-items: center; gap: 12px;
+}
+#lyla-icon { width: 24px; height: 36px; image-rendering: pixelated; }
+#lyla-label { letter-spacing: 0.1em; color: rgba(232, 185, 88, 0.9); white-space: nowrap; }
+#lyla-battery {
+  position: relative; width: 74px; height: 5px; border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08); overflow: hidden;
+}
+#lyla-bar { position: absolute; inset: 0 auto 0 0; width: 88%; background: var(--amber); }
+#lyla-pct { min-width: 46px; }
 
 /* --- dimmed while Apollo answers ------------------------------------------ */
 
