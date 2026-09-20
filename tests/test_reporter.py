@@ -28,7 +28,7 @@ def test_repeated_status_is_forwarded_once():
     for _ in range(40):
         ui.status("Listening")
     assert seen == ["Listening"]
-    assert ui.window.calls == ['window.apollo.status("Listening")']
+    assert ui.window.calls == ['window.apollo.status && window.apollo.status("Listening")']
 
 
 def test_transitions_still_forwarded():
@@ -45,7 +45,7 @@ def test_idle_after_quiet_period_reaches_page():
     ui.status("Idle")
     ui.quiet = False
     ui.status("Idle")
-    assert ui.window.calls[-1] == 'window.apollo.status("Idle")'
+    assert ui.window.calls[-1] == 'window.apollo.status && window.apollo.status("Idle")'
 
 
 def test_streaming_updates_never_block_on_the_page():
