@@ -61,3 +61,14 @@ def test_streaming_updates_never_block_on_the_page():
     ui.activity("searching the web")
     assert ui.window.calls == []
     assert turns == [("Apollo", "Opening Chr", None)] and doing == ["searching the web"]
+
+
+def test_a_page_without_a_handler_does_not_silence_everything():
+    """The page and the backend ship separately. A `data` call to a page that
+    predates it must be a no-op, not the end of every later update."""
+    ui, seen = make()
+    ui.data({"market": {}})
+    js = ui.window.calls[-1]
+    assert js.startswith("window.apollo.data && window.apollo.data(")
+    ui.status("Listening")
+    assert ui.alive is True and seen == ["Listening"]

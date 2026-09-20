@@ -548,8 +548,14 @@ class WebReporter:
         if not self.alive:
             return
         payload = ", ".join(json.dumps(a) for a in args)
+        # Guarded on the page's side: the front end and the backend ship
+        # separately, and a call into a handler an older page does not have
+        # would raise here - which `except` below reads as "the window went
+        # away" and silences every later update. A missing handler is a
+        # no-op; a missing window is still an error.
         try:
-            self.window.evaluate_js(f"window.apollo.{fn}({payload})")
+            self.window.evaluate_js(
+                f"window.apollo.{fn} && window.apollo.{fn}({payload})")
         except Exception:
             # The window went away mid-turn. Nothing left to report to.
             self.alive = False
