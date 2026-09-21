@@ -390,7 +390,7 @@ class LiveSession:
                 self._on_user_turn()
             except Exception:
                 pass
-        self._drain(self._play_q)
+        self.hush()          # if he is mid-sentence, the press cuts him off
         loop = self._loop
         if loop is not None and not loop.is_closed():
             try:
@@ -817,12 +817,14 @@ class LiveSession:
                     # appears, so it can only ever swallow the ending that
                     # belongs to the generation it just watched die - never an
                     # unrelated turn later on.
-                    self._drain(self._play_q)
+                    self.hush()      # you spoke over him; stop the speakers
                     self._false_start = True
                     self._reply = []        # cut off mid-sentence; not worth keeping
                     log.debug("interrupted: generation abandoned")
                 if content.turn_complete:
                     self._finish_turn()
+                    if self.auto_vad:
+                        self._finish_turn_transcript()
 
     def _note_usage(self, meta):
         """Tokens as the server reports them, for the day's ledger."""
@@ -833,6 +835,37 @@ class LiveSession:
                            int(getattr(meta, "response_token_count", 0) or 0))
         except Exception:
             pass          # a ledger must never cost a turn
+
+    def hush(self):
+        """Stop talking now, not at the end of the sentence.
+
+        Draining the queue is not enough. The queue holds what has not been
+        written yet; the sound card holds what has, and a RawOutputStream's
+        `stop` plays that out before it returns. `abort` throws it away, which
+        is the difference between Apollo going quiet when you speak and Apollo
+        finishing his sentence over you.
+        """
+        self._play_open.clear()
+        self._drain(self._play_q)
+        speaker = self._speaker
+        if speaker is None:
+            return
+        try:
+            speaker.abort()
+            speaker.start()
+        except Exception:  # noqa: BLE001 - a device that will not flush is
+            pass           # still a device that should keep working
+
+    def _finish_turn_transcript(self):
+        """Forget what was heard, so the next sentence stands on its own.
+
+        `begin_turn` does this for push-to-talk. Always-listening has no press
+        to begin anything, so nothing emptied the buffer and every sentence
+        was shown stuck onto every sentence before it - which is why what
+        appeared on screen was not what had just been said.
+        """
+        self._heard = []
+        self._last_heard = 0.0
 
     def _note_heard(self, text):
         """Your own words, as the model transcribes them - both modes now."""
