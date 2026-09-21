@@ -16,6 +16,7 @@ import logos
 import market
 import sysinfo
 import usage
+import watchlist
 import weather
 
 log = logging.getLogger("apollo.data")
@@ -85,23 +86,26 @@ class DataService:
     #    actually brought something back, so a failure ages rather than blanks.
 
     def _read_market(self):
-        indices, watchlist = [], []
+        # Named `watched`, not `watchlist`: the latter is the module this
+        # reads the symbols from, and shadowing it here is how the list
+        # stopped being a list.
+        indices, watched = [], []
         for symbol in market.INDICES:
             quote = self._quote(symbol, spark=False)
             if quote:
                 indices.append(quote)
-        for symbol in market.WATCHLIST:
+        for symbol in watchlist.current():
             quote = self._quote(symbol, spark=True)
             if quote:
-                watchlist.append(quote)
+                watched.append(quote)
         status = ""
         try:
             status = market.market_status()["label"]
         except Exception:  # noqa: BLE001
             pass
-        if not indices and not watchlist:
+        if not indices and not watched:
             return False
-        self.snapshot["market"] = {"indices": indices, "watchlist": watchlist,
+        self.snapshot["market"] = {"indices": indices, "watchlist": watched,
                                    "status": status}
         return True
 

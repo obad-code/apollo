@@ -17,6 +17,7 @@ import feeds
 import market
 import reminders
 import usage
+import watchlist
 import weather
 
 log = logging.getLogger("apollo.briefing")
@@ -63,7 +64,7 @@ def compose(now=None):
             indices.append(_small(market.quote(symbol)))
         except Exception:  # noqa: BLE001 - a dead feed costs a line, not the recap
             continue
-    for symbol in market.WATCHLIST:
+    for symbol in watchlist.current():
         try:
             movers.append(_small(market.quote(symbol)))
         except Exception:  # noqa: BLE001

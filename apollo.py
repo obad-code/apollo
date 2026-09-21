@@ -548,9 +548,10 @@ class WebReporter:
     ENGAGED = {assistant.LISTENING, assistant.THINKING, assistant.SPEAKING}
 
     def __init__(self, window, overlay, on_status, on_turn, on_level,
-                 on_partial, on_visual=None, on_activity=None):
+                 on_partial, on_visual=None, on_activity=None, app=None):
         self.window = window
         self.overlay = overlay
+        self._app = app     # for `refresh`, which reaches the data service
         self.on_status = on_status
         self.on_turn = on_turn
         self.on_level = on_level
@@ -644,6 +645,17 @@ class WebReporter:
         answer through `turn` once the turn is over.
         """
         self.on_turn("Apollo", text, None)
+
+    def refresh(self):
+        """Read the world again now, and push it. True if anything was told."""
+        service = getattr(self._app, "data", None) if self._app is not None else None
+        if service is None:
+            return False
+        try:
+            service.refresh(force=True)
+        except Exception:  # noqa: BLE001 - a refresh is not worth a failed turn
+            return False
+        return True
 
     def data(self, snapshot):
         """The world, for the full display. Only worth sending while it is up."""
@@ -823,7 +835,8 @@ class Apollo:
                               on_level=self.on_level,
                               on_partial=self.on_partial,
                               on_visual=self.on_visual,
-                              on_activity=self.on_activity)
+                              on_activity=self.on_activity,
+                              app=self)
         threading.Thread(target=self.worker, daemon=True).start()
 
     def on_closed(self):

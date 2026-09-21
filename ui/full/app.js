@@ -104,6 +104,7 @@ const state = {
   entered: false,
   topic: 0,
   settleTimer: null,
+  cardsTimer: null,
   level: 0,
   levelSmooth: 0,
 };
@@ -325,7 +326,37 @@ function renderMarkets(market) {
 
   const list = $('watchlist');
   list.classList.toggle('drawing', !state.entered);
+  // Which stocks were here a moment ago, so a card that has just been asked
+  // for can arrive rather than appear, and one that has been dropped can
+  // leave rather than vanish.
+  const before = [...list.children].map((card) => card.dataset.symbol);
+  const after = (market.watchlist || []).map((quote) => quote.symbol);
+  const leaving = before.filter((symbol) => !after.includes(symbol));
+
+  if (state.entered && leaving.length) {
+    // Let them go first, then draw the rest - otherwise the row under a
+    // removed card jumps up while the card is still fading.
+    for (const symbol of leaving) {
+      const card = [...list.children].find((c) => c.dataset.symbol === symbol);
+      if (card) animate(card, { opacity: [1, 0], transform: ['scale(1)', 'scale(.94)'] },
+                        { duration: 0.26, ease: 'easeOut' });
+    }
+    clearTimeout(state.cardsTimer);
+    state.cardsTimer = setTimeout(() => renderMarkets(market), 280);
+    return;
+  }
+
   list.innerHTML = (market.watchlist || []).map((quote) => stockCard(quote)).join('');
+
+  if (state.entered) {
+    const arriving = after.filter((symbol) => !before.includes(symbol));
+    for (const symbol of arriving) {
+      const card = [...list.children].find((c) => c.dataset.symbol === symbol);
+      if (card) animate(card, {
+        opacity: [0, 1], transform: ['translateY(10px) scale(.96)', 'translateY(0) scale(1)'],
+      }, { ...SPRING, delay: 0.04 });
+    }
+  }
 
   // A price that moved since the last snapshot flashes its row; one that did
   // not stays still, or the whole column would blink every minute. Rows are

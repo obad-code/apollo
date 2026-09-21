@@ -58,13 +58,17 @@ class Context:
     """What a handler may reach besides its arguments.
 
     `show(visual)` puts a chart or cards on the overlay, `activity(text)`
-    says in a few words what Apollo is doing ("fetching NVDA"), and `turn` is
-    the user's turn number at the moment the call arrived.
+    says in a few words what Apollo is doing ("fetching NVDA"), `refresh()`
+    asks the data service to read the world again and push it to the display,
+    and `turn` is the user's turn number at the moment the call arrived.
     """
 
-    def __init__(self, show=None, activity=None, turn=None):
+    def __init__(self, show=None, activity=None, turn=None, refresh=None):
         self.show = show or (lambda visual: None)
         self.activity = activity or (lambda text: None)
+        # False by default, so a tool that changes the display can tell the
+        # difference between "refreshed" and "there was nothing to refresh".
+        self.refresh = refresh or (lambda: False)
         self.turn = current_turn() if turn is None else turn
 
 
@@ -231,6 +235,7 @@ import overlay_content  # noqa: E402
 import prayer  # noqa: E402
 import pc_control  # noqa: E402
 import reminders  # noqa: E402
+import watchlist  # noqa: E402
 
 
 def _obj(props, required=()):
@@ -453,6 +458,46 @@ def _save_clip(ctx, seconds=60):
             {"label": "Clip", "value": f"{result['seconds']:.0f}s saved"},
             {"label": "Size", "value": f"{result['megabytes']:.0f} MB"}]}))
     return result
+
+
+@_tool("watch_stock", "adding it to your watchlist",
+       "Add a company to the watchlist on the display. Use this when the user "
+       "asks to follow, watch, track or add a stock. Give the company name or "
+       "ticker as the user said it.",
+       _obj({"company": {"type": "string",
+                         "description": "The company name or ticker"}},
+            ("company",)))
+def _watch_stock(ctx, company=""):
+    ctx.activity("adding it to your watchlist")
+    result = watchlist.add(company)
+    if result.get("ok"):
+        ctx.refresh()
+    return result
+
+
+@_tool("unwatch_stock", "taking it off your watchlist",
+       "Remove a company from the watchlist on the display. Use this when the "
+       "user asks to stop following, unfollow, drop or remove a stock.",
+       _obj({"company": {"type": "string",
+                         "description": "The company name or ticker"}},
+            ("company",)))
+def _unwatch_stock(ctx, company=""):
+    ctx.activity("taking it off your watchlist")
+    result = watchlist.remove(company)
+    if result.get("ok"):
+        ctx.refresh()
+    return result
+
+
+@_tool("refresh_display", "refreshing the display",
+       "Fetch everything on the display again right now - prices, news, "
+       "weather. Use this when the user asks to refresh, update or reload.",
+       _obj({}))
+def _refresh_display(ctx):
+    ctx.activity("refreshing the display")
+    if not ctx.refresh():
+        return {"ok": False, "error": "The display isn't running right now."}
+    return {"ok": True, "refreshed": True}
 
 
 @_tool("prayer_times", "checking the prayer times",

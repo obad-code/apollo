@@ -805,7 +805,9 @@ def _run_tool(block, ui):
             return deep_research(args.get("question", ""), ui)
         if block.name in tools.REGISTRY:
             return json.dumps(tools.run(block.name, args, tools.Context(
-                show=getattr(ui, "visual", None), activity=getattr(ui, "activity", None))))
+                show=getattr(ui, "visual", None),
+                activity=getattr(ui, "activity", None),
+                refresh=getattr(ui, "refresh", None))))
         return f"Failed: unknown tool '{block.name}'."
     except Exception as e:
         return f"Failed: {type(e).__name__}: {e}"
@@ -1550,7 +1552,8 @@ def tool_runner(ui):
     """Build the callable Gemini's tool calls go through."""
     def run(name, args):
         ctx = tools.Context(show=getattr(ui, "visual", None),
-                            activity=getattr(ui, "activity", None))
+                            activity=getattr(ui, "activity", None),
+                            refresh=getattr(ui, "refresh", None))
         return tools.run(name, args, ctx)
     return run
 
