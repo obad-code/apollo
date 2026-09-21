@@ -452,6 +452,41 @@ function render(snapshot) {
   enter();
 }
 
+/* Which panels are on the display. Apollo can take one off by voice, so they
+ * leave rather than disappear: the grid would otherwise reflow in one frame
+ * and everything else on the screen would jump. */
+const PANEL_OF = {
+  markets: 'markets', feed: 'headlines', clock: 'clock-block',
+  status: 'status-block', strip: 'strip', lyla: 'lyla-block', core: 'core',
+};
+
+function setPanels(wanted) {
+  for (const [panel, id] of Object.entries(PANEL_OF)) {
+    const element = $(id);
+    if (!element) continue;
+    const show = wanted[panel] !== false;
+    const already = element.dataset.hidden !== 'true';
+    if (show === already) continue;
+    element.dataset.hidden = show ? 'false' : 'true';
+    if (show) {
+      element.style.display = '';
+      animate(element, { opacity: [0, 1], transform: ['scale(.97)', 'scale(1)'] },
+              { ...SPRING });
+    } else {
+      const done = animate(element, { opacity: [1, 0], transform: ['scale(1)', 'scale(.97)'] },
+                           { duration: 0.24, ease: 'easeOut' });
+      const hide = () => { if (element.dataset.hidden === 'true') element.style.display = 'none'; };
+      // The grid reflows only once the panel has finished leaving.
+      if (done && done.finished && done.finished.then) done.finished.then(hide, hide);
+      else setTimeout(hide, 260);
+    }
+  }
+  // LYLA's room is a full-window canvas, not a grid cell, so it is hidden by
+  // stopping her rather than by leaving an empty canvas on screen.
+  if (wanted.lyla === false) lyla.stop();
+  else if (state.phase === 'idle') lyla.start();
+}
+
 /* --- the choreography ------------------------------------------------------ */
 
 /* The panels rise in once, the first time anyone can actually see them.
@@ -635,6 +670,7 @@ window.apollo = {
     else { shader.stop(); lyla.stop(); ringStop(); }
   },
   level(value) { setLevel(value); },
+  panels(state) { setPanels(state); },
   briefing(payload) { if (payload) render(payload); },
 };
 

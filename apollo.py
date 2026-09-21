@@ -646,6 +646,10 @@ class WebReporter:
         """
         self.on_turn("Apollo", text, None)
 
+    def panels(self, state):
+        """Which panels the display should be showing."""
+        self._call("panels", state)
+
     def refresh(self):
         """Read the world again now, and push it. True if anything was told."""
         service = getattr(self._app, "data", None) if self._app is not None else None

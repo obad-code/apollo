@@ -60,15 +60,18 @@ class Context:
     `show(visual)` puts a chart or cards on the overlay, `activity(text)`
     says in a few words what Apollo is doing ("fetching NVDA"), `refresh()`
     asks the data service to read the world again and push it to the display,
-    and `turn` is the user's turn number at the moment the call arrived.
+    `panels(state)` tells the display which of its panels to show, and `turn`
+    is the user's turn number at the moment the call arrived.
     """
 
-    def __init__(self, show=None, activity=None, turn=None, refresh=None):
+    def __init__(self, show=None, activity=None, turn=None, refresh=None,
+                 panels_hook=None):
         self.show = show or (lambda visual: None)
         self.activity = activity or (lambda text: None)
         # False by default, so a tool that changes the display can tell the
         # difference between "refreshed" and "there was nothing to refresh".
         self.refresh = refresh or (lambda: False)
+        self.panels = panels_hook or (lambda state: None)
         self.turn = current_turn() if turn is None else turn
 
 
@@ -232,6 +235,7 @@ import clips  # noqa: E402
 import feeds  # noqa: E402
 import market  # noqa: E402
 import overlay_content  # noqa: E402
+import panels  # noqa: E402
 import prayer  # noqa: E402
 import pc_control  # noqa: E402
 import reminders  # noqa: E402
@@ -457,6 +461,36 @@ def _save_clip(ctx, seconds=60):
         ctx.show(overlay_content.clean_visual({"cards": [
             {"label": "Clip", "value": f"{result['seconds']:.0f}s saved"},
             {"label": "Size", "value": f"{result['megabytes']:.0f} MB"}]}))
+    return result
+
+
+@_tool("hide_panel", "clearing it off the display",
+       "Take a panel off the full display - the stocks, the news feed, the "
+       "clock, the status dots, the bottom strip, Lyla, or Apollo's own ring. "
+       "Use this when the user asks to hide, remove or close part of the "
+       "display. Pass what they called it.",
+       _obj({"panel": {"type": "string",
+                       "description": "What the user called the panel"}},
+            ("panel",)))
+def _hide_panel(ctx, panel=""):
+    ctx.activity("clearing it off the display")
+    result = panels.hide(panel)
+    if result.get("ok"):
+        ctx.panels(result["panels"])
+    return result
+
+
+@_tool("show_panel", "putting it back on the display",
+       "Put a panel back on the full display after it was hidden. Use this "
+       "when the user asks to show, bring back or restore part of it.",
+       _obj({"panel": {"type": "string",
+                       "description": "What the user called the panel"}},
+            ("panel",)))
+def _show_panel(ctx, panel=""):
+    ctx.activity("putting it back on the display")
+    result = panels.show(panel)
+    if result.get("ok"):
+        ctx.panels(result["panels"])
     return result
 
 

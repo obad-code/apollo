@@ -807,7 +807,8 @@ def _run_tool(block, ui):
             return json.dumps(tools.run(block.name, args, tools.Context(
                 show=getattr(ui, "visual", None),
                 activity=getattr(ui, "activity", None),
-                refresh=getattr(ui, "refresh", None))))
+                refresh=getattr(ui, "refresh", None),
+                panels_hook=getattr(ui, "panels", None))))
         return f"Failed: unknown tool '{block.name}'."
     except Exception as e:
         return f"Failed: {type(e).__name__}: {e}"
@@ -1553,7 +1554,8 @@ def tool_runner(ui):
     def run(name, args):
         ctx = tools.Context(show=getattr(ui, "visual", None),
                             activity=getattr(ui, "activity", None),
-                            refresh=getattr(ui, "refresh", None))
+                            refresh=getattr(ui, "refresh", None),
+                            panels_hook=getattr(ui, "panels", None))
         return tools.run(name, args, ctx)
     return run
 
