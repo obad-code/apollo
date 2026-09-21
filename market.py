@@ -104,6 +104,10 @@ def _ttl():
 # a crumb, then send both. The crumb is good for hours, so it is kept.
 
 CRUMB_TTL = 3600
+# What a valuation lookup may cost while Apollo is mid-answer. The ordinary
+# timeout, across two hosts, is twelve seconds of silence for a number the
+# card can perfectly well show a dash for.
+TURN_TIMEOUT = 2.5
 SUMMARY_MODULES = "financialData,summaryDetail,defaultKeyStatistics"
 NO_FUNDAMENTALS = {"target": None, "target_high": None, "target_low": None,
                    "analysts": None, "recommendation": None,
@@ -112,9 +116,10 @@ NO_FUNDAMENTALS = {"target": None, "target_high": None, "target_low": None,
 _crumb = None            # (expires_at, crumb, opener)
 
 
-def _crumbed():
+def _crumbed(timeout=None):
     """A URL opener carrying Yahoo's cookie, and the crumb that matches it."""
     global _crumb
+    timeout = TIMEOUT if timeout is None else timeout
     now = time.monotonic()
     with _lock:
         if _crumb and _crumb[0] > now:
@@ -125,10 +130,10 @@ def _crumbed():
     opener.addheaders = list(HEADERS.items())
     try:
         # This 404s and sets the cookie anyway, which is the whole point of it.
-        opener.open("https://fc.yahoo.com", timeout=TIMEOUT).read()
+        opener.open("https://fc.yahoo.com", timeout=timeout).read()
     except Exception:  # noqa: BLE001
         pass
-    with opener.open(HOSTS[0] + "/v1/test/getcrumb", timeout=TIMEOUT) as r:
+    with opener.open(HOSTS[0] + "/v1/test/getcrumb", timeout=timeout) as r:
         crumb = r.read().decode("utf-8", "replace").strip()
     if not crumb:
         raise MarketError("The market feed would not hand over a session.")
@@ -137,7 +142,8 @@ def _crumbed():
     return crumb, opener
 
 
-def _summary_json(symbol):
+def _summary_json(symbol, timeout=None):
+    timeout = TIMEOUT if timeout is None else timeout
     path = (f"/v10/finance/quoteSummary/{urllib.parse.quote(symbol, safe='')}"
             f"?modules={SUMMARY_MODULES}")
     now = time.monotonic()
@@ -145,12 +151,12 @@ def _summary_json(symbol):
         hit = _cache.get(path)
         if hit and hit[0] > now:
             return hit[1]
-    crumb, opener = _crumbed()
+    crumb, opener = _crumbed(timeout)
     last = None
     for host in HOSTS:
         try:
             with opener.open(f"{host}{path}&crumb={urllib.parse.quote(crumb, safe='')}",
-                             timeout=TIMEOUT) as r:
+                             timeout=timeout) as r:
                 data = json.load(r)
         except Exception as e:  # noqa: BLE001 - try the other host
             last = e
@@ -174,7 +180,7 @@ def _raw(block, key, digits=None):
     return round(value, digits) if digits is not None else value
 
 
-def fundamentals(symbol):
+def fundamentals(symbol, timeout=None):
     """The analysts' target and the multiple, or dashes.
 
     Never raises. A missing valuation is a gap on the card, not a failed
@@ -182,7 +188,7 @@ def fundamentals(symbol):
     they came from a different endpoint that may well have worked.
     """
     try:
-        data = _summary_json(symbol)
+        data = _summary_json(symbol, timeout)
         result = ((data or {}).get("quoteSummary") or {}).get("result") or []
         if not result:
             return dict(NO_FUNDAMENTALS)
@@ -342,7 +348,7 @@ def visual_for(data, period):
 
     closes = [c for _, c in data["points"]] or [data["price"]]
     label = "Today" if period == "1d" else period.upper()
-    valuation = fundamentals(data["symbol"])
+    valuation = fundamentals(data["symbol"], timeout=TURN_TIMEOUT)
     unit = "$" if data["currency"] == "USD" else ""
     return overlay_content.clean_visual({
         "stock": {

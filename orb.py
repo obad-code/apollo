@@ -617,14 +617,20 @@ class Orb:
                        "name": name_font, "fmt": fmt, "rtl_fmt": rtl_fmt}
         return self._fonts
 
-    def _measure(self, text, rtl=False):
-        """The real width of a string, in pixels."""
+    def _measure(self, text, rtl=False, font=None):
+        """The real width of a string, in pixels, in the face it will be drawn in.
+
+        `font` matters wherever the caller right-aligns against the result:
+        the card's price is set in the name face, and measuring it in the
+        body face put it a few pixels off the card's edge.
+        """
         fonts = self._font_set()
         D = self._D
         probe = D.Bitmap(4, 4, D.Imaging.PixelFormat.Format32bppPArgb)
         g = D.Graphics.FromImage(probe)
         try:
-            font = fonts["rtl"] if rtl else fonts["body"]
+            if font is None:
+                font = fonts["rtl"] if rtl else fonts["body"]
             return g.MeasureString(text, font, D.PointF(0.0, 0.0), fonts["fmt"]).Width
         finally:
             g.Dispose()
@@ -748,17 +754,17 @@ class Orb:
                      text_x, head + 3.0, PALETTE["ink"], 255)
         name = block.get("name") or ""
         if name and name.upper() != block.get("symbol", "").upper():
-            offset = self._measure(block.get("symbol", "")) + 10.0
+            offset = self._measure(block.get("symbol", ""), font=fonts["name"]) + 10.0
             self._string(g, name[:22], fonts["caption"], fonts["fmt"],
                          text_x + offset, head + 6.0, PALETTE["caption"], 210)
 
         unit = block.get("unit") or ""
         price = f"{unit}{block.get('price', 0.0):,.2f}"
         move = f"{'▲' if up else '▼'}{abs(block.get('change_pct', 0.0)):.2f}%"
-        move_w = self._measure(move)
+        move_w = self._measure(move, font=fonts["caption"])
         self._string(g, move, fonts["caption"], fonts["fmt"],
                      x0 + width - move_w, head + 6.0, tint, 255)
-        price_w = self._measure(price)
+        price_w = self._measure(price, font=fonts["name"])
         self._string(g, price, fonts["name"], fonts["fmt"],
                      x0 + width - move_w - price_w - 10.0, head + 3.0,
                      PALETTE["ink"], 255)

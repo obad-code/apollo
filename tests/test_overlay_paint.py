@@ -164,3 +164,28 @@ def test_horizon_is_brightest_in_the_middle(draw, surface):
     middle = max(pixel(bitmap, 280, y)[0] for y in range(197, 204))
     edge = max(pixel(bitmap, 40, y)[0] for y in range(197, 204))
     assert middle > edge
+
+
+def test_text_is_measured_in_the_font_it_will_be_drawn_in(draw):
+    """The stock card right-aligns its price against a measured width.
+
+    Measuring in one face and drawing in another puts the number a few
+    pixels off the card's edge, and the error grows with the string. The
+    name face is bold and a different size from the body face, so the two
+    measurements must not agree.
+    """
+    import orb
+
+    view = orb.Orb.__new__(orb.Orb)
+    view._D = draw
+    view._fonts = None
+    view._private = None
+    view._collection = None
+    view._char_w = 8.0
+
+    body = view._measure("$1,234.56")
+    named = view._measure("$1,234.56", font=view._font_set()["name"])
+
+    assert body > 0 and named > 0
+    assert abs(body - named) > 0.5, (
+        f"the name face measured the same as the body face: {body} vs {named}")
