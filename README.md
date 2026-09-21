@@ -295,6 +295,35 @@ quit, because it is the foreground app):
 
 ---
 
+## Stocks
+
+Ask about a stock and the overlay becomes that stock's card: the company's
+mark, the ticker and name, the price with the day beside it, a smooth curve,
+and along the foot what the analysts think it is worth and what it costs per
+unit of earnings. The full display carries the same card for every name on
+the watchlist.
+
+Three things there come from outside the chart feed:
+
+| | Where from | If it fails |
+|---|---|---|
+| Target price, P/E | Yahoo's `quoteSummary` (`market.fundamentals`) | the card shows a dash |
+| Company marks | a public logo endpoint, cached in `ui/full/logos/` | the card shows the first letter |
+| Prices and the curve | the chart endpoint Apollo already used | the answer fails, and says so |
+
+`quoteSummary` has answered 401 to anything without a crumb since 2023, so
+`market.fundamentals` takes a cookie from Yahoo, trades it for a crumb, and
+sends both; the crumb is kept for an hour. It never raises — a missing
+valuation is a gap on the card, not a failed answer.
+
+A valuation lookup inside a turn gets `market.TURN_TIMEOUT` (2.5s) rather
+than the usual six, because a stock that is not on the watchlist has nothing
+cached and two hosts at six seconds is twelve seconds of silence for a number
+the card can live without.
+
+The marks are other companies' trademarks, fetched from a third party. They
+are cached at runtime and git-ignored, never committed.
+
 ## A note on the typeface
 
 Apollo sets both Arabic and English in **Thmanyah Sans**, carried in the
