@@ -96,6 +96,123 @@ def _ttl():
     return 60 if market_status()["open"] else 900
 
 
+# -- what a stock is worth, as against what it costs ------------------------
+#
+# The chart endpoint carries no valuation, so this comes from quoteSummary,
+# which since 2023 answers 401 to anything without a crumb and the cookie the
+# crumb was minted with. The dance is: take a cookie from Yahoo, trade it for
+# a crumb, then send both. The crumb is good for hours, so it is kept.
+
+CRUMB_TTL = 3600
+SUMMARY_MODULES = "financialData,summaryDetail,defaultKeyStatistics"
+NO_FUNDAMENTALS = {"target": None, "target_high": None, "target_low": None,
+                   "analysts": None, "recommendation": None,
+                   "pe": None, "forward_pe": None, "eps": None}
+
+_crumb = None            # (expires_at, crumb, opener)
+
+
+def _crumbed():
+    """A URL opener carrying Yahoo's cookie, and the crumb that matches it."""
+    global _crumb
+    now = time.monotonic()
+    with _lock:
+        if _crumb and _crumb[0] > now:
+            return _crumb[1], _crumb[2]
+    import http.cookiejar
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    opener.addheaders = list(HEADERS.items())
+    try:
+        # This 404s and sets the cookie anyway, which is the whole point of it.
+        opener.open("https://fc.yahoo.com", timeout=TIMEOUT).read()
+    except Exception:  # noqa: BLE001
+        pass
+    with opener.open(HOSTS[0] + "/v1/test/getcrumb", timeout=TIMEOUT) as r:
+        crumb = r.read().decode("utf-8", "replace").strip()
+    if not crumb:
+        raise MarketError("The market feed would not hand over a session.")
+    with _lock:
+        _crumb = (now + CRUMB_TTL, crumb, opener)
+    return crumb, opener
+
+
+def _summary_json(symbol):
+    path = (f"/v10/finance/quoteSummary/{urllib.parse.quote(symbol, safe='')}"
+            f"?modules={SUMMARY_MODULES}")
+    now = time.monotonic()
+    with _lock:
+        hit = _cache.get(path)
+        if hit and hit[0] > now:
+            return hit[1]
+    crumb, opener = _crumbed()
+    last = None
+    for host in HOSTS:
+        try:
+            with opener.open(f"{host}{path}&crumb={urllib.parse.quote(crumb, safe='')}",
+                             timeout=TIMEOUT) as r:
+                data = json.load(r)
+        except Exception as e:  # noqa: BLE001 - try the other host
+            last = e
+            continue
+        with _lock:
+            _cache[path] = (now + 900, data)     # valuations move slowly
+        return data
+    raise MarketError(f"The valuation feed didn't answer ({type(last).__name__}).")
+
+
+def _raw(block, key, digits=None):
+    value = (block or {}).get(key)
+    if isinstance(value, dict):
+        value = value.get("raw")
+    if value is None:
+        return None
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return round(value, digits) if digits is not None else value
+
+
+def fundamentals(symbol):
+    """The analysts' target and the multiple, or dashes.
+
+    Never raises. A missing valuation is a gap on the card, not a failed
+    answer: the price and the chart are what the question was about, and
+    they came from a different endpoint that may well have worked.
+    """
+    try:
+        data = _summary_json(symbol)
+        result = ((data or {}).get("quoteSummary") or {}).get("result") or []
+        if not result:
+            return dict(NO_FUNDAMENTALS)
+        block = result[0]
+        financial = block.get("financialData") or {}
+        summary = block.get("summaryDetail") or {}
+        stats = block.get("defaultKeyStatistics") or {}
+        recommendation = financial.get("recommendationKey")
+        analysts = _raw(financial, "numberOfAnalystOpinions")
+        return {
+            "target": _raw(financial, "targetMeanPrice", 2),
+            "target_high": _raw(financial, "targetHighPrice", 2),
+            "target_low": _raw(financial, "targetLowPrice", 2),
+            "analysts": int(analysts) if analysts else None,
+            "recommendation": (recommendation or "").replace("_", " ") or None,
+            "pe": _raw(summary, "trailingPE", 2),
+            "forward_pe": _raw(summary, "forwardPE", 2),
+            "eps": _raw(stats, "trailingEps", 2),
+        }
+    except Exception:  # noqa: BLE001 - a gap, not a failure
+        return dict(NO_FUNDAMENTALS)
+
+
+def upside(target, price):
+    """How far the target sits above today's price, as a percentage."""
+    if not target or not price:
+        return None
+    return round((float(target) - float(price)) / float(price) * 100.0, 2)
+
+
 def resolve(text):
     """A name or ticker as spoken -> a Yahoo symbol."""
     raw = (text or "").strip().strip("[]").strip().strip("'\"").strip()

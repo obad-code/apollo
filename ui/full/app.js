@@ -54,13 +54,27 @@ const SAMPLE = {
       { symbol: '^IXIC', name: 'Nasdaq', price: 26522.54, change_pct: 0.39, spark: [] },
     ],
     watchlist: [
-      { symbol: 'AAPL', price: 336.13, change_pct: -0.26, spark: [330, 332, 331, 335, 336, 334, 336] },
-      { symbol: 'MSFT', price: 493.78, change_pct: -0.8, spark: [498, 496, 495, 492, 494, 493, 494] },
-      { symbol: 'NVDA', price: 222.27, change_pct: 1.34, spark: [216, 218, 217, 220, 219, 221, 222] },
-      { symbol: 'TSLA', price: 364.27, change_pct: -0.53, spark: [368, 366, 367, 364, 365, 363, 364] },
-      { symbol: 'AMZN', price: 253.71, change_pct: 1.0, spark: [250, 251, 250, 252, 253, 252, 254] },
-      { symbol: 'GOOGL', price: 201.35, change_pct: -0.3, spark: [203, 202, 203, 201, 202, 201, 201] },
-      { symbol: 'META', price: 665.75, change_pct: -2.43, spark: [682, 679, 674, 670, 668, 666, 666] },
+      { symbol: 'AAPL', price: 336.13, change_pct: -0.26, logo: 'logos/AAPL.png',
+        target: 328.22, upside: -2.35, pe: 38.59,
+        spark: [330, 332, 331, 335, 338, 336, 334, 337, 336, 334, 336] },
+      { symbol: 'MSFT', price: 493.78, change_pct: -0.8, logo: 'logos/MSFT.png',
+        target: 560.4, upside: 13.5, pe: 31.2,
+        spark: [498, 496, 495, 492, 490, 494, 493, 491, 494, 492, 494] },
+      { symbol: 'NVDA', price: 222.27, change_pct: 1.34, logo: 'logos/NVDA.png',
+        target: 327.7, upside: 47.43, pe: 28.1,
+        spark: [206, 210, 214, 212, 218, 224, 229, 232, 226, 220, 222] },
+      { symbol: 'TSLA', price: 364.27, change_pct: -0.53, logo: 'logos/TSLA.png',
+        target: 396.94, upside: 8.97, pe: 334.19,
+        spark: [372, 368, 366, 370, 367, 364, 361, 365, 363, 366, 364] },
+      { symbol: 'AMZN', price: 253.71, change_pct: 1.0, logo: 'logos/AMZN.png',
+        target: 288.1, upside: 13.6, pe: 34.8,
+        spark: [246, 249, 248, 251, 250, 252, 255, 253, 252, 254, 254] },
+      { symbol: 'GOOGL', price: 201.35, change_pct: -0.3, logo: 'logos/GOOGL.png',
+        target: 224.6, upside: 11.5, pe: 26.4,
+        spark: [205, 203, 204, 202, 203, 201, 200, 202, 201, 202, 201] },
+      { symbol: 'META', price: 665.75, change_pct: -2.43, logo: 'logos/META.png',
+        target: 790.2, upside: 18.7, pe: 24.9,
+        spark: [692, 686, 682, 679, 674, 670, 673, 668, 666, 669, 666] },
     ],
   },
   news: {
@@ -218,19 +232,70 @@ function countUp(el, value, format) {
   requestAnimationFrame(step);
 }
 
-function sparkline(points) {
-  if (!points || points.length < 2) return '';
+/* A Catmull-Rom spline through the closes, written out as cubic Béziers.
+ * Straight segments between daily closes read as a saw; the design's line is
+ * one smooth curve. */
+function smooth(points) {
+  let d = `M${points[0][0].toFixed(1)},${points[0][1].toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] || points[i], p1 = points[i];
+    const p2 = points[i + 1], p3 = points[i + 2] || p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += `C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} `
+       + `${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
+const SPARK_W = 300, SPARK_H = 62, SPARK_PAD = 7;
+
+function sparkline(points, rising) {
+  if (!points || points.length < 2) return '<div class="chart empty"></div>';
   const low = Math.min(...points), high = Math.max(...points);
   const span = high - low || 1;
-  const step = 96 / (points.length - 1);
-  const path = points.map((value, i) =>
-    `${i ? 'L' : 'M'}${(i * step).toFixed(1)},${(24 - ((value - low) / span) * 22).toFixed(1)}`).join('');
-  const rising = points[points.length - 1] >= points[0];
-  // pathLength="1" normalises the dash units, so one CSS rule can draw every
-  // sparkline on first paint whatever shape it happens to be.
-  return `<svg viewBox="0 0 96 26" preserveAspectRatio="none"><path d="${path}" fill="none"
-    pathLength="1" stroke="${rising ? 'var(--up)' : 'var(--down)'}" stroke-width="1.6"
-    stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  const laid = points.map((value, i) => [
+    (i / (points.length - 1)) * SPARK_W,
+    SPARK_PAD + (1 - (value - low) / span) * (SPARK_H - SPARK_PAD * 2),
+  ]);
+  const up = rising === undefined ? points[points.length - 1] >= points[0] : rising;
+  const line = smooth(laid);
+  // pathLength="1" normalises the dash units, so one CSS rule draws every
+  // curve on first paint whatever shape it happens to be.
+  return `<svg class="chart" viewBox="0 0 ${SPARK_W} ${SPARK_H}" preserveAspectRatio="none">
+    <path class="wash" d="${line}L${SPARK_W},${SPARK_H}L0,${SPARK_H}Z"
+          fill="url(#${up ? 'washUp' : 'washDown'})"/>
+    <path class="line" d="${line}" fill="none" pathLength="1"
+          stroke="${up ? 'var(--up)' : 'var(--down)'}" stroke-width="2"
+          stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+/* One stock, as a card: its mark, what it costs, what it did, and what the
+ * analysts make of it. The same shape as the card the overlay draws - white
+ * paper, the price large, the curve under it, the valuation along the foot -
+ * so the two halves of Apollo say the same thing the same way. */
+function stockCard(quote) {
+  const mark = quote.logo
+    ? `<img class="mark" src="${esc(quote.logo)}" alt="">`
+    : `<span class="mark none">${esc((quote.symbol || '?')[0])}</span>`;
+  const target = quote.target
+    ? `<b>${money(quote.target)}</b> target${quote.upside != null
+        ? ` <i class="${moveClass(quote.upside)}">${quote.upside >= 0 ? '+' : ''}${quote.upside.toFixed(1)}%</i>`
+        : ''}`
+    : '<b>—</b> target';
+  const pe = quote.pe ? `<b>${quote.pe.toFixed(1)}</b> P/E` : '<b>—</b> P/E';
+  return `
+    <div class="card" data-symbol="${esc(quote.symbol)}">
+      <div class="card-top">
+        ${mark}
+        <span class="ticker">${esc(quote.symbol)}</span>
+        <span class="price">${money(quote.price)}</span>
+        <span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span>
+      </div>
+      ${sparkline(quote.spark, quote.change_pct >= 0)}
+      <div class="card-foot">${target}<i class="dot">·</i>${pe}</div>
+    </div>`;
 }
 
 function renderMarkets(market) {
@@ -251,13 +316,7 @@ function renderMarkets(market) {
 
   const list = $('watchlist');
   list.classList.toggle('drawing', !state.entered);
-  list.innerHTML = (market.watchlist || []).map((quote) => `
-    <div class="stock" data-symbol="${esc(quote.symbol)}">
-      <span class="ticker">${esc(quote.symbol)}</span>
-      ${sparkline(quote.spark)}
-      <span class="price">${money(quote.price)}</span>
-      <span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span>
-    </div>`).join('');
+  list.innerHTML = (market.watchlist || []).map((quote) => stockCard(quote)).join('');
 
   // A price that moved since the last snapshot flashes its row; one that did
   // not stays still, or the whole column would blink every minute. Rows are

@@ -9,6 +9,21 @@
 <!-- The ring shader from the brief, tinted and dimmed. Everything else sits
      on top of it; nothing else paints a background. -->
 <canvas id="shader"></canvas>
+<!-- The two washes under the stock curves, defined once: an id per card would
+     be seven ids for two gradients. -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <defs>
+    <linearGradient id="washUp" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f9d58" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#0f9d58" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="washDown" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d1453b" stop-opacity=".20"/>
+      <stop offset="1" stop-color="#d1453b" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>
+
 <div class="vignette"></div>
 
 <!-- LYLA's room is the whole window, the way it always was: her stations are

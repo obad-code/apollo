@@ -27,3 +27,7 @@ reminders.json
 
 # Plan execution scratch
 .superpowers/
+
+# Company marks, cached at runtime. Other companies trademarks, fetched from
+# a third party - not ours to keep in the history.
+ui/full/logos/

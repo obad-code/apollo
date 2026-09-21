@@ -12,6 +12,7 @@ import threading
 import time
 
 import feeds
+import logos
 import market
 import sysinfo
 import usage
@@ -110,10 +111,23 @@ class DataService:
         except Exception:  # noqa: BLE001
             return None
         points = [round(price, 2) for _, price in data.get("points", [])][-SPARK_POINTS:]
-        return {"symbol": data["symbol"], "name": data["name"],
-                "price": round(data["price"], 2),
-                "change_pct": round(data["change_pct"], 2),
-                "currency": data["currency"], "spark": points}
+        quote = {"symbol": data["symbol"], "name": data["name"],
+                 "price": round(data["price"], 2),
+                 "change_pct": round(data["change_pct"], 2),
+                 "currency": data["currency"], "spark": points}
+        if not spark:
+            return quote
+        # What the stock cards show beyond the price: the company's mark, what
+        # analysts think it is worth, and what it costs per unit of earnings.
+        # Each is allowed to be missing; a card without them is still a card.
+        quote["logo"] = logos.url_for(data["symbol"])
+        quote["high"] = round(max(points), 2) if points else None
+        quote["low"] = round(min(points), 2) if points else None
+        quote["average"] = round(sum(points) / len(points), 2) if points else None
+        valuation = market.fundamentals(data["symbol"])
+        quote.update(valuation)
+        quote["upside"] = market.upside(valuation.get("target"), quote["price"])
+        return quote
 
     def _read_news(self):
         # Per topic, so one dead feed does not take the other three with it.

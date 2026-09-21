@@ -1,6 +1,8 @@
 """The snapshot the display reads is a contract; this is the copy of it."""
 import time
 
+import pytest
+
 import dataservice
 
 
@@ -68,3 +70,62 @@ def test_a_reader_that_comes_back_empty_keeps_the_last_good_value_and_its_age(mo
 def test_age_of_a_snapshot_is_readable():
     assert dataservice.age_words(0).endswith("now") or dataservice.age_words(0) == "just now"
     assert dataservice.age_words(3600) == "1h ago"
+
+
+def test_a_watchlist_stock_carries_its_mark_and_its_valuation(monkeypatch):
+    """The stock cards show a logo, an analysts' target and a multiple.
+
+    All three come from somewhere other than the chart endpoint, and all
+    three are allowed to be missing - a card without them is still a card.
+    """
+    monkeypatch.setattr(dataservice.market, "quote", lambda s: {
+        "symbol": s, "name": s, "price": 222.27, "change": 1.0, "change_pct": 1.34,
+        "currency": "USD", "exchange": "NMS", "points": [(1, 222.27)],
+        "previous_close": 220.0, "time": 0})
+    monkeypatch.setattr(dataservice.market, "history", lambda s, p: {
+        "symbol": s, "name": s, "price": 222.27, "change_pct": 1.34, "currency": "USD",
+        "exchange": "NMS", "points": [(i, 200.0 + i) for i in range(6)],
+        "previous_close": 220.0, "time": 0})
+    monkeypatch.setattr(dataservice.market, "fundamentals", lambda s: {
+        "target": 327.7, "target_high": 515.0, "target_low": 180.0, "analysts": 59,
+        "recommendation": "strong buy", "pe": 28.1, "forward_pe": 14.17, "eps": 7.91})
+    monkeypatch.setattr(dataservice.logos, "url_for", lambda s: f"logos/{s}.png")
+    monkeypatch.setattr(dataservice.feeds, "headlines", lambda topic, limit=5: [])
+    monkeypatch.setattr(dataservice.feeds, "posts", lambda hours=24, limit=5: [])
+
+    service = dataservice.DataService()
+    service.refresh(force=True)
+    stock = service.snapshot["market"]["watchlist"][0]
+
+    assert stock["logo"] == f"logos/{stock['symbol']}.png"
+    assert stock["target"] == 327.7
+    assert stock["pe"] == 28.1
+    assert stock["upside"] == pytest.approx(47.4, abs=0.1)
+    assert stock["recommendation"] == "strong buy"
+    # The card's footer line: what the period did, not just where it ended.
+    assert stock["high"] == 205.0
+    assert stock["low"] == 200.0
+
+
+def test_a_stock_with_no_mark_and_no_valuation_still_makes_a_card(monkeypatch):
+    monkeypatch.setattr(dataservice.market, "history", lambda s, p: {
+        "symbol": s, "name": s, "price": 10.0, "change_pct": 0.0, "currency": "USD",
+        "exchange": "NMS", "points": [(i, 10.0) for i in range(3)],
+        "previous_close": 10.0, "time": 0})
+    monkeypatch.setattr(dataservice.market, "quote", lambda s: {
+        "symbol": s, "name": s, "price": 10.0, "change": 0.0, "change_pct": 0.0,
+        "currency": "USD", "exchange": "NMS", "points": [(1, 10.0)],
+        "previous_close": 10.0, "time": 0})
+    monkeypatch.setattr(dataservice.market, "fundamentals",
+                        lambda s: dict(dataservice.market.NO_FUNDAMENTALS))
+    monkeypatch.setattr(dataservice.logos, "url_for", lambda s: None)
+    monkeypatch.setattr(dataservice.feeds, "headlines", lambda topic, limit=5: [])
+    monkeypatch.setattr(dataservice.feeds, "posts", lambda hours=24, limit=5: [])
+
+    service = dataservice.DataService()
+    service.refresh(force=True)
+    stock = service.snapshot["market"]["watchlist"][0]
+
+    assert stock["logo"] is None
+    assert stock["target"] is None and stock["pe"] is None and stock["upside"] is None
+    assert stock["price"] == 10.0

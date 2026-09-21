@@ -56,6 +56,15 @@
         ],
         "createdAt": "2026-09-20T16:33:42.961Z",
         "reason": "these are the design's drifting colour blobs and the spinning mark, not scrolling content - the motion IS the thing being reproduced from the user's cardddd.html"
+      },
+      {
+        "rule": "nested-cards",
+        "value": "*",
+        "files": [
+          "ui/mock-stock.html"
+        ],
+        "createdAt": "2026-09-20T21:07:38.380Z",
+        "reason": "the nested surface is the chart tooltip, which the user's reference image has as a floating card over the plot; a tooltip has to be a distinct surface from what it labels or it is unreadable"
       }
     ]
   }
