@@ -102,6 +102,8 @@ const state = {
   entered: false,
   topic: 0,
   settleTimer: null,
+  level: 0,
+  levelSmooth: 0,
 };
 
 /* --- the shader, the ring and LYLA --------------------------------------- */
@@ -127,13 +129,18 @@ function drawRing(now) {
   const dt = Math.min(0.05, (now - lastFrame) / 1000);
   lastFrame = now;
   ringClock += dt * (state.phase === 'thinking' ? 5 : 1);
+  // Eased, not followed: the raw level jumps every packet, and a ring that
+  // jumps with it reads as a fault rather than as breathing.
+  state.levelSmooth += (state.level - state.levelSmooth)
+                     * (1 - Math.exp(-dt / (state.level > state.levelSmooth ? 0.05 : 0.28)));
+  const breath = 1 + 0.09 * state.levelSmooth;
   const size = $('ring').width;
   const centre = size / 2;
   ring.clearRect(0, 0, size, size);
   for (const [fraction, count, turns, colour] of RINGS) {
-    const radius = centre * 0.82 * fraction;
+    const radius = centre * 0.82 * fraction * breath;
     const start = ringClock * turns * Math.PI * 2;
-    ring.strokeStyle = `rgba(${colour},.28)`;
+    ring.strokeStyle = `rgba(${colour},${(0.28 + 0.22 * state.levelSmooth).toFixed(3)})`;
     ring.lineWidth = 2;
     ring.beginPath();
     for (let i = 0; i <= count; i++) {
@@ -150,7 +157,7 @@ function drawRing(now) {
       const angle = start - Math.PI / 2 + (i * Math.PI * 2) / count;
       ring.beginPath();
       ring.arc(centre + Math.cos(angle) * radius, centre + Math.sin(angle) * radius,
-               5, 0, Math.PI * 2);
+               5 + 1.8 * state.levelSmooth, 0, Math.PI * 2);
       ring.fill();
     }
     ring.shadowBlur = 0;
@@ -434,13 +441,82 @@ function enter() {
 
 document.addEventListener('visibilitychange', () => enter());
 
+/* What the display says it is doing. Each state has to be visible on its own
+ * and has to lead to the next: holding the chord used to change nothing here
+ * at all, so the display simply went quiet and you could not tell whether it
+ * had heard you. */
+const SAYS = {
+  idle: 'Hold Ctrl+Alt to talk',
+  listening: 'Listening',
+  thinking: 'Thinking',
+  speaking: '',
+};
+
 function setPhase(phase) {
+  if (phase === state.phase) return;
   state.phase = phase;
   lyla.setPhase(phase);
+
   const answering = phase === 'thinking' || phase === 'speaking';
+  const attending = phase !== 'idle';
+  document.body.classList.toggle('listening', phase === 'listening');
+  document.body.classList.toggle('thinking', phase === 'thinking');
   document.body.classList.toggle('answering', answering);
   $('answer').classList.toggle('show', answering);
-  shader.speed(answering ? 3 : 1);
+  // The room steps back as far as the state warrants: a little while it is
+  // listening to you, all the way once it is answering.
+  shader.speed(phase === 'thinking' ? 4 : attending ? 2 : 1);
+
+  const hint = $('hint');
+  hint.textContent = SAYS[phase] || '';
+  hint.classList.toggle('busy', attending);
+
+  if (phase === 'listening') {
+    $('you').textContent = '';
+    $('reply').textContent = '';
+    $('visual').innerHTML = '';
+  }
+}
+
+/* Your voice, as the ring's breath. The overlay has always reacted to this;
+ * the display ignored it, which is half of why holding the chord looked like
+ * nothing happening. */
+function setLevel(value) {
+  state.level = Math.max(0, Math.min(1, Number(value) || 0));
+}
+
+/* The reply arrives a word at a time - low, blurred, and on a stagger - the
+ * same reveal the overlay's card does, from the same brief. It used to cross-
+ * fade as one block, which is what "not smooth" meant: forty words appearing
+ * together is a cut, not an animation. */
+const WORD_STAGGER = 0.045;
+
+function reveal(element, text) {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  element.setAttribute('dir', /[֐-ࣿ]/.test(text) ? 'rtl' : 'ltr');
+  element.textContent = '';
+  if (!words.length) return;
+  const fragment = document.createDocumentFragment();
+  for (const word of words) {
+    const span = document.createElement('span');
+    span.textContent = word;
+    fragment.appendChild(span);
+  }
+  element.appendChild(fragment);
+  // Hidden pages get no frames, so the words would sit at opacity 0 for as
+  // long as the display stayed closed. There is nothing to reveal to nobody.
+  if (document.hidden) {
+    element.classList.add('shown');
+    return;
+  }
+  element.classList.remove('shown');
+  [...element.children].forEach((span, i) => {
+    animate(span, {
+      opacity: [0, 1],
+      transform: ['translateY(14px)', 'translateY(0px)'],
+      filter: ['blur(7px)', 'blur(0px)'],
+    }, { duration: 0.55, delay: i * WORD_STAGGER, ease: [0.215, 0.61, 0.355, 1] });
+  });
 }
 
 function chart(visual) {
@@ -484,11 +560,9 @@ window.apollo = {
   turn(who, text) {
     if (who === 'You') {
       $('you').textContent = text;
-    } else {
-      const reply = $('reply');
-      reply.textContent = text;
-      reply.setAttribute('dir', /[֐-ࣿ]/.test(text) ? 'rtl' : 'ltr');
+      return;
     }
+    reveal($('reply'), text);
   },
   visual(payload) { $('visual').innerHTML = chart(payload); },
   data(snapshot) { render(snapshot); },
@@ -506,7 +580,7 @@ window.apollo = {
     if (name === 'full') { shader.start(); lyla.start(); ringStart(); enter(); }
     else { shader.stop(); lyla.stop(); ringStop(); }
   },
-  level() {},
+  level(value) { setLevel(value); },
   briefing(payload) { if (payload) render(payload); },
 };
 

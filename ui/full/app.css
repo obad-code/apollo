@@ -275,6 +275,31 @@ body.answering #core { transition: transform .6s cubic-bezier(.32,.72,0,1); }
 #lyla-bar { position: absolute; inset: 0 auto 0 0; width: 88%; background: var(--amber); }
 #lyla-pct { min-width: 46px; }
 
+/* --- the reply, a word at a time ------------------------------------------- */
+
+#reply span { display: inline-block; margin-right: .26em; }
+/* Where there were no frames to animate with, the words are simply there. */
+#reply.shown span { opacity: 1; transform: none; filter: none; }
+
+/* --- listening, thinking, answering ---------------------------------------
+   Three states that have to look like three states. Holding the chord used to
+   change nothing here, so the display just went quiet. */
+
+#hint { transition: opacity .3s, color .3s; }
+#hint.busy { color: var(--cyan); letter-spacing: .18em; text-transform: uppercase;
+             font-size: 12px; opacity: 1; }
+
+/* Listening: the room steps back a little and the core comes forward. */
+body.listening .panel,
+body.listening #clock-block,
+body.listening #status-block { opacity: .5; transition: opacity .35s ease-out; }
+body.listening #core { transform: translateY(-14px) scale(1.04); }
+
+/* Thinking: further back still, and the hint pulses so the wait has a pulse. */
+body.thinking #hint { animation: pulse 1.15s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+body.thinking #core { transform: translateY(-40px) scale(.92); }
+
 /* --- dimmed while Apollo answers ------------------------------------------ */
 
 /* Going quiet takes its time; coming back is quick, because by then you have
