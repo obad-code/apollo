@@ -1,3 +1,5 @@
+import os
+
 import tools
 
 
@@ -31,3 +33,21 @@ def test_save_clip_reports_unavailable():
     tools.set_clip_buffer(None)
     result = tools.run("save_clip", {})
     assert result["ok"] is False and "recorder" in result["error"].lower()
+
+
+def test_apollo_can_open_the_clips_folder(monkeypatch):
+    """"Open my clips" has to land somewhere, even before there are any.
+
+    The folder is made on demand when a clip is saved, so asking for it on a
+    fresh machine would otherwise open nothing and say it worked.
+    """
+    opened = []
+    monkeypatch.setattr(tools.pc_control, "open_path",
+                        lambda target, want_folder=False: opened.append(target) or
+                        {"ok": True, "opened": target})
+
+    result = tools.run("open_clips", {}, tools.Context())
+
+    assert result["ok"] is True
+    assert opened and opened[0].endswith("Apollo's Clips")
+    assert os.path.isdir(opened[0]), "the folder was not created first"

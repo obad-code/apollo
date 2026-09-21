@@ -19,6 +19,10 @@ APP = pathlib.Path(__file__).resolve().parent.parent / "ui" / "full" / "app.js"
 UNTRUSTED = re.compile(
     r"(?<!\.)\b(?:story\.(?:title|source|age)"
     r"|post\.(?:text|age)"
+    # The feed merges headlines and posts into one `item`. Renaming a field
+    # must not quietly drop it out of this check - which is what happened
+    # when it did, and the count fell from eleven to six without a failure.
+    r"|item\.(?:title|source|age)"
     r"|quote\.(?:symbol|name)"
     r"|market\.status"
     r"|weather\.text"
@@ -38,6 +42,11 @@ def placeholders():
     found = [(i, expr) for i, expr in enumerate(PLACEHOLDER.findall(text))
              if UNTRUSTED.search(expr) and not LITERAL_CHOICE.search(expr)]
     assert found, "no untrusted values are interpolated at all - has the page changed shape?"
+    # A floor, so a rename cannot shrink this check towards nothing in
+    # silence: the feed's fields, the quotes' fields, and the weather.
+    assert len(found) >= 9, (
+        f"only {len(found)} untrusted values found - has a field been renamed "
+        "out of UNTRUSTED?")
     return found
 
 

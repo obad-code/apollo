@@ -18,6 +18,7 @@ true` in a turn *after* the one in which Apollo asked - see `Confirmations`.
 """
 
 import json
+import os
 import logging
 import threading
 from dataclasses import dataclass
@@ -223,6 +224,7 @@ def run(name, args=None, ctx=None):
 # importable (and testable) without Windows or the network.
 
 import briefing  # noqa: E402
+import clips  # noqa: E402
 import feeds  # noqa: E402
 import market  # noqa: E402
 import overlay_content  # noqa: E402
@@ -450,6 +452,22 @@ def _save_clip(ctx, seconds=60):
             {"label": "Clip", "value": f"{result['seconds']:.0f}s saved"},
             {"label": "Size", "value": f"{result['megabytes']:.0f} MB"}]}))
     return result
+
+
+@_tool("open_clips", "opening your clips",
+       "Open the folder where saved screen clips are kept, in File Explorer. "
+       "Use this when the user asks to see, open or find their clips.",
+       _obj({}))
+def _open_clips(ctx):
+    folder = clips.folder()
+    # Made on demand when a clip is saved, so on a machine that has never
+    # saved one there would be nothing to open and nothing to say about it.
+    try:
+        os.makedirs(folder, exist_ok=True)
+    except OSError as e:
+        return {"ok": False, "error": f"Couldn't reach the clips folder: {e}"}
+    ctx.activity("opening your clips")
+    return pc_control.open_path(folder, want_folder=True)
 
 
 @_tool("get_news", "reading the news",

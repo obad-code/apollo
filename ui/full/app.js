@@ -39,12 +39,14 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g,
 const RISE = { opacity: [0, 1], transform: ['translateY(16px)', 'translateY(0px)'] };
 const SPRING = { type: 'spring', stiffness: 220, damping: 26 };
 
-const TOPICS = ['gaming', 'marvel', 'movies', 'markets'];
+const TOPICS = ['all', 'gaming', 'marvel', 'movies', 'markets'];
 
 // dataservice.INTERVALS x 3. Past this a panel is showing something it could
 // not refresh, and it has to say so - a price from an hour ago that looks
 // current is worse than no price at all.
 const STALE_AFTER = { market: 180, news: 1800, posts: 900, weather: 2700, system: 15 };
+
+const NOW = Date.now() / 1000;
 
 const SAMPLE = {
   market: {
@@ -78,14 +80,14 @@ const SAMPLE = {
     ],
   },
   news: {
-    gaming: [{ title: "Marvel's Wolverine sold very well on PlayStation 5", source: 'levelup', age: '1h ago' },
-             { title: 'Maono G3 mixer launches with dual-PC streaming', source: 'Notebookcheck', age: '1h ago' }],
-    marvel: [{ title: "Marvel's Wolverine compared to Uncharted 4", source: 'GameGPU', age: '56m ago' }],
-    movies: [{ title: "'Resident Evil' obliterates franchise box office records", source: "Murphy's Multiverse", age: '14m ago' }],
-    markets: [{ title: "2026's top stock flashes buy signal", source: "Investor's Business Daily", age: '2h ago' }],
+    gaming: [{ title: "Marvel's Wolverine sold very well on PlayStation 5", source: 'levelup', age: '1h ago', when: NOW - 3600 },
+             { title: 'Maono G3 mixer launches with dual-PC streaming', source: 'Notebookcheck', age: '1h ago', when: NOW - 4200 }],
+    marvel: [{ title: "Marvel's Wolverine compared to Uncharted 4", source: 'GameGPU', age: '56m ago', when: NOW - 3360 }],
+    movies: [{ title: "'Resident Evil' obliterates franchise box office records", source: "Murphy's Multiverse", age: '14m ago', when: NOW - 840 }],
+    markets: [{ title: "2026's top stock flashes buy signal", source: "Investor's Business Daily", age: '2h ago', when: NOW - 7200 }],
   },
-  posts: [{ text: 'Over the years, there have been many Hoaxes...', age: '6h ago', market: true },
-          { text: 'Many people think that the words "Artificial Intelligence" are inaccurate...', age: '8h ago', market: false }],
+  posts: [{ text: 'Over the years, there have been many Hoaxes, but the greatest of them all is the one being perpetrated right now.', age: '25m ago', market: true, when: NOW - 1500 },
+          { text: 'Many people think that the words "Artificial Intelligence" are inaccurate...', age: '8h ago', market: false, when: NOW - 28800 }],
   weather: { temp: 32, high: 42, low: 30, text: 'clear' },
   system: { cpu: 16, ram: 83, gpu: 3, gpu_name: 'NVIDIA GeForce RTX 4060 Ti', vram: 2.1 },
   usage: { tokens: 839, cost: 0.02, estimated: true, turns: 1 },
@@ -340,23 +342,45 @@ function renderMarkets(market) {
   });
 }
 
-function renderHeadlines(news) {
-  $('headlines-head').innerHTML = 'Headlines' + stale('news');
-  $('topics').innerHTML = TOPICS.map((topic, i) =>
-    `<span class="chip ${i === state.topic ? 'on' : ''}">${esc(topic)}</span>`).join('');
+/* One feed, newest first. Trump's posts used to have a panel to themselves,
+ * which gave one man his own column on your screen regardless of whether he
+ * had said anything worth it. They are one source among several now, marked
+ * as such, and they sort by when they happened like everything else. */
+function feedItems(snapshot) {
   const chosen = TOPICS[state.topic];
-  const stories = (news && news[chosen]) || [];
-  $('stories').innerHTML = stories.slice(0, 4).map((story) => `
-    <div class="story">${esc(story.title)}<span>${esc(story.source)} · ${esc(story.age)}</span></div>`).join('')
-    || '<div class="story">Nothing came back for this topic<span>the feed is quiet</span></div>';
+  const items = [];
+  for (const [topic, stories] of Object.entries(snapshot.news || {})) {
+    if (chosen !== 'all' && chosen !== topic) continue;
+    for (const story of stories || []) {
+      items.push({ title: story.title, source: story.source, age: story.age,
+                   when: story.when || 0, topic });
+    }
+  }
+  // Posts belong to the markets tab as well as to "all": a market-moving post
+  // is a market story whoever wrote it.
+  if (chosen === 'all' || chosen === 'markets') {
+    for (const post of snapshot.posts || []) {
+      items.push({ title: post.text, source: 'Truth Social', age: post.age,
+                   when: post.when || 0, topic: 'posts', moving: post.market });
+    }
+  }
+  items.sort((a, b) => (b.when || 0) - (a.when || 0));
+  return items;
 }
 
-function renderPosts(posts) {
-  $('posts-head').innerHTML = 'Trump · Truth Social' + stale('posts');
-  $('post-list').innerHTML = (posts || []).slice(0, 3).map((post) => `
-    <div class="post">${esc(post.text.slice(0, 160))}${post.text.length > 160 ? '…' : ''}
-      <span>${esc(post.age)}${post.market ? ' · <b class="moving">market-moving</b>' : ''}</span>
-    </div>`).join('') || '<div class="post">No posts in the last day</div>';
+function renderFeed(snapshot) {
+  $('headlines-head').innerHTML = 'Feed' + stale('news');
+  $('topics').innerHTML = TOPICS.map((topic, i) =>
+    `<span class="chip ${i === state.topic ? 'on' : ''}">${esc(topic)}</span>`).join('');
+  const items = feedItems(snapshot);
+  $('stories').innerHTML = items.slice(0, 11).map((item) => `
+    <div class="story${item.moving ? ' moving' : ''}">
+      <span class="what">${esc(String(item.title).slice(0, 150))}</span>
+      <span class="who"><b>${esc(item.source)}</b> · ${esc(item.age)}${
+        item.moving ? ' · <i>market-moving</i>' : ''}</span>
+    </div>`).join('')
+    || '<div class="story"><span class="what">Nothing has come in yet</span>'
+     + '<span class="who">the feeds are quiet</span></div>';
 }
 
 function renderStrip(snapshot) {
@@ -391,8 +415,7 @@ function renderWeather(weather) {
 function render(snapshot) {
   state.snapshot = snapshot;
   renderMarkets(snapshot.market || {});
-  renderHeadlines(snapshot.news || {});
-  renderPosts(snapshot.posts);
+  renderFeed(snapshot);
   renderStrip(snapshot);
   renderWeather(snapshot.weather);
   enter();
