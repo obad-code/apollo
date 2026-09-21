@@ -59,3 +59,23 @@ def test_not_due_while_you_are_away(tmp_path):
 
 def test_hijri_date():
     assert briefing.hijri(datetime.date(2026, 9, 20)).endswith("1448")
+
+
+def test_not_due_while_you_are_talking_to_it(tmp_path):
+    """Pressing the talk chord must not fetch you the day's recap.
+
+    The chord makes you present, and "present" was the whole test: the first
+    Ctrl+Alt of the day set idle to zero, the watcher saw someone at the
+    machine who had not been briefed, and the briefing started talking over
+    the turn that press was opening. `turn_busy` did not catch it because
+    that flag is set from Gemini's status, which arrives after the press.
+    """
+    state = briefing.Schedule(str(tmp_path / "briefing.json"))
+    assert state.due(idle_seconds=0.0) is True
+    assert state.due(idle_seconds=0.0, busy=True) is False
+
+
+def test_due_again_once_you_have_stopped_talking(tmp_path):
+    state = briefing.Schedule(str(tmp_path / "briefing.json"))
+    assert state.due(idle_seconds=0.0, busy=True) is False
+    assert state.due(idle_seconds=0.0, busy=False) is True

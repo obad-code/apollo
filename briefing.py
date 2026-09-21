@@ -146,8 +146,19 @@ class Schedule:
         except (OSError, ValueError):
             return ""
 
-    def due(self, now=None, idle_seconds=0.0):
+    def due(self, now=None, idle_seconds=0.0, busy=False):
+        """Whether to give the day's recap now.
+
+        `busy` is the important one and was missing. Pressing the talk chord
+        makes you present, so the first Ctrl+Alt of the day satisfied every
+        other condition here and the recap started talking over the turn that
+        press was opening. Anything that means "they are mid-sentence with
+        it" - the chord held, a turn in flight, a turn just finished - has to
+        hold the recap back.
+        """
         now = now or datetime.datetime.now()
+        if busy:
+            return False              # you are talking to it, not idle at it
         if idle_seconds > PRESENT_SECONDS:
             return False              # you are not here yet
         return self.last != now.date().isoformat()

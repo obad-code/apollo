@@ -166,6 +166,11 @@ PEEK_CHORD = (VK_CTRL, 0xC0)                     # VK_OEM_3, the backtick key
 QUIT_HOTKEY = "ctrl+alt+shift+q"                 # for messages and the README
 PEEK_HOTKEY = "ctrl+`"
 
+# How long after a turn the day's recap waits before it will start. Long
+# enough that pressing the chord, thinking, and pressing it again is one
+# conversation rather than an opening for the recap to talk over.
+BRIEF_SETTLE = 25.0
+
 # How long the machine must go untouched - no key, no mouse, anywhere in
 # Windows - before Apollo opens the full display by itself, screensaver style.
 # The very next keypress or mouse movement sends it back to the orb.
@@ -699,6 +704,7 @@ class Apollo:
         self.briefing_thread = None
         self.listen_toggle = None  # ...and the CTRL+1 watcher over it
         self.turn_busy = False     # listening, thinking, or speaking
+        self.last_engaged = 0.0    # when a turn last ran; the recap waits it out
         self.presence = presence.Presence(AFK_SECONDS)
         self.last_status = None    # the phase the overlay last acted on
         self.view = turnview.TurnView()   # what this turn adds up to on screen
@@ -923,6 +929,8 @@ class Apollo:
         if delay is not None and self.orb is not None:
             self.orb.clear_content(after=delay)
         self.turn_busy = state in WebReporter.ENGAGED
+        if self.turn_busy:
+            self.last_engaged = time.monotonic()
         if self.orb is not None:
             self.orb.set_state(self.overlay_state_for(state))
         self.apply_mode()
@@ -1024,12 +1032,23 @@ class Apollo:
                 self.apply_mode()
 
     def check_briefing(self, idle):
-        """Once a day, the first time you are actually at the machine."""
+        """Once a day, the first time you are actually at the machine.
+
+        "At the machine" has to mean idle at it, not touching it. The talk
+        chord makes you present, so the first Ctrl+Alt of the day used to
+        satisfy every condition here and the recap started over the top of
+        the turn that press was opening - `turn_busy` could not catch it,
+        because that flag comes from Gemini's status and the status arrives
+        after the press.
+        """
         ui = getattr(self, "ui", None)
-        if (ui is None or ui.quiet or self.turn_busy or self.voice is None
+        if (ui is None or ui.quiet or self.voice is None
                 or self.briefing_thread is not None and self.briefing_thread.is_alive()):
             return
-        if not self.schedule.due(idle_seconds=idle):
+        busy = (self.turn_busy
+                or assistant.talk_held()          # the chord is down right now
+                or time.monotonic() - self.last_engaged < BRIEF_SETTLE)
+        if not self.schedule.due(idle_seconds=idle, busy=busy):
             return
         self.schedule.done()
         self.briefing_thread = threading.Thread(target=self.morning, daemon=True,
