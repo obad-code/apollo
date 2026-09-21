@@ -276,7 +276,7 @@ function sparkline(points, rising) {
     <path class="wash" d="${line}L${SPARK_W},${SPARK_H}L0,${SPARK_H}Z"
           fill="url(#${up ? 'washUp' : 'washDown'})"/>
     <path class="line" d="${line}" fill="none" pathLength="1"
-          stroke="${up ? 'var(--up)' : 'var(--down)'}" stroke-width="2"
+          stroke="${up ? 'var(--up)' : 'var(--down)'}" stroke-width="2.2"
           stroke-linejoin="round" stroke-linecap="round"/>
   </svg>`;
 }
