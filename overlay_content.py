@@ -133,9 +133,15 @@ def _clean(data):
     """Validate a parsed block. None if nothing survives."""
     chart = _clean_chart(data.get("chart"))
     cards = _clean_cards(data.get("cards"))
-    if chart is None and not cards:
+    # `stock` is only ever built in code, from market.py's own numbers, so it
+    # is carried through rather than validated as a model's output would be.
+    stock = data.get("stock")
+    if chart is None and not cards and not stock:
         return None
-    return {"chart": chart, "cards": cards}
+    out = {"chart": chart, "cards": cards}
+    if stock:
+        out["stock"] = stock
+    return out
 
 
 # The same validation, for visuals built in code rather than parsed from a
@@ -270,6 +276,11 @@ PAD_X = 22              # left and right margin of the content column
 LINE_H = 19             # one line of body text
 GAP = 15                # between blocks
 CHART_H = 90
+# One stock as a card: a row of identity and price, the curve, the valuation.
+STOCK_HEAD_H = 30
+STOCK_PLOT_H = 78
+STOCK_FOOT_H = 20
+STOCK_H = STOCK_HEAD_H + STOCK_PLOT_H + STOCK_FOOT_H
 CHART_GUTTER = 48       # right strip reserved for the min/max labels, so the
                         # plot line can never run underneath them
 CARD_H = 52
@@ -421,8 +432,22 @@ def layout(role, text, visual, metrics, width, max_height=None):
 
     chars = len(text)
     visual = visual or {}
+    stock = visual.get("stock")
     chart = visual.get("chart")
     cards = visual.get("cards") or []
+
+    # A stock answer is one card, not a plot plus four tiles saying the same
+    # things in more space. When there is one, it replaces both.
+    if stock:
+        top = y + GAP
+        if max_height is None or top + STOCK_H <= max_height:
+            blocks.append({
+                "kind": "stock", "x": PAD_X, "y": top, "w": inner, "h": STOCK_H,
+                "head_h": STOCK_HEAD_H, "plot_h": STOCK_PLOT_H,
+                "foot_h": STOCK_FOOT_H, **stock,
+            })
+            y = top + STOCK_H
+        chart = cards = None
 
     if chart:
         top = y + GAP

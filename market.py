@@ -331,12 +331,31 @@ def fmt_price(x):
 
 
 def visual_for(data, period):
-    """Chart + cards for the overlay, from `quote` or `history` output."""
+    """The stock's own card for the overlay, from `quote` or `history` output.
+
+    One card rather than a plot and four tiles: the tiles said Last, Today,
+    High and Low, which is the same information the card's own header and
+    footer carry in a third of the height. The chart and cards are still
+    filled in, because a reply that cannot fit the card falls back to them.
+    """
+    import logos                       # here: logos imports nothing from here
+
     closes = [c for _, c in data["points"]] or [data["price"]]
     label = "Today" if period == "1d" else period.upper()
+    valuation = fundamentals(data["symbol"])
+    unit = "$" if data["currency"] == "USD" else ""
     return overlay_content.clean_visual({
+        "stock": {
+            "symbol": data["symbol"], "name": data.get("name") or data["symbol"],
+            "price": data["price"], "change_pct": data["change_pct"],
+            "points": closes, "unit": unit, "period": period.upper(),
+            "logo": logos.path_for(data["symbol"]),
+            "target": valuation.get("target"),
+            "upside": upside(valuation.get("target"), data["price"]),
+            "pe": valuation.get("pe"),
+        },
         "chart": {"points": closes, "label": f"{data['symbol']} · {period.upper()}",
-                  "unit": "$" if data["currency"] == "USD" else ""},
+                  "unit": unit},
         "cards": [{"label": "Last", "value": fmt_price(data["price"])},
                   {"label": label, "value": f"{data['change_pct']:+.1f}%"},
                   {"label": "High", "value": fmt_price(max(closes))},

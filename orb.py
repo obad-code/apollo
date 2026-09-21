@@ -180,6 +180,7 @@ class Orb:
     ROW_GAP = 14                # between the mark and the name beside it
     BODY_GAP = 13               # between what Apollo said and that row
     FOOT_H = 44
+    MARK_BOX = 22               # the company's logo on a stock card
     SHADOW_ROOM = 46
     WINDOW_MARGIN = 30          # room around the card for its shadow
     TRANSCRIPT_LINES = 2
@@ -245,6 +246,7 @@ class Orb:
         self._heard_cache = (None, [])
         self._private = None
         self._collection = None
+        self._marks = {}
 
     # -- lifecycle ----------------------------------------------------------
 
@@ -699,6 +701,8 @@ class Orb:
             for block in plan["blocks"]:
                 if block["kind"] == "text":
                     self._render_text(g, block, fonts, rtl)
+                elif block["kind"] == "stock":
+                    self._render_stock(g, block, fonts)
                 elif block["kind"] == "chart":
                     self._render_chart(g, block, fonts)
                 elif block["kind"] == "cards":
@@ -719,6 +723,112 @@ class Orb:
                 x = line["x"] + line.get("width", 0)
             self._string(g, line["text"], font, fmt, x, line["y"],
                          PALETTE["ink"], 255)
+
+    def _render_stock(self, g, block, fonts):
+        """One stock, as its own card: the mark, the price, the curve, the
+        valuation. The same shape the full display's cards have, at the size
+        the overlay has room for.
+        """
+        D = self._D
+        x0, y0 = float(block["x"]), float(block["y"])
+        width = float(block["w"])
+        up = block.get("change_pct", 0.0) >= 0
+        tint = PALETTE["up"] if up else PALETTE["down"]
+
+        # -- the row of identity and price ---------------------------------
+        head = y0 + 2.0
+        text_x = x0
+        mark = self._mark(block.get("logo"))
+        if mark is not None:
+            g.DrawImage(mark, D.Rectangle(int(x0), int(head), self.MARK_BOX,
+                                          self.MARK_BOX))
+            text_x = x0 + self.MARK_BOX + 10.0
+
+        self._string(g, block.get("symbol", ""), fonts["name"], fonts["fmt"],
+                     text_x, head + 3.0, PALETTE["ink"], 255)
+        name = block.get("name") or ""
+        if name and name.upper() != block.get("symbol", "").upper():
+            offset = self._measure(block.get("symbol", "")) + 10.0
+            self._string(g, name[:22], fonts["caption"], fonts["fmt"],
+                         text_x + offset, head + 6.0, PALETTE["caption"], 210)
+
+        unit = block.get("unit") or ""
+        price = f"{unit}{block.get('price', 0.0):,.2f}"
+        move = f"{'▲' if up else '▼'}{abs(block.get('change_pct', 0.0)):.2f}%"
+        move_w = self._measure(move)
+        self._string(g, move, fonts["caption"], fonts["fmt"],
+                     x0 + width - move_w, head + 6.0, tint, 255)
+        price_w = self._measure(price)
+        self._string(g, price, fonts["name"], fonts["fmt"],
+                     x0 + width - move_w - price_w - 10.0, head + 3.0,
+                     PALETTE["ink"], 255)
+
+        # -- the curve ------------------------------------------------------
+        plot_y = y0 + float(block["head_h"])
+        self._curve(g, block.get("points") or [], x0, plot_y, width,
+                    float(block["plot_h"]), tint)
+
+        # -- what it is worth ----------------------------------------------
+        foot = plot_y + float(block["plot_h"]) + 1.0
+        parts = []
+        if block.get("target"):
+            piece = f"{unit}{block['target']:,.2f} target"
+            if block.get("upside") is not None:
+                piece += f"  {block['upside']:+.1f}%"
+            parts.append(piece)
+        if block.get("pe"):
+            parts.append(f"{block['pe']:.1f} P/E")
+        if parts:
+            self._string(g, "   ·   ".join(parts), fonts["caption"], fonts["fmt"],
+                         x0, foot, PALETTE["caption"], 225)
+
+    def _mark(self, path):
+        """The company's logo, loaded once and kept."""
+        if not path or not os.path.exists(path):
+            return None
+        image = self._marks.get(path)
+        if image is None:
+            try:
+                image = self._D.Image.FromFile(path)
+            except Exception:  # noqa: BLE001 - a card without a mark is a card
+                image = False
+            self._marks[path] = image
+        return image or None
+
+    def _curve(self, g, points, x0, y0, w, h, colour):
+        """A smooth line with its wash underneath, in one colour."""
+        D = self._D
+        if len(points) < 2:
+            return
+        low, high = min(points), max(points)
+        span = high - low
+        if span <= 0:
+            low, high, span = low - 1.0, high + 1.0, 2.0
+        pad = 6.0
+        step = w / (len(points) - 1)
+        xs = [x0 + step * i for i in range(len(points))]
+        ys = [y0 + pad + (h - pad * 2) * (1.0 - (v - low) / span) for v in points]
+        pairs = [D.PointF(float(x), float(y)) for x, y in zip(xs, ys)]
+
+        wash = D.Drawing2D.GraphicsPath()
+        # A cardinal spline, not straight segments: daily closes joined by
+        # lines read as a saw, and the design's curve is smooth.
+        wash.AddCurve(pairs, 0.5)
+        wash.AddLine(float(xs[-1]), float(y0 + h), float(xs[0]), float(y0 + h))
+        wash.CloseFigure()
+        brush = D.Drawing2D.LinearGradientBrush(
+            D.RectangleF(float(x0), float(y0), float(w), float(h + 1)),
+            D.Color.FromArgb(*overlay_paint.alpha(colour, 0.22)),
+            D.Color.FromArgb(0, *colour), D.Drawing2D.LinearGradientMode.Vertical)
+        g.FillPath(brush, wash)
+        brush.Dispose()
+        wash.Dispose()
+
+        pen = D.Pen(D.Color.FromArgb(255, *colour), 2.0)
+        pen.LineJoin = D.Drawing2D.LineJoin.Round
+        pen.StartCap = pen.EndCap = D.Drawing2D.LineCap.Round
+        g.DrawCurve(pen, pairs, 0.5)
+        pen.Dispose()
 
     def _render_chart(self, g, block, fonts):
         """A sparkline: violet into cyan into amber, over a soft fill.

@@ -23,6 +23,8 @@ import System.Drawing as D  # noqa: E402
 import System.Windows.Forms as WF  # noqa: E402
 from System import IntPtr  # noqa: E402
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
 import overlay_paint  # noqa: E402
@@ -118,6 +120,20 @@ def main(outdir):
     overlay._sync_content()
     settle(overlay)
     shot(overlay, "5-reply-chart", outdir)
+
+    # The stock card: what the overlay becomes when the question was a stock.
+    overlay.set_content(overlay_content.USER, "how is nvidia doing")
+    overlay.set_content(overlay_content.APOLLO,
+                        "Nvidia closed at 222.27, up 1.3% on the day.",
+                        {"stock": {"symbol": "NVDA", "name": "NVIDIA", "price": 222.27,
+                                   "change_pct": 1.34, "unit": "$", "period": "1MO",
+                                   "points": [206.1, 210.4, 214.2, 211.8, 218.6, 224.3,
+                                              229.7, 232.4, 226.1, 220.4, 222.27],
+                                   "logo": os.path.join(ROOT, "ui", "full", "logos", "NVDA.png"),
+                                   "target": 327.7, "upside": 47.43, "pe": 28.1}})
+    overlay._sync_content()
+    settle(overlay)
+    shot(overlay, "7-stock", outdir)
 
     overlay.set_content(overlay_content.USER, "كم سعر سهم إنفيديا اليوم")
     overlay.set_content(overlay_content.APOLLO,
