@@ -1,0 +1,15 @@
+# This repository is LF throughout. Python's text mode writes CRLF on Windows,
+# so a scripted edit silently rewrote every line of the files it touched and
+# turned a twenty-three line change into an eight-hundred line diff. This
+# settles it at the git boundary rather than relying on every tool behaving.
+* text=auto eol=lf
+
+# ...except what is not text. Marked so git never looks inside them.
+*.png binary
+*.jpg binary
+*.otf binary
+*.woff2 binary
+*.wav binary
+*.mp3 binary
+*.mp4 binary
+*.pdf binary
