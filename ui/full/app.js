@@ -12,6 +12,7 @@
 
 import { Shader } from './shader.js';
 import { Lyla } from './lyla.js';
+import { DotFlow, FRAMES } from './dotflow.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -534,6 +535,17 @@ document.addEventListener('visibilitychange', () => enter());
  * and has to lead to the next: holding the chord used to change nothing here
  * at all, so the display simply went quiet and you could not tell whether it
  * had heard you. */
+/* What the matrix plays while Apollo is working. `activity` swaps the words
+ * for whatever he is actually doing - fetching NVDA, searching the web - and
+ * the sequence goes on underneath it. */
+const THINKING = [
+  { title: 'Thinking', frames: FRAMES.importing, duration: 170 },
+  { title: 'Working', frames: FRAMES.syncing, duration: 110, repeatCount: 2 },
+  { title: 'Looking', frames: FRAMES.searching, duration: 140, repeatCount: 2 },
+];
+
+const dots = new DotFlow($('thinking'), { dotSize: 8, gap: 4 });
+
 const SAYS = {
   idle: 'Hold Ctrl+Alt to talk',
   listening: 'Listening',
@@ -557,8 +569,15 @@ function setPhase(phase) {
   shader.speed(phase === 'thinking' ? 4 : attending ? 2 : 1);
 
   const hint = $('hint');
-  hint.textContent = SAYS[phase] || '';
-  hint.classList.toggle('busy', attending);
+  // The matrix carries the word while it is working, so the hint stands down
+  // rather than saying "Thinking" a second time just above it.
+  hint.textContent = phase === 'thinking' ? '' : (SAYS[phase] || '');
+  hint.classList.toggle('busy', attending && phase !== 'thinking');
+
+  // The matrix replaces the word "Thinking" entirely while it is working.
+  $('thinking').classList.toggle('on', phase === 'thinking');
+  if (phase === 'thinking') dots.play(THINKING);
+  else dots.stop();
 
   if (phase === 'listening') {
     $('you').textContent = '';
@@ -655,6 +674,9 @@ window.apollo = {
   },
   visual(payload) { $('visual').innerHTML = chart(payload); },
   data(snapshot) { render(snapshot); },
+  activity(text) {
+    if (state.phase === 'thinking' && text) dots.say(text);
+  },
   note(text) {
     const note = $('note');
     note.textContent = text || '';

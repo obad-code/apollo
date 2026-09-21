@@ -275,6 +275,37 @@ body.answering #core { transition: transform .6s cubic-bezier(.32,.72,0,1); }
             color: var(--amber-bright); margin-top: 10px; }
 #hint { margin-top: 14px; color: rgba(127, 224, 238, 0.6); transition: opacity .35s; }
 
+/* --- the dot matrix, while it is working ----------------------------------- */
+
+#thinking {
+  display: none; align-items: center; gap: 20px; margin-top: 22px;
+  padding: 14px 24px 14px 18px; border-radius: 16px;
+  background: rgba(255, 255, 255, .045);
+}
+#thinking.on { display: flex; }
+
+.dotflow-grid { display: grid; }
+.dotflow-grid i {
+  display: block; border-radius: 2px; background: rgba(255, 255, 255, .13);
+  transition: background .12s linear, box-shadow .12s linear;
+}
+/* Lit cells take the amber, so the matrix belongs to Apollo rather than to
+   the component it came from. */
+.dotflow-grid i.on {
+  background: var(--amber-bright);
+  box-shadow: 0 0 8px rgba(240, 217, 160, .55);
+}
+
+.dotflow-label {
+  font-size: 20px; font-weight: 700; letter-spacing: .01em;
+  color: var(--amber-bright); white-space: nowrap;
+  animation: dotflow-in .55s cubic-bezier(.215, .61, .355, 1) both;
+}
+@keyframes dotflow-in {
+  from { opacity: 0; transform: translateY(-14px); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0);     filter: blur(0); }
+}
+
 /* --- the answer ----------------------------------------------------------- */
 
 /* High enough that a reply with a chart under it clears LYLA's status line
