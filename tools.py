@@ -228,6 +228,7 @@ import clips  # noqa: E402
 import feeds  # noqa: E402
 import market  # noqa: E402
 import overlay_content  # noqa: E402
+import prayer  # noqa: E402
 import pc_control  # noqa: E402
 import reminders  # noqa: E402
 
@@ -452,6 +453,31 @@ def _save_clip(ctx, seconds=60):
             {"label": "Clip", "value": f"{result['seconds']:.0f}s saved"},
             {"label": "Size", "value": f"{result['megabytes']:.0f} MB"}]}))
     return result
+
+
+@_tool("prayer_times", "checking the prayer times",
+       "Today's prayer times for Riyadh, and which one is next. Use this "
+       "whenever the user asks about a prayer, about Athan, or how long "
+       "until one.",
+       _obj({}))
+def _prayer_times(ctx):
+    ctx.activity("checking the prayer times")
+    today = prayer.times()
+    if not today:
+        return {"ok": False, "error": "I couldn't reach the prayer times just now."}
+    name, when = prayer.next_prayer()
+    minutes = None
+    if when is not None:
+        minutes = int(round((when - __import__("datetime").datetime.now())
+                            .total_seconds() / 60.0))
+    ctx.show(overlay_content.clean_visual({"cards": [
+        {"label": key, "value": value.strftime("%H:%M")}
+        for key, value in sorted(today.items(), key=lambda kv: kv[1])]}))
+    return {"ok": True,
+            "times": {k: v.strftime("%H:%M") for k, v in today.items()},
+            "next": name, "next_at": when.strftime("%H:%M") if when else None,
+            "minutes_away": minutes, "city": prayer.CITY,
+            "method": "Umm al-Qura"}
 
 
 @_tool("open_clips", "opening your clips",

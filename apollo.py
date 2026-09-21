@@ -111,6 +111,7 @@ import dataservice  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
 import overlay_state  # noqa: E402
+import prayer  # noqa: E402
 import presence  # noqa: E402
 import reminders  # noqa: E402
 import tools  # noqa: E402
@@ -702,9 +703,11 @@ class Apollo:
         self.data = None           # the world, refreshed on a timer
         self.schedule = briefing.Schedule()   # has today's recap happened?
         self.briefing_thread = None
+        self.prayer_thread = None
         self.listen_toggle = None  # ...and the CTRL+1 watcher over it
         self.turn_busy = False     # listening, thinking, or speaking
         self.last_engaged = 0.0    # when a turn last ran; the recap waits it out
+        self.prayers = prayer.Watch()
         self.presence = presence.Presence(AFK_SECONDS)
         self.last_status = None    # the phase the overlay last acted on
         self.view = turnview.TurnView()   # what this turn adds up to on screen
@@ -1055,6 +1058,26 @@ class Apollo:
                                                 name="apollo-briefing")
         self.briefing_thread.start()
 
+    def check_prayer(self):
+        """Fifteen minutes before each prayer, once.
+
+        It waits for a turn the way a reminder does, rather than talking over
+        one: TURN_GATE is what `announce` blocks on.
+        """
+        ui = getattr(self, "ui", None)
+        if ui is None or ui.quiet or self.voice is None:
+            return
+        if self.prayer_thread is not None and self.prayer_thread.is_alive():
+            return
+        found = self.prayers.due()
+        if found is None:
+            return
+        name, when = found
+        self.prayer_thread = threading.Thread(
+            target=assistant.fire_prayer, daemon=True, name="apollo-prayer",
+            args=(ui, self.voice, name, when, prayer.LEAD_MINUTES))
+        self.prayer_thread.start()
+
     def check_presence(self, idle):
         """Open the display when you are away; put it away when you come back.
 
@@ -1064,6 +1087,7 @@ class Apollo:
         if self.presence.check(idle):
             self.apply_mode()
         self.check_briefing(idle)
+        self.check_prayer()
 
     def check_overlay_alive(self):
         """Keep the window the shape it is supposed to be.

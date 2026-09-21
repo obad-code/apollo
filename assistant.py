@@ -1600,6 +1600,17 @@ def fire_reminder(ui, voice, reminder, late):
     announce(ui, voice, instruction, f"Reminder: {text}")
 
 
+def fire_prayer(ui, voice, name, when, lead_minutes):
+    """A prayer is close. Say so, once, in the language they last used."""
+    instruction = (
+        f"{name} prayer in Riyadh is at {when.strftime('%H:%M')}, about "
+        f"{lead_minutes} minutes from now. Tell the user in one short "
+        f"sentence, in the language they last spoke to you in - their dialect "
+        f"if it was Arabic. Say only that; do not add anything else.")
+    announce(ui, voice, instruction,
+             f"{name} at {when.strftime('%H:%M')}")
+
+
 def answer_with_agent(name, said, ui):
     """Hand one turn to a summoned agent, and speak what comes back.
 
