@@ -339,7 +339,11 @@ def _log_to_console(level=logging.INFO):
         if not logger.handlers:
             logger.addHandler(handler)
             logger.setLevel(level)
-            logger.propagate = False
+            # Still propagating, so these reach Apollo's log file as well as
+            # the console. They were cut off from it, and they are the two
+            # most useful things Apollo writes - which backend a turn went to,
+            # and whether Gemini connected - under pythonw, where the console
+            # they were kept to does not exist.
 
 
 _log_to_console()

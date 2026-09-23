@@ -132,19 +132,53 @@ LOG_PATH = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
 
 
 def start_log(path=LOG_PATH):
-    """One rotating file for the whole app: a megabyte, three kept."""
+    """One rotating file for the whole app: a megabyte, three kept.
+
+    If the file cannot be opened - still held by a copy that was being shut
+    down as this one started - it writes beside it under its own pid rather
+    than not at all. It used to return None there, and every line after it
+    went nowhere: Apollo ran fully awake with an empty log, which looks
+    exactly like Apollo not running.
+    """
+    root = logging.getLogger("apollo")
+    # Once per process. A second call must not write every line twice.
+    for existing in root.handlers:
+        if getattr(existing, "_apollo_log", False):
+            return existing
+
+    handler = None
+    reason = None
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        handler = logging.handlers.RotatingFileHandler(
-            path, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
     except OSError:
+        return None                   # no folder at all: nothing to fall back to
+    for attempt, target in enumerate((path, path, _beside(path))):
+        try:
+            handler = logging.handlers.RotatingFileHandler(
+                target, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+            break
+        except OSError as exc:
+            reason = exc
+            if attempt == 0:
+                time.sleep(0.5)       # a copy that is exiting lets go quickly
+    if handler is None:
         return None                   # no log is survivable; no Apollo is not
+
+    handler._apollo_log = True
     handler.setFormatter(logging.Formatter(
         "%(asctime)s %(levelname)-7s %(name)s: %(message)s"))
-    root = logging.getLogger("apollo")
     root.setLevel(logging.INFO)
     root.addHandler(handler)
+    if handler.baseFilename != os.path.abspath(path):
+        root.warning("could not open %s (%s); logging here instead",
+                     os.path.basename(path), reason)
     return handler
+
+
+def _beside(path):
+    """Where to write when the usual file is held: next to it, by pid."""
+    stem, ext = os.path.splitext(path)
+    return f"{stem}-{os.getpid()}{ext}"
 
 
 # The hand-written display. `ui/legacy/` holds the generated page this one
