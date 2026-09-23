@@ -273,17 +273,17 @@ def is_rtl(text):
 # and one place that draws it; a caller that wants a different size is a
 # caller that wants a different design.
 PAD_X = 22              # left and right margin of the content column
-LINE_H = 19             # one line of body text
+LINE_H = 23             # one line of body text, at orb.FONT_PT
 GAP = 15                # between blocks
 CHART_H = 90
 # One stock as a card: a row of identity and price, the curve, the valuation.
-STOCK_HEAD_H = 30
+STOCK_HEAD_H = 34
 STOCK_PLOT_H = 78
-STOCK_FOOT_H = 20
+STOCK_FOOT_H = 23
 STOCK_H = STOCK_HEAD_H + STOCK_PLOT_H + STOCK_FOOT_H
 CHART_GUTTER = 48       # right strip reserved for the min/max labels, so the
                         # plot line can never run underneath them
-CARD_H = 52
+CARD_H = 60
 CARD_GAP = 10
 CARD_MIN_W = 132        # narrower than this and a value starts to clip
 BOTTOM_PAD = 18         # so the last line is not flush with nothing

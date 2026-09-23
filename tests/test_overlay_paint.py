@@ -28,22 +28,26 @@ def pixel(bitmap, x, y):
     return (colour.A, colour.R, colour.G, colour.B)
 
 
-def test_palette_has_the_approved_colours():
-    """The card's own colours, straight off the design."""
-    assert overlay_paint.PALETTE["card"] == (244, 244, 242)
-    assert overlay_paint.PALETTE["ink"] == (21, 23, 28)
-    assert overlay_paint.PALETTE["you"] == (74, 79, 89)
-    assert overlay_paint.PALETTE["warm"] == (255, 207, 110)
-    assert overlay_paint.PALETTE["rose"] == (255, 111, 156)
-    assert overlay_paint.PALETTE["sky"] == (79, 195, 247)
-    assert overlay_paint.PALETTE["lilac"] == (196, 181, 255)
+def test_the_card_is_black_and_its_colours_are_yellow_phosphor():
+    """A black card now, with the drifting colour a CRT's yellow: amber, gold,
+    ember and a touch of the green-yellow a tube glows at its brightest."""
+    card = overlay_paint.PALETTE["card"]
+    assert max(card) <= 16, card
+    for name, _home, _drift, _period, _strength in overlay_paint.BLOBS:
+        r, g, b = overlay_paint.PALETTE[name]
+        # Yellow light: red and green high, blue low.
+        assert r >= 190 and g >= 130 and b <= 110, (name, (r, g, b))
 
 
-def test_the_ink_is_dark_enough_to_read_on_the_card():
-    """A light card needs dark type; the old palette's amber vanishes on it."""
+def test_the_ink_is_light_enough_to_read_on_the_card():
+    """A black card needs light type; the cream card's dark ink vanishes on it."""
     card = sum(overlay_paint.PALETTE["card"])
     for name in ("ink", "you", "caption", "amber", "up", "down", "cyan"):
-        assert sum(overlay_paint.PALETTE[name]) < card - 200, name
+        assert sum(overlay_paint.PALETTE[name]) > card + 300, name
+
+
+def test_the_dots_are_light_on_the_dark_card():
+    assert sum(overlay_paint.DOT_INK) > sum(overlay_paint.PALETTE["card"]) + 400
 
 
 def test_panel_fills_inside_and_leaves_the_outside_clear(draw, surface):
@@ -189,3 +193,15 @@ def test_text_is_measured_in_the_font_it_will_be_drawn_in(draw):
     assert body > 0 and named > 0
     assert abs(body - named) > 0.5, (
         f"the name face measured the same as the body face: {body} vs {named}")
+
+
+def test_the_card_has_scanlines(draw, surface):
+    """The CRT look: every third row a little darker, over the colour."""
+    bitmap, graphics = surface
+    overlay_paint.Backdrop(draw).panel(graphics, 30, 0, 500, 200, t=0.0)
+    # Between two columns of dots, low on the card where the colour is.
+    light = [sum(pixel(bitmap, 250, y)[1:]) for y in range(150, 196)]
+    dips = [offset for offset in range(3)
+            if all(light[i] < light[i - 1] and light[i] < light[i + 1]
+                   for i in range(1, len(light) - 1) if i % 3 == offset)]
+    assert dips, f"no row in three is darker than its neighbours: {light}"

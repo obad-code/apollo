@@ -10,32 +10,36 @@ once into a bitmap and blitted: the card's stock, the veil over it, the dot
 grid, and the four soft colours that drift underneath. What is left per frame
 is a handful of DrawImage calls and the things that genuinely move.
 
-The design is a cream card that hangs out of the top edge of the screen, so
-its top corners are square - that edge is above the screen - and its ink is
-dark. Only Apollo's own mark kept its colours.
+The card hangs out of the top edge of the screen, so its top corners are
+square - that edge is above the screen. It was cream; it is black now, a
+tube's glass with a yellow phosphor glow drifting low in it, the printed dots
+kept, scanlines over all of it, and light ink. Apollo's own mark kept its
+colours.
 """
 
 import math
 import random
 
 PALETTE = {
-    # The card itself: paper, and the ink on it.
-    "card": (244, 244, 242),
-    "ink": (21, 23, 28),          # Apollo's own words
-    "you": (74, 79, 89),          # yours, and the line under them
-    "caption": (106, 112, 124),
-    # The four colours that drift across its lower half.
-    "warm": (255, 207, 110),
-    "rose": (255, 111, 156),
-    "sky": (79, 195, 247),
-    "lilac": (196, 181, 255),
-    # Kept for the ring, the charts and the cards, which did not change.
-    "amber": (184, 130, 36),
-    "up": (34, 150, 96),
-    "down": (198, 52, 70),
-    "cyan": (46, 138, 168),
-    "violet": (140, 95, 190),
-    "teal": (50, 160, 170),
+    # The card itself: the glass, and the light on it.
+    "card": (10, 9, 7),
+    "ink": (255, 239, 208),       # Apollo's own words, warm white
+    "you": (224, 206, 170),       # yours, and the line under them
+    "caption": (184, 162, 122),
+    # The four colours that drift across its lower half: a yellow phosphor
+    # at its different heats, from straw to ember.
+    "gold": (255, 198, 58),
+    "ember": (255, 132, 30),
+    "straw": (255, 224, 96),
+    "phosphor": (255, 176, 44),   # amber: a green-yellow here read as olive
+    # The ring, the charts and the cards, at the brightness a black card
+    # needs - the darker set was for cream paper.
+    "amber": (255, 190, 70),
+    "up": (104, 226, 146),
+    "down": (255, 112, 120),
+    "cyan": (110, 214, 232),
+    "violet": (196, 166, 255),
+    "teal": (100, 214, 214),
     "white": (255, 246, 224),
 }
 
@@ -43,25 +47,30 @@ PALETTE = {
 # wanders, how long one loop takes, and how strong it is. All four sit low,
 # because the mask above keeps colour out of the card's upper half - which is
 # the part that hides above the screen's edge.
-BLOBS = (("warm", (0.14, 1.12), (0.26, 0.12), 9.0, 0.40),
-         ("rose", (0.46, 1.16), (0.30, 0.13), 11.0, 0.36),
-         ("sky", (0.86, 1.14), (0.28, 0.12), 10.0, 0.38),
-         ("lilac", (0.66, 1.04), (0.22, 0.10), 13.0, 0.28))
+BLOBS = (("gold", (0.14, 1.14), (0.26, 0.12), 9.0, 0.46),
+         ("ember", (0.46, 1.18), (0.30, 0.13), 11.0, 0.40),
+         ("straw", (0.86, 1.16), (0.28, 0.12), 10.0, 0.38),
+         ("phosphor", (0.66, 1.08), (0.22, 0.10), 13.0, 0.30))
 
 # Where the paper stops covering the colour, as fractions of the card's
 # height: opaque paper down to the first, clear by the second.
 SCRIM = (0.24, 0.82)
 
-DOT_ALPHA = 41           # rgba(20, 22, 28, .16)
+DOT_ALPHA = 30           # light dots, faint, on the black
 DOT_EVERY = 9
-DOT_INK = (20, 22, 28)
+DOT_INK = (255, 226, 160)
+
+# A tube's scanlines: one darker row in every three, over the colour and the
+# dots alike. Drawn once into a bitmap like the rest.
+SCANLINE_EVERY = 3
+SCANLINE_ALPHA = 0.30
 # The design lays a noise tile over the card as well. It is left out: in GDI+
 # it costs a SetPixel per pixel to build, and at the card's size the dot grid
 # carries the same texture for the price of one blit.
 
 RADIUS = 28              # the card's bottom corners; the top ones are square
                          # because that edge sits above the screen
-EDGE = (255, 255, 255, 72)   # the hairline around it, over a dark desktop
+EDGE = (255, 214, 140, 70)   # the hairline around it, warm, over any desktop
 # How much of the card hides above the screen's edge. The part that hides is
 # paper the content does not need, so nothing readable is ever cut off.
 HIDDEN = 0.25
@@ -152,6 +161,20 @@ def dot_grid(draw, w, h):
     return bitmap
 
 
+def scanlines(draw, w, h):
+    """Every third row darkened, for the whole card: the tube's raster."""
+    bitmap = draw.Bitmap(w, h, draw.Imaging.PixelFormat.Format32bppPArgb)
+    graphics = draw.Graphics.FromImage(bitmap)
+    try:
+        brush = draw.SolidBrush(draw.Color.FromArgb(*alpha((0, 0, 0), SCANLINE_ALPHA)))
+        for y in range(0, h, SCANLINE_EVERY):
+            graphics.FillRectangle(brush, 0, y, w, 1)
+        brush.Dispose()
+    finally:
+        graphics.Dispose()
+    return bitmap
+
+
 def paper(draw, w, h, colour):
     """The card's stock: opaque, edge to edge.
 
@@ -220,16 +243,17 @@ class Backdrop:
         self._paper = None
         self._veil = None
         self._dots = None
+        self._lines = None
         self._blobs = []
 
     def invalidate(self):
-        for bitmap in ([self._paper, self._veil, self._dots]
+        for bitmap in ([self._paper, self._veil, self._dots, self._lines]
                        + [b for _, b in self._blobs]):
             try:
                 bitmap.Dispose()
             except Exception:
                 pass
-        self._paper = self._veil = self._dots = None
+        self._paper = self._veil = self._dots = self._lines = None
         self._blobs = []
         self.cached_size = None
 
@@ -240,6 +264,7 @@ class Backdrop:
         self._paper = paper(draw, w, h, PALETTE["card"])
         self._veil = veil(draw, w, h, PALETTE["card"])
         self._dots = dot_grid(draw, w, h)
+        self._lines = scanlines(draw, w, h)
         # Wider than the card: a blob that only just reaches the edge reads as
         # a disc, and the design's blobs all spill past it.
         size = int(max(w, h) * 1.25)
@@ -274,8 +299,9 @@ class Backdrop:
                            attributes)
             self._blit(g, self._veil, x, y, w, h, attributes)
             self._blit(g, self._dots, x, y, w, h, attributes)
-            # The hairline the design draws around the card, which is what
-            # separates cream paper from a bright desktop behind it.
+            self._blit(g, self._lines, x, y, w, h, attributes)
+            # The hairline around the card, which is what separates it from a
+            # desktop as dark as it is.
             pen = draw.Pen(draw.Color.FromArgb(
                 int(EDGE[3] * max(0.0, min(1.0, alpha_scale))), *EDGE[:3]), 1.0)
             g.DrawPath(pen, path)
@@ -316,10 +342,11 @@ RING_SPEC = ((1.00, 22, 0.026, (255, 193, 94)),
 # The same mark at the size it sits in the card's footer. Twenty-two points
 # around a 22-pixel radius are three pixels apart and read as a smudge, so the
 # small mark keeps the three counter-turning rings and drops the point count
-# until each one is a point again. Its colours are darkened for cream paper.
-RING_SPEC_SMALL = ((1.00, 11, 0.026, (184, 130, 36)),
-                   (0.72, 8, -0.034, (205, 141, 26)),
-                   (0.44, 5, 0.045, (46, 138, 168)))
+# until each one is a point again. On the black card it takes the big ring's
+# own colours; the darkened set was for cream paper.
+RING_SPEC_SMALL = ((1.00, 11, 0.026, (255, 204, 96)),
+                   (0.72, 8, -0.034, (255, 176, 0)),
+                   (0.44, 5, 0.045, (86, 197, 214)))
 SMALL_BELOW = 34         # outer radius, in pixels
 
 # One point's glow: concentric discs, widest first. Eight closely spaced

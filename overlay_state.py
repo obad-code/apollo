@@ -20,7 +20,7 @@ SEARCHING = "searching"
 RESULT = "result"
 REPLY = "reply"
 
-PANEL_W = 430            # the width the design gives the card
+PANEL_W = 470            # the design's 430, widened for the bigger type
 SPARKLE_H = 150
 PANEL_MIN_H = 104          # the orb, your line and the caption under it
 

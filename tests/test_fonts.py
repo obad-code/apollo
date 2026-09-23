@@ -71,3 +71,52 @@ def test_both_scripts_come_out_of_the_one_family():
 
     assert ink(0, 28) > 100, "no Latin drawn"
     assert ink(30, 58) > 100, "no Arabic drawn"
+
+
+def _card_fonts():
+    import clr
+    clr.AddReference("System.Drawing")
+    import System.Drawing as D
+
+    import orb
+    view = orb.Orb.__new__(orb.Orb)
+    view._D = D
+    view._fonts = None
+    view._private = None
+    view._collection = None
+    view._char_w = 8.0
+    return view, view._font_set()
+
+
+def test_the_card_type_is_bigger_and_still_fits_its_lines():
+    """Bigger than it was - the reply read small on the card - and a line of
+    it still fits the line height the layout gives it, or lines overlap."""
+    import overlay_content
+    _view, fonts = _card_fonts()
+    body = fonts["body"].GetHeight()
+    assert body >= 20.5, f"the reply's type is still small: {body:.1f}px"
+    assert body <= overlay_content.LINE_H, (
+        f"a {body:.1f}px line does not fit LINE_H={overlay_content.LINE_H}")
+    assert fonts["caption"].GetHeight() >= 15.5
+
+
+def test_the_name_on_the_card_is_bigger():
+    view, fonts = _card_fonts()
+    assert view._measure("Apollo", font=fonts["name"]) >= 52
+
+
+def test_your_words_wrap_in_the_face_they_are_drawn_in():
+    """The transcript is drawn in the caption face. Measured in the reply's
+    bigger face, it wrapped early and its caret sat a word past the end."""
+    import orb
+    import overlay_content
+    view, fonts = _card_fonts()
+    view._heard = ("open chrome and show me nvidia and then tell me how the market "
+                   "did today and whether apple moved")
+    view._heard_cache = (None, [])
+    text_w = view.PANEL_W - view.PAD_X * 2
+    caption = orb.Metrics(view._char_w, lambda s: view._measure(s, font=fonts["caption"]))
+    expected = overlay_content.wrap(view._heard, 0, caption, text_w)
+    assert view._heard_lines() == expected[-view.TRANSCRIPT_LINES:]
+    assert view._heard_width("show me nvidia", False) == view._measure(
+        "show me nvidia", font=fonts["caption"])

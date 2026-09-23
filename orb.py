@@ -54,10 +54,14 @@ SW_HIDE, SW_SHOWNOACTIVATE = 0, 8
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 PALETTE = overlay_paint.PALETTE
+# The bleed round light type on the black card, the way a tube's letters
+# glowed: drawn once into the cached body, so it costs nothing per frame.
+PHOSPHOR = (255, 170, 60)
 
-# The resting ring's own amber, kept exactly as it was tuned.
-AMBER = (255, 176, 0)
-AMBER_WARM = (255, 193, 94)
+# The resting ring - the quarter of it that peeks down from the top edge -
+# in a yellow phosphor: the same family as the card's glow under it.
+AMBER = (255, 184, 0)
+AMBER_WARM = (255, 212, 92)
 
 # Thmanyah, which Apollo carries with him rather than expecting Windows to
 # have it. One family sets both scripts, so Arabic and English are no longer
@@ -77,10 +81,12 @@ FONT_FAMILIES = {"light": "thmanyah sans Light",
 # has to draw something.
 FONT_STACK = ("Segoe UI", "IBM Plex Mono", "Consolas", "Tahoma")
 RTL_FONT_STACK = ("Segoe UI", "Tahoma", "Arial")
-FONT_PT = 10.5
-FONT_SMALL_PT = 8.0
-CAPTION_PT = 8.0
-NAME_PT = 10.0            # the name on the card, in the proportional face
+# Bigger than the card first had: on black, light type reads smaller than
+# the same size in dark ink on cream, and the reply was already small.
+FONT_PT = 12.5
+FONT_SMALL_PT = 9.0
+CAPTION_PT = 9.5
+NAME_PT = 13.5            # the name on the card, in the proportional face
 
 _user32 = ctypes.windll.user32
 _gdi32 = ctypes.windll.gdi32
@@ -176,10 +182,10 @@ class Orb:
     PAD_X = 26
     PAD_TOP = 22
     PAD_BOTTOM = 20
-    ORB_BOX = 44                # Apollo's mark, in the footer row
+    ORB_BOX = 50                # Apollo's mark, in the footer row
     ROW_GAP = 14                # between the mark and the name beside it
     BODY_GAP = 13               # between what Apollo said and that row
-    FOOT_H = 44
+    FOOT_H = 52
     MARK_BOX = 22               # the company's logo on a stock card
     SHADOW_ROOM = 46
     WINDOW_MARGIN = 30          # room around the card for its shadow
@@ -460,10 +466,16 @@ class Orb:
         key = (self._heard, text_w)
         if self._heard_cache[0] != key:
             rtl = overlay_content.is_rtl(self._heard)
-            metrics = Metrics(self._char_w, lambda s: self._measure(s, rtl))
+            metrics = Metrics(self._char_w, lambda s: self._heard_width(s, rtl))
             lines = overlay_content.wrap(self._heard, 0, metrics, text_w)
             self._heard_cache = (key, lines[-self.TRANSCRIPT_LINES:])
         return self._heard_cache[1]
+
+    def _heard_width(self, text, rtl):
+        """Your words' width in the face `_draw_lines` sets them in - the
+        caption face, or the Arabic one - not the reply's."""
+        fonts = self._font_set()
+        return self._measure(text, rtl, font=fonts["rtl"] if rtl else fonts["caption"])
 
     def _heard_height(self):
         """As tall as your words actually are. Reserving the maximum left a
@@ -587,9 +599,11 @@ class Orb:
             return self._fonts
 
         D = self._D
-        body = self._face("regular", FONT_PT)
+        # Medium, not regular: light strokes on black thin out, and the
+        # reply is the thing on the card that has to read.
+        body = self._face("medium", FONT_PT)
         # The same family for Arabic: that is the whole point of it.
-        rtl = self._face("regular", FONT_PT)
+        rtl = self._face("medium", FONT_PT)
         small = self._face("light", FONT_SMALL_PT)
         caption = self._face("regular", CAPTION_PT)
         # The name in the footer carries a weight: it is a label, not a readout.
@@ -728,7 +742,7 @@ class Orb:
                 # The format draws from the right edge of the box it is given.
                 x = line["x"] + line.get("width", 0)
             self._string(g, line["text"], font, fmt, x, line["y"],
-                         PALETTE["ink"], 255)
+                         PALETTE["ink"], 255, PHOSPHOR)
 
     def _render_stock(self, g, block, fonts):
         """One stock, as its own card: the mark, the price, the curve, the
@@ -1022,11 +1036,11 @@ class Orb:
         fonts = self._font_set()
         text_x = left + self.PAD_X + self.ORB_BOX + self.ROW_GAP
         self._string(g, "Apollo", fonts["name"], fonts["fmt"],
-                     text_x, top + 4, PALETTE["ink"], 255 * fade)
+                     text_x, top + 3, PALETTE["ink"], 255 * fade, PHOSPHOR)
         caption = self._activity or self._status_word()
         if caption:
             self._string(g, caption, fonts["caption"], fonts["fmt"],
-                         text_x, top + 23, self._caption_colour(), 220 * fade)
+                         text_x, top + 29, self._caption_colour(), 220 * fade)
 
     def _draw_lines(self, g, left, top, now, fade):
         """Your own words, above whatever Apollo made of them."""
@@ -1051,7 +1065,7 @@ class Orb:
         if self.view.state in (overlay_state.LISTENING, overlay_state.SEARCHING):
             lit = (now % self.CARET_BLINK) < self.CARET_BLINK * self.CARET_DUTY
             if lit and not rtl:
-                caret_x = text_x + self._measure(lines[-1], rtl) + 3
+                caret_x = text_x + self._heard_width(lines[-1], rtl) + 3
                 g.FillRectangle(self._brush(PALETTE["cyan"], 190 * fade),
                                 float(caret_x), float(y - overlay_content.LINE_H + 2),
                                 2.0, float(overlay_content.LINE_H - 6))
@@ -1069,7 +1083,8 @@ class Orb:
             return PALETTE["violet"]
         if self.view.state == overlay_state.RESULT:
             return PALETTE["up"]
-        return PALETTE["caption"]
+        # Not the grey caption: this sits on the brightest of the glow.
+        return PALETTE["you"]
 
     def _draw_body(self, g, left, top, panel_h, now, fade):
         """The reply, its cards and its chart, arriving a word at a time.
@@ -1191,7 +1206,7 @@ class Orb:
     CONSTELLATION_N = 22          # points around the circle
     CONSTELLATION_R = 0.355       # their radius, as a fraction of the box
     CONSTELLATION_STEP = 6        # star polygon {N/6}: the chords across it
-    CONSTELLATION_DOT = 0.009     # point radius, as a fraction of the box
+    CONSTELLATION_DOT = 0.011     # point radius, as a fraction of the box
     BLOOM_LAYERS = overlay_paint.BLOOM
 
     def _draw_ring(self, g, ox, oy, w, h, t, fade):
@@ -1215,13 +1230,15 @@ class Orb:
             angle = rot - math.tau / 4 + i * (math.tau / n)
             points.append((cx + math.cos(angle) * r, cy + math.sin(angle) * r))
 
-        chord_pen = self._pen(AMBER_WARM, max(0, int(24 * fade)))
+        # Brighter than it was: only a quarter of it ever shows, and that
+        # quarter has to read as a lit tube's glow rather than a pencil line.
+        chord_pen = self._pen(AMBER_WARM, max(0, int(36 * fade)))
         for i in range(n):
             x0, y0 = points[i]
             x1, y1 = points[(i + self.CONSTELLATION_STEP) % n]
             g.DrawLine(chord_pen, float(x0), float(y0), float(x1), float(y1))
 
-        ring_pen = self._pen(AMBER_WARM, max(0, int(52 * fade)))
+        ring_pen = self._pen(AMBER_WARM, max(0, int(80 * fade)), 1.3)
         for i in range(n):
             x0, y0 = points[i]
             x1, y1 = points[(i + 1) % n]
