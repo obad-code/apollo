@@ -134,11 +134,15 @@ LOG_PATH = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
 def start_log(path=LOG_PATH):
     """One rotating file for the whole app: a megabyte, three kept.
 
-    If the file cannot be opened - still held by a copy that was being shut
-    down as this one started - it writes beside it under its own pid rather
-    than not at all. It used to return None there, and every line after it
-    went nowhere: Apollo ran fully awake with an empty log, which looks
-    exactly like Apollo not running.
+    If the file cannot be opened, it writes beside it under its own pid
+    rather than not at all - returning None there would send every later line
+    nowhere, and awake with an empty log looks exactly like not running.
+
+    A note for whoever debugs this from an agent's shell: a sandboxed shell
+    can keep its own copy of %LOCALAPPDATA%, so a log that looks empty from
+    there may be full in the real folder. Apollo launched through Explorer
+    writes the real one. That, not a locked file, is what made this look
+    broken when it was written.
     """
     root = logging.getLogger("apollo")
     # Once per process. A second call must not write every line twice.
