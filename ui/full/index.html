@@ -6,8 +6,8 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<!-- The ring shader from the brief, tinted and dimmed. Everything else sits
-     on top of it; nothing else paints a background. -->
+<!-- The dot field under everything: CRT phosphors in a halftone, seen through
+     a fisheye (shader.js). Nothing else paints a background. -->
 <canvas id="shader"></canvas>
 <!-- The two washes under the stock curves, defined once: an id per card would
      be seven ids for two gradients. -->
@@ -56,7 +56,14 @@
   <section id="headlines" class="panel rise">
     <h2 id="headlines-head">Headlines</h2>
     <div id="topics" class="chips"></div>
-    <div id="stories"></div>
+    <!-- The list from the interactive-list component: a bar that slides to
+         the row under the pointer and turns its text dark. -->
+    <div id="feed">
+      <div id="feed-bar"></div>
+      <div id="stories"></div>
+    </div>
+    <!-- One story, opened out of its row. -->
+    <article id="story" aria-hidden="true"></article>
   </section>
 
   <section id="strip" class="panel rise">
@@ -87,6 +94,19 @@
     <div id="lyla-pct" class="caption">88%</div>
   </section>
 </main>
+
+<!-- The picture that follows the pointer beside the feed. Outside the panels,
+     so the panel's rounded clip does not cut it off. -->
+<div id="peek" aria-hidden="true"></div>
+
+<!-- Asleep: ten quiet minutes, and this is all there is. -->
+<section id="sleep" aria-hidden="true">
+  <div id="sleep-copy">
+    <div id="sleep-name"><span id="sleep-word">Apollo</span><span id="sleep-tag"></span></div>
+    <p id="sleep-fact"></p>
+  </div>
+  <div id="sleep-wake">Press any key or say anything to wake Apollo</div>
+</section>
 
 <!-- Under this page's own directory on purpose: pywebview roots its HTTP
      server at the page, so anything above it is unreachable at runtime. -->

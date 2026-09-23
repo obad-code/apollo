@@ -81,15 +81,19 @@ const SAMPLE = {
     ],
   },
   news: {
-    gaming: [{ title: "Marvel's Wolverine sold very well on PlayStation 5", source: 'levelup', age: '1h ago', when: NOW - 3600 },
-             { title: 'Maono G3 mixer launches with dual-PC streaming', source: 'Notebookcheck', age: '1h ago', when: NOW - 4200 }],
-    marvel: [{ title: "Marvel's Wolverine compared to Uncharted 4", source: 'GameGPU', age: '56m ago', when: NOW - 3360 }],
-    movies: [{ title: "'Resident Evil' obliterates franchise box office records", source: "Murphy's Multiverse", age: '14m ago', when: NOW - 840 }],
-    markets: [{ title: "2026's top stock flashes buy signal", source: "Investor's Business Daily", age: '2h ago', when: NOW - 7200 }],
+    gaming: [{ title: "Marvel's Wolverine sold very well on PlayStation 5", source: 'levelup', age: '1h ago', when: NOW - 3600,
+               summary: 'Early figures put the launch among the fastest-selling first-party games on the console, ahead of the studio\'s last release.' },
+             { title: 'Maono G3 mixer launches with dual-PC streaming', source: 'Notebookcheck', age: '1h ago', when: NOW - 4200,
+               summary: 'The mixer routes a game PC and a streaming PC through one box, with separate levels for chat and game audio.' }],
+    marvel: [{ title: "Marvel's Wolverine compared to Uncharted 4", source: 'GameGPU', age: '56m ago', when: NOW - 3360, summary: '' }],
+    movies: [{ title: "'Resident Evil' obliterates franchise box office records", source: "Murphy's Multiverse", age: '14m ago', when: NOW - 840,
+               summary: 'A $108M worldwide opening, the best start the franchise has had, with the international markets carrying most of it.' }],
+    markets: [{ title: "2026's top stock flashes buy signal", source: "Investor's Business Daily", age: '2h ago', when: NOW - 7200, summary: '' }],
   },
   posts: [{ text: 'Over the years, there have been many Hoaxes, but the greatest of them all is the one being perpetrated right now.', age: '25m ago', market: true, when: NOW - 1500 },
           { text: 'Many people think that the words "Artificial Intelligence" are inaccurate...', age: '8h ago', market: false, when: NOW - 28800 }],
   weather: { temp: 32, high: 42, low: 30, text: 'clear' },
+  prayer: { name: 'Asr', at: NOW + 5400 },
   system: { cpu: 16, ram: 83, gpu: 3, gpu_name: 'NVIDIA GeForce RTX 4060 Ti', vram: 2.1 },
   usage: { tokens: 839, cost: 0.02, estimated: true, turns: 1 },
   clips: { saved_today: 0, seconds: 60 },
@@ -108,7 +112,16 @@ const state = {
   cardsTimer: null,
   level: 0,
   levelSmooth: 0,
+  mode: 'full',           // what apollo.py last said the window is
+  feed: [],               // the stories on screen, in the order they are numbered
+  feedKey: '',            // ...and what they were, so an unchanged feed is left alone
+  lit: -1,                // the row under the pointer
+  open: null,             // the story opened out of its row: { index, item }
 };
+
+// Whether the display is the idle screen. Up here because the clock, which
+// starts ticking before the rest of the page is built, asks it.
+const asleep = { on: false, timer: null, last: '' };
 
 /* --- the shader, the ring and LYLA --------------------------------------- */
 
@@ -190,6 +203,7 @@ ringStart();
 /* --- the clock ------------------------------------------------------------ */
 
 function tickClock() {
+  tickSleep();
   const now = new Date();
   // Read from the clock rather than counting frames, so it can neither drift
   // nor stall while the display is open.
@@ -385,7 +399,8 @@ function feedItems(snapshot) {
     if (chosen !== 'all' && chosen !== topic) continue;
     for (const story of stories || []) {
       items.push({ title: story.title, source: story.source, age: story.age,
-                   when: story.when || 0, topic });
+                   summary: story.summary || '', image: story.image || '',
+                   link: story.link || '', when: story.when || 0, topic });
     }
   }
   // Posts belong to the markets tab as well as to "all": a market-moving post
@@ -393,6 +408,7 @@ function feedItems(snapshot) {
   if (chosen === 'all' || chosen === 'markets') {
     for (const post of snapshot.posts || []) {
       items.push({ title: post.text, source: 'Truth Social', age: post.age,
+                   summary: post.text, image: '', link: '',
                    when: post.when || 0, topic: 'posts', moving: post.market });
     }
   }
@@ -400,20 +416,248 @@ function feedItems(snapshot) {
   return items;
 }
 
+/* Only pictures served over https, and only as pictures: the address comes
+ * from a feed. Bing's thumbnail service sizes and crops to order. */
+const safeImage = (url) => (/^https:\/\//.test(String(url || '')) ? String(url) : '');
+const sized = (url, width, height) => (url ? `${url}&w=${width}&h=${height}&c=14` : '');
+const numbered = (index) => String(index + 1).padStart(2, '0');
+
+function renderChips() {
+  $('topics').innerHTML = TOPICS.map((topic, i) =>
+    `<span class="chip ${i === state.topic ? 'on' : ''}" data-topic="${i}">${esc(topic)}</span>`).join('');
+}
+
 function renderFeed(snapshot) {
   $('headlines-head').innerHTML = 'Feed' + stale('news');
-  $('topics').innerHTML = TOPICS.map((topic, i) =>
-    `<span class="chip ${i === state.topic ? 'on' : ''}">${esc(topic)}</span>`).join('');
-  const items = feedItems(snapshot);
-  $('stories').innerHTML = items.slice(0, 11).map((item) => `
-    <div class="story${item.moving ? ' moving' : ''}">
+  renderChips();
+  const items = feedItems(snapshot).slice(0, 11);
+  // A snapshot arrives every few seconds for the machine's numbers. The feed
+  // is rebuilt only when the feed changed, or the row under the pointer would
+  // lose its bar every five seconds.
+  const key = state.topic + '#' + items.map((item) => [item.title, item.age].join('|')).join('\n');
+  if (key === state.feedKey) return;
+  state.feedKey = key;
+  state.feed = items;
+  unlight();
+  $('stories').innerHTML = items.map((item, i) => `
+    <div class="story${item.moving ? ' moving' : ''}" data-i="${i}">
+      <span class="num">${numbered(i)}</span>
       <span class="what">${esc(String(item.title).slice(0, 150))}</span>
       <span class="who"><b>${esc(item.source)}</b> · ${esc(item.age)}${
         item.moving ? ' · <i>market-moving</i>' : ''}</span>
+      ${item.image ? '<span class="pic"></span>' : ''}
     </div>`).join('')
-    || '<div class="story"><span class="what">Nothing has come in yet</span>'
+    || '<div class="story empty"><span class="num">—</span><span class="what">Nothing has come in yet</span>'
      + '<span class="who">the feeds are quiet</span></div>';
+  $('peek').innerHTML = items.map((item) => `<div class="shot">${shot(item, 720, 456)}</div>`).join('');
 }
+
+/* A story's picture, or its source set large where it has none. */
+function shot(item, width, height) {
+  if (safeImage(item.image)) {
+    return `<img src="${esc(sized(safeImage(item.image), width, height))}" alt="">`;
+  }
+  return `<div class="tile"><b>${esc(item.source || 'Apollo')}</b><span>${esc(item.topic)}</span></div>`;
+}
+
+/* --- the list, after the interactive-list component ---------------------------
+ *
+ * The component's three moving parts, without GSAP or React: the bar that
+ * slides to the row under the pointer (a CSS transition on its transform and
+ * height), the row's text going dark as the bar arrives (a class, with its
+ * own transition), and the picture that opens out of its centre beside the
+ * list and follows the pointer a little behind it (a lerp, on frames only
+ * while there is something to follow). */
+
+const PEEK_LERP = 0.18;          // the component's `lerp`
+const PEEK_WANDER = 20;          // ...and its IMAGE_OFFSET_MULTIPLIER
+const peekAt = { x: 0, y: 0, tx: 0, ty: 0, frame: null, placed: false };
+let peekTop = 10;
+
+const rowAt = (index) => $('stories').children[index] || null;
+
+function light(index) {
+  if (state.open || index === state.lit) return;
+  const row = rowAt(index);
+  if (!row || row.classList.contains('empty')) return;
+  if (state.lit >= 0) {
+    const before = rowAt(state.lit);
+    if (before) before.classList.remove('lit');
+    closeShot(state.lit);
+  }
+  state.lit = index;
+  row.classList.add('lit');
+  const bar = $('feed-bar');
+  bar.style.height = `${row.offsetHeight}px`;
+  bar.style.transform = `translateY(${row.offsetTop}px)`;
+  bar.style.opacity = '1';
+  openShot(index);
+}
+
+function unlight() {
+  if (state.lit >= 0) {
+    const row = rowAt(state.lit);
+    if (row) row.classList.remove('lit');
+    closeShot(state.lit);
+  }
+  state.lit = -1;
+  $('feed-bar').style.opacity = '0';
+  $('peek').classList.remove('on');
+}
+
+function openShot(index) {
+  const frame = $('peek').children[index];
+  if (!frame) return;
+  clearTimeout(frame._closing);
+  frame.classList.remove('gone', 'open');
+  peekTop += 1;
+  frame.style.zIndex = String(peekTop);
+  void frame.offsetWidth;                  // from closed, every time
+  frame.classList.add('open');
+  $('peek').classList.add('on');
+  follow();
+}
+
+function closeShot(index) {
+  const frame = $('peek').children[index];
+  if (!frame || !frame.classList.contains('open')) return;
+  frame.classList.remove('open');
+  frame.classList.add('gone');
+  frame._closing = setTimeout(() => frame.classList.remove('gone'), 640);
+}
+
+/* Beside the feed, on the side the screen has room: level with the pointer,
+ * and drifting with it by up to PEEK_WANDER either way. */
+function peekTarget() {
+  const panel = $('headlines').getBoundingClientRect();
+  const peek = $('peek');
+  const width = peek.offsetWidth, height = peek.offsetHeight;
+  const across = (peekAt.tx - panel.left) / Math.max(1, panel.width) - 0.5;
+  const x = panel.left - width - 30 + across * PEEK_WANDER * 2;
+  const y = Math.max(24, Math.min(window.innerHeight - height - 24, peekAt.ty - height / 2));
+  return [x, y];
+}
+
+function follow() {
+  if (peekAt.frame !== null) return;
+  const step = () => {
+    const [x, y] = peekTarget();
+    if (!peekAt.placed) { peekAt.x = x; peekAt.y = y; peekAt.placed = true; }
+    peekAt.x += (x - peekAt.x) * PEEK_LERP;
+    peekAt.y += (y - peekAt.y) * PEEK_LERP;
+    $('peek').style.transform = `translate3d(${peekAt.x.toFixed(1)}px, ${peekAt.y.toFixed(1)}px, 0)`;
+    const settled = Math.abs(x - peekAt.x) < 0.3 && Math.abs(y - peekAt.y) < 0.3;
+    // Frames only while there is somewhere to go.
+    peekAt.frame = state.lit >= 0 || !settled ? requestAnimationFrame(step) : null;
+  };
+  peekAt.frame = requestAnimationFrame(step);
+}
+
+$('stories').addEventListener('pointerover', (event) => {
+  const row = event.target.closest('.story');
+  if (row && row.dataset.i !== undefined) light(Number(row.dataset.i));
+});
+$('feed').addEventListener('pointermove', (event) => {
+  peekAt.tx = event.clientX;
+  peekAt.ty = event.clientY;
+});
+$('feed').addEventListener('pointerleave', () => {
+  unlight();
+  peekAt.placed = false;
+});
+$('stories').addEventListener('click', (event) => {
+  const row = event.target.closest('.story');
+  if (row && row.dataset.i !== undefined) openStory(Number(row.dataset.i));
+});
+$('topics').addEventListener('click', (event) => {
+  const chip = event.target.closest('.chip');
+  if (!chip || state.snapshot === null) return;
+  state.topic = Number(chip.dataset.topic) || 0;
+  closeStory();
+  renderFeed(state.snapshot);
+});
+
+/* --- one story, opened out of its row ------------------------------------- */
+
+function clipTo(row) {
+  const panel = $('headlines').getBoundingClientRect();
+  if (!row) return 'inset(45% 0px 45% 0px round 22px)';
+  const r = row.getBoundingClientRect();
+  return `inset(${(r.top - panel.top).toFixed(0)}px ${(panel.right - r.right).toFixed(0)}px `
+       + `${(panel.bottom - r.bottom).toFixed(0)}px ${(r.left - panel.left).toFixed(0)}px round 10px)`;
+}
+
+function storyMarkup(item, index) {
+  const read = item.link ? '<button class="read" data-act="read">Read the story ↗</button>' : '';
+  return `
+    <div class="media">${shot(item, 1280, 720)}</div>
+    <div class="body">
+      <div class="meta"><span class="num">${numbered(index)}</span><b>${esc(item.source)}</b> · ${esc(item.age)}</div>
+      <h3></h3>
+      <p class="text"></p>
+      <div class="actions">${read}<button class="back" data-act="back">Back to the feed</button></div>
+    </div>`;
+}
+
+/* What Apollo is told about a story it opened, so it can talk about it. */
+const told = (item, index) => ({ number: index + 1, title: String(item.title || ''),
+                                 source: String(item.source || ''),
+                                 summary: String(item.summary || '') });
+
+function openStory(index) {
+  const item = state.feed[index];
+  if (!item) return null;
+  const card = $('story');
+  unlight();
+  state.open = { index, item };
+  card.innerHTML = storyMarkup(item, index);
+  card.classList.add('on');
+  card.setAttribute('aria-hidden', 'false');
+  // Clipped to its own row first, then to the whole panel: the row opens.
+  card.style.transition = 'none';
+  card.style.clipPath = clipTo(rowAt(index));
+  void card.offsetWidth;
+  card.style.transition = '';
+  card.style.clipPath = 'inset(0px 0px 0px 0px round 22px)';
+  card.classList.toggle('shown', document.hidden);
+  reveal(card.querySelector('h3'), String(item.title || ''));
+  const text = card.querySelector('.text');
+  if (item.summary && item.summary !== item.title) {
+    reveal(text, String(item.summary));
+  } else {
+    text.textContent = item.link ? 'No summary came with this one. Read the story for all of it.'
+                                 : 'That is all there is of this one.';
+    text.classList.add('none');
+  }
+  return told(item, index);
+}
+
+function closeStory() {
+  const open = state.open;
+  if (!open) return;
+  state.open = null;
+  const card = $('story');
+  card.setAttribute('aria-hidden', 'true');
+  card.style.clipPath = clipTo(rowAt(open.index));
+  setTimeout(() => {
+    if (state.open) return;               // another was opened meanwhile
+    card.classList.remove('on');
+    card.innerHTML = '';
+  }, 560);
+}
+
+$('story').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-act]');
+  if (!button) return;
+  if (button.dataset.act === 'back') closeStory();
+  if (button.dataset.act === 'read' && state.open) {
+    const api = window.pywebview && window.pywebview.api;
+    if (api && api.open_link) api.open_link(String(state.open.item.link || ''));
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeStory();
+});
 
 function renderStrip(snapshot) {
   const usage = snapshot.usage || {};
@@ -451,6 +695,115 @@ function render(snapshot) {
   renderStrip(snapshot);
   renderWeather(snapshot.weather);
   enter();
+}
+
+/* --- asleep ------------------------------------------------------------------
+ *
+ * Ten quiet minutes and the display is just the name, one or two things worth
+ * knowing, and how to wake it. The things change every little while, picked
+ * at random from what the snapshot already knows; none of them is invented. */
+
+const FACT_EVERY = 16000;
+
+function clock(date) {
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/* Sentences, not markup: they only ever reach the page through `reveal`,
+ * which sets text. So feed values are joined as text here, not placed in
+ * templates - the templates on this page are the markup ones. */
+function facts(snapshot) {
+  const out = [];
+  const now = new Date();
+  const hijri = new Intl.DateTimeFormat('en-TN-u-ca-islamic-umalqura',
+    { day: 'numeric', month: 'long' }).format(now);
+  out.push(`It's ${now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}, ${hijri}.`);
+
+  const weather = snapshot.weather || {};
+  if (weather.temp !== undefined) {
+    out.push('Riyadh is ' + weather.temp + '° and ' + (weather.text || 'quiet')
+      + (weather.high !== undefined ? ', with a high of ' + weather.high + '°.' : '.'));
+  }
+  const next = snapshot.prayer || {};
+  if (next.name && next.at * 1000 > Date.now()) {
+    const minutes = Math.round((next.at * 1000 - Date.now()) / 60000);
+    const wait = minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes} minutes`;
+    out.push(`${next.name} is at ${clock(new Date(next.at * 1000))}, in ${wait}.`);
+  }
+  const market = snapshot.market || {};
+  for (const index of market.indices || []) {
+    out.push(`The ${index.name || index.symbol} is ${index.change_pct >= 0 ? 'up' : 'down'} `
+      + `${Math.abs(index.change_pct).toFixed(2)}%, at ${money(index.price)}.`);
+  }
+  const movers = [...(market.watchlist || [])].sort(
+    (a, b) => Math.abs(b.change_pct) - Math.abs(a.change_pct));
+  if (movers.length) {
+    const mover = movers[0];
+    out.push(`${mover.symbol} has moved the most on your watchlist today: `
+      + `${mover.change_pct >= 0 ? 'up' : 'down'} ${Math.abs(mover.change_pct).toFixed(2)}% to ${money(mover.price)}.`);
+  }
+  if (market.status) out.push(market.status + '.');
+  const headlines = feedItems({ news: snapshot.news || {}, posts: [] });
+  if (headlines.length) {
+    const pick = headlines[Math.floor(Math.random() * Math.min(6, headlines.length))];
+    out.push(pick.title + ' (' + pick.source + ').');
+  }
+  const usage = snapshot.usage || {};
+  if (usage.turns) out.push(`You've talked to Apollo ${usage.turns} time${usage.turns === 1 ? '' : 's'} today.`);
+  return out;
+}
+
+function nextFact() {
+  const all = facts(state.snapshot || {});
+  if (!all.length) return;
+  // Two at a time, never the same pair twice running.
+  let pair = '';
+  for (let tries = 0; tries < 6; tries++) {
+    const first = all[Math.floor(Math.random() * all.length)];
+    const rest = all.filter((fact) => fact !== first);
+    const second = rest.length ? rest[Math.floor(Math.random() * rest.length)] : '';
+    pair = second && (first + second).length < 190 ? `${first} ${second}` : first;
+    if (pair !== asleep.last) break;
+  }
+  asleep.last = pair;
+  const element = $('sleep-fact');
+  const done = animate(element, { opacity: [1, 0] }, { duration: 0.4, ease: 'easeIn' });
+  const swap = () => {
+    element.style.opacity = '';
+    element.classList.toggle('shown', document.hidden);
+    reveal(element, pair);
+  };
+  if (done && done.finished && done.finished.then && element.textContent) done.finished.then(swap, swap);
+  else swap();
+}
+
+function tickSleep() {
+  if (!asleep.on) return;
+  const now = new Date();
+  $('sleep-tag').textContent = `${clock(now)} · ${now.toLocaleDateString('en-GB', { weekday: 'short' })}`;
+}
+
+function setSleep(on) {
+  on = Boolean(on);
+  if (on === asleep.on) return;
+  asleep.on = on;
+  document.body.classList.toggle('asleep', on);
+  $('sleep').setAttribute('aria-hidden', on ? 'false' : 'true');
+  shader.sleep(on);
+  clearInterval(asleep.timer);
+  if (on) {
+    unlight();
+    closeStory();
+    // Under the idle screen only the dots are seen; nothing else earns frames.
+    lyla.stop();
+    ringStop();
+    tickSleep();
+    nextFact();
+    asleep.timer = setInterval(nextFact, FACT_EVERY);
+  } else if (state.mode === 'full') {
+    ringStart();
+    if ($('lyla-block').dataset.hidden !== 'true') lyla.start();
+  }
 }
 
 /* Which panels are on the display. Apollo can take one off by voice, so they
@@ -686,14 +1039,28 @@ window.apollo = {
   },
   fatal(text) { window.apollo.note(text); },
   mode(name) {
+    state.mode = name;
     // The overlay has the screen while Apollo is at rest; a shader drawing to
     // a window nobody can see is a GPU burning for nothing.
-    if (name === 'full') { shader.start(); lyla.start(); ringStart(); enter(); }
-    else { shader.stop(); lyla.stop(); ringStop(); }
+    if (name === 'full') {
+      shader.start();
+      if (!asleep.on) { lyla.start(); ringStart(); }
+      enter();
+    } else {
+      shader.stop(); lyla.stop(); ringStop();
+      unlight();
+    }
   },
   level(value) { setLevel(value); },
   panels(state) { setPanels(state); },
   briefing(payload) { if (payload) render(payload); },
+  sleep(on) { setSleep(on); },
+  // "Open story three": opens it and says what it is. 0 closes it.
+  story(number) {
+    number = Number(number) || 0;
+    if (!number) { closeStory(); return { closed: true }; }
+    return openStory(number - 1);
+  },
 };
 
 render(SAMPLE);

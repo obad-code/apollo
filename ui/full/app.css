@@ -1,6 +1,6 @@
 /* The full display's skin: the overlay's palette, a CRT surface, and a grid
    that holds at 2560x1440 and at 1920x1080. Nothing here paints a background
-   except the shader behind it - the panels are glass. */
+   except the dot field behind it - the panels are smoked glass over it. */
 
 /* Thmanyah, carried with Apollo rather than expected from the system, and
    served from under this page because pywebview roots its server here. One
@@ -41,7 +41,10 @@
   /* ...and the same two on white paper, where the bright pair vanishes. */
   --up-ink: #0f9d58;
   --down-ink: #d1453b;
-  --panel: rgba(10, 14, 30, 0.42);
+  /* Smoked, warm glass: the dots show through it, blurred, and the words on
+     it still read. */
+  --panel: rgba(9, 8, 7, 0.62);
+  --paper: #fff6e6;               /* the feed's bar and the idle screen's ink */
   --panel-soft: rgba(255, 255, 255, 0.045);
   --gutter: 48px;
   --radius: 22px;
@@ -57,7 +60,7 @@
 html, body {
   height: 100%;
   overflow: hidden;
-  background: #04060c;
+  background: #060505;
   font-family: var(--mono);
   font-weight: 500;              /* Thmanyah reads thin at 400 on a dark ground */
   color: var(--amber);
@@ -68,15 +71,17 @@ html, body {
 
 #shader { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
+/* The tube's own corners are the shader's; this only settles the edges a
+   little further, over the panels as well as the dots. */
 .vignette {
   position: fixed; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, 0.72) 100%);
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.45) 100%);
 }
 
 .scanlines {
-  position: fixed; inset: 0; pointer-events: none;
+  position: fixed; inset: 0; pointer-events: none; z-index: 60;
   background: repeating-linear-gradient(0deg,
-    rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px);
+    rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 3px);
 }
 
 #stage {
@@ -101,8 +106,9 @@ html, body {
 .panel {
   background: var(--panel);
   border-radius: var(--radius);
+  border: 1px solid rgba(255, 214, 150, 0.07);
   padding: 22px 24px;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(7px) saturate(1.2);
   min-height: 0;
   overflow: hidden;
 }
@@ -233,27 +239,140 @@ html, body {
 
 /* --- headlines and posts -------------------------------------------------- */
 
-#headlines { grid-area: headlines; display: flex; flex-direction: column; }
-#stories { flex: 1; min-height: 0; overflow: hidden; }
-.chips { margin-bottom: 14px; }
+#headlines { grid-area: headlines; display: flex; flex-direction: column; position: relative; }
+.chips { margin-bottom: 12px; }
 .chip {
-  display: inline-block; font-size: 12px; font-weight: 700; padding: 4px 14px;
-  border-radius: 999px; background: var(--panel-soft);
-  color: rgba(216, 210, 196, 0.7); margin-right: 8px;
+  display: inline-block; font-size: 12px; font-weight: 700; padding: 5px 14px;
+  border-radius: 999px; background: var(--panel-soft); cursor: pointer;
+  color: rgba(216, 210, 196, 0.7); margin-right: 8px; text-transform: capitalize;
+  transition: background .25s, color .25s;
 }
-.chip.on { background: rgba(127, 224, 238, 0.14); color: var(--cyan); }
+.chip:hover { color: var(--amber-bright); }
+.chip.on { background: rgba(240, 217, 160, 0.14); color: var(--amber-bright); }
+
+/* The feed, after the interactive-list component: rows edge to edge of the
+   panel, a paper bar that slides to the row under the pointer, and the row's
+   text turning dark as the bar arrives under it. */
+#feed { position: relative; flex: 1; min-height: 0; overflow: hidden; margin: 0 -24px; }
+#feed-bar {
+  position: absolute; left: 0; right: 0; top: 0; height: 0; opacity: 0;
+  background: var(--paper); pointer-events: none;
+  transition: transform .35s cubic-bezier(.215, .61, .355, 1),
+              height .35s cubic-bezier(.215, .61, .355, 1), opacity .35s ease-out;
+  will-change: transform;
+}
+#stories { position: relative; }
 
 /* One item in the feed, whoever it came from. */
-.story { font-size: 14px; color: #d8d2c4; line-height: 1.38; margin-bottom: 14px; }
-.story .what { display: block; overflow: hidden; text-overflow: ellipsis;
-               display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.story .who { display: block; margin-top: 3px; font-size: 12px;
-              color: rgba(127, 224, 238, 0.55); }
-.story .who b { font-weight: 700; color: rgba(127, 224, 238, 0.85); }
+.story {
+  position: relative; display: grid; grid-template-columns: 30px 1fr; gap: 0 10px;
+  padding: 11px 24px; cursor: pointer; color: #ece4d2; line-height: 1.34;
+  border-bottom: 1px solid rgba(255, 240, 210, 0.055);
+  transition: color .35s cubic-bezier(.215, .61, .355, 1);
+}
+.story .num { font-size: 12px; font-weight: 900; letter-spacing: .06em; padding-top: 2px;
+              color: rgba(232, 185, 88, 0.62); font-variant-numeric: tabular-nums;
+              transition: color .35s; }
+.story .what { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2;
+               -webkit-box-orient: vertical; font-size: 15px; font-weight: 700; }
+.story .who { grid-column: 2; display: block; margin-top: 4px; font-size: 11px;
+              font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+              color: rgba(127, 224, 238, 0.55); transition: color .35s; }
+.story .who b { font-weight: 900; color: rgba(127, 224, 238, 0.88); transition: color .35s; }
 .story .who i { font-style: normal; color: var(--down); }
+.story .pic { position: absolute; right: 22px; top: 50%; width: 6px; height: 6px;
+              margin-top: -3px; border-radius: 50%; background: rgba(240, 217, 160, .35); }
+/* Under the bar: dark on paper, and no phosphor bleed on paper. */
+.story.lit { color: #121012; text-shadow: none; }
+.story.lit .num, .story.lit .who, .story.lit .who b { color: rgba(18, 16, 18, .62); }
+.story.lit .pic { background: rgba(18, 16, 18, .35); }
 /* A post that moves the market is the one thing here worth a mark. */
-.story.moving { border-left: 2px solid rgba(255, 107, 122, .5); padding-left: 10px;
-                margin-left: -12px; }
+.story.moving { box-shadow: inset 2px 0 0 rgba(255, 107, 122, .6); }
+.story.empty { cursor: default; }
+
+/* --- the picture beside the feed ------------------------------------------
+   The component's preview: every story's picture is stacked here, and the
+   one under the pointer opens out of its own centre (clip-path) on top of
+   the last. It follows the pointer a little behind it. */
+
+#peek {
+  position: fixed; left: 0; top: 0; width: 360px; height: 228px; z-index: 30;
+  pointer-events: none; border-radius: 14px; overflow: hidden;
+  box-shadow: 0 30px 60px -24px rgba(0, 0, 0, .9);
+  opacity: 0; transition: opacity .3s ease-out; will-change: transform;
+}
+#peek.on { opacity: 1; }
+#peek > .shot {
+  position: absolute; inset: 0; visibility: hidden;
+  clip-path: inset(50%);
+  transition: clip-path .6s cubic-bezier(.65, 0, .35, 1), opacity .6s ease-out;
+}
+#peek > .shot.open { visibility: visible; clip-path: inset(0%); opacity: 1; }
+#peek > .shot.gone { visibility: visible; clip-path: inset(50%); opacity: 0; }
+#peek img, #story .media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* The same scanlines over the pictures as over everything else, a little
+   stronger: a photograph is the thing on this screen that looks least like
+   it came out of a tube. */
+#peek > .shot::after, #story .media::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .16) 0 1px, transparent 1px 3px),
+              radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, .35) 100%);
+}
+
+/* A story with no picture gets its source instead, set large on the dots. */
+.tile {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  justify-content: flex-end; padding: 18px 20px; background: #121014;
+  color: var(--amber-bright);
+}
+.tile::before {
+  content: ""; position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(240, 217, 160, .16) 1px, transparent 1.3px);
+  background-size: 11px 11px;
+}
+.tile b { position: relative; font-size: 30px; font-weight: 900; line-height: 1.05; }
+.tile span { position: relative; margin-top: 6px; font-size: 12px; font-weight: 700;
+             letter-spacing: .14em; text-transform: uppercase; color: var(--caption); }
+
+/* --- one story, opened ------------------------------------------------------
+   It opens out of its own row: clipped to the row at first, then to the
+   whole panel. */
+
+#story {
+  position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column;
+  background: #0e0c0b; border-radius: var(--radius); overflow: hidden;
+  transition: clip-path .55s cubic-bezier(.32, .72, 0, 1);
+}
+#story::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, .09) 1px, transparent 1.2px);
+  background-size: 11px 11px;
+}
+#story.on { display: flex; }
+#story > * { position: relative; }
+#story .media { position: relative; flex: 0 0 40%; min-height: 0; overflow: hidden; }
+#story .body { flex: 1; min-height: 0; display: flex; flex-direction: column;
+               padding: 18px 24px 20px; }
+#story .meta { font-size: 11px; font-weight: 700; letter-spacing: .14em;
+               text-transform: uppercase; color: var(--caption); }
+#story .meta b { color: var(--cyan); font-weight: 900; }
+#story .meta .num { color: var(--amber-bright); margin-right: 10px; font-weight: 900; }
+#story h3 { margin-top: 10px; font-size: 22px; line-height: 1.25; font-weight: 900;
+            color: #fff3dc; }
+#story h3 span, #story .text span { display: inline-block; margin-right: .26em; }
+#story .text { margin-top: 12px; flex: 1; min-height: 0; overflow: hidden;
+               font-size: 15px; line-height: 1.5; font-weight: 500; color: #d9d0bf; }
+#story .text.none { color: var(--caption); }
+#story .actions { display: flex; gap: 10px; margin-top: 14px; }
+#story button {
+  font: inherit; font-size: 13px; font-weight: 700; border: 0; cursor: pointer;
+  border-radius: 999px; padding: 9px 18px; text-shadow: none;
+  transition: transform .2s ease-out, background .2s;
+}
+#story button:hover { transform: translateY(-1px); }
+#story button.read { background: var(--paper); color: #121012; }
+#story button.back { background: rgba(255, 255, 255, .08); color: #e9e1d0; }
+#story.shown h3 span, #story.shown .text span { opacity: 1; transform: none; filter: none; }
 
 /* --- the bottom strip ----------------------------------------------------- */
 
@@ -382,6 +501,52 @@ body.answering #lyla { opacity: .18; transition: opacity .45s ease-in-out; }
 body.answering #core { transform: translateY(-64px) scale(.78); }
 body.answering #hint { opacity: 0; }
 
+/* --- asleep ------------------------------------------------------------------
+   Ten quiet minutes, and the display is just its name, one thing worth
+   knowing, and how to wake it - laid out like the photograph it came from:
+   the name large in the lower left, a paragraph under it, and a pill on the
+   right. The dots keep going underneath, turned to dusk. */
+
+#sleep {
+  position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  opacity: 0; visibility: hidden;
+  transition: opacity 1.1s ease-in-out, visibility 0s linear 1.1s;
+  color: var(--paper);
+  text-shadow: 0 0 18px rgba(255, 170, 90, 0.25);
+}
+body.asleep #sleep { opacity: 1; visibility: visible;
+                     transition: opacity 1.4s ease-in-out .35s, visibility 0s; }
+body.asleep #stage,
+body.asleep #lyla,
+body.asleep #peek { opacity: 0 !important; pointer-events: none; transition: opacity .8s ease-in-out; }
+#stage { transition: opacity .6s ease-out; }
+
+#sleep-copy { position: absolute; left: 72px; bottom: 80px; max-width: 640px; }
+#sleep-name { display: flex; align-items: baseline; gap: 22px; }
+#sleep-word { font-size: 136px; font-weight: 700; line-height: .92; letter-spacing: -0.035em; }
+#sleep-tag { font-size: 15px; font-weight: 900; letter-spacing: .16em;
+             text-transform: uppercase; color: rgba(255, 246, 230, .62); }
+#sleep-fact { margin-top: 26px; min-height: 3em; font-size: 22px; line-height: 1.5;
+              font-weight: 500; color: rgba(255, 246, 230, .86); }
+#sleep-fact span { display: inline-block; margin-right: .26em; }
+#sleep-fact.shown span { opacity: 1; transform: none; filter: none; }
+#sleep-wake {
+  position: absolute; right: 72px; bottom: 86px;
+  background: var(--paper); color: #121012; text-shadow: none;
+  border-radius: 999px; padding: 15px 28px; font-size: 16px; font-weight: 700;
+  box-shadow: 0 0 44px rgba(255, 170, 90, .22);
+  animation: wake-breath 3.8s ease-in-out infinite;
+}
+@keyframes wake-breath {
+  0%, 100% { box-shadow: 0 0 34px rgba(255, 170, 90, .16); transform: translateY(0); }
+  50%      { box-shadow: 0 0 60px rgba(255, 170, 90, .34); transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #feed-bar, .story, #peek > .shot, #story { transition-duration: .01s; }
+  #sleep-wake { animation: none; }
+}
+
 /* #lyla is deliberately absent here: her canvas is the window at every size,
    and her room is measured in pixels from the bottom, not in proportions. */
 @media (max-width: 1920px) {
@@ -389,4 +554,13 @@ body.answering #hint { opacity: 0; }
   #clock { font-size: 54px; }
   #wordmark { font-size: 26px; }
   #ring { width: 200px; height: 200px; }
+  #peek { width: 300px; height: 190px; }
+  .story { padding: 9px 24px; }
+  .story .what { font-size: 14px; }
+  #story h3 { font-size: 19px; }
+  #story .text { font-size: 14px; }
+  #sleep-word { font-size: 104px; }
+  #sleep-fact { font-size: 19px; }
+  #sleep-copy { left: 56px; bottom: 60px; }
+  #sleep-wake { right: 56px; bottom: 64px; }
 }
