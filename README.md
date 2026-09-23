@@ -115,9 +115,9 @@ Apollo has two windows, and it is only ever as big as what it needs to show.
 | Shape | When | Covers |
 |---|---|---|
 | **Overlay** | at rest, and for a whole conversation | a mesh at the top edge (~1% of the screen), growing downward only as far as the answer needs |
-| **Full** | you have been away ~40 min, or you pressed `` Ctrl+` `` | the whole work area |
+| **Full** | you pressed `` Ctrl+` ``, or you have been away 10 min (the idle screen) | the whole work area |
 
-At rest it is just the mesh: a small constellation of glowing amber points,
+At rest it is just the mesh: a small constellation of glowing yellow points,
 turning slowly, hanging off the very top edge of the screen with only its
 bottom quarter in view. It is genuinely transparent — your wallpaper and
 desktop icons show through it and through its glow, because it is drawn with
@@ -131,16 +131,17 @@ edge of the screen and retracts when it is done:
 
 | | What you see |
 |---|---|
-| **At rest** | The amber ring, hanging off the top edge with a quarter of it in view. Your wallpaper shows through it and through its glow. |
+| **At rest** | The yellow ring, hanging off the top edge with a quarter of it in view. Your wallpaper shows through it and through its glow. |
 | **While you talk** | The panel drops down: Apollo's three-ring orb on the left, your words in cyan as they are transcribed, and a word underneath saying it is listening. Under the panel's edge, a glowing horizon and a dome of sparkles that brighten and speed up with your voice. |
 | **While it works** | The orb spins up, and the line under your words says what it is doing - *searching the web*, *fetching NVDA*, *saving the clip*. |
-| **When it answers** | The reply in amber, rising in line by line. An answer that rests on real numbers brings a chart with it - violet into cyan into amber, with the last reading marked - and one that is two to six figures brings borderless cards instead. |
+| **When it answers** | The reply in warm white, each word rising out of a blur. An answer that rests on real numbers brings a chart with it - violet into cyan into amber, with the last reading marked - and one that is two to six figures brings borderless cards instead. |
 | **Afterwards** | It retracts into the ring, quicker than it came. |
 
-Arabic answers are laid out right to left, in a face that shapes them
-properly. The panel is a deep navy with violet and teal light drifting across
-it on loops of sixteen, twenty-one and twenty-six seconds, so it never sits
-still and never repeats.
+Arabic answers are laid out right to left, in the same Thmanyah face as
+English. The panel is black glass hanging from the top edge, a quarter of it
+above the screen: a yellow CRT glow - straw to ember - drifts along its foot
+on loops of nine to thirteen seconds, over printed dots and scanlines, so it
+never sits still and never repeats.
 
 ```
       /\/\                   resting - the ring alone
@@ -185,25 +186,39 @@ one is a number Apollo actually has.
 
 ### The full display
 
-The full display is the whole screen: a shader rippling behind everything, the
-clock with the date in both calendars, Riyadh's weather, your watchlist with
-sparklines, headlines on what you follow, Trump's posts with the
-market-moving ones flagged, what Apollo has cost today, what the machine is
-doing — and LYLA still in her room along the bottom.
+The full display is the whole screen: a field of dots behind everything - a
+CRT's phosphors in a halftone, bulged by a fisheye - the clock with the date in
+both calendars, Riyadh's weather, your watchlist with sparklines, headlines
+on what you follow, Trump's posts with the market-moving ones flagged, what
+Apollo has cost today, what the machine is doing — and LYLA still in her room
+along the bottom.
+
+The feed is a list you can pick from. Point at a story and a bar slides under
+it and its picture opens beside the panel; click it and the story opens out
+of its row - picture, summary, and a **Read** button that opens the article in
+your browser. Or say it: *"open story three"* opens it (bringing the display
+up if it was not) and Apollo tells you what it is. The chips along the top
+filter by topic.
 
 Nothing on it is invented. Every number comes from `dataservice.DataService`
 through `window.apollo.data(snapshot)`, and the service stamps each reader
 separately: when one fails, its panel keeps the last good value and wears its
 age in the heading rather than going blank and implying the world went quiet.
 
-It opens two ways:
+It opens on demand, with `` Ctrl+` ``, and stays open until you press the
+chord again — typing and moving the mouse in between do not close it.
 
-- **By itself, when you are away.** After **40 minutes** with no keyboard or
-  mouse input anywhere in Windows, Apollo opens the full display like a
-  screensaver. The very next keypress or mouse movement sends it straight back
-  to the overlay.
-- **On demand, with `` Ctrl+` ``.** It stays open until you press the chord
-  again — typing and moving the mouse in between do not close it.
+**Asleep.** After **10 minutes** with no key, no mouse and no voice, Apollo
+falls asleep: the screen becomes the idle screen - just *Apollo*, the time,
+a fact or two picked at random from what the display already knows (the next
+prayer, the weather, a mover on your watchlist, a headline), and *Press any
+key or say anything to wake Apollo*, on the same dots turned to dusk. It
+falls asleep over the desktop or over the full display, and wakes back to
+whichever it was. Any key or mouse movement wakes it, and so does speaking:
+while asleep Apollo reads the loudness of the microphone the voice session
+already holds - the level only, nothing is recorded or sent - and a sentence
+wakes it where a click or a cough does not. It will not fall asleep over a
+full-screen program, so a film or a game is left alone.
 
 A conversation can happen while it is open, and it stays open for it: LYLA and
 the panels step aside while there is an answer on screen, then come back.
@@ -451,7 +466,7 @@ memory:
 | | Source | Refreshed |
 |---|---|---|
 | Your watchlist and the indices | Yahoo Finance | every minute while New York trades, else every 15 |
-| Headlines on gaming, Marvel, movies and markets | Google News feeds | every 10 minutes |
+| Headlines on gaming, Marvel, movies and markets, with pictures and summaries | Bing News RSS, Google News when Bing has nothing | every 10 minutes |
 | Trump's posts, market-moving ones flagged | trumpstruth.org | every 5 minutes |
 | Riyadh's weather | Open-Meteo | every 15 minutes |
 | CPU, memory and the GPU | the machine itself | every 5 seconds |
@@ -523,7 +538,7 @@ The only thing left is your API key.
 | `dataservice.py` | The one background thread that keeps all of it fresh. |
 | `clips.py` | The replay buffer: the last minute of the screen and system audio, in memory, and the MP4 a save writes. |
 | `turnview.py` | What the overlay shows for the turn in progress, as your words, the reply and any chart arrive from different threads. |
-| `presence.py` | When the full display is open (Ctrl+` is sticky; away-from-keyboard closes on input), and what a phase change does to the overlay. |
+| `presence.py` | When the full display is open (Ctrl+` is sticky), when Apollo is asleep on the idle screen and what wakes it (input, a voice, a conversation), and what a phase change does to the overlay. |
 | `reminders.py` | Reminder storage and the watcher that fires them. |
 | `probes/` | Live checks against the real APIs and PC: which Gemini model to use, transcript timing, and an end-to-end tool run. |
 | `apollo.py` | The overlay host. Owns the window shapes, the tray icon, the presence watcher and the single-instance lock, and drives the page from `assistant`. |
@@ -616,6 +631,9 @@ it in the window Apollo actually uses:
 .\.venv\Scripts\python.exe probes\probe_full_display.py
 ```
 
+`probes\probe_feed_shots.py` screenshots the feed, a story opened out of it
+and the idle screen, with the real feeds in it.
+
 One trap worth knowing: pywebview roots its HTTP server at the page's own
 directory, so anything the page references has to live under `ui/full/` —
 `../anything` resolves in a browser and 404s in the window, silently.
@@ -658,7 +676,7 @@ And the overlay's own knobs, at the top of `apollo.py`:
 
 | Setting | Default | Notes |
 |---|---|---|
-| `AFK_SECONDS` | `2400` (40 min) | How long the machine must go untouched before the full display opens by itself. |
+| `AFK_SECONDS` | `600` (10 min) | How long the machine must go untouched - no key, no mouse, no voice - before Apollo falls asleep on the idle screen. |
 | `PEEK_HOTKEY` | `ctrl+`` ` | Opens/closes the full display. Shares no key with the talk chord, so expanding never records a fragment of a turn. |
 | `ORB_PX` | `190` | The mesh's own box. The overlay grows downward from the top of it; the mesh itself always sits in a square of exactly this size. |
 | `ORB_REVEAL` | `0.25` | How much of the mesh stays below the top edge; the rest hangs off-screen. |
