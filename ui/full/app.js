@@ -488,8 +488,7 @@ function light(index) {
   state.lit = index;
   row.classList.add('lit');
   const bar = $('feed-bar');
-  bar.style.height = `${row.offsetHeight}px`;
-  bar.style.transform = `translateY(${row.offsetTop}px)`;
+  bar.style.transform = `translateY(${row.offsetTop}px) scaleY(${row.offsetHeight / 100})`;
   bar.style.opacity = '1';
   openShot(index);
 }

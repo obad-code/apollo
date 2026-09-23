@@ -254,11 +254,13 @@ html, body {
    panel, a paper bar that slides to the row under the pointer, and the row's
    text turning dark as the bar arrives under it. */
 #feed { position: relative; flex: 1; min-height: 0; overflow: hidden; margin: 0 -24px; }
+/* A fixed 100px bar, moved and stretched to the row by transform alone:
+   animating its height would lay the panel out again every frame. */
 #feed-bar {
-  position: absolute; left: 0; right: 0; top: 0; height: 0; opacity: 0;
-  background: var(--paper); pointer-events: none;
-  transition: transform .35s cubic-bezier(.215, .61, .355, 1),
-              height .35s cubic-bezier(.215, .61, .355, 1), opacity .35s ease-out;
+  position: absolute; left: 0; right: 0; top: 0; height: 100px; opacity: 0;
+  background: var(--paper); pointer-events: none; transform-origin: 0 0;
+  transform: scaleY(0);
+  transition: transform .35s cubic-bezier(.215, .61, .355, 1), opacity .35s ease-out;
   will-change: transform;
 }
 #stories { position: relative; }
