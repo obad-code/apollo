@@ -304,6 +304,8 @@ TOOLS = tools.claude_tools() + [
 # show it and the console version doesn't want it.
 logging.getLogger("anthropic.lib.credentials._auth").setLevel(logging.ERROR)
 
+log = logging.getLogger("apollo.assistant")
+
 # ...but Apollo's own loggers do want a console. There are two backends now and
 # the single most useful thing to see while debugging is which one each turn
 # went to, so `apollo.router` and `apollo.gemini` get a handler of their own
@@ -1358,6 +1360,52 @@ class ConsolePrinter:
         print(f"  ... {text}")
 
 
+class Offline(RuntimeError):
+    """The network is not there yet - worth waiting for, unlike a bad key."""
+
+
+# Seconds between tries while the network comes up. Short at first, because
+# at sign-in it is usually a few seconds away; capped, because a machine that
+# has been offline for an hour should still notice within half a minute.
+WAIT_DELAYS = (2, 3, 5, 8, 13, 20, 30)
+
+
+def wait_for_api(ui=None, stop=lambda: False, sleep=time.sleep, check=None):
+    """`check_api`, but patient about the network.
+
+    Apollo starts at sign-in, exactly when Wi-Fi is least likely to have
+    connected yet, and the startup check used to treat "could not reach the
+    API" like "your key is wrong": it put up a note and the worker returned
+    for good. Apollo went on running with no voice, no data, no reminders and
+    no recap, and never tried again.
+
+    Offline now means wait and try again, with the note said once. Anything
+    else - no key, a rejected key, a missing model - still raises at once,
+    because waiting will not fix it. False if Apollo is quitting meanwhile.
+    """
+    check = check or check_api
+    attempt = 0
+    while True:
+        try:
+            check()
+            if attempt:
+                log.info("the API is reachable after %d tries", attempt + 1)
+            return True
+        except Offline as exc:
+            if stop():
+                return False
+            if attempt == 0:
+                log.info("waiting for the network: %s", exc)
+                note = getattr(ui, "note", None)
+                if note is not None:
+                    try:
+                        note("Waiting for the network…")
+                    except Exception:  # noqa: BLE001 - a note is not the point
+                        pass
+            sleep(WAIT_DELAYS[min(attempt, len(WAIT_DELAYS) - 1)])
+            attempt += 1
+
+
 def check_api():
     """Validate the key, workspace header and model name before we start.
 
@@ -1376,7 +1424,7 @@ def check_api():
     try:
         client.models.retrieve(CLAUDE_MODEL)
     except anthropic.APIConnectionError as e:
-        raise RuntimeError(f"Couldn't reach the API. Check your internet.\n  {e}")
+        raise Offline(f"Couldn't reach the API. Check your internet.\n  {e}")
     except anthropic.APIStatusError as e:
         raise RuntimeError(api_error_detail(e))
 

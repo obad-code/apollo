@@ -81,6 +81,8 @@ composites unreliably outside the normal window hierarchy.
 
 import ctypes
 import json
+import logging
+import logging.handlers
 import os
 import sys
 import threading
@@ -118,6 +120,32 @@ import tools  # noqa: E402
 import turnview  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+log = logging.getLogger("apollo")
+
+# Where Apollo writes what goes wrong. It runs under pythonw, which has no
+# console, so without this a failure in a background thread - the watcher, the
+# data service, the prayer check - happened and left no trace at all. Every
+# module logs under "apollo.*", so this one file catches all of them.
+LOG_PATH = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
+                        "Apollo", "apollo.log")
+
+
+def start_log(path=LOG_PATH):
+    """One rotating file for the whole app: a megabyte, three kept."""
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        handler = logging.handlers.RotatingFileHandler(
+            path, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+    except OSError:
+        return None                   # no log is survivable; no Apollo is not
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)-7s %(name)s: %(message)s"))
+    root = logging.getLogger("apollo")
+    root.setLevel(logging.INFO)
+    root.addHandler(handler)
+    return handler
+
 
 # The hand-written display. `ui/legacy/` holds the generated page this one
 # replaced; `build_ui.py` still builds that, and nothing in the run reads it.
@@ -433,23 +461,41 @@ class Watcher(threading.Thread):
 
     def run(self):
         held = {"peek": False, "quit": False}
+        last_error = None
         while not self.app.stopping.is_set():
-            # Quit is checked first and wins: it contains the peek chord's
-            # CTRL, and on the way to CTRL+ALT+SHIFT+Q you should not get a
-            # full display you did not ask for.
-            for name, chord, fn in (("quit", QUIT_CHORD, self.app.quit),
-                                    ("peek", PEEK_CHORD, self.app.toggle_peek)):
-                down = chord_down(chord)
-                if down and not held[name]:    # act on the press, not the hold
-                    held[name] = True
-                    fn()
-                    break
-                if not down:
-                    held[name] = False
-
-            self.app.check_presence(idle_seconds())
-            self.app.check_overlay_alive()
+            # One bad tick must not end the thread. It used to: an exception
+            # anywhere in here escaped `run`, the daemon thread died, and with
+            # it went Ctrl+`, the quit chord, presence, the day's recap and the
+            # prayer reminders - silently, because pythonw has no console.
+            try:
+                self._tick(held)
+                last_error = None
+            except Exception as exc:  # noqa: BLE001 - the loop outlives any check
+                # Logged once per distinct failure, not once per tick: at
+                # twenty-five ticks a second a stuck check would otherwise
+                # write the same traceback into the log for as long as it lasts.
+                signature = (type(exc).__name__, str(exc))
+                if signature != last_error:
+                    log.exception("watcher tick failed")
+                    last_error = signature
             time.sleep(0.04)
+
+    def _tick(self, held):
+        # Quit is checked first and wins: it contains the peek chord's CTRL,
+        # and on the way to CTRL+ALT+SHIFT+Q you should not get a full display
+        # you did not ask for.
+        for name, chord, fn in (("quit", QUIT_CHORD, self.app.quit),
+                                ("peek", PEEK_CHORD, self.app.toggle_peek)):
+            down = chord_down(chord)
+            if down and not held[name]:    # act on the press, not the hold
+                held[name] = True
+                fn()
+                break
+            if not down:
+                held[name] = False
+
+        self.app.check_presence(idle_seconds())
+        self.app.check_overlay_alive()
 
 
 class Tray:
@@ -1071,6 +1117,7 @@ class Apollo:
         if not self.schedule.due(idle_seconds=idle, busy=busy):
             return
         self.schedule.done()
+        log.info("day's recap starting")
         self.briefing_thread = threading.Thread(target=self.morning, daemon=True,
                                                 name="apollo-briefing")
         self.briefing_thread.start()
@@ -1090,6 +1137,7 @@ class Apollo:
         if found is None:
             return
         name, when = found
+        log.info("prayer reminder: %s at %s", name, when.strftime("%H:%M"))
         self.prayer_thread = threading.Thread(
             target=assistant.fire_prayer, daemon=True, name="apollo-prayer",
             args=(ui, self.voice, name, when, prayer.LEAD_MINUTES))
@@ -1150,11 +1198,17 @@ class Apollo:
         ui = self.ui
         ui.status(STARTING)
 
+        # Patient about the network: at sign-in it is usually a few seconds
+        # away, and giving up here used to leave Apollo running but empty for
+        # the whole session. A bad key is still fatal at once.
         try:
-            assistant.check_api()
+            if not assistant.wait_for_api(ui, stop=self.stopping.is_set):
+                return                        # quitting while it waited
         except RuntimeError as e:
+            log.error("startup check failed: %s", e)
             ui.fatal(str(e))
             return
+        log.info("API reachable")
 
         # The backup transcriber loads behind everything else - Gemini's own
         # transcript is the one in use - so it no longer holds up waking.
@@ -1178,6 +1232,7 @@ class Apollo:
             on_activity=ui.activity,
             run_tool=assistant.tool_runner(ui))
         self.voice.open(auto_vad=False)
+        log.info("voice session opened")
 
         # The replay buffer: the last minute of the screen, in memory only, so
         # "clip that" has something to save. Nothing reaches the disk until
@@ -1190,6 +1245,7 @@ class Apollo:
         # posts, weather, the machine - refreshed on a timer rather than
         # inside a turn, where it would be latency you could hear.
         self.data = dataservice.DataService(on_snapshot=self.on_data).start()
+        log.info("data service started")
 
         # CTRL+1. A thread of its own so it answers during a turn as well as
         # between them; `run_loop` reads its flag and does the actual
@@ -1210,6 +1266,7 @@ class Apollo:
         # Waking is over: from here a turn is allowed to take the screen.
         ui.quiet = False
         ui.status(assistant.IDLE)
+        log.info("awake")
 
         # Quitting is the Hotkeys thread's job, so that it answers during a
         # turn as well as between them.
@@ -1271,9 +1328,14 @@ def main():
         # Startup copy is already resident, and a dialog for that is noise.
         sys.exit(0)
 
+    # After the lock: the copy that exits because one is already running
+    # must not write "started" into the running one's log.
+    start_log()
+    log.info("started, pid %s", os.getpid())
+
     Apollo()
     # http_server serves ui/ over localhost instead of file://, which is what
-    # lets the page fetch() its own sound effects and load the Melete face.
+    # lets the page fetch() its own sound effects and load the fonts.
     webview.start(http_server=True)
 
 
