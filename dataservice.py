@@ -45,6 +45,7 @@ class DataService:
         self._due = {key: 0.0 for key in INTERVALS}
         self._thread = None
         self._stopping = threading.Event()
+        self._wake = threading.Event()      # see `poke`
 
     def start(self):
         if self._thread is None or not self._thread.is_alive():
@@ -55,14 +56,27 @@ class DataService:
 
     def stop(self):
         self._stopping.set()
+        self._wake.set()
+
+    def poke(self, *keys):
+        """Have the loop read these (all of them, with none named) now.
+
+        Returns at once: the reading happens on the service's own thread,
+        so whoever asked - a tool call, with Apollo silent until it answers -
+        does not wait on Yahoo.
+        """
+        for key in keys or tuple(INTERVALS):
+            self._due[key] = 0.0
+        self._wake.set()
 
     def _run(self):
         while not self._stopping.is_set():
+            self._wake.clear()
             try:
                 self.refresh()
             except Exception:  # noqa: BLE001 - the loop outlives any one failure
                 log.debug("refresh failed", exc_info=True)
-            self._stopping.wait(2.0)
+            self._wake.wait(2.0)
 
     def refresh(self, force=False):
         """Update whatever is due. `force` updates everything."""

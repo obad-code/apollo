@@ -769,13 +769,19 @@ class WebReporter:
         """Which panels the display should be showing."""
         self._call("panels", state)
 
-    def refresh(self):
-        """Read the world again now, and push it. True if anything was told."""
+    def refresh(self, *keys):
+        """Have the data service read these again (everything, if none) and
+        push them. True if there is a service to ask.
+
+        It asks and returns. It used to read the lot on the tool's own
+        thread - every stock with its valuation, four news topics, the
+        posts, the weather - and the tool's answer waited for all of it.
+        """
         service = getattr(self._app, "data", None) if self._app is not None else None
         if service is None:
             return False
         try:
-            service.refresh(force=True)
+            service.poke(*keys)
         except Exception:  # noqa: BLE001 - a refresh is not worth a failed turn
             return False
         return True

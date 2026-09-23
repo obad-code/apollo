@@ -58,8 +58,9 @@ class Context:
     """What a handler may reach besides its arguments.
 
     `show(visual)` puts a chart or cards on the overlay, `activity(text)`
-    says in a few words what Apollo is doing ("fetching NVDA"), `refresh()`
-    asks the data service to read the world again and push it to the display,
+    says in a few words what Apollo is doing ("fetching NVDA"), `refresh(*keys)`
+    asks the data service to read those parts of the world again (all of it,
+    with none named) and push them to the display - without waiting for it,
     `panels(state)` tells the display which of its panels to show, `story(n)`
     opens the feed's nth story on it and says what that story is, and `turn`
     is the user's turn number at the moment the call arrived.
@@ -71,7 +72,7 @@ class Context:
         self.activity = activity or (lambda text: None)
         # False by default, so a tool that changes the display can tell the
         # difference between "refreshed" and "there was nothing to refresh".
-        self.refresh = refresh or (lambda: False)
+        self.refresh = refresh or (lambda *keys: False)
         self.panels = panels_hook or (lambda state: None)
         self.story = story_hook or (lambda number: None)
         self.turn = current_turn() if turn is None else turn
@@ -522,33 +523,53 @@ def _open_story(ctx, number=0):
             "source": found.get("source", ""), "summary": found.get("summary", "")}
 
 
-@_tool("watch_stock", "adding it to your watchlist",
-       "Add a company to the watchlist on the display. Use this when the user "
-       "asks to follow, watch, track or add a stock. Give the company name or "
-       "ticker as the user said it.",
-       _obj({"company": {"type": "string",
-                         "description": "The company name or ticker"}},
-            ("company",)))
-def _watch_stock(ctx, company=""):
-    ctx.activity("adding it to your watchlist")
-    result = watchlist.add(company)
-    if result.get("ok"):
-        ctx.refresh()
+_COMPANIES = {"type": "array", "items": {"type": "string"},
+              "description": ("The companies, each by its English name or its "
+                              "ticker (Palantir or PLTR, never بالانتير) - "
+                              "translate a name the user said in Arabic")}
+
+
+def _change_watchlist(ctx, companies, change, done):
+    """One call for however many were named, each changed on its own."""
+    changed, already, failed = [], [], []
+    for company in companies[:watchlist.MAX]:
+        result = change(str(company))
+        if result.get("already"):
+            already.append(result["symbol"])
+        elif result.get("ok"):
+            changed.append(result["symbol"])
+        else:
+            failed.append({"company": company, "error": result.get("error", "")})
+    if changed:
+        # Asked for, not waited on: the stock's card follows a moment later.
+        ctx.refresh("market")
+    result = {"ok": bool(changed or already), done: changed,
+              "watchlist": watchlist.current()}
+    if already:
+        result["already"] = already
+    if failed:
+        result["failed"] = failed
     return result
+
+
+@_tool("watch_stock", "adding it to your watchlist",
+       "Add companies to the watchlist on the display. Use this when the user "
+       "asks to follow, watch, track or add a stock - all of the ones they "
+       "named, in one call.",
+       _obj({"companies": _COMPANIES}, ("companies",)))
+def _watch_stock(ctx, companies=()):
+    ctx.activity("adding it to your watchlist")
+    return _change_watchlist(ctx, companies, watchlist.add, "added")
 
 
 @_tool("unwatch_stock", "taking it off your watchlist",
-       "Remove a company from the watchlist on the display. Use this when the "
-       "user asks to stop following, unfollow, drop or remove a stock.",
-       _obj({"company": {"type": "string",
-                         "description": "The company name or ticker"}},
-            ("company",)))
-def _unwatch_stock(ctx, company=""):
+       "Remove companies from the watchlist on the display. Use this when the "
+       "user asks to stop following, unfollow, drop or remove a stock - all "
+       "of the ones they named, in one call.",
+       _obj({"companies": _COMPANIES}, ("companies",)))
+def _unwatch_stock(ctx, companies=()):
     ctx.activity("taking it off your watchlist")
-    result = watchlist.remove(company)
-    if result.get("ok"):
-        ctx.refresh()
-    return result
+    return _change_watchlist(ctx, companies, watchlist.remove, "removed")
 
 
 @_tool("refresh_display", "refreshing the display",
@@ -559,7 +580,8 @@ def _refresh_display(ctx):
     ctx.activity("refreshing the display")
     if not ctx.refresh():
         return {"ok": False, "error": "The display isn't running right now."}
-    return {"ok": True, "refreshed": True}
+    # Under way rather than done: the service reads it on its own thread.
+    return {"ok": True, "refreshing": True}
 
 
 @_tool("prayer_times", "checking the prayer times",

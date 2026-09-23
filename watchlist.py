@@ -27,6 +27,10 @@ MAX = 12
 
 _memo = None
 _lock = threading.Lock()
+# Held across a whole change - read, edit, save. "Take off Apple, Tesla and
+# Meta" can arrive as three tool calls on three threads, and without this each
+# read the same list, dropped its own, and saved: the last save won.
+_edit = threading.Lock()
 
 
 def current():
@@ -71,20 +75,29 @@ def _symbol_for(text):
     return (symbol or "").upper() or None
 
 
+def _unknown(text):
+    # The market search knows companies by their English names. You say them
+    # in Arabic and the model passes them on as said, so the refusal says
+    # what to try instead: the model reads it and calls again.
+    return {"ok": False, "error": f"I couldn't find a stock called {text}. "
+                                  "Try its English name or its ticker."}
+
+
 def add(text):
     """Start watching whatever `text` names."""
     symbol = _symbol_for(text)
     if symbol is None:
-        return {"ok": False, "error": f"I couldn't find a stock called {text}."}
-    symbols = current()
-    if symbol in symbols:
-        return {"ok": True, "already": True, "symbol": symbol,
-                "watchlist": symbols}
-    if len(symbols) >= MAX:
-        return {"ok": False, "symbol": symbol,
-                "error": f"The watchlist is full at {MAX}. Take one off first."}
-    symbols.append(symbol)
-    _save(symbols)
+        return _unknown(text)
+    with _edit:
+        symbols = current()
+        if symbol in symbols:
+            return {"ok": True, "already": True, "symbol": symbol,
+                    "watchlist": symbols}
+        if len(symbols) >= MAX:
+            return {"ok": False, "symbol": symbol,
+                    "error": f"The watchlist is full at {MAX}. Take one off first."}
+        symbols.append(symbol)
+        _save(symbols)
     return {"ok": True, "symbol": symbol, "watchlist": symbols}
 
 
@@ -92,11 +105,12 @@ def remove(text):
     """Stop watching it."""
     symbol = _symbol_for(text)
     if symbol is None:
-        return {"ok": False, "error": f"I couldn't find a stock called {text}."}
-    symbols = current()
-    if symbol not in symbols:
-        return {"ok": False, "symbol": symbol,
-                "error": f"{symbol} isn't on the watchlist."}
-    symbols.remove(symbol)
-    _save(symbols)
+        return _unknown(text)
+    with _edit:
+        symbols = current()
+        if symbol not in symbols:
+            return {"ok": False, "symbol": symbol,
+                    "error": f"{symbol} isn't on the watchlist."}
+        symbols.remove(symbol)
+        _save(symbols)
     return {"ok": True, "symbol": symbol, "watchlist": symbols}

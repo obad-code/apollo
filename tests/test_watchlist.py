@@ -70,3 +70,43 @@ def test_a_corrupt_file_falls_back_rather_than_failing(monkeypatch):
     pathlib.Path(watchlist.PATH).write_text("{ not json", encoding="utf-8")
     watchlist._memo = None
     assert watchlist.current() == list(watchlist.DEFAULT)
+
+
+def test_changes_made_at_once_all_stick(monkeypatch):
+    """"Take off Apple, Tesla and Meta" arrives as three calls at once, on
+    three threads. Each read the list, dropped its own, and saved - so the
+    last save won and the other two came back."""
+    import threading
+    import time
+
+    names = {"apple": "AAPL", "tesla": "TSLA", "meta": "META"}
+    monkeypatch.setattr(watchlist.market, "resolve", lambda text: names[text])
+    read = watchlist.current
+
+    def slow_read():
+        symbols = read()
+        time.sleep(0.05)          # long enough for the others to read too
+        return symbols
+
+    monkeypatch.setattr(watchlist, "current", slow_read)
+    threads = [threading.Thread(target=watchlist.remove, args=(name,)) for name in names]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    left = read()
+    assert not {"AAPL", "TSLA", "META"} & set(left), left
+
+
+def test_a_name_it_cannot_place_asks_for_the_english_one(monkeypatch):
+    """You say it in Arabic, and the model passes it on as you said it. The
+    market search only knows English names, so the refusal tells the model
+    what to try instead - it reads the error and calls again."""
+    def unknown(text):
+        raise watchlist.market.MarketError("no such company")
+
+    monkeypatch.setattr(watchlist.market, "resolve", unknown)
+    result = watchlist.add("بالانتير")
+    assert result["ok"] is False
+    assert "English" in result["error"] and "ticker" in result["error"]
