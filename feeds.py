@@ -121,7 +121,10 @@ def _when(item):
 
 
 def _clean(text):
-    text = re.sub(r"<[^>]+>", " ", text or "")
+    # Inline tags sit inside words ("@<span>name</span>"), so they go without
+    # a trace; every other tag is a break between words.
+    text = re.sub(r"</?(?:span|a)\b[^>]*>", "", text or "")
+    text = re.sub(r"<[^>]+>", " ", text)
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
@@ -164,6 +167,26 @@ def _unwrap(link):
     return link
 
 
+THUMB_MAX_W = 800        # the widest the display ever shows a story's picture
+THUMB_SMALL = (400, 225)  # when the feed does not say how big the original is
+
+
+def _thumbnail_size(max_w, max_h):
+    """Bing's size parameters for the largest 16:9 picture the original has.
+
+    Asked for more than that, Bing does not refuse - it centres the picture
+    on white and hands that back, which on this display is a white frame.
+    """
+    try:
+        width, height = int(max_w), int(max_h)
+    except (TypeError, ValueError):
+        width, height = THUMB_SMALL
+    width = min(width, THUMB_MAX_W, height * 16 // 9)
+    if width <= 0:
+        width = THUMB_SMALL[0]
+    return f"&w={width}&h={width * 9 // 16}&c=14"
+
+
 def parse_bing(body):
     """Bing News RSS -> [{title, source, link, when, age, summary, image}].
 
@@ -179,6 +202,9 @@ def parse_bing(body):
         image = _child(item, "Image")
         if image.startswith("http://"):
             image = "https://" + image[len("http://"):]
+        if image.startswith("https://"):
+            image += _thumbnail_size(_child(item, "ImageMaxWidth"),
+                                     _child(item, "ImageMaxHeight"))
         when = _when(item)
         items.append({"title": title, "source": _clean(_child(item, "Source")),
                       "link": _unwrap(item.findtext("link") or ""),
@@ -190,6 +216,23 @@ def parse_bing(body):
     return items
 
 
+# A shared article, as Truth Social marks it up: an anchor whose text is the
+# address itself, split into spans. A mention (@someone) is an anchor too,
+# but its text is a name, so it is left alone.
+_SHARED = re.compile(r'<a\b[^>]*href="(https?://[^"]+)"[^>]*>\s*<span class="invisible">'
+                     r'.*?</a>', re.S)
+
+
+def _unlink(description):
+    """(description without its shared links, the first link it shared)."""
+    found = _SHARED.search(description)
+    cut = _SHARED.sub(" ", description)
+    # "Headline: <link>" leaves the colon hanging once the link is gone.
+    cut = re.sub(r"[\s:]+(</p>)", r"\1", cut)
+    cut = re.sub(r"[\s:]+$", "", cut)
+    return cut, html.unescape(found.group(1)) if found else ""
+
+
 def parse_posts(body):
     """trumpstruth.org RSS -> [{text, when, age, market}], newest first.
 
@@ -198,11 +241,12 @@ def parse_posts(body):
     """
     items = []
     for item in ET.fromstring(body).findall(".//item"):
-        text = _clean(item.findtext("description") or "") or _clean(item.findtext("title") or "")
+        description, link = _unlink(item.findtext("description") or "")
+        text = _clean(description) or _clean(item.findtext("title") or "")
         if not text or text.startswith("[No Title]"):
             continue
         when = _when(item)
-        items.append({"text": text, "when": when,
+        items.append({"text": text, "link": link, "when": when,
                       "age": age_words(time.time() - when) if when else "",
                       "market": is_market_moving(text)})
     items.sort(key=lambda i: i["when"], reverse=True)

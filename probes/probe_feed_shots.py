@@ -95,7 +95,14 @@ def main():
             time.sleep(1.2)
             grab(box, os.path.join(OUT, "3-hover-next.png"))
 
-            print("open:", window.evaluate_js("JSON.stringify(window.apollo.story(2))"))
+            # The first story that has a picture, so the opened view shows one.
+            pictured = window.evaluate_js(
+                "[...document.querySelectorAll('#stories .story')].findIndex(r => r.querySelector('.pic'))")
+            pictured = pictured if isinstance(pictured, int) and pictured >= 0 else 0
+            print("hover pictured:", window.evaluate_js(pointer_at(pictured)))
+            time.sleep(1.2)
+            grab(box, os.path.join(OUT, "3b-hover-picture.png"))
+            print("open:", window.evaluate_js(f"JSON.stringify(window.apollo.story({pictured + 1}))"))
             time.sleep(0.25)
             grab(box, os.path.join(OUT, "4-opening.png"))
             time.sleep(1.6)

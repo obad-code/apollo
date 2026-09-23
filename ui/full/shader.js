@@ -61,25 +61,27 @@ vec3 phosphor(vec2 q, float t) {
 // The same dots at dusk: the idle screen's sky, from its reference photo.
 vec3 dusk(vec2 q, float t, float aspect) {
   float y = q.y;                                   // -1 at the bottom, 1 at the top
-  float horizon = -0.46;
-  vec3 night = vec3(0.07, 0.12, 0.24);
-  vec3 mauve = vec3(0.34, 0.24, 0.34);
-  vec3 ember = vec3(1.00, 0.48, 0.20);
-  vec3 water = vec3(0.16, 0.09, 0.08);
-  float above = smoothstep(horizon - 0.02, 1.1, y);
-  vec3 sky = mix(ember, mauve, smoothstep(0.0, 0.42, above));
-  sky = mix(sky, night, smoothstep(0.30, 1.0, above));
+  float horizon = -0.54;
+  float h = y - horizon;                           // height above the line
+  vec3 night = vec3(0.11, 0.17, 0.34);
+  vec3 dusky = vec3(0.40, 0.28, 0.40);
+  vec3 ember = vec3(0.96, 0.47, 0.22);
+  vec3 water = vec3(0.13, 0.09, 0.09);
+  // Mostly night, as in the photo: the warmth is a strip just above the
+  // line, going dusky purple and then navy within a fifth of the screen.
+  vec3 sky = mix(ember * 0.72, dusky, smoothstep(0.0, 0.26, h));
+  sky = mix(sky, night, smoothstep(0.22, 1.1, h));
   // A band of cloud just over the horizon, drifting.
-  float band = exp(-pow((y - horizon - 0.16) * 5.5, 2.0));
-  float cloud = smoothstep(0.52, 0.78, fbm(vec2(q.x * 2.4 + t * 0.02, y * 9.0)));
-  sky *= 1.0 - band * cloud * 0.72;
+  float band = exp(-pow((h - 0.12) * 7.0, 2.0));
+  float cloud = smoothstep(0.50, 0.76, fbm(vec2(q.x * 2.2 + t * 0.02, y * 10.0)));
+  sky *= 1.0 - band * cloud * 0.8;
   // The glow is brightest just above the line and towards the right, where
   // the sun went down in the photo.
-  float glow = exp(-pow((y - horizon) * 3.2, 2.0)) * (0.55 + 0.45 * smoothstep(-aspect, aspect, q.x));
-  sky += ember * glow * 0.55;
+  float glow = exp(-pow(h * 4.6, 2.0)) * (0.45 + 0.55 * smoothstep(-aspect, aspect, q.x));
+  sky += ember * glow * 0.34;
   // Below the line: still water, holding a little of it.
-  float below = smoothstep(horizon + 0.02, horizon - 0.06, y);
-  vec3 sea = water + ember * 0.22 * exp(-(horizon - y) * 3.0)
+  float below = smoothstep(0.02, -0.04, h);
+  vec3 sea = water + ember * 0.15 * exp(h * 4.0)
            * (0.7 + 0.3 * noise(vec2(q.x * 30.0, y * 90.0 + t * 0.3)));
   return mix(sky, sea, below);
 }

@@ -28,7 +28,7 @@ const animate = Motion.animate || ((el, props) => {
 
 const $ = (id) => document.getElementById(id);
 
-/* Headlines come from Google News and posts come from Truth Social. Neither is
+/* Headlines come from Bing and Google News, posts from Truth Social. Neither is
  * Apollo's to trust: a title carrying `<img src=x onerror=...>` written into
  * innerHTML would run as script in the window that holds your watchlist, your
  * usage and a bridge back into the app. The old page was React, which escaped
@@ -408,7 +408,7 @@ function feedItems(snapshot) {
   if (chosen === 'all' || chosen === 'markets') {
     for (const post of snapshot.posts || []) {
       items.push({ title: post.text, source: 'Truth Social', age: post.age,
-                   summary: post.text, image: '', link: '',
+                   summary: post.text, image: '', link: post.link || '',
                    when: post.when || 0, topic: 'posts', moving: post.market });
     }
   }
@@ -417,9 +417,9 @@ function feedItems(snapshot) {
 }
 
 /* Only pictures served over https, and only as pictures: the address comes
- * from a feed. Bing's thumbnail service sizes and crops to order. */
+ * from a feed. It arrives already sized (feeds.parse_bing): asked for bigger
+ * than its original, Bing pads a picture out with white. */
 const safeImage = (url) => (/^https:\/\//.test(String(url || '')) ? String(url) : '');
-const sized = (url, width, height) => (url ? `${url}&w=${width}&h=${height}&c=14` : '');
 const numbered = (index) => String(index + 1).padStart(2, '0');
 
 function renderChips() {
@@ -449,13 +449,13 @@ function renderFeed(snapshot) {
     </div>`).join('')
     || '<div class="story empty"><span class="num">—</span><span class="what">Nothing has come in yet</span>'
      + '<span class="who">the feeds are quiet</span></div>';
-  $('peek').innerHTML = items.map((item) => `<div class="shot">${shot(item, 720, 456)}</div>`).join('');
+  $('peek').innerHTML = items.map((item) => `<div class="shot">${shot(item)}</div>`).join('');
 }
 
 /* A story's picture, or its source set large where it has none. */
-function shot(item, width, height) {
+function shot(item) {
   if (safeImage(item.image)) {
-    return `<img src="${esc(sized(safeImage(item.image), width, height))}" alt="">`;
+    return `<img src="${esc(safeImage(item.image))}" alt="">`;
   }
   return `<div class="tile"><b>${esc(item.source || 'Apollo')}</b><span>${esc(item.topic)}</span></div>`;
 }
@@ -590,7 +590,7 @@ function clipTo(row) {
 function storyMarkup(item, index) {
   const read = item.link ? '<button class="read" data-act="read">Read the story ↗</button>' : '';
   return `
-    <div class="media">${shot(item, 1280, 720)}</div>
+    <div class="media">${shot(item)}</div>
     <div class="body">
       <div class="meta"><span class="num">${numbered(index)}</span><b>${esc(item.source)}</b> · ${esc(item.age)}</div>
       <h3></h3>
@@ -732,8 +732,10 @@ function facts(snapshot) {
   }
   const market = snapshot.market || {};
   for (const index of market.indices || []) {
-    out.push(`The ${index.name || index.symbol} is ${index.change_pct >= 0 ? 'up' : 'down'} `
-      + `${Math.abs(index.change_pct).toFixed(2)}%, at ${money(index.price)}.`);
+    const flat = Math.abs(index.change_pct) < 0.005;
+    out.push(`The ${index.name || index.symbol} is `
+      + (flat ? 'flat' : `${index.change_pct >= 0 ? 'up' : 'down'} ${Math.abs(index.change_pct).toFixed(2)}%`)
+      + `, at ${money(index.price)}.`);
   }
   const movers = [...(market.watchlist || [])].sort(
     (a, b) => Math.abs(b.change_pct) - Math.abs(a.change_pct));
@@ -767,13 +769,17 @@ function nextFact() {
   }
   asleep.last = pair;
   const element = $('sleep-fact');
-  const done = animate(element, { opacity: [1, 0] }, { duration: 0.4, ease: 'easeIn' });
   const swap = () => {
     element.style.opacity = '';
     element.classList.toggle('shown', document.hidden);
     reveal(element, pair);
   };
-  if (done && done.finished && done.finished.then && element.textContent) done.finished.then(swap, swap);
+  // The old words fade before the new ones arrive - but only if there are
+  // old words. Faded with nothing in it, the line finished the fade after
+  // the first fact had been written, and sat at opacity 0 with it inside.
+  if (!element.textContent) { swap(); return; }
+  const done = animate(element, { opacity: [1, 0] }, { duration: 0.4, ease: 'easeIn' });
+  if (done && done.finished && done.finished.then) done.finished.then(swap, swap);
   else swap();
 }
 

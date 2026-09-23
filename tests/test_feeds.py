@@ -104,8 +104,10 @@ def test_parse_bing_gives_summary_image_and_the_publishers_link():
     assert record["summary"].startswith("The film took $108M")
     # Bing's click-tracking wrapper is unwrapped to the article itself.
     assert record["link"] == "https://www.example.com/news/record-weekend"
-    # Served over https, so the page never asks for a mixed-content image.
-    assert record["image"] == "https://www.bing.com/th?id=ORMS.0001&pid=News"
+    # Served over https, so the page never asks for a mixed-content image,
+    # and asked for at a size the original has: past it, Bing pads the
+    # picture out with white. 16:9 inside the feed's 1024x576, capped at 800.
+    assert record["image"] == "https://www.bing.com/th?id=ORMS.0001&pid=News&w=800&h=450&c=14"
     assert record["when"] > 0 and record["age"]
 
 
@@ -146,3 +148,28 @@ def test_headlines_fall_back_to_google_when_bing_has_nothing(monkeypatch):
     assert len(stories) == 3
     # Google has no picture or summary to give; the keys are there, empty.
     assert all(story["image"] == "" and "summary" in story for story in stories)
+
+
+POST_WITH_LINK = b"""<?xml version="1.0"?><rss><channel><item>
+<description>&lt;p&gt;Netanyahu Bloc Takes Lead in Latest Israeli Election Poll: &lt;a href="https://www.example.com/newsfront/poll/2026/09/17/" rel="nofollow"&gt;&lt;span class="invisible"&gt;https://www.&lt;/span&gt;&lt;span class="ellipsis"&gt;example.com/newsfront/poll&lt;/span&gt;&lt;span class="invisible"&gt;/2026/09/17/&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;</description>
+<pubDate>Tue, 22 Sep 2026 13:29:00 GMT</pubDate></item>
+<item><description>&lt;p&gt;RT &lt;span class="h-card"&gt;&lt;a href="https://truthsocial.com/@someone" rel="nofollow"&gt;@&lt;span&gt;someone&lt;/span&gt;&lt;/a&gt;&lt;/span&gt; A great day for the Economy!&lt;/p&gt;</description>
+<pubDate>Tue, 22 Sep 2026 12:00:00 GMT</pubDate></item></channel></rss>"""
+
+
+def test_a_posted_link_is_taken_out_of_the_words_and_kept_as_the_link():
+    """A post that shares an article reads "Headline: https://www. example.com/..."
+    once its markup is stripped - the address, broken with spaces, is most of
+    the line. It comes out of the text and becomes the post's link."""
+    shared, retweet = feeds.parse_posts(POST_WITH_LINK)
+    assert shared["text"] == "Netanyahu Bloc Takes Lead in Latest Israeli Election Poll"
+    assert shared["link"] == "https://www.example.com/newsfront/poll/2026/09/17/"
+    # A mention is words, not an address: it stays.
+    assert retweet["text"] == "RT @someone A great day for the Economy!"
+    assert retweet["link"] == ""
+
+
+def test_a_picture_with_no_stated_size_is_asked_for_small():
+    """Without the feed's maximum, a small size is the one that is never padded."""
+    streaming = feeds.parse_bing(fixture("news_bing.xml"))[2]
+    assert streaming["image"] == "https://www.bing.com/th?id=OVFT.0002&pid=News&w=400&h=225&c=14"
