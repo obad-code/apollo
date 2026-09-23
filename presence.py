@@ -8,23 +8,30 @@ you touched the keyboard, and in always-listening every answer was wiped a
 quarter of a second after it appeared.
 """
 
+from collections import deque
+
 IDLE = "Idle"             # the same strings as assistant.IDLE / LISTENING;
 LISTENING = "Listening"   # a test holds them in step without importing it
 
 
 class Presence:
-    """Whether the full display is up, and why.
+    """Whether the full display is up, and whether Apollo is asleep on it.
 
-    Two independent reasons. CTRL+` (`peek_open`) is yours: it stays until
-    you press the chord again, whatever you do in between. Being away
-    (`afk_open`) is the machine's: it opens after `afk_seconds` without input
-    and closes on the very next keypress or mouse move.
+    Two independent reasons for the display. CTRL+` (`peek_open`) is yours:
+    it stays until you press the chord again, whatever you do in between.
+    Being away (`afk_open`) is the machine's: after `afk_seconds` without
+    input Apollo falls `asleep` - the display becomes the idle screen, over
+    whatever was there - and the very next keypress, mouse move or voice
+    wakes it. Asleep over the dashboard wakes back to the dashboard; asleep
+    over the desktop wakes back to the desktop.
     """
 
     def __init__(self, afk_seconds):
         self.afk_seconds = afk_seconds
         self.peek_open = False
         self.afk_open = False
+        self.asleep = False
+        self._touched = None      # the last sign of you that was not input
 
     @property
     def full(self):
@@ -32,17 +39,60 @@ class Presence:
 
     def toggle_peek(self):
         self.peek_open = not self.peek_open
+        # The chord is a keypress, so it is also you coming back.
+        self.asleep = False
         if not self.peek_open:
             # Pressing the chord to close is an answer to "is it open?", not
             # to "which reason opened it?" - so it closes whichever it was.
             self.afk_open = False
 
-    def check(self, idle):
-        """Feed seconds-since-last-input. True if `full` changed."""
-        before = self.full
+    def touch(self, now):
+        """Someone is here who has not touched anything: a voice, a turn.
+
+        GetLastInputInfo only counts keys and the mouse, so without this the
+        idle time keeps growing while you talk to Apollo from across the room.
+        """
+        self._touched = now
+
+    def check(self, idle, now=None, screen_busy=False):
+        """Feed seconds-since-last-input. True if `full` or `asleep` changed.
+
+        `screen_busy` - a full-screen program is up - keeps Apollo from
+        falling asleep, because ten quiet minutes is also most of a film. It
+        never wakes an Apollo that is already asleep.
+        """
+        if self._touched is not None and now is not None:
+            idle = min(idle, max(0.0, now - self._touched))
+        before = (self.full, self.asleep)
+        if idle < self.afk_seconds:
+            self.asleep = False
+        elif not self.asleep and not screen_busy:
+            self.asleep = True
         if not self.peek_open:
-            self.afk_open = idle >= self.afk_seconds
-        return self.full != before
+            self.afk_open = self.asleep
+        return (self.full, self.asleep) != before
+
+
+class VoiceWake:
+    """Whether the microphone has heard someone speaking, rather than a noise.
+
+    Fed the 0-1 level of each 100 ms block. `needed` loud blocks among the
+    last `window` is a sentence starting; a door, a click or a cough is one
+    or two blocks and does not get there. It answers True once per
+    utterance and starts counting again.
+    """
+
+    def __init__(self, threshold=0.3, needed=4, window=6):
+        self.threshold = threshold
+        self.needed = needed
+        self._recent = deque(maxlen=window)
+
+    def feed(self, level):
+        self._recent.append(level >= self.threshold)
+        if sum(self._recent) >= self.needed:
+            self._recent.clear()
+            return True
+        return False
 
 
 def content_action(prev, state, linger):

@@ -238,10 +238,16 @@ PEEK_HOTKEY = "ctrl+`"
 # conversation rather than an opening for the recap to talk over.
 BRIEF_SETTLE = 25.0
 
-# How long the machine must go untouched - no key, no mouse, anywhere in
-# Windows - before Apollo opens the full display by itself, screensaver style.
-# The very next keypress or mouse movement sends it back to the orb.
-AFK_SECONDS = 40 * 60
+# How long the machine must go untouched - no key, no mouse, no voice - before
+# Apollo falls asleep: the display becomes the idle screen, screensaver style,
+# over whatever was there. The very next keypress, mouse movement or sentence
+# wakes it (see `presence.Presence`).
+AFK_SECONDS = 10 * 60
+
+# SHQueryUserNotificationState's answers that mean someone is using the
+# machine without touching it: a full-screen program (a film in a browser, a
+# borderless game), a Direct3D exclusive-mode game, presentation mode.
+QUNS_BUSY, QUNS_RUNNING_D3D_FULL_SCREEN, QUNS_PRESENTATION_MODE = 2, 3, 4
 
 # Extended window styles. pywebview's `focus=False` already sets NOACTIVATE;
 # the rest are ours. See Overlay for why TRANSPARENT and LAYERED come as a pair.
@@ -414,6 +420,10 @@ class Overlay:
             self.hide_page()
             return
         left, top, right, bottom = self.rect_for(mode)
+        # Clickable while it is the display: a story in the feed is picked by
+        # clicking it. It still never takes focus - NOACTIVATE stays - so
+        # whatever you were typing in keeps the keyboard.
+        self.set_clickable(True)
         win32gui.SetWindowPos(
             self.hwnd, win32con.HWND_TOPMOST,
             left, top, right - left, bottom - top,
@@ -425,6 +435,15 @@ class Overlay:
     def hide_page(self):
         if self.hwnd:
             win32gui.ShowWindow(self.hwnd, win32con.SW_HIDE)
+            self.set_clickable(False)
+
+    def set_clickable(self, on):
+        """Whether the page takes the mouse, or lets it fall through."""
+        if not self.hwnd:
+            return
+        style = win32gui.GetWindowLong(self.hwnd, GWL_EXSTYLE)
+        style = style & ~WS_EX_TRANSPARENT if on else style | WS_EX_TRANSPARENT
+        win32gui.SetWindowLong(self.hwnd, GWL_EXSTYLE, style)
 
     def set_alpha(self, alpha):
         """Make the whole window translucent.
@@ -453,6 +472,22 @@ class Overlay:
             self.hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
             win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE,
         )
+
+
+def screen_busy():
+    """True while a full-screen program has the screen.
+
+    Asked only on the way to falling asleep: it is a call into the shell, and
+    the watcher ticks twenty-five times a second.
+    """
+    state = ctypes.c_int(0)
+    try:
+        if ctypes.windll.shell32.SHQueryUserNotificationState(ctypes.byref(state)) != 0:
+            return False
+    except (AttributeError, OSError):
+        return False
+    return state.value in (QUNS_BUSY, QUNS_RUNNING_D3D_FULL_SCREEN,
+                           QUNS_PRESENTATION_MODE)
 
 
 def idle_seconds():
@@ -767,6 +802,32 @@ class WebReporter:
     def mode(self, name):
         self._call("mode", name)
 
+    def sleep(self, on):
+        """Asleep: the display is the idle screen. Awake: it is itself."""
+        self._call("sleep", bool(on))
+
+    def story(self, number):
+        """Open story `number` on the display's feed (0 closes it).
+
+        Answers with what the page opened - its title, source and summary -
+        so Apollo can talk about the story he just put up, or None if there
+        is no such story or no page to ask.
+        """
+        if not self.alive:
+            return None
+        number = int(number)
+        app = self._app
+        # A story asked for is a story to be seen: if the display is not up,
+        # it comes up with the story open on it.
+        if (number and app is not None
+                and getattr(app.overlay, "mode", None) != Overlay.FULL):
+            app.toggle_peek()
+        try:
+            return self.window.evaluate_js(
+                f"window.apollo.story && window.apollo.story({number})")
+        except Exception:
+            return None
+
 
 class Api:
     """What the page can call back into. Just the one thing it needs.
@@ -782,11 +843,18 @@ class Api:
     what keeps it out.
     """
 
-    def __init__(self, quit):
+    def __init__(self, quit, open_link=None):
         self._quit = quit
+        self._open_link = open_link
 
     def quit(self):
         self._quit()
+
+    def open_link(self, url):
+        """A story's "Read" button: the article, in your browser."""
+        if self._open_link is not None:
+            return self._open_link(url)
+        return False
 
 
 class Apollo:
@@ -809,6 +877,8 @@ class Apollo:
         self.last_engaged = 0.0    # when a turn last ran; the recap waits it out
         self.prayers = prayer.Watch()
         self.presence = presence.Presence(AFK_SECONDS)
+        self.wake = presence.VoiceWake()    # asleep, a voice wakes it
+        self.asleep_shown = False           # what the page was last told
         self.last_status = None    # the phase the overlay last acted on
         self.view = turnview.TurnView()   # what this turn adds up to on screen
         self.window = webview.create_window(
@@ -824,7 +894,7 @@ class Apollo:
             on_top=True,
             transparent=True,
             background_color="#000000",
-            js_api=Api(self.quit),
+            js_api=Api(self.quit, open_link=self.open_link),
         )
         self.window.events.shown += self.on_shown
         self.window.events.loaded += self.on_loaded
@@ -976,6 +1046,7 @@ class Apollo:
         overlay's own business (see `orb.Orb._advance_box`). Exactly one of
         the two windows is on screen at any moment.
         """
+        self.apply_sleep()
         mode = self.desired_mode()
         if mode == self.overlay.mode:
             return
@@ -1008,6 +1079,48 @@ class Apollo:
             orb.set_visible(False)
             self.overlay.show_page(mode)
 
+    def apply_sleep(self):
+        """Tell the page whether it is the idle screen, and listen if it is.
+
+        Before the window is shown, never after: told late, the page would put
+        the whole dashboard up for a frame on its way to the idle screen.
+        """
+        asleep = self.presence.asleep
+        if asleep == self.asleep_shown:
+            return
+        self.asleep_shown = asleep
+        log.info("asleep" if asleep else "awake again")
+        ui = getattr(self, "ui", None)
+        if ui is not None and ui.alive:
+            ui.sleep(asleep)
+        voice = getattr(self, "voice", None)
+        if voice is not None:
+            self.wake = presence.VoiceWake()
+            voice.listen(self.on_wake_level if asleep else None)
+
+    def on_wake_level(self, level):
+        """Asleep, every mic block's loudness. PortAudio's thread: it only
+        leaves a note, and the watcher's next tick does the waking."""
+        if self.wake.feed(level):
+            self.presence.touch(time.monotonic())
+
+    def open_link(self, url):
+        """Open an article from the feed, and get the display out of its way.
+
+        Only web addresses: the page is handed feed data, and a feed that
+        slipped a `file:` or `ms-settings:` link into a story must not get to
+        run it by being clicked.
+        """
+        url = str(url or "")
+        if not url.startswith(("https://", "http://")):
+            return False
+        import webbrowser
+        webbrowser.open(url)
+        if self.presence.peek_open:
+            self.presence.toggle_peek()
+        self.apply_mode()
+        return True
+
     def on_level(self, value):
         """Mic loudness while you are speaking. Called from the audio thread."""
         if self.orb is not None:
@@ -1035,6 +1148,8 @@ class Apollo:
         self.turn_busy = state in WebReporter.ENGAGED
         if self.turn_busy:
             self.last_engaged = time.monotonic()
+            # A conversation is someone being here, keyboard or no keyboard.
+            self.presence.touch(self.last_engaged)
         if self.orb is not None:
             self.orb.set_state(self.overlay_state_for(state))
         self.apply_mode()
@@ -1187,7 +1302,11 @@ class Apollo:
         `idle` is seconds since the last input anywhere in Windows, so this
         follows you rather than following Apollo's own window.
         """
-        if self.presence.check(idle):
+        now = time.monotonic()
+        # Only asked on the way to sleep; see `screen_busy`.
+        busy = (idle >= self.presence.afk_seconds and not self.presence.asleep
+                and screen_busy())
+        if self.presence.check(idle, now=now, screen_busy=busy):
             self.apply_mode()
         self.check_briefing(idle)
         self.check_prayer()

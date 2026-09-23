@@ -60,18 +60,20 @@ class Context:
     `show(visual)` puts a chart or cards on the overlay, `activity(text)`
     says in a few words what Apollo is doing ("fetching NVDA"), `refresh()`
     asks the data service to read the world again and push it to the display,
-    `panels(state)` tells the display which of its panels to show, and `turn`
+    `panels(state)` tells the display which of its panels to show, `story(n)`
+    opens the feed's nth story on it and says what that story is, and `turn`
     is the user's turn number at the moment the call arrived.
     """
 
     def __init__(self, show=None, activity=None, turn=None, refresh=None,
-                 panels_hook=None):
+                 panels_hook=None, story_hook=None):
         self.show = show or (lambda visual: None)
         self.activity = activity or (lambda text: None)
         # False by default, so a tool that changes the display can tell the
         # difference between "refreshed" and "there was nothing to refresh".
         self.refresh = refresh or (lambda: False)
         self.panels = panels_hook or (lambda state: None)
+        self.story = story_hook or (lambda number: None)
         self.turn = current_turn() if turn is None else turn
 
 
@@ -492,6 +494,32 @@ def _show_panel(ctx, panel=""):
     if result.get("ok"):
         ctx.panels(result["panels"])
     return result
+
+
+@_tool("open_story", "opening it on the display",
+       "Open one story from the news feed on the full display, by the number "
+       "it has there (01, 02...), to show its picture and summary. Use this "
+       "when the user asks to open, show or read story N, or the Nth "
+       "headline. 0 closes the story that is open. Returns the story's title "
+       "and summary - tell the user about it in a sentence or two.",
+       _obj({"number": {"type": "integer",
+                        "description": "The story's number on the display; 0 closes it"}},
+            ("number",)))
+def _open_story(ctx, number=0):
+    ctx.activity("opening it on the display")
+    try:
+        number = int(number)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": f"'{number}' is not a story number."}
+    found = ctx.story(number)
+    if not found:
+        if number == 0:
+            return {"ok": True, "closed": True}
+        return {"ok": False, "error": f"There is no story {number} on the display."}
+    if number == 0:
+        return {"ok": True, "closed": True}
+    return {"ok": True, "number": number, "title": found.get("title", ""),
+            "source": found.get("source", ""), "summary": found.get("summary", "")}
 
 
 @_tool("watch_stock", "adding it to your watchlist",

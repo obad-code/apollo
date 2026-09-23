@@ -620,23 +620,34 @@ class LiveCapture:
         # mode turns on only the first. Keeping frames there would be a leak
         # with no reader: nothing ever empties them.
         self.metering = False
+        # Anyone else who wants the level of every block, turn or no turn -
+        # Apollo asleep, listening for a voice to wake to. Only the level
+        # leaves this method; the audio itself goes nowhere new.
+        self.listener = None
 
     def feed(self, data):
         """One block of int16 PCM, straight from the live session's mic."""
-        if not (self.recording or self.metering):
+        listener = self.listener
+        if not (self.recording or self.metering or listener is not None):
             return            # the stream is always on; the turn is not
 
         # The stream is int16 because that is what the Live API wants; Whisper
         # and the level meter both want float32 in -1..1.
         block = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+        level = voice_level(block)
 
         if self.recording:
             self.frames.append(block)
-        if self.on_level is not None:
+        if self.on_level is not None and (self.recording or self.metering):
             try:
-                self.on_level(voice_level(block))
+                self.on_level(level)
             except Exception:
                 pass          # never let a UI hiccup break the recording
+        if listener is not None:
+            try:
+                listener(level)
+            except Exception:
+                pass
 
     def start(self):
         self.frames = []
@@ -814,7 +825,8 @@ def _run_tool(block, ui):
                 show=getattr(ui, "visual", None),
                 activity=getattr(ui, "activity", None),
                 refresh=getattr(ui, "refresh", None),
-                panels_hook=getattr(ui, "panels", None))))
+                panels_hook=getattr(ui, "panels", None),
+                story_hook=getattr(ui, "story", None))))
         return f"Failed: unknown tool '{block.name}'."
     except Exception as e:
         return f"Failed: {type(e).__name__}: {e}"
@@ -1509,7 +1521,19 @@ class Voice:
         self.run_tool = run_tool          # (name, args) -> result dict
         self.live = None
         self.capture = None
+        self.listener = None              # see `listen`
         self._lock = threading.Lock()
+
+    def listen(self, fn):
+        """Hand every block's level to `fn` (or stop, with None).
+
+        Kept here as well as on the capture because a reconnect builds a new
+        capture, and the listener has to survive it.
+        """
+        self.listener = fn
+        capture = self.capture
+        if capture is not None:
+            capture.listener = fn
 
     @property
     def ready(self):
@@ -1556,6 +1580,7 @@ class Voice:
             # Always-listening keeps no audio of its own - the model does the
             # transcribing - but the orb should still bloom when you speak.
             capture.metering = auto_vad
+            capture.listener = self.listener
 
             live = gemini_live.LiveSession(
                 on_audio=capture.feed, auto_vad=auto_vad,
@@ -1607,7 +1632,8 @@ def tool_runner(ui):
         ctx = tools.Context(show=getattr(ui, "visual", None),
                             activity=getattr(ui, "activity", None),
                             refresh=getattr(ui, "refresh", None),
-                            panels_hook=getattr(ui, "panels", None))
+                            panels_hook=getattr(ui, "panels", None),
+                            story_hook=getattr(ui, "story", None))
         return tools.run(name, args, ctx)
     return run
 
