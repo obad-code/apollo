@@ -48,12 +48,17 @@ def test_age_words():
     assert feeds.age_words(200000) == "2d ago"
 
 
+def by_source(url):
+    """Bing's feed for Bing's URLs, Google's for Google's."""
+    return fixture("news_bing.xml" if "bing.com" in url else "news_gaming.xml")
+
+
 def test_headlines_uses_the_cache_and_survives_failure(monkeypatch):
     calls = []
 
     def fake_download(url):
         calls.append(url)
-        return fixture("news_gaming.xml")
+        return by_source(url)
 
     feeds._cache.clear()
     monkeypatch.setattr(feeds, "_download", fake_download)
@@ -65,21 +70,79 @@ def test_headlines_uses_the_cache_and_survives_failure(monkeypatch):
 
 def test_failed_fetch_keeps_the_last_good_value(monkeypatch):
     feeds._cache.clear()
-    monkeypatch.setattr(feeds, "_download", lambda url: fixture("news_gaming.xml"))
+    monkeypatch.setattr(feeds, "_download", by_source)
     good = feeds.headlines("marvel", limit=2)
 
     def broken(url):
         raise OSError("offline")
 
     monkeypatch.setattr(feeds, "_download", broken)
-    url = feeds._url_for("marvel")
+    url = feeds._bing_url_for("marvel")
     feeds._cache[url] = (0, feeds._cache[url][1])              # expire it
     assert feeds.headlines("marvel", limit=2) == good              # last good value
 
 
 def test_unknown_topic_is_searched_verbatim(monkeypatch):
     seen = []
-    monkeypatch.setattr(feeds, "_download", lambda url: seen.append(url) or fixture("news_gaming.xml"))
+    monkeypatch.setattr(feeds, "_download", lambda url: seen.append(url) or by_source(url))
     feeds._cache.clear()
     feeds.headlines("rocket lab", limit=1)
     assert "rocket" in seen[0].lower()
+
+
+# -- Bing News: the display's pictures and summaries come from here ----------
+
+def test_parse_bing_gives_summary_image_and_the_publishers_link():
+    items = feeds.parse_bing(fixture("news_bing.xml"))
+    assert [item["title"] for item in items] == [
+        "Studio moves its winter release up by a month",           # newest first
+        "A sequel opens to a record weekend at the global box office",
+        "Streaming numbers for the summer's biggest release",
+    ]                                                              # blank dropped
+    record = items[1]
+    assert record["source"] == "Example Trade"
+    assert record["summary"].startswith("The film took $108M")
+    # Bing's click-tracking wrapper is unwrapped to the article itself.
+    assert record["link"] == "https://www.example.com/news/record-weekend"
+    # Served over https, so the page never asks for a mixed-content image.
+    assert record["image"] == "https://www.bing.com/th?id=ORMS.0001&pid=News"
+    assert record["when"] > 0 and record["age"]
+
+
+def test_parse_bing_story_without_a_picture_has_an_empty_image():
+    items = feeds.parse_bing(fixture("news_bing.xml"))
+    winter = items[0]
+    assert winter["image"] == ""
+    assert winter["summary"] == "The date change clears the way for a holiday run."
+    assert winter["link"] == "https://news.example.org/2026/09/winter"
+
+
+def test_bing_is_asked_with_its_own_or():
+    # Bing's RSS answers `a OR b` with nothing at all; `a | b` is its OR.
+    url = feeds._bing_url_for("movies")
+    assert "bing.com/news/search" in url and "format=rss" in url
+    assert "%7C" in url and "OR" not in url
+    assert "setmkt=en-US" in url
+
+
+def test_headlines_prefer_bing_and_carry_pictures(monkeypatch):
+    feeds._cache.clear()
+    monkeypatch.setattr(feeds, "_download", by_source)
+    stories = feeds.headlines("movies", limit=5)
+    assert stories and any(story["image"] for story in stories)
+    assert all("summary" in story for story in stories)
+
+
+def test_headlines_fall_back_to_google_when_bing_has_nothing(monkeypatch):
+    feeds._cache.clear()
+
+    def bing_down(url):
+        if "bing.com" in url:
+            raise OSError("bing unreachable")
+        return fixture("news_gaming.xml")
+
+    monkeypatch.setattr(feeds, "_download", bing_down)
+    stories = feeds.headlines("gaming", limit=3)
+    assert len(stories) == 3
+    # Google has no picture or summary to give; the keys are there, empty.
+    assert all(story["image"] == "" and "summary" in story for story in stories)

@@ -14,6 +14,7 @@ import time
 import feeds
 import logos
 import market
+import prayer
 import sysinfo
 import usage
 import watchlist
@@ -25,7 +26,8 @@ log = logging.getLogger("apollo.data")
 # re-exported so a caller that has the service does not also need the feeds.
 age_words = feeds.age_words
 
-INTERVALS = {"market": 60, "news": 600, "posts": 300, "weather": 900, "system": 5}
+INTERVALS = {"market": 60, "news": 600, "posts": 300, "weather": 900, "system": 5,
+             "prayer": 300}
 SPARK_POINTS = 24
 
 
@@ -34,7 +36,7 @@ class DataService:
         self.on_snapshot = on_snapshot
         self.snapshot = {"market": {"indices": [], "watchlist": [], "status": ""},
                          "news": {}, "posts": [], "weather": {}, "system": {},
-                         "usage": {}, "updated": 0.0,
+                         "usage": {}, "prayer": {}, "updated": 0.0,
                          # When each reader last came back with something. A
                          # reader that fails keeps its last good value, and the
                          # display says how old that value is rather than
@@ -155,6 +157,17 @@ class DataService:
         if not reading:
             return False
         self.snapshot["weather"] = reading
+        return True
+
+    def _read_prayer(self):
+        # The day's times are fetched once and remembered by `prayer`, which
+        # the reminders already rely on, so asking again every few minutes is
+        # a dictionary lookup; the few minutes are what keep "next" honest.
+        name, when = prayer.next_prayer()
+        if name is None:
+            self.snapshot["prayer"] = {}
+            return False
+        self.snapshot["prayer"] = {"name": name, "at": when.timestamp()}
         return True
 
     def _read_system(self):

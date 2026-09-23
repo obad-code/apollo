@@ -1,7 +1,9 @@
 """Headlines and posts, from feeds that need no key and no account.
 
-Google News publishes an RSS search feed, and trumpstruth.org mirrors Truth
-Social as RSS - Trump Media's own real-time API is a paid Wall Street product
+Bing News publishes an RSS search feed with a picture and a paragraph for most
+stories, which is what the display's feed shows when you open one; Google
+News's feed has neither, and is kept as the fallback for when Bing has
+nothing. trumpstruth.org mirrors Truth Social as RSS - Trump Media's own real-time API is a paid Wall Street product
 (CNBC, August 2026), and this is the public alternative. Both answer in about
 a second, so they are read on a timer and cached; every reader here is total,
 because a dead feed should cost a line on the display, never a turn.
@@ -33,6 +35,15 @@ TOPICS = {
     "marvel": "Marvel",
     "movies": "box office OR movies",
     "markets": "stock market OR Nasdaq OR S&P 500",
+}
+
+# The same topics as Bing asks them. Its RSS answers `a OR b` with an empty
+# feed, which is easy to mistake for a quiet news day; `|` is its OR.
+BING_TOPICS = {
+    "gaming": 'PlayStation | "GTA 6" | gaming',
+    "marvel": "Marvel",
+    "movies": "box office | movies",
+    "markets": "stock market | Nasdaq | S&P 500",
 }
 
 # Words that make a post worth flagging before the market opens. Deliberately
@@ -131,6 +142,54 @@ def parse_news(body):
     return items
 
 
+def _child(item, name):
+    """A `News:` element's text, whatever namespace this query was given.
+
+    Bing sets the namespace to the query's own URL, so it differs per topic
+    and cannot be spelled once.
+    """
+    for node in item:
+        if node.tag.rpartition("}")[2] == name and node.text:
+            return node.text.strip()
+    return ""
+
+
+def _unwrap(link):
+    """Bing's click-tracking redirect -> the article it points at."""
+    parsed = urllib.parse.urlparse(link)
+    if parsed.netloc.endswith("bing.com") and parsed.path.endswith("apiclick.aspx"):
+        target = urllib.parse.parse_qs(parsed.query).get("url", [""])[0]
+        if target.startswith(("https://", "http://")):
+            return target
+    return link
+
+
+def parse_bing(body):
+    """Bing News RSS -> [{title, source, link, when, age, summary, image}].
+
+    `image` is Bing's own thumbnail service, asked for over https; the page
+    adds the size it wants. A story without one has an empty string there,
+    which is what Google's stories carry too.
+    """
+    items = []
+    for item in ET.fromstring(body).findall(".//item"):
+        title = _clean(item.findtext("title") or "")
+        if not title:
+            continue
+        image = _child(item, "Image")
+        if image.startswith("http://"):
+            image = "https://" + image[len("http://"):]
+        when = _when(item)
+        items.append({"title": title, "source": _clean(_child(item, "Source")),
+                      "link": _unwrap(item.findtext("link") or ""),
+                      "summary": _clean(item.findtext("description") or ""),
+                      "image": image if image.startswith("https://") else "",
+                      "when": when,
+                      "age": age_words(time.time() - when) if when else ""})
+    items.sort(key=lambda i: i["when"], reverse=True)
+    return items
+
+
 def parse_posts(body):
     """trumpstruth.org RSS -> [{text, when, age, market}], newest first.
 
@@ -162,15 +221,36 @@ def _url_for(topic):
                                       "ceid": "US:en"}))
 
 
-def headlines(topic, limit=5):
-    """The newest `limit` headlines for a topic (or any phrase)."""
-    body = _cached_or_fetch(_url_for(topic), NEWS_TTL)
+def _bing_url_for(topic):
+    query = BING_TOPICS.get(topic.lower(), topic)
+    return ("https://www.bing.com/news/search?"
+            + urllib.parse.urlencode({"q": query, "format": "rss", "setmkt": "en-US",
+                                      "setlang": "en-US", "cc": "US"}))
+
+
+def _read(url, parse):
+    body = _cached_or_fetch(url, NEWS_TTL)
     if not body:
         return []
     try:
-        return parse_news(body)[:limit]
+        return parse(body)
     except ET.ParseError:
         return []
+
+
+def headlines(topic, limit=5):
+    """The newest `limit` headlines for a topic (or any phrase).
+
+    Bing first, for the pictures and summaries; Google when Bing has nothing,
+    with the same keys left empty so a reader never has to ask which it got.
+    Bing's terms allow its results in an RSS reader for personal,
+    non-commercial use, which is what this is.
+    """
+    found = _read(_bing_url_for(topic), parse_bing)
+    if not found:
+        found = [dict(story, summary="", image="")
+                 for story in _read(_url_for(topic), parse_news)]
+    return found[:limit]
 
 
 def posts(hours=24, limit=5):

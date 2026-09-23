@@ -1,6 +1,40 @@
+import datetime
 import time
 
+import pytest
+
 import dataservice
+
+
+@pytest.fixture(autouse=True)
+def no_prayer_fetch(monkeypatch):
+    """The prayer reader goes to Aladhan on a cold cache; no test here should."""
+    monkeypatch.setattr(dataservice.prayer, "next_prayer",
+                        lambda now=None: ("Asr", datetime.datetime(2026, 9, 23, 15, 21)))
+
+
+def test_the_next_prayer_is_in_the_snapshot(monkeypatch):
+    """The idle screen says when the next prayer is; it reads it from here."""
+    monkeypatch.setattr(dataservice.feeds, "headlines", lambda topic, limit=5: [])
+    monkeypatch.setattr(dataservice.feeds, "posts", lambda hours=24, limit=5: [])
+    monkeypatch.setattr(dataservice.weather, "now", lambda: {})
+    service = dataservice.DataService()
+    service._read_market = lambda: False
+    service.refresh(force=True)
+    upcoming = service.snapshot["prayer"]
+    assert upcoming["name"] == "Asr"
+    assert upcoming["at"] == datetime.datetime(2026, 9, 23, 15, 21).timestamp()
+
+
+def test_no_prayer_times_leaves_the_prayer_empty(monkeypatch):
+    monkeypatch.setattr(dataservice.prayer, "next_prayer", lambda now=None: (None, None))
+    monkeypatch.setattr(dataservice.feeds, "headlines", lambda topic, limit=5: [])
+    monkeypatch.setattr(dataservice.feeds, "posts", lambda hours=24, limit=5: [])
+    monkeypatch.setattr(dataservice.weather, "now", lambda: {})
+    service = dataservice.DataService()
+    service._read_market = lambda: False
+    service.refresh(force=True)
+    assert service.snapshot["prayer"] == {}
 
 
 def test_snapshot_gathers_every_reader(monkeypatch):

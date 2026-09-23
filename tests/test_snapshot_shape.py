@@ -1,9 +1,16 @@
 """The snapshot the display reads is a contract; this is the copy of it."""
+import datetime
 import time
 
 import pytest
 
 import dataservice
+
+
+@pytest.fixture(autouse=True)
+def no_prayer_fetch(monkeypatch):
+    monkeypatch.setattr(dataservice.prayer, "next_prayer",
+                        lambda now=None: ("Asr", datetime.datetime(2026, 9, 23, 15, 21)))
 
 
 def test_snapshot_has_every_key_the_display_reads(monkeypatch):
@@ -28,7 +35,9 @@ def test_snapshot_has_every_key_the_display_reads(monkeypatch):
     service.refresh(force=True)
     snap = service.snapshot
 
-    assert set(snap) >= {"market", "news", "posts", "weather", "system", "usage", "updated"}
+    assert set(snap) >= {"market", "news", "posts", "weather", "system", "usage", "updated",
+                         "prayer"}
+    assert set(snap["prayer"]) == {"name", "at"}
     assert set(snap["market"]) == {"indices", "watchlist", "status"}
     stock = snap["market"]["watchlist"][0]
     assert set(stock) >= {"symbol", "name", "price", "change_pct", "currency", "spark"}
