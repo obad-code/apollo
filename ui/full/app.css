@@ -237,6 +237,146 @@ html, body {
 .flash-up { animation: flash-up .6s ease-out; }
 .flash-down { animation: flash-down .6s ease-out; }
 
+/* --- picking a stock --------------------------------------------------------
+   The feed's list, on the cards: a frame slides to the card under the
+   pointer, and a click opens the stock out of its card across the panel. */
+
+#markets { position: relative; }
+#watch-area {
+  position: relative; flex: 1; min-height: 0; margin: -6px; padding: 6px;
+  overflow-x: hidden; overflow-y: auto; scrollbar-width: none;
+}
+#watch-area::-webkit-scrollbar { display: none; }
+/* Equal rows, so the add slot is a card's height wherever it lands. */
+#watchlist { grid-auto-rows: 1fr; }
+#watchlist .card { cursor: pointer; transition: background .3s ease-out; }
+#watchlist .card.lit { background: #1b1b1f; }
+
+#watch-frame {
+  position: absolute; left: 0; top: 0; z-index: 2; opacity: 0; pointer-events: none;
+  border-radius: 16px; border: 1.5px solid rgba(255, 226, 172, .85);
+  box-shadow: 0 0 0 4px rgba(255, 176, 60, .10), 0 0 30px rgba(255, 160, 40, .32);
+  transition: transform .35s cubic-bezier(.215, .61, .355, 1), opacity .3s ease-out;
+  will-change: transform;
+}
+
+#watchlist .card.add {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; font: inherit; color: rgba(240, 217, 160, .82);
+  background: rgba(255, 255, 255, .02); border: 1.5px dashed rgba(255, 214, 150, .22);
+  box-shadow: none; min-height: 112px;
+}
+#watchlist .card.add::before { display: none; }
+#watchlist .card.add.lit { background: rgba(240, 217, 160, .06); }
+.card.add .plus { font-size: 30px; line-height: .9; font-weight: 300; color: var(--amber-bright); }
+.card.add b { font-size: 14px; font-weight: 900; }
+.card.add small { font-size: 11px; font-weight: 500; color: var(--caption); }
+
+@keyframes fetching { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+#watchlist .card.pending { cursor: default; }
+.card.pending .card-foot { animation: fetching 1.4s ease-in-out infinite; }
+
+/* --- one stock, opened out of its card -------------------------------------- */
+
+#stock {
+  position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column;
+  padding: 22px 24px 20px; background: #0e0c0b; border-radius: var(--radius);
+  overflow: hidden; color: #f2ead9; text-shadow: none;
+  transition: clip-path .55s cubic-bezier(.32, .72, 0, 1);
+}
+#stock::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, .09) 1px, transparent 1.2px);
+  background-size: 11px 11px;
+}
+#stock.on { display: flex; }
+#stock > * { position: relative; }
+
+.stock-head { display: flex; align-items: center; gap: 14px; }
+.stock-head .mark { width: 42px; height: 42px; object-fit: contain; flex: none; }
+.stock-head .mark.none {
+  display: grid; place-items: center; border-radius: 11px; font-size: 20px; font-weight: 900;
+  background: rgba(255, 255, 255, .08); color: var(--amber-bright);
+}
+.stock-head .who { display: flex; flex-direction: column; min-width: 0; }
+.stock-head .who b { font-size: 24px; font-weight: 900; line-height: 1.1; color: #fff3dc; }
+.stock-head .who span { font-size: 13px; color: var(--caption);
+                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stock-head .now { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; }
+.stock-head .price { font-size: 30px; font-weight: 900; line-height: 1.05; color: #fff3dc;
+                     font-variant-numeric: tabular-nums; }
+.stock-head .move { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.spans { display: flex; align-items: center; margin: 18px 0 6px; }
+.spans .chip { margin-right: 6px; }
+.span-move { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--caption);
+             font-variant-numeric: tabular-nums; }
+
+/* The chart, drawn in from the left each time a span is picked. */
+@keyframes unveil { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+.big { position: relative; flex: 1; min-height: 120px; margin: 8px 0 14px; cursor: crosshair;
+       transition: opacity .25s ease-out; }
+.big .plot, .big svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.big svg { animation: unveil .8s cubic-bezier(.32, .72, 0, 1) both; overflow: visible; }
+.big .base { fill: none; stroke: rgba(255, 240, 210, .2); stroke-width: 1; stroke-dasharray: 4 5; }
+.big .hi, .big .lo {
+  position: absolute; right: 0; padding: 1px 6px; border-radius: 6px;
+  font-size: 11px; font-weight: 700; color: var(--caption); background: rgba(14, 12, 11, .85);
+  font-variant-numeric: tabular-nums;
+}
+.big .hi { top: 0; }
+.big .lo { bottom: 0; }
+.big .scrub { position: absolute; left: 0; top: 0; bottom: 0; width: 0; opacity: 0;
+              pointer-events: none; transition: opacity .2s ease-out; }
+.big .scrub i { position: absolute; left: 0; top: 0; bottom: 0;
+                border-left: 1px solid rgba(255, 240, 210, .5); }
+.big .scrub b {
+  position: absolute; top: -6px; left: 8px; white-space: nowrap; padding: 3px 10px;
+  border-radius: 999px; background: var(--paper); color: #121012;
+  font-size: 12px; font-weight: 900; font-variant-numeric: tabular-nums;
+}
+.big .scrub.left b { left: auto; right: 8px; }
+#stock.scrubbing .scrub { opacity: 1; }
+#stock.loading .big { opacity: .4; }
+
+.facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.facts div { background: rgba(255, 255, 255, .045); border-radius: 12px; padding: 9px 12px;
+             font-variant-numeric: tabular-nums; }
+.facts span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .14em;
+              text-transform: uppercase; color: var(--caption); }
+.facts b { font-size: 17px; font-weight: 900; color: #fff3dc; }
+.facts i { font-style: normal; font-size: 12px; font-weight: 700; margin-left: 4px; }
+
+#stock .actions { display: flex; gap: 10px; margin-top: 14px; }
+#stock .actions button {
+  font: inherit; font-size: 13px; font-weight: 700; border: 0; cursor: pointer;
+  border-radius: 999px; padding: 9px 18px;
+  transition: transform .2s ease-out, background .2s, color .2s;
+}
+#stock .actions button:hover { transform: translateY(-1px); }
+#stock button.drop { background: rgba(255, 107, 122, .13); color: #ff9aa4; }
+#stock button.drop.sure { background: var(--down); color: #1a0c0e; }
+#stock button.back { background: rgba(255, 255, 255, .08); color: #e9e1d0; }
+
+/* "Add a stock": the suggestions, each one click from the list. */
+#stock .picks {
+  flex: 1; min-height: 0; margin-top: 18px; display: grid; align-content: start;
+  grid-template-columns: repeat(3, 1fr); gap: 8px; overflow-y: auto; scrollbar-width: none;
+}
+#stock .pick {
+  font: inherit; text-align: left; cursor: pointer; display: flex; flex-direction: column;
+  gap: 2px; padding: 10px 12px; border-radius: 12px; color: #f2ead9;
+  background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 214, 150, .08);
+  transition: background .25s, color .25s, transform .2s ease-out;
+}
+#stock .pick b { font-size: 15px; font-weight: 900; }
+#stock .pick span { font-size: 12px; color: var(--caption); transition: color .25s; }
+#stock .pick:hover { background: var(--paper); color: #121012; transform: translateY(-1px); }
+#stock .pick:hover span { color: rgba(18, 16, 18, .62); }
+#stock .pick.busy { opacity: .45; cursor: default; }
+#stock .said { margin-top: 10px; min-height: 1.2em; font-size: 13px; color: var(--down); }
+#stock .picks .said { grid-column: 1 / -1; color: var(--caption); }
+
 /* --- headlines and posts -------------------------------------------------- */
 
 #headlines { grid-area: headlines; display: flex; flex-direction: column; position: relative; }
@@ -545,7 +685,8 @@ body.asleep #peek { opacity: 0 !important; pointer-events: none; transition: opa
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #feed-bar, .story, #peek > .shot, #story { transition-duration: .01s; }
+  #feed-bar, .story, #peek > .shot, #story, #stock, #watch-frame { transition-duration: .01s; }
+  .big svg, .card.pending .card-foot { animation: none; }
   #sleep-wake { animation: none; }
 }
 
@@ -561,6 +702,9 @@ body.asleep #peek { opacity: 0 !important; pointer-events: none; transition: opa
   .story .what { font-size: 14px; }
   #story h3 { font-size: 19px; }
   #story .text { font-size: 14px; }
+  .stock-head .price { font-size: 26px; }
+  .stock-head .who b { font-size: 21px; }
+  .facts b { font-size: 15px; }
   #sleep-word { font-size: 104px; }
   #sleep-fact { font-size: 19px; }
   #sleep-copy { left: 56px; bottom: 60px; }

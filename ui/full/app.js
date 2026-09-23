@@ -117,6 +117,10 @@ const state = {
   feedKey: '',            // ...and what they were, so an unchanged feed is left alone
   lit: -1,                // the row under the pointer
   open: null,             // the story opened out of its row: { index, item }
+  cardLit: null,          // the stock card under the pointer
+  stock: null,            // the stock opened out of its card, or the add picker
+  pending: new Map(),     // stocks asked for whose cards have not come yet
+  marketKey: '',          // what the cards were last drawn from
 };
 
 // Whether the display is the idle screen. Up here because the clock, which
@@ -344,8 +348,14 @@ function renderMarkets(market) {
   // Which stocks were here a moment ago, so a card that has just been asked
   // for can arrive rather than appear, and one that has been dropped can
   // leave rather than vanish.
-  const before = [...list.children].map((card) => card.dataset.symbol);
-  const after = (market.watchlist || []).map((quote) => quote.symbol);
+  const watched = market.watchlist || [];
+  for (const [symbol, asked] of [...state.pending]) {
+    if (watched.some((quote) => quote.symbol === symbol) || Date.now() - asked.since > PENDING_FOR) {
+      state.pending.delete(symbol);
+    }
+  }
+  const before = [...list.children].map((card) => card.dataset.symbol).filter(Boolean);
+  const after = watched.map((quote) => quote.symbol).concat([...state.pending.keys()]);
   const leaving = before.filter((symbol) => !after.includes(symbol));
 
   if (state.entered && leaving.length) {
@@ -357,11 +367,28 @@ function renderMarkets(market) {
                         { duration: 0.26, ease: 'easeOut' });
     }
     clearTimeout(state.cardsTimer);
-    state.cardsTimer = setTimeout(() => renderMarkets(market), 280);
+    state.cardsTimer = setTimeout(() => {
+      for (const card of [...list.children]) {
+        if (leaving.includes(card.dataset.symbol)) card.remove();
+      }
+      renderMarkets(market);
+    }, 280);
     return;
   }
 
-  list.innerHTML = (market.watchlist || []).map((quote) => stockCard(quote)).join('');
+  // A snapshot comes every few seconds for the machine's numbers; the cards
+  // are rebuilt only when something on them changed, or the frame under the
+  // pointer would drop off its card every five seconds.
+  const key = JSON.stringify([after, watched.map((quote) =>
+    [quote.price, quote.change_pct, quote.target, quote.pe, quote.logo, quote.spark]), state.entered]);
+  if (key === state.marketKey) return;
+  state.marketKey = key;
+  const lit = state.cardLit ? (state.cardLit.dataset.symbol || 'add') : null;
+  unlightCard();
+  list.innerHTML = watched.map((quote) => stockCard(quote)).join('')
+    + [...state.pending].map(([symbol, asked]) => pendingCard(symbol, asked.name)).join('')
+    + (watched.length + state.pending.size < WATCH_MAX ? ADD_SLOT : '');
+  if (lit) lightCard(lit === 'add' ? list.querySelector('.add') : cardFor(lit));
 
   if (state.entered) {
     const arriving = after.filter((symbol) => !before.includes(symbol));
@@ -578,8 +605,8 @@ $('topics').addEventListener('click', (event) => {
 
 /* --- one story, opened out of its row ------------------------------------- */
 
-function clipTo(row) {
-  const panel = $('headlines').getBoundingClientRect();
+function clipTo(row, across = $('headlines')) {
+  const panel = across.getBoundingClientRect();
   if (!row) return 'inset(45% 0px 45% 0px round 22px)';
   const r = row.getBoundingClientRect();
   return `inset(${(r.top - panel.top).toFixed(0)}px ${(panel.right - r.right).toFixed(0)}px `
@@ -655,8 +682,341 @@ $('story').addEventListener('click', (event) => {
   }
 });
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') closeStory();
+  if (event.key === 'Escape') { closeStory(); closeStock(); }
 });
+
+/* --- the stocks, picked the way the feed is -----------------------------------
+ *
+ * A frame slides to the card under the pointer, and a click opens the stock
+ * out of its card across the whole panel: its chart over a day, a week, a
+ * month, six months or a year, with a line you can run along it; what it
+ * did; what the analysts think it is worth; and a button that takes it off
+ * the list. The slot after the last card puts one on. Voice does the same
+ * through apollo.py: "open Nvidia", "add Palantir", "take off Tesla". */
+
+const SPANS = [['1d', '1D'], ['5d', '5D'], ['1mo', '1M'], ['6mo', '6M'], ['1y', '1Y']];
+const WATCH_MAX = 12;             // watchlist.MAX
+const PENDING_FOR = 45000;        // a card asked for and never delivered goes
+const BIG_W = 600, BIG_H = 200, BIG_PAD = 14;
+
+const bridge = () => (window.pywebview && window.pywebview.api) || null;
+const cardFor = (symbol) =>
+  [...$('watchlist').children].find((card) => card.dataset.symbol === symbol) || null;
+
+function pendingCard(symbol, name) {
+  return `
+    <div class="card pending" data-symbol="${esc(symbol)}">
+      <div class="card-top"><span class="mark none">${esc(String(symbol)[0])}</span>
+        <span class="ticker">${esc(symbol)}</span><span class="price">…</span></div>
+      <div class="chart empty"></div>
+      <div class="card-foot">Fetching ${esc(name)}</div>
+    </div>`;
+}
+
+const ADD_SLOT = `
+    <button class="card add" type="button">
+      <span class="plus">+</span><b>Add a stock</b><small>or say “add Palantir”</small>
+    </button>`;
+
+function lightCard(card) {
+  if (state.stock || !card || card === state.cardLit || card.classList.contains('pending')) return;
+  if (state.cardLit) state.cardLit.classList.remove('lit');
+  state.cardLit = card;
+  card.classList.add('lit');
+  const frame = $('watch-frame');
+  // Sized to the card, moved by transform: the cards are one size, so the
+  // size is set once and it is only the move that animates.
+  frame.style.width = `${card.offsetWidth}px`;
+  frame.style.height = `${card.offsetHeight}px`;
+  frame.style.transform = `translate(${card.offsetLeft}px, ${card.offsetTop}px)`;
+  frame.style.opacity = '1';
+}
+
+function unlightCard() {
+  if (state.cardLit) state.cardLit.classList.remove('lit');
+  state.cardLit = null;
+  $('watch-frame').style.opacity = '0';
+}
+
+/* What Apollo is told about a stock it opened, so it can talk about it. */
+const toldStock = (quote) => ({
+  symbol: String(quote.symbol || ''), name: String(quote.name || ''),
+  price: quote.price, change_pct: quote.change_pct, target: quote.target ?? null,
+  upside: quote.upside ?? null, pe: quote.pe ?? null });
+
+function stockMarkup(quote) {
+  const mark = quote.logo
+    ? `<img class="mark" src="${esc(quote.logo)}" alt="">`
+    : `<span class="mark none">${esc((quote.symbol || '?')[0])}</span>`;
+  const upside = quote.target && quote.upside != null
+    ? ` <i class="${moveClass(quote.upside)}">${quote.upside >= 0 ? '+' : ''}${quote.upside.toFixed(1)}%</i>` : '';
+  return `
+    <div class="stock-head">
+      ${mark}
+      <div class="who"><b>${esc(quote.symbol)}</b><span>${esc(quote.name || '')}</span></div>
+      <div class="now">
+        <span class="price">${money(quote.price)}</span>
+        <span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)} today</span>
+      </div>
+    </div>
+    <div class="spans">
+      ${SPANS.map(([span, label]) =>
+        `<span class="chip${span === '1d' ? ' on' : ''}" data-span="${span}">${label}</span>`).join('')}
+      <span class="span-move"></span>
+    </div>
+    <div class="big">
+      <div class="plot"></div>
+      <span class="hi"></span><span class="lo"></span>
+      <div class="scrub"><i></i><b></b></div>
+    </div>
+    <div class="facts">
+      <div><span>Day high</span><b>${quote.high != null ? money(quote.high) : '—'}</b></div>
+      <div><span>Day low</span><b>${quote.low != null ? money(quote.low) : '—'}</b></div>
+      <div><span>Target</span><b>${quote.target ? money(quote.target) : '—'}</b>${upside}</div>
+      <div><span>P/E</span><b>${quote.pe ? quote.pe.toFixed(1) : '—'}</b></div>
+    </div>
+    <div class="actions">
+      <button class="drop" data-act="drop">Remove from watchlist</button>
+      <button class="back" data-act="back">Back to the list</button>
+    </div>`;
+}
+
+/* The chart across the open stock, drawn in again for every span. */
+function drawBig(points, rising) {
+  const view = $('stock');
+  const plot = view.querySelector('.plot');
+  if (!plot) return;
+  if (!points || points.length < 2) {
+    plot.innerHTML = '';
+    view.querySelector('.hi').textContent = '';
+    view.querySelector('.lo').textContent = '';
+    return;
+  }
+  const low = Math.min(...points), high = Math.max(...points);
+  const span = high - low || 1;
+  const laid = points.map((value, i) => [
+    (i / (points.length - 1)) * BIG_W,
+    BIG_PAD + (1 - (value - low) / span) * (BIG_H - BIG_PAD * 2),
+  ]);
+  const line = smooth(laid);
+  const start = laid[0][1].toFixed(1);
+  plot.innerHTML = `<svg viewBox="0 0 ${BIG_W} ${BIG_H}" preserveAspectRatio="none">
+      <path class="base" d="M0,${start}L${BIG_W},${start}" vector-effect="non-scaling-stroke"/>
+      <path class="wash" d="${line}L${BIG_W},${BIG_H}L0,${BIG_H}Z"
+            fill="url(#${rising ? 'washUp' : 'washDown'})"/>
+      <path class="line" d="${line}" fill="none" vector-effect="non-scaling-stroke"
+            stroke="${rising ? 'var(--up)' : 'var(--down)'}" stroke-width="2.6"
+            stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`;
+  view.querySelector('.hi').textContent = money(high);
+  view.querySelector('.lo').textContent = money(low);
+}
+
+function spanWhen(stamp, span) {
+  if (!stamp) return '';
+  const at = new Date(stamp * 1000);
+  if (span === '1d') return at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (span === '5d') return at.toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+  return at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: span === '1y' ? 'numeric' : undefined });
+}
+
+function spanMove(pct, span) {
+  const words = { '1d': 'today', '5d': 'over 5 days', '1mo': 'over a month',
+                  '6mo': 'over 6 months', '1y': 'over a year' };
+  const move = $('stock').querySelector('.span-move');
+  if (!move) return;
+  // The day's move is in the heading already; the span's own is for the rest.
+  if (span === '1d') { move.textContent = ''; return; }
+  move.className = `span-move ${moveClass(pct)}`;
+  move.textContent = `${moveText(pct)} ${words[span]}`;
+}
+
+async function loadSpan(span) {
+  const open = state.stock;
+  if (!open || open.picker) return;
+  open.span = span;
+  const view = $('stock');
+  view.querySelectorAll('.spans .chip').forEach((chip) =>
+    chip.classList.toggle('on', chip.dataset.span === span));
+  const api = bridge();
+  if (!api || !api.chart) {
+    // On its own, as a sample, there is only today's line.
+    if (span === '1d') spanMove(open.quote.change_pct, span);
+    return;
+  }
+  view.classList.add('loading');
+  let result = null;
+  try { result = await api.chart(open.symbol, span); } catch (error) { result = null; }
+  if (state.stock !== open || open.span !== span) return;     // moved on meanwhile
+  view.classList.remove('loading');
+  if (!result || !result.ok || !result.points || result.points.length < 2) {
+    const move = view.querySelector('.span-move');
+    move.className = 'span-move';
+    move.textContent = (result && result.error) || 'No chart came back for that span';
+    return;
+  }
+  open.points = result.points;
+  open.times = result.times || [];
+  const pct = Number(result.change_pct) || 0;
+  drawBig(open.points, pct >= 0);
+  spanMove(pct, span);
+}
+
+function openStock(symbol) {
+  const market = (state.snapshot && state.snapshot.market) || {};
+  const quote = (market.watchlist || []).find((q) => q.symbol === symbol);
+  if (!quote) return null;
+  unlightCard();
+  const view = $('stock');
+  state.stock = { symbol, quote, span: '1d', points: quote.spark || [], times: [] };
+  view.innerHTML = stockMarkup(quote);
+  openOver(view, $('markets'), cardFor(symbol));
+  drawBig(state.stock.points, quote.change_pct >= 0);
+  spanMove(quote.change_pct, '1d');
+  loadSpan('1d');
+  return toldStock(quote);
+}
+
+/* Opened out of `from`: clipped to it first, then to the whole panel. */
+function openOver(view, panel, from) {
+  view.classList.add('on');
+  view.setAttribute('aria-hidden', 'false');
+  view.style.transition = 'none';
+  view.style.clipPath = clipTo(from, panel);
+  void view.offsetWidth;
+  view.style.transition = '';
+  view.style.clipPath = 'inset(0px 0px 0px 0px round 22px)';
+}
+
+function closeStock() {
+  const open = state.stock;
+  if (!open) return;
+  state.stock = null;
+  const view = $('stock');
+  view.setAttribute('aria-hidden', 'true');
+  view.style.clipPath = clipTo(open.picker ? $('watchlist').querySelector('.add') : cardFor(open.symbol),
+                               $('markets'));
+  setTimeout(() => {
+    if (state.stock) return;               // another was opened meanwhile
+    view.classList.remove('on', 'loading');
+    view.innerHTML = '';
+  }, 560);
+}
+
+/* Two clicks, the first one saying what the second will do: there is no
+ * dialog to ask with, and a list you built should not lose a stock to a
+ * stray click. */
+function dropStock(button) {
+  const open = state.stock;
+  if (!open || open.picker) return;
+  if (!button.classList.contains('sure')) {
+    button.classList.add('sure');
+    button.textContent = `Click again to remove ${open.symbol}`;
+    clearTimeout(button._undo);
+    button._undo = setTimeout(() => {
+      button.classList.remove('sure');
+      button.textContent = 'Remove from watchlist';
+    }, 3500);
+    return;
+  }
+  const api = bridge();
+  if (api && api.unwatch) api.unwatch(open.symbol);
+  closeStock();
+  // Off the list at once, not when the next snapshot comes round.
+  const market = state.snapshot && state.snapshot.market;
+  if (market) {
+    market.watchlist = (market.watchlist || []).filter((q) => q.symbol !== open.symbol);
+    renderMarkets(market);
+  }
+}
+
+async function openPicker() {
+  unlightCard();
+  const view = $('stock');
+  const open = { picker: true };
+  state.stock = open;
+  view.innerHTML = `
+    <div class="stock-head">
+      <span class="mark none">+</span>
+      <div class="who"><b>Add a stock</b><span>Pick one - or say “add” and any company</span></div>
+    </div>
+    <div class="picks"></div>
+    <p class="said"></p>
+    <div class="actions"><button class="back" data-act="back">Back to the list</button></div>`;
+  openOver(view, $('markets'), $('watchlist').querySelector('.add'));
+  const api = bridge();
+  let picks = [];
+  try { picks = api && api.suggestions ? await api.suggestions() : SAMPLE_PICKS; } catch (error) { picks = []; }
+  if (state.stock !== open) return;
+  view.querySelector('.picks').innerHTML = (picks || []).map((pick) => `
+    <button class="pick" data-pick="${esc(pick.symbol)}"><b>${esc(pick.symbol)}</b><span>${esc(pick.name)}</span></button>`).join('')
+    || '<p class="said">Everything suggested is on your list already.</p>';
+}
+
+const SAMPLE_PICKS = [{ symbol: 'PLTR', name: 'Palantir' }, { symbol: 'AMD', name: 'AMD' },
+                      { symbol: '2222.SR', name: 'Aramco' }];
+
+async function addPick(button) {
+  const symbol = button.dataset.pick;
+  const name = button.querySelector('span').textContent;
+  button.disabled = true;
+  button.classList.add('busy');
+  const api = bridge();
+  let result = { ok: true, symbol };
+  try { if (api && api.watch) result = await api.watch(symbol); } catch (error) { result = null; }
+  if (!result || !result.ok) {
+    button.disabled = false;
+    button.classList.remove('busy');
+    $('stock').querySelector('.said').textContent = (result && result.error) || 'That one would not go on.';
+    return;
+  }
+  if (!result.already) state.pending.set(result.symbol || symbol, { name, since: Date.now() });
+  closeStock();
+  if (state.snapshot) renderMarkets(state.snapshot.market || {});
+}
+
+$('watch-area').addEventListener('pointerover', (event) => {
+  lightCard(event.target.closest('.card'));
+});
+$('watch-area').addEventListener('pointerleave', () => unlightCard());
+$('watchlist').addEventListener('click', (event) => {
+  const card = event.target.closest('.card');
+  if (!card) return;
+  if (card.classList.contains('add')) openPicker();
+  else if (card.dataset.symbol && !card.classList.contains('pending')) openStock(card.dataset.symbol);
+});
+$('stock').addEventListener('click', (event) => {
+  const span = event.target.closest('[data-span]');
+  if (span) { loadSpan(span.dataset.span); return; }
+  const pick = event.target.closest('[data-pick]');
+  if (pick) { addPick(pick); return; }
+  const button = event.target.closest('[data-act]');
+  if (!button) return;
+  if (button.dataset.act === 'back') closeStock();
+  if (button.dataset.act === 'drop') dropStock(button);
+});
+
+/* Run the pointer along the chart: the close under it, and when. */
+$('stock').addEventListener('pointermove', (event) => {
+  const open = state.stock;
+  const big = event.target.closest('.big');
+  const view = $('stock');
+  if (!open || open.picker || !big || !open.points || open.points.length < 2) {
+    view.classList.remove('scrubbing');
+    return;
+  }
+  const box = big.getBoundingClientRect();
+  const at = Math.max(0, Math.min(1, (event.clientX - box.left) / box.width));
+  const i = Math.round(at * (open.points.length - 1));
+  const x = (i / (open.points.length - 1)) * box.width;
+  const scrub = big.querySelector('.scrub');
+  scrub.style.transform = `translateX(${x.toFixed(1)}px)`;
+  scrub.querySelector('b').textContent =
+    [money(open.points[i]), spanWhen(open.times[i], open.span)].filter(Boolean).join(' · ');
+  scrub.classList.toggle('left', at > 0.72);
+  view.classList.add('scrubbing');
+});
+$('stock').addEventListener('pointerleave', () => $('stock').classList.remove('scrubbing'));
 
 function renderStrip(snapshot) {
   const usage = snapshot.usage || {};
@@ -1054,6 +1414,7 @@ window.apollo = {
     } else {
       shader.stop(); lyla.stop(); ringStop();
       unlight();
+      unlightCard();
     }
   },
   level(value) { setLevel(value); },
@@ -1065,6 +1426,13 @@ window.apollo = {
     number = Number(number) || 0;
     if (!number) { closeStory(); return { closed: true }; }
     return openStory(number - 1);
+  },
+  // "Open Nvidia": opens it out of its card and says what it shows. An empty
+  // symbol closes it.
+  stock(symbol) {
+    symbol = String(symbol || '');
+    if (!symbol) { closeStock(); return { closed: true }; }
+    return openStock(symbol);
   },
 };
 

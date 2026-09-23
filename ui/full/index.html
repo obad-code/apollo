@@ -50,7 +50,14 @@
   <section id="markets" class="panel rise">
     <h2 id="markets-head">Markets</h2>
     <div id="indices"></div>
-    <div id="watchlist"></div>
+    <!-- The frame slides to the card under the pointer, as the feed's bar
+         slides to its row. -->
+    <div id="watch-area">
+      <div id="watch-frame"></div>
+      <div id="watchlist"></div>
+    </div>
+    <!-- One stock, opened out of its card; or the stocks you can add. -->
+    <article id="stock" aria-hidden="true"></article>
   </section>
 
   <section id="headlines" class="panel rise">

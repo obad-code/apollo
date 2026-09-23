@@ -23,7 +23,9 @@ UNTRUSTED = re.compile(
     # must not quietly drop it out of this check - which is what happened
     # when it did, and the count fell from eleven to six without a failure.
     r"|item\.(?:title|source|age|summary|image|link)"
-    r"|quote\.(?:symbol|name)"
+    r"|quote\.(?:symbol|name|logo)"
+    # "Add a stock" lists what apollo.py suggests; a pick is data like a quote.
+    r"|pick\.(?:symbol|name)"
     r"|market\.status"
     r"|weather\.text"
     r"|system\.gpu_name"

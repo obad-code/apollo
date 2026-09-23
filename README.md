@@ -187,7 +187,8 @@ one is a number Apollo actually has.
 ### The full display
 
 The full display is the whole screen: a field of dots behind everything - a
-CRT's phosphors in a halftone, bulged by a fisheye - the clock with the date in
+halftone of five coloured lights drifting on their own slow loops and
+blooming where they cross, bulged by a fisheye - the clock with the date in
 both calendars, Riyadh's weather, your watchlist with sparklines, headlines
 on what you follow, Trump's posts with the market-moving ones flagged, what
 Apollo has cost today, what the machine is doing — and LYLA still in her room
@@ -199,6 +200,15 @@ of its row - picture, summary, and a **Read** button that opens the article in
 your browser. Or say it: *"open story three"* opens it (bringing the display
 up if it was not) and Apollo tells you what it is. The chips along the top
 filter by topic.
+
+The stocks work the same way. Point at a card and a frame slides to it;
+click it and the stock opens out of its card: its chart over a day, five
+days, a month, six months or a year (run the pointer along it for the close
+at any point), the day's range, the analysts' target and the P/E, and
+**Remove from watchlist** - which asks for a second click before it does.
+The slot after the last card, **Add a stock**, opens a list of suggestions
+to put on with a click. By voice: *"open Nvidia"*, *"add Palantir and AMD"*,
+*"take off Apple and Tesla"* - in English or Arabic.
 
 Nothing on it is invented. Every number comes from `dataservice.DataService`
 through `window.apollo.data(snapshot)`, and the service stamps each reader
@@ -338,6 +348,15 @@ the card can live without.
 
 The marks are other companies' trademarks, fetched from a third party. They
 are cached at runtime and git-ignored, never committed.
+
+Changing the watchlist answers at once. The tools ask the data service to
+read the market again (`DataService.poke`) and return; the new card follows
+a moment later. They used to read every feed there was before answering,
+and Apollo sat silent through all of it. Company names go to the market
+search in English - the tool asks the model to translate, and a name it
+cannot place comes back saying to try the English name or the ticker, so
+the model retries. One call takes several companies, and a change holds a
+lock from read to save, so three at once all stick.
 
 ## A note on the typeface
 
@@ -632,7 +651,11 @@ it in the window Apollo actually uses:
 ```
 
 `probes\probe_feed_shots.py` screenshots the feed, a story opened out of it
-and the idle screen, with the real feeds in it.
+and the idle screen, with the real feeds in it. `probes\probe_stock_shots.py`
+does the same for the stocks - a card picked, one opened over each span, one
+removed and one added - on a watchlist of its own. Both take the screen for a
+minute and capture whatever is on top of it, so leave the machine alone
+while they run.
 
 One trap worth knowing: pywebview roots its HTTP server at the page's own
 directory, so anything the page references has to live under `ui/full/` —

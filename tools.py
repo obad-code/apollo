@@ -62,12 +62,13 @@ class Context:
     asks the data service to read those parts of the world again (all of it,
     with none named) and push them to the display - without waiting for it,
     `panels(state)` tells the display which of its panels to show, `story(n)`
-    opens the feed's nth story on it and says what that story is, and `turn`
+    opens the feed's nth story on it and says what that story is, `stock(sym)`
+    does the same for a stock on the watchlist, and `turn`
     is the user's turn number at the moment the call arrived.
     """
 
     def __init__(self, show=None, activity=None, turn=None, refresh=None,
-                 panels_hook=None, story_hook=None):
+                 panels_hook=None, story_hook=None, stock_hook=None):
         self.show = show or (lambda visual: None)
         self.activity = activity or (lambda text: None)
         # False by default, so a tool that changes the display can tell the
@@ -75,6 +76,7 @@ class Context:
         self.refresh = refresh or (lambda *keys: False)
         self.panels = panels_hook or (lambda state: None)
         self.story = story_hook or (lambda number: None)
+        self.stock = stock_hook or (lambda symbol: None)
         self.turn = current_turn() if turn is None else turn
 
 
@@ -570,6 +572,34 @@ def _watch_stock(ctx, companies=()):
 def _unwatch_stock(ctx, companies=()):
     ctx.activity("taking it off your watchlist")
     return _change_watchlist(ctx, companies, watchlist.remove, "removed")
+
+
+@_tool("open_stock", "opening it on the display",
+       "Open one stock from the watchlist on the full display, out of its "
+       "card: its chart, price, move, target and P/E. Use this when the user "
+       "asks to open, show or look at one of their stocks on the display. An "
+       "empty company closes the stock that is open.",
+       _obj({"company": _str("The company by its English name or its ticker "
+                             "(Nvidia or NVDA), empty to close")},
+            ("company",)))
+def _open_stock(ctx, company=""):
+    ctx.activity("opening it on the display")
+    company = str(company or "").strip()
+    if not company:
+        ctx.stock("")
+        return {"ok": True, "closed": True}
+    try:
+        symbol = market.resolve(company)
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "error": f"I couldn't find a stock called {company}. "
+                                      "Try its English name or its ticker."}
+    shown = ctx.stock(symbol)
+    if not shown:
+        return {"ok": False, "error": f"{symbol} isn't on the watchlist. Add it "
+                                      "with watch_stock first if the user wants it."}
+    return {"ok": True, **{key: shown.get(key) for key in (
+        "symbol", "name", "price", "change_pct", "target", "upside", "pe")
+        if shown.get(key) is not None}}
 
 
 @_tool("refresh_display", "refreshing the display",

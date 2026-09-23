@@ -3,16 +3,19 @@
 //
 // Plain WebGL - three.js would be 600 KB to draw two triangles. Three layers,
 // all in one pass:
-//   - the colour: CRT phosphors (amber, red, green, a deep blue) folded
-//     through each other by slow noise. Asleep, it settles into a dusk
-//     horizon instead - navy overhead, the last orange low down - which is
-//     the idle screen's sky.
+//   - the colour: five soft lights - rose, cyan, amber, violet, green -
+//     drifting across the tube on their own slow loops, so the gradient is
+//     always moving, and blooming towards white where they cross. Asleep,
+//     it settles into a dusk horizon instead - navy overhead, the last
+//     orange low down - which is the idle screen's sky.
 //   - the dots: a halftone of that colour. Each dot takes the colour at its
 //     own centre and grows with its brightness, so the gradient is drawn in
 //     dots rather than washed across the screen.
 //   - the glass: a fisheye that swells the middle of the grid and pinches its
 //     corners, the three guns landing a hair apart towards the edges, and the
-//     scanlines. The corners go dark the way a tube's did.
+//     scanlines. The corners go dark the way a tube's did. Over the dots, the
+//     bloom: the same lights, unbroken, as a haze - the glow a bright tube
+//     threw past its own phosphors.
 // Dimmed throughout: the panels sit on it and have to stay readable.
 
 const VERTEX = `
@@ -42,20 +45,38 @@ float fbm(vec2 p) {
   return value;
 }
 
-// The phosphors, awake. q is centred, aspect-correct and already bent.
-vec3 phosphor(vec2 q, float t) {
-  vec2 w = q + 0.45 * vec2(fbm(q * 0.8 + t * 0.045), fbm(q * 0.8 - t * 0.035 + 3.1));
-  float a = fbm(w * 1.25 + vec2(t * 0.030, -t * 0.020));
-  float b = fbm(w * 1.05 - vec2(t * 0.022, t * 0.031) + 7.3);
-  vec3 amber = vec3(1.00, 0.64, 0.12);
-  vec3 red   = vec3(1.00, 0.30, 0.22);
-  vec3 green = vec3(0.32, 1.00, 0.58);
-  vec3 blue  = vec3(0.22, 0.46, 1.00);
-  vec3 colour = mix(blue, amber, smoothstep(0.38, 0.68, a));
-  colour = mix(colour, red, smoothstep(0.52, 0.78, b) * 0.65);
-  colour = mix(colour, green, smoothstep(0.60, 0.82, 1.0 - a) * 0.40);
-  float light = smoothstep(0.30, 0.86, a * 0.62 + b * 0.52);
-  return colour * light;
+// One soft light: a gaussian of the given size round the given point.
+float lamp(vec2 q, vec2 at, float size) {
+  vec2 d = q - at;
+  return exp(-dot(d, d) / (size * size));
+}
+
+// The lights, awake, at s seconds. q is centred and aspect-correct: x runs
+// about -1.8..1.8 on a 16:9 screen, y -1..1. Each light loops on its own
+// pair of periods (40 to 90 seconds), so they never line up the same way
+// twice and something on the screen is always visibly on the move.
+vec3 lights(vec2 q, float s) {
+  vec3 rose   = vec3(1.00, 0.26, 0.58);
+  vec3 cyan   = vec3(0.16, 0.78, 1.00);
+  vec3 amber  = vec3(1.00, 0.58, 0.12);
+  vec3 violet = vec3(0.50, 0.32, 1.00);
+  vec3 green  = vec3(0.20, 1.00, 0.62);
+  vec3 sum = vec3(0.0);
+  sum += rose   * lamp(q, vec2(-0.95 + 0.75 * sin(s * 0.110), 0.30 + 0.40 * cos(s * 0.083)), 0.78);
+  sum += cyan   * lamp(q, vec2( 0.95 + 0.65 * cos(s * 0.093), -0.15 + 0.45 * sin(s * 0.140)), 0.74);
+  sum += amber  * lamp(q, vec2( 0.10 + 0.95 * sin(s * 0.071 + 1.3), -0.62 + 0.30 * cos(s * 0.120)), 0.70);
+  sum += violet * lamp(q, vec2( 0.35 + 0.85 * cos(s * 0.104 + 2.1), 0.62 + 0.30 * sin(s * 0.077)), 0.72);
+  sum += green  * lamp(q, vec2(-0.45 + 0.70 * sin(s * 0.066 + 4.0), -0.30 + 0.50 * cos(s * 0.098)), 0.60) * 0.7;
+  // Light adds up towards white rather than past it: where two cross, the
+  // colour blooms instead of clipping to a flat patch.
+  return 1.0 - exp(-sum * 1.35);
+}
+
+// The dots' colour: the lights, their edges folded by slow noise so they
+// read as glow and not as circles.
+vec3 phosphor(vec2 q, float s) {
+  vec2 fold = vec2(fbm(q * 0.9 + s * 0.050), fbm(q * 0.9 - s * 0.040 + 5.2)) - 0.5;
+  return lights(q + fold * 0.55, s);
 }
 
 // The same dots at dusk: the idle screen's sky, from its reference photo.
@@ -87,7 +108,7 @@ vec3 dusk(vec2 q, float t, float aspect) {
 }
 
 vec3 colourAt(vec2 q, float t, float aspect) {
-  vec3 awake = phosphor(q, t);
+  vec3 awake = phosphor(q, t / 1.5);           // time runs 1.5 a second
   if (sleep <= 0.001) return awake;
   return mix(awake, dusk(q, t, aspect), sleep);
 }
@@ -126,11 +147,17 @@ void main() {
   float blue  = smoothstep(radius + edge, radius - edge, length(f + miss));
   vec3 dots = lit * vec3(red, green, blue);
 
-  // A little of the colour between the dots, and a halo round each, so the
-  // grid glows rather than sitting on black.
-  float halo = exp(-length(f) * 5.0) * 0.16;
+  // A halo round each dot, so the grid glows rather than sitting on black.
+  float halo = exp(-length(f) * 5.0) * 0.18;
 
-  vec3 colour = dots * 0.92 + lit * (halo + 0.075);
+  // The bloom: the lights again, unbroken and unfolded, as a haze over the
+  // whole field - a wash of their colour, and more of it where they are
+  // brightest. Taken at this pixel, not at the dot's centre, or it would
+  // come out in squares the size of the grid. Asleep, the dusk has none.
+  vec3 haze = lights(plane, t / 1.5) * (1.0 - sleep);
+  vec3 bloom = haze * 0.16 + haze * haze * 0.30;
+
+  vec3 colour = dots * 0.92 + lit * (halo + 0.06) + bloom;
 
   // Scanlines, every other row.
   colour *= 0.86 + 0.14 * sin(gl_FragCoord.y * 3.14159);
@@ -142,7 +169,7 @@ void main() {
   colour *= mix(0.25, 1.0, tube);
 
   // Dim enough to read over, and a floor that is not quite black.
-  float dim = mix(0.44, 0.62, sleep);
+  float dim = mix(0.50, 0.62, sleep);
   gl_FragColor = vec4(colour * dim + vec3(0.014, 0.012, 0.018), 1.0);
 }
 `;

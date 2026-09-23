@@ -116,6 +116,7 @@ import overlay_state  # noqa: E402
 import prayer  # noqa: E402
 import presence  # noqa: E402
 import reminders  # noqa: E402
+import stockdesk  # noqa: E402
 import tools  # noqa: E402
 import turnview  # noqa: E402
 
@@ -834,6 +835,27 @@ class WebReporter:
         except Exception:
             return None
 
+    def stock(self, symbol):
+        """Open `symbol` out of its card on the display ("" closes it).
+
+        Answers with what the card shows - price, move, target - or None if
+        the stock is not on the display. Like a story, a stock asked for
+        brings the display up.
+        """
+        if not self.alive:
+            return None
+        symbol = str(symbol or "")
+        app = self._app
+        if (symbol and app is not None
+                and getattr(app.overlay, "mode", None) != Overlay.FULL):
+            app.toggle_peek()
+        try:
+            # Quoted, not spliced: the symbol came back from a market search.
+            return self.window.evaluate_js(
+                f"window.apollo.stock && window.apollo.stock({json.dumps(symbol)})")
+        except Exception:
+            return None
+
 
 class Api:
     """What the page can call back into. Just the one thing it needs.
@@ -849,9 +871,10 @@ class Api:
     what keeps it out.
     """
 
-    def __init__(self, quit, open_link=None):
+    def __init__(self, quit, open_link=None, desk=None):
         self._quit = quit
         self._open_link = open_link
+        self._desk = desk or stockdesk.StockDesk()
 
     def quit(self):
         self._quit()
@@ -861,6 +884,20 @@ class Api:
         if self._open_link is not None:
             return self._open_link(url)
         return False
+
+    # The stock panel: a chart over a span, and the watchlist changed by hand.
+
+    def chart(self, symbol, period):
+        return self._desk.chart(symbol, period)
+
+    def watch(self, symbol):
+        return self._desk.watch(symbol)
+
+    def unwatch(self, symbol):
+        return self._desk.unwatch(symbol)
+
+    def suggestions(self):
+        return stockdesk.suggestions()
 
 
 class Apollo:
@@ -900,7 +937,8 @@ class Apollo:
             on_top=True,
             transparent=True,
             background_color="#000000",
-            js_api=Api(self.quit, open_link=self.open_link),
+            js_api=Api(self.quit, open_link=self.open_link,
+                       desk=stockdesk.StockDesk(poke=self.poke_data)),
         )
         self.window.events.shown += self.on_shown
         self.window.events.loaded += self.on_loaded
@@ -1109,6 +1147,11 @@ class Apollo:
         leaves a note, and the watcher's next tick does the waking."""
         if self.wake.feed(level):
             self.presence.touch(time.monotonic())
+
+    def poke_data(self, *keys):
+        """Have the data service read these again soon, if it is running."""
+        if self.data is not None:
+            self.data.poke(*keys)
 
     def open_link(self, url):
         """Open an article from the feed, and get the display out of its way.
