@@ -108,6 +108,7 @@ os.environ.setdefault(
 import webview  # noqa: E402  - must follow the env var above
 
 import assistant  # noqa: E402
+import away as away_mode  # noqa: E402
 import briefing  # noqa: E402
 import clips  # noqa: E402
 import dataservice  # noqa: E402
@@ -115,6 +116,7 @@ import ideas  # noqa: E402
 import interests  # noqa: E402
 import journal  # noqa: E402
 import live  # noqa: E402
+import phone  # noqa: E402
 import private_eye  # noqa: E402
 import projects  # noqa: E402
 import orb as orb_module  # noqa: E402
@@ -904,6 +906,15 @@ class WebReporter:
         self._call("tab", str(name))
         return True
 
+    def going_out(self):
+        """You said you are going out."""
+        app = self._app
+        if app is None:
+            return False
+        log.info("going out, you said")
+        app.request_away()
+        return True
+
     def idle(self):
         """You asked for idle mode by voice."""
         app = self._app
@@ -1017,6 +1028,10 @@ class Apollo:
         self.ticker = None         # prices as they trade, with a Finnhub key
         self.learner = None        # learns your interests from the record
         self.eye = None            # Private Eye, the scout
+        self.away = away_mode.Away()        # out of the house? (away.py)
+        self.keeper = away_mode.Keeper()    # ...then the PC stays up with Claude open
+        self.phone_watch = None             # your phone on the Wi-Fi, if APOLLO_PHONE is set
+        self.away_requested = False
         self.intro_wanted = False  # the word, once; see `check_intro`
         self.intro_until = 0.0     # ...playing until then (monotonic)
         self.schedule = briefing.Schedule()   # has today's recap happened?
@@ -1174,6 +1189,8 @@ class Apollo:
             self.learner.stop()
         if self.eye is not None:
             self.eye.stop()
+        if self.phone_watch is not None:
+            self.phone_watch.stop()
         if self.orb:
             self.orb.close()
         if self.tray:
@@ -1424,6 +1441,10 @@ class Apollo:
         if self.orb is not None:
             self.orb.set_activity(text)
 
+    def request_away(self):
+        """You said you are going out. The watcher does it (check_presence)."""
+        self.away_requested = True
+
     def request_idle(self):
         """Idle mode, because you asked. The watcher does it (check_presence)."""
         self.idle_requested = time.monotonic()
@@ -1526,6 +1547,21 @@ class Apollo:
             log.info("the PC was locked: idle mode")
             self.request_idle()
         self._was_locked = locked
+        # Away mode (away.py): out by what you say - once the answer is over,
+        # or Apollo's own voice would count as you being here - or by your
+        # phone leaving the Wi-Fi; back by a touch, or the phone coming home.
+        # Here, on the watcher's thread, because keeping the PC up holds only
+        # as long as the thread that asked for it.
+        if getattr(self, "away", None) is not None:
+            if getattr(self, "away_requested", False) and not getattr(self, "turn_busy", False):
+                self.away_requested = False
+                if self.away.leaving(now):
+                    self.keeper.apply(True)
+            touched = self.presence._touched
+            here = idle if touched is None else min(idle, max(0.0, now - touched))
+            watch = getattr(self, "phone_watch", None)
+            if self.away.update(now, here, watch.state() if watch is not None else None):
+                self.keeper.apply(self.away.away)
         # Asked for by voice: once Apollo has finished saying it will, or his
         # own voice would be the thing that wakes him.
         if (getattr(self, "idle_requested", None) is not None
@@ -1655,6 +1691,14 @@ class Apollo:
         # care about; the best few finds go on the display and into the recap.
         self.eye = private_eye.PrivateEye().start(on_found=lambda: self.poke_data("finds"))
         log.info("Private Eye on watch")
+
+        # Away mode by your phone, if Apollo knows which one it is.
+        ident = phone.saved_ident()
+        if ident:
+            self.phone_watch = phone.Watch(phone.Phone(ident)).start()
+            log.info("watching for your phone on the Wi-Fi")
+        else:
+            log.info("no APOLLO_PHONE; away mode goes by what you say")
 
         # CTRL+1. A thread of its own so it answers during a turn as well as
         # between them; `run_loop` reads its flag and does the actual

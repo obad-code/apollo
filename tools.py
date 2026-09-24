@@ -69,7 +69,7 @@ class Context:
 
     def __init__(self, show=None, activity=None, turn=None, refresh=None,
                  panels_hook=None, story_hook=None, stock_hook=None, idle_hook=None,
-                 tab_hook=None):
+                 tab_hook=None, away_hook=None):
         self.show = show or (lambda visual: None)
         self.activity = activity or (lambda text: None)
         # False by default, so a tool that changes the display can tell the
@@ -80,6 +80,7 @@ class Context:
         self.stock = stock_hook or (lambda symbol: None)
         self.idle = idle_hook or (lambda: False)
         self.tab = tab_hook or (lambda name: None)
+        self.away = away_hook or (lambda: False)
         self.turn = current_turn() if turn is None else turn
 
 
@@ -661,6 +662,19 @@ def _drop_idea(ctx, number=0):
 def _panel_tab(ctx, tab="stocks"):
     ctx.tab(tab)
     return {"ok": True, "tab": tab}
+
+
+@_tool("going_out", "seeing you off",
+       "The user is leaving the house: the PC stays up with the Claude app "
+       "open so they can reach it from their phone, until they are back at "
+       "it. Use this when they say they are going out or leaving - \"أنا "
+       "طالع\", \"رايح برا\", \"I'm heading out\". Wish them well in a few "
+       "words.",
+       _obj({}))
+def _going_out(ctx):
+    if ctx.away() is False:
+        return {"ok": False, "error": "Away mode isn't available right now."}
+    return {"ok": True, "away": True}
 
 
 @_tool("idle_mode", "going idle",
