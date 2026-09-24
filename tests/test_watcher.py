@@ -26,6 +26,9 @@ class App:
     def toggle_peek(self):
         pass
 
+    def check_intro(self):
+        pass
+
     def check_presence(self, idle):
         self.ticks += 1
         if self.ticks >= self.ticks_until_stop:

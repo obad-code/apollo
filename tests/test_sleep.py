@@ -140,10 +140,21 @@ def test_the_full_display_takes_clicks_and_hidden_it_lets_them_through(monkeypat
     clicked. Hidden, it goes back to being nothing under the pointer."""
     styles = {"ex": apollo.Overlay.PASSIVE}
     monkeypatch.setattr(apollo.win32gui, "GetWindowLong", lambda hwnd, index: styles["ex"])
-    monkeypatch.setattr(apollo.win32gui, "SetWindowLong",
-                        lambda hwnd, index, value: styles.__setitem__("ex", value))
-    monkeypatch.setattr(apollo.win32gui, "SetWindowPos", lambda *args: None)
-    monkeypatch.setattr(apollo.win32gui, "ShowWindow", lambda *args: None)
+
+    class User32:                       # see test_overlay_gil for why ctypes
+        @staticmethod
+        def SetWindowLongPtrW(hwnd, index, value):
+            styles["ex"] = value
+
+        @staticmethod
+        def SetWindowPos(*args):
+            return 1
+
+        @staticmethod
+        def ShowWindow(*args):
+            return 1
+
+    monkeypatch.setattr(apollo, "_user32", User32)
     overlay = apollo.Overlay()
     overlay.hwnd = 1
     monkeypatch.setattr(overlay, "set_alpha", lambda value: None)

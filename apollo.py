@@ -80,6 +80,7 @@ composites unreliably outside the normal window hierarchy.
 """
 
 import ctypes
+from ctypes import wintypes
 import json
 import logging
 import logging.handlers
@@ -255,6 +256,32 @@ INTRO_SECONDS = 3.6
 # borderless game), a Direct3D exclusive-mode game, presentation mode.
 QUNS_BUSY, QUNS_RUNNING_D3D_FULL_SCREEN, QUNS_PRESENTATION_MODE = 2, 3, 4
 
+def user32_releasing_gil():
+    """user32 through ctypes' WinDLL, which lets go of the GIL for the length
+    of each call.
+
+    Changing another thread's window - its style, whether it shows, where it
+    sits - makes Windows send that thread a message and wait for the answer.
+    pywin32's wrappers wait holding the GIL. The page window belongs to the
+    WebView2 thread, which runs Python callbacks (every evaluate_js answer is
+    one), so the first time it needed the GIL while the watcher sat in
+    SetWindowLong holding it, both stopped for good: Apollo came up, said "API
+    reachable", and never spoke. Every such call on the page window goes
+    through here instead.
+    """
+    lib = ctypes.WinDLL("user32", use_last_error=True)
+    lib.SetWindowLongPtrW.argtypes = (wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t)
+    lib.SetWindowLongPtrW.restype = ctypes.c_ssize_t
+    lib.ShowWindow.argtypes = (wintypes.HWND, ctypes.c_int)
+    lib.ShowWindow.restype = wintypes.BOOL
+    lib.SetWindowPos.argtypes = (wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                                 ctypes.c_int, ctypes.c_int, ctypes.c_uint)
+    lib.SetWindowPos.restype = wintypes.BOOL
+    return lib
+
+
+_user32 = user32_releasing_gil()
+
 # Extended window styles. pywebview's `focus=False` already sets NOACTIVATE;
 # the rest are ours. See Overlay for why TRANSPARENT and LAYERED come as a pair.
 GWL_EXSTYLE = -20
@@ -328,13 +355,13 @@ class Overlay:
         # re-show must not activate - that would steal focus from whatever you
         # were typing in at the time.
         try:
-            win32gui.ShowWindow(self.hwnd, win32con.SW_HIDE)
+            _user32.ShowWindow(self.hwnd, win32con.SW_HIDE)
             style = win32gui.GetWindowLong(self.hwnd, GWL_EXSTYLE)
             style |= self.PASSIVE
             style &= ~WS_EX_APPWINDOW
-            win32gui.SetWindowLong(self.hwnd, GWL_EXSTYLE, style)
+            _user32.SetWindowLongPtrW(self.hwnd, GWL_EXSTYLE, style)
         finally:
-            win32gui.ShowWindow(self.hwnd, win32con.SW_SHOWNOACTIVATE)
+            _user32.ShowWindow(self.hwnd, win32con.SW_SHOWNOACTIVATE)
 
         # Deliberately does NOT pick a mode. The resting mode hides this
         # window, and a hidden WebView2 never finishes navigating - so hiding
@@ -430,17 +457,17 @@ class Overlay:
         # clicking it. It still never takes focus - NOACTIVATE stays - so
         # whatever you were typing in keeps the keyboard.
         self.set_clickable(True)
-        win32gui.SetWindowPos(
+        _user32.SetWindowPos(
             self.hwnd, win32con.HWND_TOPMOST,
             left, top, right - left, bottom - top,
             win32con.SWP_NOACTIVATE | win32con.SWP_SHOWWINDOW,
         )
-        win32gui.ShowWindow(self.hwnd, win32con.SW_SHOWNOACTIVATE)
+        _user32.ShowWindow(self.hwnd, win32con.SW_SHOWNOACTIVATE)
         self.set_alpha(ALPHA.get(mode, 255))
 
     def hide_page(self):
         if self.hwnd:
-            win32gui.ShowWindow(self.hwnd, win32con.SW_HIDE)
+            _user32.ShowWindow(self.hwnd, win32con.SW_HIDE)
             self.set_clickable(False)
 
     def set_clickable(self, on):
@@ -449,7 +476,7 @@ class Overlay:
             return
         style = win32gui.GetWindowLong(self.hwnd, GWL_EXSTYLE)
         style = style & ~WS_EX_TRANSPARENT if on else style | WS_EX_TRANSPARENT
-        win32gui.SetWindowLong(self.hwnd, GWL_EXSTYLE, style)
+        _user32.SetWindowLongPtrW(self.hwnd, GWL_EXSTYLE, style)
 
     def set_alpha(self, alpha):
         """Make the whole window translucent.
@@ -474,7 +501,7 @@ class Overlay:
         """
         if not self.hwnd:
             return
-        win32gui.SetWindowPos(
+        _user32.SetWindowPos(
             self.hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
             win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE,
         )
@@ -573,6 +600,7 @@ class Watcher(threading.Thread):
             if not down:
                 held[name] = False
 
+        self.app.check_intro()
         self.app.check_presence(idle_seconds())
         self.app.check_overlay_alive()
 
@@ -928,7 +956,8 @@ class Apollo:
         self.clips = None          # the replay buffer, once recording
         self.data = None           # the world, refreshed on a timer
         self.ticker = None         # prices as they trade, with a Finnhub key
-        self.intro_on = False      # the word is playing; see `play_intro`
+        self.intro_wanted = False  # the word, once; see `check_intro`
+        self.intro_until = 0.0     # ...playing until then (monotonic)
         self.schedule = briefing.Schedule()   # has today's recap happened?
         self.briefing_thread = None
         self.prayer_thread = None
@@ -1056,7 +1085,7 @@ class Apollo:
                               on_visual=self.on_visual,
                               on_activity=self.on_activity,
                               app=self)
-        self.play_intro()
+        self.want_intro()
         threading.Thread(target=self.worker, daemon=True).start()
 
     def on_closed(self):
@@ -1100,11 +1129,17 @@ class Apollo:
         method to decide when a turn starts. It decides between the ambient
         overlay and the full display, and that is all.
         """
-        if getattr(self, "intro_on", False):
+        # Set while the intro plays; only `check_intro` clears it, on the
+        # watcher's thread, so this needs no clock of its own.
+        if getattr(self, "intro_until", 0.0):
             return Overlay.FULL
         return Overlay.FULL if self.presence.full else Overlay.ORB
 
-    def play_intro(self):
+    def want_intro(self):
+        """Ask for the intro. The watcher plays it on its next tick."""
+        self.intro_wanted = True
+
+    def check_intro(self, now=None):
         """APOLLO in lit cells, on the whole screen, as Apollo comes up.
 
         The display holds the screen for INTRO_SECONDS while the page plays
@@ -1112,20 +1147,29 @@ class Apollo:
         and then Apollo is whatever it would have been: the overlay, or the
         display if Ctrl+` was pressed meanwhile. Not over a full-screen
         program: a game or a film that was up first is left alone.
-        """
-        if screen_busy():
-            return False
-        self.intro_on = True
-        self.apply_mode()
-        self.ui.intro()
-        timer = threading.Timer(INTRO_SECONDS, self.end_intro)
-        timer.daemon = True
-        timer.start()
-        return True
 
-    def end_intro(self):
-        self.intro_on = False
-        self.apply_mode()
+        On the watcher's thread, start and end, like every other change of
+        mode. The first version ended on a timer thread, which raced the
+        watcher's own check of the window: it saw the window halfway between
+        two modes and "repaired" it, and that is how the deadlock described
+        in `user32_releasing_gil` was found.
+        """
+        now = time.monotonic() if now is None else now
+        if self.intro_wanted:
+            self.intro_wanted = False
+            if screen_busy():
+                log.info("intro skipped: a full-screen program has the screen")
+                return
+            log.info("intro")
+            self.intro_until = now + INTRO_SECONDS
+            # Told first, while the page is still hidden, so the display is
+            # never seen for a frame on its way to the intro.
+            self.ui.intro()
+            self.apply_mode()
+            return
+        if self.intro_until and now >= self.intro_until:
+            self.intro_until = 0.0
+            self.apply_mode()
 
     def apply_mode(self):
         """Swap between the overlay and the full display.
