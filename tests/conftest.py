@@ -14,3 +14,14 @@ def no_live_prices(monkeypatch):
     monkeypatch.delenv(live.KEY_NAME, raising=False)
     monkeypatch.setattr(live, "_saved_key", lambda: None)
     monkeypatch.setattr(live, "_feed", None)
+
+
+@pytest.fixture(autouse=True)
+def private_journal(tmp_path, monkeypatch):
+    """Every test writes its record somewhere of its own, never into the
+    real one under %LOCALAPPDATA%."""
+    try:
+        import journal
+    except ImportError:          # before the module exists
+        return
+    monkeypatch.setattr(journal, "ROOT", str(tmp_path / "journal"))

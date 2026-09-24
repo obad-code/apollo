@@ -220,6 +220,9 @@ def run(name, args=None, ctx=None):
                           "loud, and call again with confirmed=true only after they "
                           "say yes.")}
     clean.pop("confirmed", None)
+    # Into the day's record (journal.py): what Apollo was asked to do says
+    # as much about what you care about as what you said.
+    journal.write("tool", name=name, args=clean)
     try:
         return _as_result(tool.handler(ctx, **clean))
     except Exception as e:  # noqa: BLE001 - a tool must never take a turn down
@@ -236,6 +239,7 @@ def run(name, args=None, ctx=None):
 # importable (and testable) without Windows or the network.
 
 import briefing  # noqa: E402
+import journal  # noqa: E402
 import clips  # noqa: E402
 import feeds  # noqa: E402
 import live  # noqa: E402

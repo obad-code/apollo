@@ -111,6 +111,7 @@ import assistant  # noqa: E402
 import briefing  # noqa: E402
 import clips  # noqa: E402
 import dataservice  # noqa: E402
+import journal  # noqa: E402
 import live  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
@@ -941,6 +942,11 @@ class Api:
 
     def suggestions(self):
         return stockdesk.suggestions()
+
+    def noted(self, what, title, source=""):
+        """A story or a stock you opened on the display, for the record."""
+        journal.opened(str(what or ""), str(title or ""), str(source or ""))
+        return True
 
 
 class Apollo:

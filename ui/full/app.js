@@ -666,9 +666,16 @@ const told = (item, index) => ({ number: index + 1, title: String(item.title || 
                                  source: String(item.source || ''),
                                  summary: String(item.summary || '') });
 
+/* Into Apollo's record (journal.py): what you open says what you care about. */
+function noted(what, title, source) {
+  const api = window.pywebview && window.pywebview.api;
+  if (api && api.noted) api.noted(what, String(title || ''), String(source || ''));
+}
+
 function openStory(index) {
   const item = state.feed[index];
   if (!item) return null;
+  noted('story', item.title, item.source);
   const card = $('story');
   unlight();
   state.open = { index, item };
@@ -911,6 +918,7 @@ function openStock(symbol) {
   const market = (state.snapshot && state.snapshot.market) || {};
   const quote = (market.watchlist || []).find((q) => q.symbol === symbol);
   if (!quote) return null;
+  noted('stock', quote.symbol, quote.name);
   unlightCard();
   const view = $('stock');
   state.stock = { symbol, quote, span: '1d', points: quote.spark || [], times: [] };

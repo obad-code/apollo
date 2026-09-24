@@ -40,6 +40,7 @@ from faster_whisper import WhisperModel
 import agents
 import briefing
 import gemini_live
+import journal
 import overlay_content
 import router
 import tools
@@ -1720,6 +1721,7 @@ def answer_with_agent(name, said, ui):
     # and nothing else, so the tag can never be read out.
     spoken, visual = overlay_content.split_reply(reply)
     ui.turn(name, spoken, visual)
+    journal.answered(spoken, who=name)
 
     ui.status(SPEAKING)
     speak(spoken)
@@ -1808,6 +1810,7 @@ def push_to_talk_turn(ui, whisper, voice):
         return
 
     ui.turn("You", said)
+    journal.said(said)
 
     # The one decision a turn makes, and there is one question in it: was an
     # agent called by name? Everything else is conversation, and conversation
@@ -1835,6 +1838,7 @@ def push_to_talk_turn(ui, whisper, voice):
             spoken = retry_after_drop(ui, voice, said)
         if spoken:
             ui.turn("Apollo", spoken)
+            journal.answered(spoken)
         return
 
     # An agent was summoned. Whatever Gemini was about to say is thrown away
@@ -1862,6 +1866,7 @@ def always_listening_turn(ui, voice):
 
     if said:
         ui.turn("You", said)
+        journal.said(said)
 
     route = router.route_request(said)
     router.log_route(route, said)
@@ -1876,6 +1881,7 @@ def always_listening_turn(ui, voice):
 
     if reply:
         ui.turn("Apollo", reply)
+        journal.answered(reply)
         # Gemini has already answered - the audio is playing now - so this
         # is the one moment the overlay should say so. Back to LISTENING once
         # it has finished, which is what starts the answer's linger.

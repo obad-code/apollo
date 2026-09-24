@@ -8,6 +8,7 @@ is the other hand on it.
 Nothing here raises: every answer is a dict the page can show.
 """
 
+import journal
 import market
 import watchlist
 
@@ -44,12 +45,14 @@ class StockDesk:
     def watch(self, symbol):
         result = watchlist.add(str(symbol or ""))
         if result.get("ok") and not result.get("already"):
+            journal.write("watch", symbol=result["symbol"])
             self._poke("market")
         return result
 
     def unwatch(self, symbol):
         result = watchlist.remove(str(symbol or ""))
         if result.get("ok"):
+            journal.write("unwatch", symbol=result["symbol"])
             self._poke("market")
         return result
 
