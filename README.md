@@ -244,6 +244,14 @@ earnings: Tue 17 Nov, in 53 days", marked *est.* while the company has not
 fixed the day), on its card once it is within a week, in the morning recap
 that week, and by voice (*"when are Nvidia's earnings?"*) - from the same
 Yahoo lookup as the target price.
+What the people running each company did with its shares is in the
+opened view too: open-market buys and sells by directors and officers over
+the last 90 days, from their SEC Form 4 filings as Finnhub carries them
+(the same key as live prices; tax withholding, option exercises, gifts and
+grants are routine and left out). A card says *Insider buying* when one of
+them bought in the last month, the morning recap mentions any trade over
+$1M filed in the last two days, and *"are Nvidia's insiders selling?"*
+asks by voice. US stocks only.
 The slot after the last card, **Add a stock**, opens a list of suggestions
 to put on with a click. By voice: *"open Nvidia"*, *"add Palantir and AMD"*,
 *"take off Apple and Tesla"* - in English or Arabic.

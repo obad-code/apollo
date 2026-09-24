@@ -243,6 +243,7 @@ def run(name, args=None, ctx=None):
 
 import briefing  # noqa: E402
 import ideas  # noqa: E402
+import insiders  # noqa: E402
 import journal  # noqa: E402
 import private_eye  # noqa: E402
 import clips  # noqa: E402
@@ -673,6 +674,28 @@ def _idle_mode(ctx):
     if ctx.idle() is False:
         return {"ok": False, "error": "Idle mode isn't available right now."}
     return {"ok": True, "idle": True}
+
+
+@_tool("insider_trades", "checking the insiders",
+       "What a company's directors and officers have bought and sold of its "
+       "stock on the open market over the last 90 days, from their SEC Form 4 "
+       "filings: totals, and the latest few with who, when and how much. US "
+       "stocks only. Use this when the user asks about insider buying or "
+       "selling, or whether the people running a company are buying.",
+       _obj({"company": _str("The company by its English name or its ticker")}, ("company",)))
+def _insider_trades(ctx, company=""):
+    import datetime as _dt
+
+    symbol = market.resolve(company)
+    ctx.activity(f"checking {symbol}'s insiders")
+    key = insiders.api_key()
+    if not key:
+        return {"ok": False, "error": "Insider trades need the Finnhub key, and there isn't one."}
+    today = insiders._today()
+    rows = insiders.fetch(symbol, key, today - _dt.timedelta(days=insiders.DAYS))
+    s = insiders.summary(symbol, rows, today=today)
+    return {"ok": True, "symbol": symbol, "days": s["days"], "bought": s["buys"],
+            "sold": s["sells"], "latest": s["latest"][:3]}
 
 
 @_tool("next_earnings", "checking the earnings date",

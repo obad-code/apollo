@@ -13,6 +13,7 @@ import time
 
 import feeds
 import ideas
+import insiders
 import logos
 import market
 import prayer
@@ -34,7 +35,7 @@ age_words = feeds.age_words
 INTERVALS = {"market": 60, "news": 600, "posts": 300, "weather": 900, "system": 5,
              "prayer": 300,
              "finds": 60,
-             "talks": 15, "projects": 300, "ideas": 15}
+             "talks": 15, "projects": 300, "ideas": 15, "insiders": 21600}
 SPARK_POINTS = 24
 
 
@@ -45,7 +46,8 @@ class DataService:
                          "news": {}, "posts": [], "weather": {}, "system": {},
                          "usage": {}, "prayer": {}, "finds": [], "talks": [],
                          "projects": {"sessions": [], "folders": [], "repos": []},
-                         "ideas": {"ideas": [], "reminders": []}, "updated": 0.0,
+                         "ideas": {"ideas": [], "reminders": []}, "insiders": {},
+                         "updated": 0.0,
                          # When each reader last came back with something. A
                          # reader that fails keeps its last good value, and the
                          # display says how old that value is rather than
@@ -217,6 +219,15 @@ class DataService:
             "ideas": ideas.all(),
             "reminders": [{"text": r.get("text", ""), "due": r.get("due", "")}
                           for r in reminders.pending()[:10]]}
+        return True
+
+    def _read_insiders(self):
+        # Form 4 filings for the watchlist, every six hours: they arrive a day
+        # or two after the trade, so anything faster would only re-read them.
+        key = insiders.api_key()
+        if not key:
+            return False
+        self.snapshot["insiders"] = insiders.for_watchlist(watchlist.current(), key=key)
         return True
 
     def _read_system(self):

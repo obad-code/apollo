@@ -14,6 +14,7 @@ import logging
 import os
 
 import feeds
+import insiders
 import market
 import private_eye
 import reminders
@@ -104,6 +105,8 @@ def compose(now=None):
         "posts": feeds.posts(hours=24, limit=3),
         "reminders": reminders.pending()[:3],
         "finds": private_eye.load()[:3],
+        "insiders": insiders.notable(watchlist.current(), key=insiders.api_key(),
+                                     today=now.date())[:3],
         "usage": usage.today(),
     }
 
@@ -139,6 +142,10 @@ def spoken(payload):
         lines.append(f"Trump posted{flag} {post['age']}: {post['text'][:200]}")
     for reminder in payload.get("reminders") or []:
         lines.append(f"Reminder: {reminder['text']} ({reminder['due']}).")
+    for trade in payload.get("insiders") or []:
+        verb = "sold" if trade["side"] == "sell" else "bought"
+        lines.append(f"Insider: {trade['name']} ({trade['symbol']}) {verb} "
+                     f"${trade['value'] / 1e6:.1f}M of shares on {trade['date']}.")
     for find in payload.get("finds") or []:
         lines.append(f"Private Eye found, about {find.get('interest', '')}: "
                      f"{find.get('title', '')} ({find.get('source', '')}, {find.get('age', '')}).")
@@ -148,7 +155,8 @@ def spoken(payload):
         "Lead with the date and weather in one sentence, then the market and "
         "any of their stocks reporting earnings this week, then "
         "the two or three stories that actually matter to them, then anything "
-        "market-moving in the posts, then the best of what Private Eye found, "
+        "market-moving in the posts, then any big insider trade in their stocks, "
+        "then the best of what Private Eye found, "
         "then their reminders. Give real numbers. "
         "Skip anything the facts above do not cover, and never invent a figure.")
     return "\n".join(lines)

@@ -33,6 +33,7 @@ UNTRUSTED = re.compile(
     r"|repo\.(?:name|about)"
     r"|idea\.(?:text|age|id)"
     r"|reminder\.(?:text|due)"
+    r"|trade\.(?:name|date)"
     r"|market\.status"
     r"|weather\.text"
     r"|system\.gpu_name"

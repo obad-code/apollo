@@ -374,6 +374,10 @@ function stockCard(quote) {
   const days = earningsIn(quote);
   const soon = days !== null && days >= 0 && days <= 7
     ? `<i class="dot">·</i><b class="soon">Earnings ${earningsWords(days)}</b>` : '';
+  // Someone who runs the company bought in the last month: rare, and worth a word.
+  const inside = ((state.snapshot || {}).insiders || {})[quote.symbol];
+  const buying = inside && inside.recent_buy
+    ? '<i class="dot">·</i><b class="buying">Insider buying</b>' : '';
   return `
     <div class="card" data-symbol="${esc(quote.symbol)}">
       <div class="card-top">
@@ -383,7 +387,7 @@ function stockCard(quote) {
         <span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span>
       </div>
       ${sparkline(quote.spark, quote.change_pct >= 0)}
-      <div class="card-foot">${target}<i class="dot">·</i>${pe}${soon}</div>
+      <div class="card-foot">${target}<i class="dot">·</i>${pe}${soon}${buying}</div>
     </div>`;
 }
 
@@ -836,6 +840,30 @@ const toldStock = (quote) => ({
   price: quote.price, change_pct: quote.change_pct, target: quote.target ?? null,
   upside: quote.upside ?? null, pe: quote.pe ?? null });
 
+/* A dollar amount the way a headline says it. */
+function big(value) {
+  const v = Number(value) || 0;
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  return `$${Math.round(v / 1e3)}K`;
+}
+
+/* What the company's own people did with its shares (insiders.py): open-
+ * market buys and sells from their Form 4 filings, the last 90 days. */
+function insidersMarkup(quote) {
+  const s = ((state.snapshot || {}).insiders || {})[quote.symbol];
+  if (!s) return '';
+  const bought = s.buys.count ? big(s.buys.value) : 'nothing';
+  const sold = s.sells.count ? big(s.sells.value) : 'nothing';
+  const rows = (s.latest || []).slice(0, 3).map((trade) => `
+    <div class="trade ${trade.side === 'buy' ? 'buy' : 'sell'}">
+      <b>${esc(trade.name)}</b>
+      <span>${trade.side === 'buy' ? 'bought' : 'sold'} ${big(trade.value)}</span>
+      <i>${esc(trade.date)}</i>
+    </div>`).join('');
+  return `<div class="insiders"><h4>Insiders · ${Number(s.days) || 90} days: bought ${bought}, sold ${sold}</h4>${rows}</div>`;
+}
+
 function nextEarnings(quote) {
   const days = earningsIn(quote);
   if (days === null || days < 0) return '<b>—</b>';
@@ -879,6 +907,7 @@ function stockMarkup(quote) {
       <div><span>P/E</span><b>${quote.pe ? quote.pe.toFixed(1) : '—'}</b></div>
       <div><span>Next earnings</span>${nextEarnings(quote)}</div>
     </div>
+    ${insidersMarkup(quote)}
     <div class="actions">
       <button class="drop" data-act="drop">Remove from watchlist</button>
       <button class="back" data-act="back">Back to the list</button>
