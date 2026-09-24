@@ -609,6 +609,27 @@ def _open_stock(ctx, company=""):
         if shown.get(key) is not None}}
 
 
+@_tool("next_earnings", "checking the earnings date",
+       "When a company next reports its earnings: the date, the weekday, how "
+       "many days away, and whether the date is still an estimate. Use this "
+       "when the user asks when a stock reports, or about its earnings date "
+       "or results day.",
+       _obj({"company": _str("The company by its English name or its ticker")},
+            ("company",)))
+def _next_earnings(ctx, company=""):
+    import datetime as _dt
+
+    symbol = market.resolve(company)
+    ctx.activity(f"checking {symbol}'s earnings")
+    found = market.fundamentals(symbol, timeout=market.TURN_TIMEOUT)
+    if not found.get("earnings"):
+        return {"ok": False, "error": f"No earnings date is out for {symbol} yet."}
+    day = _dt.date.fromisoformat(found["earnings"])
+    return {"ok": True, "symbol": symbol, "date": day.isoformat(),
+            "weekday": day.strftime("%A"), "days_away": (day - _dt.date.today()).days,
+            "estimate": bool(found.get("earnings_estimate"))}
+
+
 @_tool("private_eye_finds", "checking Private Eye",
        "What Private Eye - Apollo's scout, which searches the web every few "
        "hours for what the user cares about - has found lately, best first and "

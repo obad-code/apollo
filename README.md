@@ -225,6 +225,11 @@ click it and the stock opens out of its card: its chart over a day, five
 days, a month, six months or a year (run the pointer along it for the close
 at any point), the day's range, the analysts' target and the P/E, and
 **Remove from watchlist** - which asks for a second click before it does.
+When a stock next reports its earnings is in the opened view ("Next
+earnings: Tue 17 Nov, in 53 days", marked *est.* while the company has not
+fixed the day), on its card once it is within a week, in the morning recap
+that week, and by voice (*"when are Nvidia's earnings?"*) - from the same
+Yahoo lookup as the target price.
 The slot after the last card, **Add a stock**, opens a list of suggestions
 to put on with a click. By voice: *"open Nvidia"*, *"add Palantir and AMD"*,
 *"take off Apple and Tesla"* - in English or Arabic.

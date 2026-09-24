@@ -337,6 +337,19 @@ function sparkline(points, rising) {
   </svg>`;
 }
 
+/* How many days until a stock next reports, or null when nobody knows yet.
+ * Counted between noons, so a report tomorrow is 1 whatever the hour. */
+function earningsIn(quote) {
+  if (!quote || !/^\d{4}-\d{2}-\d{2}$/.test(String(quote.earnings || ''))) return null;
+  const day = new Date(`${quote.earnings}T12:00:00`);
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return Math.round((day - today) / 86400000);
+}
+
+const earningsWords = (days) =>
+  (days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`);
+
 /* One stock, as a card: its mark, what it costs, what it did, and what the
  * analysts make of it. The same shape as the card the overlay draws - white
  * paper, the price large, the curve under it, the valuation along the foot -
@@ -351,6 +364,10 @@ function stockCard(quote) {
         : ''}`
     : '<b>—</b> target';
   const pe = quote.pe ? `<b>${quote.pe.toFixed(1)}</b> P/E` : '<b>—</b> P/E';
+  // Earnings within the week earn a word on the card itself.
+  const days = earningsIn(quote);
+  const soon = days !== null && days >= 0 && days <= 7
+    ? `<i class="dot">·</i><b class="soon">Earnings ${earningsWords(days)}</b>` : '';
   return `
     <div class="card" data-symbol="${esc(quote.symbol)}">
       <div class="card-top">
@@ -360,7 +377,7 @@ function stockCard(quote) {
         <span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span>
       </div>
       ${sparkline(quote.spark, quote.change_pct >= 0)}
-      <div class="card-foot">${target}<i class="dot">·</i>${pe}</div>
+      <div class="card-foot">${target}<i class="dot">·</i>${pe}${soon}</div>
     </div>`;
 }
 
@@ -813,6 +830,15 @@ const toldStock = (quote) => ({
   price: quote.price, change_pct: quote.change_pct, target: quote.target ?? null,
   upside: quote.upside ?? null, pe: quote.pe ?? null });
 
+function nextEarnings(quote) {
+  const days = earningsIn(quote);
+  if (days === null || days < 0) return '<b>—</b>';
+  const day = new Date(`${quote.earnings}T12:00:00`).toLocaleDateString('en-GB',
+    { weekday: 'short', day: 'numeric', month: 'short' });
+  const guess = quote.earnings_estimate ? ' (est.)' : '';
+  return `<b>${esc(day)}</b><i>${esc(earningsWords(days) + guess)}</i>`;
+}
+
 function stockMarkup(quote) {
   const mark = quote.logo
     ? `<img class="mark" src="${esc(quote.logo)}" alt="">`
@@ -845,6 +871,7 @@ function stockMarkup(quote) {
       <div><span>Day low</span><b>${quote.low != null ? money(quote.low) : '—'}</b></div>
       <div><span>Target</span><b>${quote.target ? money(quote.target) : '—'}</b>${upside}</div>
       <div><span>P/E</span><b>${quote.pe ? quote.pe.toFixed(1) : '—'}</b></div>
+      <div><span>Next earnings</span>${nextEarnings(quote)}</div>
     </div>
     <div class="actions">
       <button class="drop" data-act="drop">Remove from watchlist</button>

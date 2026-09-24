@@ -14,7 +14,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import overlay_content
@@ -108,10 +108,11 @@ CRUMB_TTL = 3600
 # timeout, across two hosts, is twelve seconds of silence for a number the
 # card can perfectly well show a dash for.
 TURN_TIMEOUT = 2.5
-SUMMARY_MODULES = "financialData,summaryDetail,defaultKeyStatistics"
+SUMMARY_MODULES = "financialData,summaryDetail,defaultKeyStatistics,calendarEvents"
 NO_FUNDAMENTALS = {"target": None, "target_high": None, "target_low": None,
                    "analysts": None, "recommendation": None,
-                   "pe": None, "forward_pe": None, "eps": None}
+                   "pe": None, "forward_pe": None, "eps": None,
+                   "earnings": None, "earnings_estimate": None}
 
 _crumb = None            # (expires_at, crumb, opener)
 
@@ -196,6 +197,13 @@ def fundamentals(symbol, timeout=None):
         financial = block.get("financialData") or {}
         summary = block.get("summaryDetail") or {}
         stats = block.get("defaultKeyStatistics") or {}
+        # When it next reports: the first day given - Yahoo gives a range
+        # while the company has not fixed it, and says it is an estimate.
+        calendar = ((block.get("calendarEvents") or {}).get("earnings")) or {}
+        dates = [d.get("raw") for d in calendar.get("earningsDate") or []
+                 if isinstance(d, dict) and d.get("raw")]
+        earnings = (datetime.fromtimestamp(min(dates), timezone.utc)
+                    .date().isoformat() if dates else None)
         recommendation = financial.get("recommendationKey")
         analysts = _raw(financial, "numberOfAnalystOpinions")
         return {
@@ -207,6 +215,8 @@ def fundamentals(symbol, timeout=None):
             "pe": _raw(summary, "trailingPE", 2),
             "forward_pe": _raw(summary, "forwardPE", 2),
             "eps": _raw(stats, "trailingEps", 2),
+            "earnings": earnings,
+            "earnings_estimate": bool(calendar.get("isEarningsDateEstimate")) if dates else None,
         }
     except Exception:  # noqa: BLE001 - a gap, not a failure
         return dict(NO_FUNDAMENTALS)

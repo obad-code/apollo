@@ -187,6 +187,7 @@ def test_the_morning_briefing_mentions_what_it_found(monkeypatch):
     monkeypatch.setattr(briefing.weather, "now", lambda: {})
     monkeypatch.setattr(briefing.market, "quote", lambda symbol: (_ for _ in ()).throw(OSError()))
     monkeypatch.setattr(briefing.market, "market_status", lambda now=None: {"label": ""})
+    monkeypatch.setattr(briefing.market, "fundamentals", lambda symbol, timeout=None: {})
     eye({"GTA 6": [item("GTA 6 map leak", source="IGN")]}).run()
     payload = briefing.compose(now=datetime.datetime(2026, 9, 25, 8, 30))
     assert [f["title"] for f in payload["finds"]] == ["GTA 6 map leak"]

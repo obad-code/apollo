@@ -72,6 +72,20 @@ def compose(now=None):
             continue
     movers.sort(key=lambda q: abs(q["change_pct"]), reverse=True)
 
+    # Which of your stocks report this week: worth a sentence before it happens.
+    earnings = []
+    for symbol in watchlist.current():
+        try:
+            when = market.fundamentals(symbol, timeout=market.TURN_TIMEOUT).get("earnings")
+        except Exception:  # noqa: BLE001
+            continue
+        if not when:
+            continue
+        days = (datetime.date.fromisoformat(when) - now.date()).days
+        if 0 <= days <= 7:
+            earnings.append({"symbol": symbol, "date": when, "days": days})
+    earnings.sort(key=lambda e: e["days"])
+
     try:
         status = market.market_status(now.astimezone() if now.tzinfo else None)["label"]
     except Exception:  # noqa: BLE001
@@ -85,6 +99,7 @@ def compose(now=None):
         "week": now.isocalendar().week,
         "weather": weather.now(),
         "market": {"indices": indices, "movers": movers[:4], "status": status},
+        "earnings": earnings,
         "headlines": {topic: feeds.headlines(topic, limit=2) for topic in feeds.TOPICS},
         "posts": feeds.posts(hours=24, limit=3),
         "reminders": reminders.pending()[:3],
@@ -112,6 +127,10 @@ def spoken(payload):
         lines.append(f"Market: {market_part['status']}.")
     for quote in market_part.get("indices", []) + market_part.get("movers", []):
         lines.append(f"{quote['symbol']} {quote['price']:.2f} {quote['change_pct']:+.2f}%.")
+    for report in payload.get("earnings") or []:
+        when = ("today" if report["days"] == 0 else "tomorrow" if report["days"] == 1
+                else f"in {report['days']} days")
+        lines.append(f"{report['symbol']} reports earnings {when} ({report['date']}).")
     for topic, items in (payload.get("headlines") or {}).items():
         for item in items:
             lines.append(f"{topic}: {item['title']} ({item['source']}, {item['age']}).")
@@ -126,7 +145,8 @@ def spoken(payload):
     lines.append(
         "Read this as a short spoken briefing - about 30 to 45 seconds, in the "
         "language the user last spoke to you in, their dialect if it was Arabic. "
-        "Lead with the date and weather in one sentence, then the market, then "
+        "Lead with the date and weather in one sentence, then the market and "
+        "any of their stocks reporting earnings this week, then "
         "the two or three stories that actually matter to them, then anything "
         "market-moving in the posts, then the best of what Private Eye found, "
         "then their reminders. Give real numbers. "

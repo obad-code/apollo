@@ -224,6 +224,7 @@ html, body {
 .card-foot i.up { color: var(--up-ink); }
 .card-foot i.down { color: var(--down-ink); }
 .card-foot .dot { opacity: .4; margin: 0 6px; }
+.card-foot .soon { color: var(--amber-bright); }
 
 /* The curve draws itself in on the first paint only. */
 @keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
@@ -345,13 +346,14 @@ html, body {
 #stock.scrubbing .scrub { opacity: 1; }
 #stock.loading .big { opacity: .4; }
 
-.facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.facts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .facts div { background: rgba(255, 255, 255, .045); border-radius: 12px; padding: 9px 12px;
              font-variant-numeric: tabular-nums; }
 .facts span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .14em;
               text-transform: uppercase; color: var(--caption); }
 .facts b { font-size: 17px; font-weight: 900; color: #fff3dc; }
 .facts i { font-style: normal; font-size: 12px; font-weight: 700; margin-left: 4px; }
+.facts div:last-child i { display: block; margin: 1px 0 0; color: var(--caption); }
 
 #stock .actions { display: flex; gap: 10px; margin-top: 14px; }
 #stock .actions button {

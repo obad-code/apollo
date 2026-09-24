@@ -19,6 +19,7 @@ def quiet(monkeypatch):
         "currency": "USD", "exchange": "NMS", "points": [], "previous_close": 99.0, "time": 0})
     monkeypatch.setattr(briefing.market, "market_status", lambda now=None: {
         "open": False, "next": None, "label": "NYSE opens in 8h 00m"})
+    monkeypatch.setattr(briefing.market, "fundamentals", lambda symbol, timeout=None: {})
 
 
 def test_compose_has_every_section(quiet):
