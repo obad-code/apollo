@@ -110,6 +110,7 @@ import assistant  # noqa: E402
 import briefing  # noqa: E402
 import clips  # noqa: E402
 import dataservice  # noqa: E402
+import live  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
 import overlay_state  # noqa: E402
@@ -119,6 +120,7 @@ import reminders  # noqa: E402
 import stockdesk  # noqa: E402
 import tools  # noqa: E402
 import turnview  # noqa: E402
+import watchlist  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -791,6 +793,12 @@ class WebReporter:
         """The world, for the full display. Only worth sending while it is up."""
         self._call("data", snapshot)
 
+    def live(self, batch):
+        """Trades since the last batch, {symbol: (price, seconds)}: the cards
+        and an opened stock move with them."""
+        self._call("live", {symbol: {"price": price, "time": seconds}
+                            for symbol, (price, seconds) in batch.items()})
+
     def note(self, text):
         self._call("note", text)
 
@@ -912,6 +920,7 @@ class Apollo:
         self.voice = None          # the Gemini Live session, once connected
         self.clips = None          # the replay buffer, once recording
         self.data = None           # the world, refreshed on a timer
+        self.ticker = None         # prices as they trade, with a Finnhub key
         self.schedule = briefing.Schedule()   # has today's recap happened?
         self.briefing_thread = None
         self.prayer_thread = None
@@ -1059,6 +1068,8 @@ class Apollo:
             self.clips.stop()
         if self.data is not None:
             self.data.stop()
+        if self.ticker is not None:
+            self.ticker.stop()
         if self.orb:
             self.orb.close()
         if self.tray:
@@ -1282,7 +1293,15 @@ class Apollo:
         """A fresh world snapshot. The page only wants it while it is visible."""
         ui = getattr(self, "ui", None)
         if ui is not None and ui.alive and self.overlay.mode == Overlay.FULL:
-            ui.data(snapshot)
+            # With the streamed prices over the minute-old ones, or the next
+            # snapshot would put every card back a minute.
+            ui.data(live.overlay_snapshot(snapshot, getattr(self, "ticker", None)))
+
+    def on_ticks(self, batch):
+        """Trades from the stream, about once a second. Only for the page."""
+        ui = getattr(self, "ui", None)
+        if ui is not None and ui.alive and self.overlay.mode == Overlay.FULL:
+            ui.live(batch)
 
     def morning(self):
         """The day's first recap: open the display, say it, put it away."""
@@ -1452,6 +1471,17 @@ class Apollo:
         # inside a turn, where it would be latency you could hear.
         self.data = dataservice.DataService(on_snapshot=self.on_data).start()
         log.info("data service started")
+
+        # Prices as they trade, over the minute-by-minute reading, for the
+        # stocks the stream carries. No key, no stream: the minute will do.
+        key = live.api_key()
+        if key:
+            self.ticker = live.LiveFeed(key, symbols=watchlist.current,
+                                        on_tick=self.on_ticks).start()
+            live.set_feed(self.ticker)
+            log.info("live prices on")
+        else:
+            log.info("no %s; prices refresh once a minute", live.KEY_NAME)
 
         # CTRL+1. A thread of its own so it answers during a turn as well as
         # between them; `run_loop` reads its flag and does the actual

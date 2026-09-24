@@ -41,6 +41,8 @@ def test_snapshot_has_every_key_the_display_reads(monkeypatch):
     assert set(snap["market"]) == {"indices", "watchlist", "status"}
     stock = snap["market"]["watchlist"][0]
     assert set(stock) >= {"symbol", "name", "price", "change_pct", "currency", "spark"}
+    # Yesterday's close, so a price that streams in can say how far it has moved.
+    assert "previous" in stock
     assert set(snap["system"]) >= {"cpu", "ram", "gpu", "gpu_name"}
     assert set(snap["usage"]) >= {"tokens", "cost", "estimated", "turns"}
     headline = snap["news"]["gaming"][0]

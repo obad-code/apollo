@@ -238,6 +238,7 @@ def run(name, args=None, ctx=None):
 import briefing  # noqa: E402
 import clips  # noqa: E402
 import feeds  # noqa: E402
+import live  # noqa: E402
 import market  # noqa: E402
 import overlay_content  # noqa: E402
 import panels  # noqa: E402
@@ -397,7 +398,8 @@ def _stock_quote(ctx, symbols):
     for raw in symbols[:6]:
         symbol = market.resolve(raw)
         ctx.activity(f"fetching {symbol}")
-        quotes.append(market.quote(symbol))
+        # Up to the trade where it can be: the stream's price, or Finnhub's.
+        quotes.append(live.freshen(market.quote(symbol)))
     if len(quotes) == 1:
         ctx.show(market.visual_for(quotes[0], "1d"))
     else:

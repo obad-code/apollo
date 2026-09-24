@@ -358,6 +358,39 @@ html, body {
 #stock button.drop.sure { background: var(--down); color: #1a0c0e; }
 #stock button.back { background: rgba(255, 255, 255, .08); color: #e9e1d0; }
 
+/* --- prices as they trade ------------------------------------------------------
+   A price flickers the way it went; the panel and an opened stock say LIVE
+   while trades are coming, and a dot pulses at the end of the day's line. */
+
+@keyframes tick-up { from { color: var(--up); text-shadow: 0 0 14px rgba(95, 227, 154, .8); } }
+@keyframes tick-down { from { color: var(--down); text-shadow: 0 0 14px rgba(255, 107, 122, .8); } }
+.tick-up { animation: tick-up .9s ease-out; }
+.tick-down { animation: tick-down .9s ease-out; }
+
+@keyframes live-breath { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+#markets.streaming #markets-head::after {
+  content: "● Live"; margin-left: 12px; color: var(--up);
+  animation: live-breath 1.6s ease-in-out infinite;
+}
+#stock .live-badge {
+  display: none; margin-left: 6px; font-size: 11px; font-weight: 900; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--up); animation: live-breath 1.6s ease-in-out infinite;
+}
+#stock .live-badge::before { content: "● "; }
+#stock.live .live-badge { display: inline; }
+
+@keyframes pulse-ring {
+  from { box-shadow: 0 0 0 0 rgba(255, 246, 230, .6); }
+  to { box-shadow: 0 0 0 12px rgba(255, 246, 230, 0); }
+}
+.big .pulse {
+  position: absolute; right: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--paper); opacity: 0; pointer-events: none;
+  transition: opacity .3s ease-out, transform .35s cubic-bezier(.215, .61, .355, 1);
+}
+#stock.live .big .pulse { opacity: 1; animation: pulse-ring 1.4s ease-out infinite; }
+.big svg.still { animation: none; }
+
 /* "Add a stock": the suggestions, each one click from the list. */
 #stock .picks {
   flex: 1; min-height: 0; margin-top: 18px; display: grid; align-content: start;
@@ -687,6 +720,8 @@ body.asleep #peek { opacity: 0 !important; pointer-events: none; transition: opa
 @media (prefers-reduced-motion: reduce) {
   #feed-bar, .story, #peek > .shot, #story, #stock, #watch-frame { transition-duration: .01s; }
   .big svg, .card.pending .card-foot { animation: none; }
+  .tick-up, .tick-down, #stock.live .big .pulse, #stock .live-badge,
+  #markets.streaming #markets-head::after { animation: none; }
   #sleep-wake { animation: none; }
 }
 

@@ -349,6 +349,21 @@ the card can live without.
 The marks are other companies' trademarks, fetched from a third party. They
 are cached at runtime and git-ignored, never committed.
 
+**Live prices.** With a free Finnhub key saved as `FINNHUB_API_KEY`
+(`setx FINNHUB_API_KEY "..."` from finnhub.io's dashboard, then restart
+Apollo), prices move as they trade. `live.LiveFeed` holds one WebSocket to
+Finnhub for the watchlist's US stocks and hands the latest trade per stock
+on about once a second: the cards' prices tick and flicker the way they
+went, the end of each curve follows, an opened stock's day chart grows at
+its edge with a dot pulsing at the price, and the panel says **Live** while
+trades are coming. A price asked for out loud takes the stream's price, or
+Finnhub's quote for a US stock that is not on the list. The free stream has
+no indices, no Tadawul, no futures or crypto; those stay on the minute-by-
+minute reading, and so does everything when the market is shut or the
+stream is down (it reconnects by itself). The key rides in the stream's
+address, so the address is never logged. No key, no stream: nothing else
+changes.
+
 Changing the watchlist answers at once. The tools ask the data service to
 read the market again (`DataService.poke`) and return; the new card follows
 a moment later. They used to read every feed there was before answering,

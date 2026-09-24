@@ -134,7 +134,9 @@ class DataService:
         quote = {"symbol": data["symbol"], "name": data["name"],
                  "price": round(data["price"], 2),
                  "change_pct": round(data["change_pct"], 2),
-                 "currency": data["currency"], "spark": points}
+                 "currency": data["currency"], "spark": points,
+                 # Yesterday's close: what a streamed price is measured against.
+                 "previous": data.get("previous_close")}
         if not spark:
             return quote
         # What the stock cards show beyond the price: the company's mark, what

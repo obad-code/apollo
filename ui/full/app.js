@@ -121,6 +121,7 @@ const state = {
   stock: null,            // the stock opened out of its card, or the add picker
   pending: new Map(),     // stocks asked for whose cards have not come yet
   marketKey: '',          // what the cards were last drawn from
+  liveTimer: null,        // takes LIVE off the panel when the trades stop
 };
 
 // Whether the display is the idle screen. Up here because the clock, which
@@ -762,10 +763,12 @@ function stockMarkup(quote) {
     <div class="spans">
       ${SPANS.map(([span, label]) =>
         `<span class="chip${span === '1d' ? ' on' : ''}" data-span="${span}">${label}</span>`).join('')}
+      <span class="live-badge">Live</span>
       <span class="span-move"></span>
     </div>
     <div class="big">
       <div class="plot"></div>
+      <i class="pulse"></i>
       <span class="hi"></span><span class="lo"></span>
       <div class="scrub"><i></i><b></b></div>
     </div>
@@ -781,8 +784,9 @@ function stockMarkup(quote) {
     </div>`;
 }
 
-/* The chart across the open stock, drawn in again for every span. */
-function drawBig(points, rising) {
+/* The chart across the open stock, drawn in again for every span - and, while
+ * trades stream, redrawn still (no sweep) as its last point moves. */
+function drawBig(points, rising, { still = false } = {}) {
   const view = $('stock');
   const plot = view.querySelector('.plot');
   if (!plot) return;
@@ -800,7 +804,7 @@ function drawBig(points, rising) {
   ]);
   const line = smooth(laid);
   const start = laid[0][1].toFixed(1);
-  plot.innerHTML = `<svg viewBox="0 0 ${BIG_W} ${BIG_H}" preserveAspectRatio="none">
+  plot.innerHTML = `<svg class="${still ? 'still' : ''}" viewBox="0 0 ${BIG_W} ${BIG_H}" preserveAspectRatio="none">
       <path class="base" d="M0,${start}L${BIG_W},${start}" vector-effect="non-scaling-stroke"/>
       <path class="wash" d="${line}L${BIG_W},${BIG_H}L0,${BIG_H}Z"
             fill="url(#${rising ? 'washUp' : 'washDown'})"/>
@@ -810,6 +814,12 @@ function drawBig(points, rising) {
     </svg>`;
   view.querySelector('.hi').textContent = money(high);
   view.querySelector('.lo').textContent = money(low);
+  // The dot sits on the last point: moved, not laid out again.
+  const pulse = view.querySelector('.pulse');
+  if (pulse) {
+    const height = view.querySelector('.big').clientHeight;
+    pulse.style.transform = `translateY(${((laid[laid.length - 1][1] / BIG_H) * height).toFixed(1)}px)`;
+  }
 }
 
 function spanWhen(stamp, span) {
@@ -1017,6 +1027,98 @@ $('stock').addEventListener('pointermove', (event) => {
   view.classList.add('scrubbing');
 });
 $('stock').addEventListener('pointerleave', () => $('stock').classList.remove('scrubbing'));
+
+/* --- prices as they trade ------------------------------------------------------
+ *
+ * With a Finnhub key, apollo.py hands on the stream's trades about once a
+ * second. A card's price and move change in place, the price flickers the
+ * way it went, and the end of its curve follows; an opened stock's day
+ * chart grows at its right edge, with a dot pulsing at the price. The panel
+ * says LIVE while trades are coming and stops saying it when they stop -
+ * the market shut, the stream down - rather than claiming a pulse it has
+ * not got. */
+
+const LIVE_QUIET = 15000;        // this long without a trade, and it is not live
+const BAR_SECONDS = 300;         // Yahoo's day comes in five-minute closes
+
+function markLive() {
+  const panel = $('markets');
+  panel.classList.add('streaming');
+  clearTimeout(state.liveTimer);
+  state.liveTimer = setTimeout(() => panel.classList.remove('streaming'), LIVE_QUIET);
+}
+
+function flicker(element, up) {
+  if (!element) return;
+  element.classList.remove('tick-up', 'tick-down');
+  void element.offsetWidth;                  // from the start, every trade
+  element.classList.add(up ? 'tick-up' : 'tick-down');
+}
+
+function tickCard(quote, before) {
+  // The next full redraw compares against this, so it has nothing to flash.
+  state.prices.set(quote.symbol, quote.price);
+  const card = cardFor(quote.symbol);
+  if (!card || card.classList.contains('pending')) return;
+  const price = card.querySelector('.card-top .price');
+  const move = card.querySelector('.card-top .move');
+  if (price) price.textContent = money(quote.price);
+  if (move) {
+    move.className = `move ${moveClass(quote.change_pct)}`;
+    move.textContent = moveText(quote.change_pct);
+  }
+  if (quote.price !== before) flicker(price, quote.price > before);
+  const chart = card.querySelector('.chart');
+  if (chart && quote.spark && quote.spark.length > 1) {
+    chart.outerHTML = sparkline(quote.spark, quote.change_pct >= 0);
+  }
+}
+
+function tickStock(quote, tick, before) {
+  const open = state.stock;
+  const view = $('stock');
+  const price = view.querySelector('.stock-head .price');
+  const move = view.querySelector('.stock-head .move');
+  if (price) price.textContent = money(quote.price);
+  if (move) {
+    move.className = `move ${moveClass(quote.change_pct)}`;
+    move.textContent = `${moveText(quote.change_pct)} today`;
+  }
+  if (quote.price !== before) flicker(price, quote.price > before);
+  view.classList.add('live');
+  clearTimeout(open.liveTimer);
+  open.liveTimer = setTimeout(() => view.classList.remove('live'), LIVE_QUIET);
+  if (open.span !== '1d' || !open.points || open.points.length < 2) return;
+  // A trade inside the last bar moves it; a trade past it starts the next.
+  const last = open.times.length ? open.times[open.times.length - 1] : 0;
+  if (last && Number(tick.time) - last >= BAR_SECONDS) {
+    open.points.push(quote.price);
+    open.times.push(Number(tick.time));
+  } else {
+    open.points[open.points.length - 1] = quote.price;
+  }
+  drawBig(open.points, quote.change_pct >= 0, { still: true });
+}
+
+function applyLive(batch) {
+  const market = state.snapshot && state.snapshot.market;
+  if (!market || !batch) return;
+  let traded = false;
+  for (const quote of market.watchlist || []) {
+    const tick = batch[quote.symbol];
+    const price = tick ? Number(tick.price) : NaN;
+    if (!(price > 0)) continue;
+    traded = true;
+    const before = quote.price;
+    quote.price = price;
+    if (quote.previous) quote.change_pct = ((price - quote.previous) / quote.previous) * 100;
+    if (quote.spark && quote.spark.length) quote.spark[quote.spark.length - 1] = price;
+    tickCard(quote, before);
+    const open = state.stock;
+    if (open && !open.picker && open.symbol === quote.symbol) tickStock(quote, tick, before);
+  }
+  if (traded) markLive();
+}
 
 function renderStrip(snapshot) {
   const usage = snapshot.usage || {};
@@ -1392,6 +1494,8 @@ window.apollo = {
   },
   visual(payload) { $('visual').innerHTML = chart(payload); },
   data(snapshot) { render(snapshot); },
+  // Trades from the stream, {symbol: {price, time}}, about once a second.
+  live(batch) { applyLive(batch); },
   activity(text) {
     if (state.phase === 'thinking' && text) dots.say(text);
   },
