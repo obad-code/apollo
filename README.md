@@ -188,17 +188,20 @@ one is a number Apollo actually has.
 
 **The name.** Wherever Apollo writes its name - under the ring on the full
 display, on the idle screen, and in the intro - it is an LED sign on an old
-tube: Thmanyah at its heaviest, stretched and leaning, used as a stencil
-over a grid of small lit cells, with a bloom, the three colours landing a
-hair apart, a flicker, scanlines and now and then a bright band rolling
-down (`ui/full/ledword.js`). The cells light in a sweep from the left each
-time the display or the idle screen opens.
+tube: VT323, the lettering of a DEC VT320 terminal, upright, used as a
+stencil over a grid of small lit cells, with a bloom, the three colours
+landing a hair apart, a flicker, scanlines and now and then a bright band
+rolling down (`ui/full/ledword.js`). It arrives scrambled, like the
+scramble-text component: every letter a random symbol, settling into the
+word from the left. Point at it on the display and it scrambles again.
+VT323 is under the SIL Open Font License (`ui/full/fonts/vt323/OFL.txt`),
+so unlike Thmanyah it may be shared with the code.
 
 **The intro.** As Apollo starts, the display holds the screen for about
 three and a half seconds (`INTRO_SECONDS`): black glass with soft pale
-shapes behind, the name tilted away and sweeping on, and then the tube
-switching off - the picture collapsing to a bright line and the line to
-nothing - before Apollo settles into the overlay. It is skipped when a
+shapes behind, the name tilted away and settling out of its scramble, and
+then the tube switching off - the picture collapsing to a bright line and
+the line to nothing - before Apollo settles into the overlay. It is skipped when a
 full-screen program was already up, so a game or a film is left alone.
 
 The full display is the whole screen: a field of dots behind everything - a

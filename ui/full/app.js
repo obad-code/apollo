@@ -135,11 +135,15 @@ const shader = new Shader($('shader'));
 shader.start();
 
 /* The name in lit cells, in its three places: under the ring, on the idle
- * screen, and in the intro as Apollo comes up. */
-const wordmark = new LedWord($('wordmark'), { rows: 10, glow: 0.8, fill: 0.86 });
-const sleepWord = new LedWord($('sleep-word'), { rows: 15 });
-const introWord = new LedWord($('intro-word'), { rows: 20, glow: 1.15 });
-wordmark.sweep(0.9);
+ * screen, and in the intro as Apollo comes up. Upright, in VT323 - a CRT
+ * terminal's own letters - and arriving scrambled. */
+const CRT_FONT = '"VT323", "Consolas", monospace';
+const wordmark = new LedWord($('wordmark'), { rows: 12, glow: 0.8, fill: 0.9, font: CRT_FONT, weight: 400 });
+const sleepWord = new LedWord($('sleep-word'), { rows: 16, font: CRT_FONT, weight: 400 });
+const introWord = new LedWord($('intro-word'), { rows: 22, glow: 1.15, font: CRT_FONT, weight: 400 });
+wordmark.scramble(0.75);
+// The scramble-text component's own trigger: point at the name and it goes again.
+$('wordmark').addEventListener('pointerenter', () => wordmark.scramble(0.75));
 
 window.addEventListener('resize', () => {
   shader.resize();
@@ -156,7 +160,7 @@ function playIntro() {
   box.classList.remove('off');
   box.classList.add('on');
   introWord.resize();              // it had no size while it was not shown
-  introWord.sweep(1.1, 0.25);
+  introWord.scramble(1.0, 0.35);
   box._off = setTimeout(() => box.classList.add('off'), INTRO_OFF_AT);
   box._gone = setTimeout(() => {
     box.classList.remove('on', 'off');
@@ -1296,7 +1300,7 @@ function setSleep(on) {
     ringStop();
     wordmark.stop();
     sleepWord.resize();
-    sleepWord.sweep(1.4, 0.5);     // as the idle screen fades in
+    sleepWord.scramble(0.9, 0.5);  // as the idle screen fades in
     tickSleep();
     nextFact();
     asleep.timer = setInterval(nextFact, FACT_EVERY);
@@ -1304,7 +1308,7 @@ function setSleep(on) {
     sleepWord.stop();
   }
   if (!on && state.mode === 'full') {
-    wordmark.sweep(0.9);
+    wordmark.scramble(0.75);
     ringStart();
     if ($('lyla-block').dataset.hidden !== 'true') lyla.start();
   }
@@ -1550,7 +1554,7 @@ window.apollo = {
     // a window nobody can see is a GPU burning for nothing.
     if (name === 'full') {
       shader.start();
-      if (!asleep.on) { lyla.start(); ringStart(); wordmark.sweep(0.9); }
+      if (!asleep.on) { lyla.start(); ringStart(); wordmark.scramble(0.75); }
       else sleepWord.start();
       enter();
     } else {
