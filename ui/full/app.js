@@ -140,8 +140,8 @@ shader.start();
  * heaviest drawn at four fifths of its width - a little taller than it
  * comes - and arriving scrambled. */
 const NAME = { font: '"Orbitron", "Segoe UI", sans-serif', weight: 900, stretch: 0.8 };
-const wordmark = new LedWord($('wordmark'), { ...NAME, rows: 12, glow: 0.8, fill: 0.9 });
-const sleepWord = new LedWord($('sleep-word'), { ...NAME, rows: 16 });
+const wordmark = new LedWord($('wordmark'), { ...NAME, rows: 12, glow: 0.8, fill: 0.62, bulge: 0.18 });
+const sleepWord = new LedWord($('sleep-word'), { ...NAME, rows: 16, fill: 0.7 });
 const introWord = new LedWord($('intro-word'), { ...NAME, rows: 22, glow: 1.15 });
 wordmark.scramble(0.75);
 // The scramble-text component's own trigger: point at the name and it goes again.

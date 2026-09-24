@@ -191,7 +191,8 @@ display, on the idle screen, and in the intro - it is an LED sign on an old
 tube: Orbitron at its heaviest, upright and drawn a little taller than it
 comes, used as a stencil over a grid of small lit cells, with a bloom, the
 three colours landing a hair apart, a flicker, scanlines and now and then a
-bright band rolling down (`ui/full/ledword.js`). It arrives scrambled, like
+bright band rolling down (`ui/full/ledword.js`) - and all of it seen through the
+same fisheye as the dots behind, its colours parting towards the edges. It arrives scrambled, like
 the scramble-text component: every letter a random symbol, settling into
 the word from the left. Point at it on the display and it scrambles again.
 Orbitron is under the SIL Open Font License

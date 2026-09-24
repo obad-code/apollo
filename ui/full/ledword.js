@@ -13,6 +13,10 @@
 // the display's wordmark open with it, and the wordmark does it again under
 // the pointer.
 //
+// And it is seen through the glass: the frame is bent by the same fisheye
+// as the dots behind it, with its colours parting towards the edges (see
+// `glass` below).
+//
 // Frames only while it runs, at most `fps` of them.
 
 const DEFAULT_FONT = '"Thmanyah", "Segoe UI", system-ui, sans-serif';
@@ -27,6 +31,81 @@ export function scrambled(target, progress) {
   return [...target].map((ch, i) => (ch === ' ' ? ' ' : i < settled ? ch : randomChar())).join('');
 }
 
+// The glass the word is seen through: the same bulge as the dots behind it
+// (shader.js), and the three guns landing further apart towards the edges.
+// A second pass on the GPU over the finished 2D frame; without WebGL the
+// word is simply drawn flat.
+const GLASS_VERTEX = `
+attribute vec2 position;
+varying vec2 uv;
+void main() { uv = position * 0.5 + 0.5; gl_Position = vec4(position, 0.0, 1.0); }
+`;
+
+const GLASS_FRAGMENT = `
+precision mediump float;
+varying vec2 uv;
+uniform sampler2D frame;
+uniform float aspect;      // width over height
+uniform float bulge;       // how far the middle swells, 0 for flat glass
+void main() {
+  vec2 p = uv * 2.0 - 1.0;
+  // 0 at the centre to 1 in a corner, measured on the real shape.
+  float r2 = (p.x * p.x * aspect * aspect + p.y * p.y) / (aspect * aspect + 1.0);
+  vec2 q = p * (1.0 - bulge + bulge * r2 * 1.4);
+  vec2 at = q * 0.5 + 0.5;
+  if (at.x < 0.0 || at.x > 1.0 || at.y < 0.0 || at.y > 1.0) {
+    gl_FragColor = vec4(0.0);
+    return;
+  }
+  vec2 miss = q * r2 * 0.012;
+  vec4 red = texture2D(frame, at + miss);
+  vec4 mid = texture2D(frame, at);
+  vec4 blue = texture2D(frame, at - miss);
+  // Premultiplied throughout: the alpha has to cover the brightest channel.
+  vec4 colour = vec4(red.r, mid.g, blue.b, max(mid.a, max(red.a, blue.a)));
+  // Faded out towards the canvas's own edges, so the glow ends softly
+  // rather than on a straight line where the canvas stops.
+  float edge = smoothstep(0.0, 0.06, at.x) * smoothstep(1.0, 0.94, at.x)
+             * smoothstep(0.0, 0.14, at.y) * smoothstep(1.0, 0.86, at.y);
+  gl_FragColor = colour * edge;
+}
+`;
+
+function glass(canvas) {
+  const gl = canvas.getContext('webgl', { premultipliedAlpha: true, alpha: true,
+                                          antialias: false, depth: false });
+  if (!gl) return null;
+  const compile = (type, source) => {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error('ledword glass:', gl.getShaderInfoLog(shader));
+    }
+    return shader;
+  };
+  const program = gl.createProgram();
+  gl.attachShader(program, compile(gl.VERTEX_SHADER, GLASS_VERTEX));
+  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, GLASS_FRAGMENT));
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
+  gl.useProgram(program);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const position = gl.getAttribLocation(program, 'position');
+  gl.enableVertexAttribArray(position);
+  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+  gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  return { gl, aspect: gl.getUniformLocation(program, 'aspect'),
+           bulge: gl.getUniformLocation(program, 'bulge') };
+}
+
 // Motion's "easeOut".
 const easeOut = (t) => 1 - (1 - t) * (1 - t);
 
@@ -34,12 +113,16 @@ export class LedWord {
   constructor(canvas, {
     text = 'APOLLO', rows = 16, aspect = 2.1, gap = 0.34, colour = [255, 246, 230],
     glow = 1, stretch = 1, lean = 0, fps = 30, fill = 0.9,
-    font = DEFAULT_FONT, weight = 900,
+    font = DEFAULT_FONT, weight = 900, bulge = 0.22,
   } = {}) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    // The word is drawn in 2D onto `surface`; the glass bends that onto the
+    // canvas on the page. No WebGL, no glass: the surface is the canvas.
+    this.glass = glass(canvas);
+    this.surface = this.glass ? document.createElement('canvas') : canvas;
+    this.ctx = this.surface.getContext('2d');
     Object.assign(this, { text, rows, aspect, gap, colour, glow, stretch, lean, fps, fill,
-                          font, weight });
+                          font, weight, bulge });
     this.shown = text;         // what the stencil says right now
     this.cells = [];
     this.frame = null;
@@ -68,7 +151,7 @@ export class LedWord {
     const width = Math.round(this.canvas.clientWidth * ratio);
     const height = Math.round(this.canvas.clientHeight * ratio);
     if (!width || !height) return;          // not laid out yet (display: none)
-    for (const c of [this.canvas, this.layer, this.mask, this.lines]) {
+    for (const c of new Set([this.canvas, this.surface, this.layer, this.mask, this.lines])) {
       c.width = width;
       c.height = height;
     }
@@ -198,7 +281,7 @@ export class LedWord {
   }
 
   draw(now) {
-    const { canvas, ctx } = this;
+    const { surface: canvas, ctx } = this;
     const width = canvas.width, height = canvas.height;
     if (!width || !height || !this.grid) return;
     const next = this._scrambling(now);
@@ -230,15 +313,16 @@ export class LedWord {
     l.drawImage(this.mask, 0, 0);
     l.globalCompositeOperation = 'source-over';
 
-    // The tube: bloom under, the cells, a flicker through all of it.
-    const flicker = Math.random() < 0.012 ? 0.62 : 0.93 + Math.random() * 0.07;
+    // The tube: bloom under, the cells, a flicker through all of it - a
+    // restless one, and now and then a dip.
+    const flicker = Math.random() < 0.02 ? 0.55 : 0.87 + Math.random() * 0.13;
     ctx.clearRect(0, 0, width, height);
     ctx.globalCompositeOperation = 'lighter';
-    ctx.filter = `blur(${(this.cellH * 2.2).toFixed(1)}px)`;
-    ctx.globalAlpha = 0.55 * this.glow * flicker;
+    ctx.filter = `blur(${(this.cellH * 2.6).toFixed(1)}px)`;
+    ctx.globalAlpha = 0.7 * this.glow * flicker;
     ctx.drawImage(this.layer, 0, 0);
-    ctx.filter = `blur(${(this.cellH * 0.6).toFixed(1)}px)`;
-    ctx.globalAlpha = 0.5 * this.glow * flicker;
+    ctx.filter = `blur(${(this.cellH * 0.7).toFixed(1)}px)`;
+    ctx.globalAlpha = 0.6 * this.glow * flicker;
     ctx.drawImage(this.layer, 0, 0);
     ctx.filter = 'none';
     ctx.globalAlpha = flicker;
@@ -265,6 +349,18 @@ export class LedWord {
     ctx.globalCompositeOperation = 'destination-out';
     ctx.drawImage(this.lines, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
+
+    // Through the glass.
+    if (this.glass) {
+      const { gl } = this.glass;
+      gl.viewport(0, 0, width, height);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+      gl.uniform1f(this.glass.aspect, width / height);
+      gl.uniform1f(this.glass.bulge, this.bulge);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
   }
 
   /* Arrive scrambled and settle into the word over `seconds`, `delay`
