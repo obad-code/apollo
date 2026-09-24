@@ -31,3 +31,28 @@ reminders.json
 # Company marks, cached at runtime. Other companies trademarks, fetched from
 # a third party - not ours to keep in the history.
 ui/full/logos/
+
+# Keys and credentials, whatever they end up called.
+*.pem
+*.key
+*.pfx
+*.p12
+*.token
+secrets.*
+credentials*.json
+
+# Build and tool output.
+build/
+dist/
+*.egg-info/
+node_modules/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+probes/shots/
+
+# This machine's own Claude Code permissions - not the project's.
+.claude/settings.local.json
