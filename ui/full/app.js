@@ -176,6 +176,10 @@ const lyla = new Lyla($('lyla'), {
 });
 lyla.start();
 
+// Click the display and LYLA comes after the pointer for a while (lyla.js).
+document.addEventListener('pointerdown', (event) => lyla.follow(event.clientX, event.clientY));
+document.addEventListener('pointermove', (event) => lyla.pointer(event.clientX, event.clientY));
+
 const ring = $('ring').getContext('2d');
 const RINGS = [[1.0, 22, 0.026, '255,193,94'], [0.85, 18, -0.034, '255,176,0'],
                [0.7, 14, 0.045, '86,197,214']];

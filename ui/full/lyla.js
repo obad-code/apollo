@@ -39,6 +39,7 @@ export class Lyla {
       // rAF, nothing reschedules, and she is gone for the rest of the session
       // with an empty room where she used to be.
       try {
+        this._chase(t, dt);
         this.drawLyla(t);
         this.drawLylaHealth(t, dt, 0);
       } catch (err) {
@@ -54,6 +55,51 @@ export class Lyla {
     this.frame = null;
     const ctx = this.canvas && this.canvas.getContext('2d');
     if (ctx) ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  /* Following you. Click anywhere on the display and she flies after the
+   * pointer for `seconds`, a little behind and below it so she never covers
+   * it, looking at it; then she goes back to whatever her day was. New, and
+   * kept out here: the methods from stations() down are the old page's byte
+   * for byte (tests/test_lyla_port.py), so this steers her from outside -
+   * a state of its own, 'chase', that drawLyla draws but never moves. */
+
+  follow(x, y, seconds = 10) {
+    this.chase = { x, y, until: performance.now() + seconds * 1000 };
+  }
+
+  pointer(x, y) {
+    if (this.chase) { this.chase.x = x; this.chase.y = y; }
+  }
+
+  _chase(t, dt) {
+    const L = this.ly, c = this.chase;
+    if (!L || !c || this.phase !== 'idle') return;
+    if (t > c.until) {
+      // Back to her day: drawLyla picks what she does next on the next frame.
+      this.chase = null;
+      L.st = 'rest';
+      L.until = t;
+      return;
+    }
+    if (L.st !== 'chase') {
+      L.st = 'chase';
+      L.chatQ = null;
+      L.bubble = null;
+      this.sound('ly1');
+      if (this.label) this.label.textContent = 'LYLA // FOLLOWING YOU';
+    }
+    L.until = t + 1e9;                     // nothing of hers cuts it short
+    const S = 4, gw = window.innerWidth / S, gh = window.innerHeight / S;
+    const tx = Math.max(3, Math.min(gw - 18, c.x / S - 10));
+    const ty = Math.max(14, Math.min(gh - 6, c.y / S + 6));
+    const dx = tx - L.x, dy = ty - L.y, dist = Math.hypot(dx, dy);
+    if (dist > 0.5) {
+      const step = Math.min(0.05 * dt, dist);
+      L.x += (dx / dist) * step;
+      L.y += (dy / dist) * step;
+    }
+    L.face = c.x / S >= L.x ? 1 : -1;
   }
 
   /* Apollo talking pauses her: drawLyla returns early on any phase but idle,

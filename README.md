@@ -213,6 +213,9 @@ on what you follow, Trump's posts with the market-moving ones flagged, what
 Apollo has cost today, what the machine is doing — and LYLA still in her room
 along the bottom.
 
+Click anywhere on the display and LYLA flies after the pointer for ten
+seconds, a little behind it and watching it, then goes back to her day.
+
 The feed is a list you can pick from. Point at a story and a bar slides under
 it and its picture opens beside the panel; click it and the story opens out
 of its row - picture, summary, and a **Read** button that opens the article in
