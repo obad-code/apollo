@@ -35,3 +35,13 @@ def private_interests(tmp_path, monkeypatch):
     except ImportError:
         return
     monkeypatch.setattr(interests, "PATH", str(tmp_path / "profile.json"))
+
+
+@pytest.fixture(autouse=True)
+def private_finds(tmp_path, monkeypatch):
+    """...and Private Eye its own finds."""
+    try:
+        import private_eye
+    except ImportError:
+        return
+    monkeypatch.setattr(private_eye, "PATH", str(tmp_path / "finds.json"))

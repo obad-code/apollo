@@ -15,6 +15,7 @@ import feeds
 import logos
 import market
 import prayer
+import private_eye
 import sysinfo
 import usage
 import watchlist
@@ -27,7 +28,8 @@ log = logging.getLogger("apollo.data")
 age_words = feeds.age_words
 
 INTERVALS = {"market": 60, "news": 600, "posts": 300, "weather": 900, "system": 5,
-             "prayer": 300}
+             "prayer": 300,
+             "finds": 60}
 SPARK_POINTS = 24
 
 
@@ -36,7 +38,7 @@ class DataService:
         self.on_snapshot = on_snapshot
         self.snapshot = {"market": {"indices": [], "watchlist": [], "status": ""},
                          "news": {}, "posts": [], "weather": {}, "system": {},
-                         "usage": {}, "prayer": {}, "updated": 0.0,
+                         "usage": {}, "prayer": {}, "finds": [], "updated": 0.0,
                          # When each reader last came back with something. A
                          # reader that fails keeps its last good value, and the
                          # display says how old that value is rather than
@@ -184,6 +186,12 @@ class DataService:
             self.snapshot["prayer"] = {}
             return False
         self.snapshot["prayer"] = {"name": name, "at": when.timestamp()}
+        return True
+
+    def _read_finds(self):
+        # Private Eye's finds, from the file it keeps: the scout searches every
+        # few hours on its own thread, and this only reads what it left.
+        self.snapshot["finds"] = private_eye.load()
         return True
 
     def _read_system(self):

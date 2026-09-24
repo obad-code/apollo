@@ -535,6 +535,29 @@ stories that matter to you, anything market-moving Trump posted, and your
 reminders. About 40 seconds. Say *"brief me"* or *"what did I miss"* for the
 same thing any time. It is spoken in whatever language you last used.
 
+**What it remembers about you.** Apollo keeps a record of your days on this
+PC and nowhere else (`journal.py`, `%LOCALAPPDATA%\Apollo\journal`): what
+you said, what he answered, the tools he used, and the stories and stocks you
+opened. The last 60 days are kept. The first time Apollo is running after a
+day ends, one question to Claude reads that day with what he already knows and
+updates a small profile (`interests.py`, `%LOCALAPPDATA%\Apollo\profile.json`):
+what you care about and how much, what you do not, and a few lasting facts.
+Gemini reads a summary of it at the start of every session, so Apollo knows
+you without being told. Interests that stop coming up fade. Nothing is
+trained: the models are the same; what changes is what they are told. Delete
+the journal folder and `profile.json` to make him forget.
+
+**Private Eye.** Apollo's scout (`private_eye.py`). Every three hours it
+searches free sources - Bing News, Hacker News and Reddit - for your strongest
+interests and keeps the five best finds you have not been shown: about what
+you care about most, fresh, and never about something you said you do not
+care for. They sit in the feed marked *Private Eye* (and alone under their own
+chip), go into the morning recap, and Apollo tells you about them when you ask
+*"what did Private Eye find?"*. Open one and press **Useful** or **Not for
+me**, or say *"number two is مهم"* / *"مو مهم"*: its interest moves up or down,
+and that is what the next search goes by. It costs nothing but the few cents
+of Claude's nightly pass.
+
 **What it costs.** Neither provider tells an ordinary API key what it has
 spent, so Apollo counts its own tokens as they are reported and keeps a daily
 ledger in `%LOCALAPPDATA%\Apollo\usage.json`. The figures on screen are

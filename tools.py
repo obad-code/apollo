@@ -240,6 +240,7 @@ def run(name, args=None, ctx=None):
 
 import briefing  # noqa: E402
 import journal  # noqa: E402
+import private_eye  # noqa: E402
 import clips  # noqa: E402
 import feeds  # noqa: E402
 import live  # noqa: E402
@@ -606,6 +607,44 @@ def _open_stock(ctx, company=""):
     return {"ok": True, **{key: shown.get(key) for key in (
         "symbol", "name", "price", "change_pct", "target", "upside", "pe")
         if shown.get(key) is not None}}
+
+
+@_tool("private_eye_finds", "checking Private Eye",
+       "What Private Eye - Apollo's scout, which searches the web every few "
+       "hours for what the user cares about - has found lately, best first and "
+       "numbered. Use this when the user asks what Private Eye found, or what "
+       "is new about the things they follow. Tell them the best one or two in "
+       "a sentence each.",
+       _obj({}))
+def _private_eye_finds(ctx):
+    ctx.activity("checking Private Eye")
+    finds = private_eye.load()
+    if not finds:
+        return {"ok": True, "finds": [], "note": "Private Eye has not found anything new yet."}
+    return {"ok": True, "finds": [
+        {"number": n, "title": f.get("title", ""), "source": f.get("source", ""),
+         "about": f.get("interest", ""), "age": f.get("age", ""),
+         "summary": (f.get("summary") or "")[:240]}
+        for n, f in enumerate(finds, 1)]}
+
+
+@_tool("rate_find", "noting that",
+       "Tell Private Eye whether one of its finds, by its number, was useful, so "
+       "it learns what the user wants. Use this when the user says a find is "
+       "useful, interesting or \"مهم\" (useful=true), or not useful, not for "
+       "them or \"مو مهم\" (useful=false).",
+       _obj({"number": {"type": "integer", "description": "The find's number"},
+             "useful": {"type": "boolean", "description": "Whether it was useful"}},
+            ("number", "useful")))
+def _rate_find(ctx, number=0, useful=True):
+    finds = private_eye.load()
+    if not 1 <= int(number) <= len(finds):
+        return {"ok": False, "error": f"There is no find number {number}."}
+    find = private_eye.rate(finds[int(number) - 1]["id"], bool(useful))
+    if find is None:
+        return {"ok": False, "error": "That find is gone already."}
+    ctx.refresh("finds")
+    return {"ok": True, "about": find.get("interest", ""), "useful": bool(useful)}
 
 
 @_tool("refresh_display", "refreshing the display",

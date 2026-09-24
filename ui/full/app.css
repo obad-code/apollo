@@ -461,6 +461,8 @@ html, body {
               color: rgba(127, 224, 238, 0.55); transition: color .35s; }
 .story .who b { font-weight: 900; color: rgba(127, 224, 238, 0.88); transition: color .35s; }
 .story .who i { font-style: normal; color: var(--down); }
+.story .who i.eye { color: var(--violet); }
+.story.lit .who i.eye { color: rgba(18, 16, 18, .62); }
 .story .pic { position: absolute; right: 22px; top: 50%; width: 6px; height: 6px;
               margin-top: -3px; border-radius: 50%; background: rgba(240, 217, 160, .35); }
 /* Under the bar: dark on paper, and no phosphor bleed on paper. */
@@ -553,6 +555,9 @@ html, body {
 #story button:hover { transform: translateY(-1px); }
 #story button.read { background: var(--paper); color: #121012; }
 #story button.back { background: rgba(255, 255, 255, .08); color: #e9e1d0; }
+#story button.useful { background: rgba(185, 150, 240, .18); color: #d9c6ff; }
+#story button.useless { background: rgba(255, 255, 255, .05); color: #a9a295; }
+#story button:disabled { cursor: default; transform: none; }
 #story.shown h3 span, #story.shown .text span { opacity: 1; transform: none; filter: none; }
 
 /* --- the bottom strip ----------------------------------------------------- */

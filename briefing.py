@@ -15,6 +15,7 @@ import os
 
 import feeds
 import market
+import private_eye
 import reminders
 import usage
 import watchlist
@@ -87,6 +88,7 @@ def compose(now=None):
         "headlines": {topic: feeds.headlines(topic, limit=2) for topic in feeds.TOPICS},
         "posts": feeds.posts(hours=24, limit=3),
         "reminders": reminders.pending()[:3],
+        "finds": private_eye.load()[:3],
         "usage": usage.today(),
     }
 
@@ -118,12 +120,16 @@ def spoken(payload):
         lines.append(f"Trump posted{flag} {post['age']}: {post['text'][:200]}")
     for reminder in payload.get("reminders") or []:
         lines.append(f"Reminder: {reminder['text']} ({reminder['due']}).")
+    for find in payload.get("finds") or []:
+        lines.append(f"Private Eye found, about {find.get('interest', '')}: "
+                     f"{find.get('title', '')} ({find.get('source', '')}, {find.get('age', '')}).")
     lines.append(
         "Read this as a short spoken briefing - about 30 to 45 seconds, in the "
         "language the user last spoke to you in, their dialect if it was Arabic. "
         "Lead with the date and weather in one sentence, then the market, then "
         "the two or three stories that actually matter to them, then anything "
-        "market-moving in the posts, then their reminders. Give real numbers. "
+        "market-moving in the posts, then the best of what Private Eye found, "
+        "then their reminders. Give real numbers. "
         "Skip anything the facts above do not cover, and never invent a figure.")
     return "\n".join(lines)
 

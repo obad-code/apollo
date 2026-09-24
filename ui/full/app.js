@@ -41,7 +41,8 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g,
 const RISE = { opacity: [0, 1], transform: ['translateY(16px)', 'translateY(0px)'] };
 const SPRING = { type: 'spring', stiffness: 220, damping: 26 };
 
-const TOPICS = ['all', 'gaming', 'marvel', 'movies', 'markets'];
+// The last is Private Eye's own: its finds, and nothing else.
+const TOPICS = ['all', 'gaming', 'marvel', 'movies', 'markets', 'private eye'];
 
 // dataservice.INTERVALS x 3. Past this a panel is showing something it could
 // not refresh, and it has to say so - a price from an hour ago that looks
@@ -475,6 +476,16 @@ function feedItems(snapshot) {
                    when: post.when || 0, topic: 'posts', moving: post.market });
     }
   }
+  // What Private Eye found (private_eye.py): in "all" among the rest, marked,
+  // and alone under its own chip.
+  if (chosen === 'all' || chosen === 'private eye') {
+    for (const find of snapshot.finds || []) {
+      items.push({ title: find.title, source: find.source, age: find.age,
+                   summary: find.summary || '', image: find.image || '',
+                   link: find.link || '', when: find.when || 0, topic: 'private eye',
+                   eye: true, id: String(find.id || ''), interest: find.interest || '' });
+    }
+  }
   items.sort((a, b) => (b.when || 0) - (a.when || 0));
   return items;
 }
@@ -507,7 +518,8 @@ function renderFeed(snapshot) {
       <span class="num">${numbered(i)}</span>
       <span class="what">${esc(String(item.title).slice(0, 150))}</span>
       <span class="who"><b>${esc(item.source)}</b> · ${esc(item.age)}${
-        item.moving ? ' · <i>market-moving</i>' : ''}</span>
+        item.moving ? ' · <i>market-moving</i>' : ''}${
+        item.eye ? ' · <i class="eye">Private Eye</i>' : ''}</span>
       ${item.image ? '<span class="pic"></span>' : ''}
     </div>`).join('')
     || '<div class="story empty"><span class="num">—</span><span class="what">Nothing has come in yet</span>'
@@ -651,13 +663,18 @@ function clipTo(row, across = $('headlines')) {
 
 function storyMarkup(item, index) {
   const read = item.link ? '<button class="read" data-act="read">Read the story ↗</button>' : '';
+  // A find says whether it was worth finding: that is what Private Eye learns from.
+  const rate = item.eye
+    ? '<button class="useful" data-act="useful">Useful</button>'
+      + '<button class="useless" data-act="useless">Not for me</button>'
+    : '';
   return `
     <div class="media">${shot(item)}</div>
     <div class="body">
       <div class="meta"><span class="num">${numbered(index)}</span><b>${esc(item.source)}</b> · ${esc(item.age)}</div>
       <h3></h3>
       <p class="text"></p>
-      <div class="actions">${read}<button class="back" data-act="back">Back to the feed</button></div>
+      <div class="actions">${read}${rate}<button class="back" data-act="back">Back to the feed</button></div>
     </div>`;
 }
 
@@ -722,6 +739,15 @@ $('story').addEventListener('click', (event) => {
   if (button.dataset.act === 'read' && state.open) {
     const api = window.pywebview && window.pywebview.api;
     if (api && api.open_link) api.open_link(String(state.open.item.link || ''));
+  }
+  if ((button.dataset.act === 'useful' || button.dataset.act === 'useless') && state.open) {
+    const useful = button.dataset.act === 'useful';
+    const api = window.pywebview && window.pywebview.api;
+    if (api && api.rate_find) api.rate_find(state.open.item.id, useful);
+    // Not for you: it goes. Useful: it stays, and says it was heard.
+    if (!useful) { closeStory(); return; }
+    button.textContent = 'Noted - more like this';
+    button.disabled = true;
   }
 });
 document.addEventListener('keydown', (event) => {

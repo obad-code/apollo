@@ -114,6 +114,7 @@ import dataservice  # noqa: E402
 import interests  # noqa: E402
 import journal  # noqa: E402
 import live  # noqa: E402
+import private_eye  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
 import overlay_state  # noqa: E402
@@ -916,10 +917,11 @@ class Api:
     what keeps it out.
     """
 
-    def __init__(self, quit, open_link=None, desk=None):
+    def __init__(self, quit, open_link=None, desk=None, poke=None):
         self._quit = quit
         self._open_link = open_link
         self._desk = desk or stockdesk.StockDesk()
+        self._poke = poke or (lambda *keys: None)
 
     def quit(self):
         self._quit()
@@ -944,6 +946,13 @@ class Api:
     def suggestions(self):
         return stockdesk.suggestions()
 
+    def rate_find(self, find_id, useful):
+        """A Private Eye find marked useful or not, from the display."""
+        if private_eye.rate(str(find_id or ""), bool(useful)) is None:
+            return False
+        self._poke("finds")
+        return True
+
     def noted(self, what, title, source=""):
         """A story or a stock you opened on the display, for the record."""
         journal.opened(str(what or ""), str(title or ""), str(source or ""))
@@ -964,6 +973,7 @@ class Apollo:
         self.data = None           # the world, refreshed on a timer
         self.ticker = None         # prices as they trade, with a Finnhub key
         self.learner = None        # learns your interests from the record
+        self.eye = None            # Private Eye, the scout
         self.intro_wanted = False  # the word, once; see `check_intro`
         self.intro_until = 0.0     # ...playing until then (monotonic)
         self.schedule = briefing.Schedule()   # has today's recap happened?
@@ -992,7 +1002,8 @@ class Apollo:
             transparent=True,
             background_color="#000000",
             js_api=Api(self.quit, open_link=self.open_link,
-                       desk=stockdesk.StockDesk(poke=self.poke_data)),
+                       desk=stockdesk.StockDesk(poke=self.poke_data),
+                       poke=self.poke_data),
         )
         self.window.events.shown += self.on_shown
         self.window.events.loaded += self.on_loaded
@@ -1118,6 +1129,8 @@ class Apollo:
             self.ticker.stop()
         if self.learner is not None:
             self.learner.stop()
+        if self.eye is not None:
+            self.eye.stop()
         if self.orb:
             self.orb.close()
         if self.tray:
@@ -1576,6 +1589,11 @@ class Apollo:
         # start of every session.
         self.learner = interests.Learner(assistant.ask_once).start()
         log.info("learning from the record")
+
+        # Private Eye: every few hours, the free sources searched for what you
+        # care about; the best few finds go on the display and into the recap.
+        self.eye = private_eye.PrivateEye().start(on_found=lambda: self.poke_data("finds"))
+        log.info("Private Eye on watch")
 
         # CTRL+1. A thread of its own so it answers during a turn as well as
         # between them; `run_loop` reads its flag and does the actual
