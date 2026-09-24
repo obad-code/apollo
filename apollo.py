@@ -111,10 +111,12 @@ import assistant  # noqa: E402
 import briefing  # noqa: E402
 import clips  # noqa: E402
 import dataservice  # noqa: E402
+import ideas  # noqa: E402
 import interests  # noqa: E402
 import journal  # noqa: E402
 import live  # noqa: E402
 import private_eye  # noqa: E402
+import projects  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
 import overlay_state  # noqa: E402
@@ -894,6 +896,14 @@ class WebReporter:
         except Exception:
             return None
 
+    def tab(self, name):
+        """Show one tab of the side panel; the display comes up if it is not."""
+        app = self._app
+        if app is not None and getattr(app.overlay, "mode", None) != Overlay.FULL:
+            app.toggle_peek()
+        self._call("tab", str(name))
+        return True
+
     def idle(self):
         """You asked for idle mode by voice."""
         app = self._app
@@ -973,6 +983,17 @@ class Api:
         if private_eye.rate(str(find_id or ""), bool(useful)) is None:
             return False
         self._poke("finds")
+        return True
+
+    def open_folder(self, path):
+        """A project folder from the Projects tab, in VS Code."""
+        return projects.open_folder(str(path or ""))
+
+    def drop_idea(self, idea_id):
+        """An idea taken off the Ideas tab."""
+        if not ideas.remove(str(idea_id or "")):
+            return False
+        self._poke("ideas")
         return True
 
     def noted(self, what, title, source=""):

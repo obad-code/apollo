@@ -214,6 +214,16 @@ on what you follow, Trump's posts with the market-moving ones flagged, what
 Apollo has cost today, what the machine is doing — and LYLA still in her room
 along the bottom.
 
+The panel on the left has four tabs. **Markets** is the stocks. **Talks**
+is what you said to Apollo and what came back, newest first, from the record.
+**Projects** is the Claude Code sessions you have been working in (by their
+titles), the git folders on your Desktop and in Documents (branch and last
+commit - click one to open it in VS Code), and your GitHub repos (click to
+open; private ones show only with a token saved as `GITHUB_TOKEN`).
+**Ideas** is what you told Apollo to keep - *"فكرة: a Discord bot for the
+clan"* - beside your reminders; *"what ideas do I have?"* reads them back.
+*"Show my projects"* switches the tab by voice.
+
 Click anywhere on the display and LYLA flies after the pointer for ten
 seconds, a little behind it and watching it, then goes back to her day.
 

@@ -48,14 +48,26 @@
   </aside>
 
   <section id="markets" class="panel rise">
-    <h2 id="markets-head">Markets</h2>
-    <div id="indices"></div>
-    <!-- The frame slides to the card under the pointer, as the feed's bar
-         slides to its row. -->
-    <div id="watch-area">
-      <div id="watch-frame"></div>
-      <div id="watchlist"></div>
+    <!-- The side panel's tabs: the stocks, your talks with Apollo, your
+         projects, your ideas. -->
+    <h2 id="panel-tabs">
+      <span class="tab on" data-tab="stocks" id="markets-head">Markets</span>
+      <span class="tab" data-tab="talks">Talks</span>
+      <span class="tab" data-tab="projects">Projects</span>
+      <span class="tab" data-tab="ideas">Ideas</span>
+    </h2>
+    <div class="pane" id="pane-stocks">
+      <div id="indices"></div>
+      <!-- The frame slides to the card under the pointer, as the feed's bar
+           slides to its row. -->
+      <div id="watch-area">
+        <div id="watch-frame"></div>
+        <div id="watchlist"></div>
+      </div>
     </div>
+    <div class="pane" id="pane-talks" hidden></div>
+    <div class="pane" id="pane-projects" hidden></div>
+    <div class="pane" id="pane-ideas" hidden></div>
     <!-- One stock, opened out of its card; or the stocks you can add. -->
     <article id="stock" aria-hidden="true"></article>
   </section>

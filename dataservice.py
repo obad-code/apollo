@@ -12,11 +12,15 @@ import threading
 import time
 
 import feeds
+import ideas
 import logos
 import market
 import prayer
 import private_eye
+import projects
+import reminders
 import sysinfo
+import talks
 import usage
 import watchlist
 import weather
@@ -29,7 +33,8 @@ age_words = feeds.age_words
 
 INTERVALS = {"market": 60, "news": 600, "posts": 300, "weather": 900, "system": 5,
              "prayer": 300,
-             "finds": 60}
+             "finds": 60,
+             "talks": 15, "projects": 300, "ideas": 15}
 SPARK_POINTS = 24
 
 
@@ -38,7 +43,9 @@ class DataService:
         self.on_snapshot = on_snapshot
         self.snapshot = {"market": {"indices": [], "watchlist": [], "status": ""},
                          "news": {}, "posts": [], "weather": {}, "system": {},
-                         "usage": {}, "prayer": {}, "finds": [], "updated": 0.0,
+                         "usage": {}, "prayer": {}, "finds": [], "talks": [],
+                         "projects": {"sessions": [], "folders": [], "repos": []},
+                         "ideas": {"ideas": [], "reminders": []}, "updated": 0.0,
                          # When each reader last came back with something. A
                          # reader that fails keeps its last good value, and the
                          # display says how old that value is rather than
@@ -192,6 +199,24 @@ class DataService:
         # Private Eye's finds, from the file it keeps: the scout searches every
         # few hours on its own thread, and this only reads what it left.
         self.snapshot["finds"] = private_eye.load()
+        return True
+
+    # The side panel's other tabs: all local, all cheap, except the projects -
+    # which run git in each folder and ask GitHub now and then.
+
+    def _read_talks(self):
+        self.snapshot["talks"] = talks.recent()
+        return True
+
+    def _read_projects(self):
+        self.snapshot["projects"] = projects.snapshot()
+        return True
+
+    def _read_ideas(self):
+        self.snapshot["ideas"] = {
+            "ideas": ideas.all(),
+            "reminders": [{"text": r.get("text", ""), "due": r.get("due", "")}
+                          for r in reminders.pending()[:10]]}
         return True
 
     def _read_system(self):

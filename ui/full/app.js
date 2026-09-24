@@ -123,6 +123,8 @@ const state = {
   stock: null,            // the stock opened out of its card, or the add picker
   pending: new Map(),     // stocks asked for whose cards have not come yet
   marketKey: '',          // what the cards were last drawn from
+  tab: 'stocks',          // which of the side panel's tabs is showing
+  projects: null,         // the projects last drawn, for their clicks
   liveTimer: null,        // takes LIVE off the panel when the trades stop
 };
 
@@ -1220,6 +1222,118 @@ function applyLive(batch) {
   if (traded) markLive();
 }
 
+/* --- the side panel's other tabs ---------------------------------------------
+ *
+ * Talks: what you said to Apollo and what came back, newest first (talks.py,
+ * from the record). Projects: the Claude Code sessions you have been in, the
+ * git folders on this PC - a click opens one - and your GitHub repos - a click
+ * opens it in the browser (projects.py). Ideas: the ideas you told Apollo to
+ * keep, and your reminders (ideas.py). */
+
+const TABS = ['stocks', 'talks', 'projects', 'ideas'];
+
+function showTab(name) {
+  if (!TABS.includes(name)) return;
+  state.tab = name;
+  document.querySelectorAll('#panel-tabs .tab').forEach((tab) =>
+    tab.classList.toggle('on', tab.dataset.tab === name));
+  for (const tab of TABS) $(`pane-${tab}`).hidden = tab !== name;
+  if (name !== 'stocks') closeStock();
+}
+
+$('panel-tabs').addEventListener('click', (event) => {
+  const tab = event.target.closest('.tab');
+  if (tab) showTab(tab.dataset.tab);
+});
+
+const ago = (when) => (when ? `${words(Math.max(0, Date.now() / 1000 - when))} ago` : '');
+
+function renderTalks(list) {
+  $('pane-talks').innerHTML = (list || []).map((talk) => `
+    <div class="talk">
+      <span class="when">${esc(talk.day === 'today' ? talk.time : 'yday ' + talk.time)}</span>
+      <div class="lines">
+        <p class="you">${esc(talk.you)}</p>
+        <p class="said"><b>${esc(talk.who)}</b> ${esc(talk.apollo || '…')}</p>
+        ${(talk.tools || []).length ? `<p class="used">${(talk.tools || []).map((name) =>
+          `<i>${esc(name)}</i>`).join('')}</p>` : ''}
+      </div>
+    </div>`).join('')
+    || '<p class="quiet">Nothing said yet today. Hold Ctrl+Alt and ask him something.</p>';
+}
+
+function renderProjects(p) {
+  const group = (title, rows, empty) => `<h3>${title}</h3>${rows || `<p class="quiet">${empty}</p>`}`;
+  const sessions = (p.sessions || []).map((session) => `
+    <div class="work">
+      <b>${esc(session.title)}</b>
+      <span>${esc(session.project)} · ${esc(ago(session.when))}</span>
+      ${session.prompt && session.prompt !== session.title ? `<i>${esc(session.prompt)}</i>` : ''}
+    </div>`).join('');
+  const folders = (p.folders || []).map((folder, n) => `
+    <div class="work link" data-folder="${n}">
+      <b>${esc(folder.name)}</b>
+      <span>${esc(folder.branch)} · ${esc(ago(folder.when))}</span>
+      ${folder.last ? `<i>${esc(folder.last)}</i>` : ''}
+    </div>`).join('');
+  const repos = (p.repos || []).map((repo, n) => `
+    <div class="work link" data-repo="${n}">
+      <b>${esc(repo.name)}${repo.private ? ' <em>private</em>' : ''}</b>
+      <span>${esc(ago(repo.when))}</span>
+      ${repo.about ? `<i>${esc(repo.about)}</i>` : ''}
+    </div>`).join('');
+  state.projects = p;
+  $('pane-projects').innerHTML =
+    group('Claude Code', sessions, 'No sessions found.')
+    + group('On this PC', folders, 'No git folders on the Desktop or in Documents.')
+    + group('GitHub', repos, 'Nothing public to show. Save a GitHub token as '
+            + 'GITHUB_TOKEN to see private repos too.');
+}
+
+$('pane-projects').addEventListener('click', (event) => {
+  const row = event.target.closest('.link');
+  const p = state.projects || {};
+  const api = window.pywebview && window.pywebview.api;
+  if (!row || !api) return;
+  if (row.dataset.folder !== undefined && api.open_folder) {
+    const folder = (p.folders || [])[Number(row.dataset.folder)];
+    if (folder) api.open_folder(folder.path);
+  }
+  if (row.dataset.repo !== undefined && api.open_link) {
+    const repo = (p.repos || [])[Number(row.dataset.repo)];
+    if (repo && repo.link) api.open_link(repo.link);
+  }
+});
+
+function renderIdeas(data) {
+  const list = (data.ideas || []).map((idea) => `
+    <div class="idea">
+      <p>${esc(idea.text)}</p>
+      <span>${esc(idea.age)}</span>
+      <button data-idea="${esc(idea.id)}" title="Remove">×</button>
+    </div>`).join('');
+  const due = (data.reminders || []).map((reminder) => `
+    <div class="idea due"><p>${esc(reminder.text)}</p><span>${esc(reminder.due)}</span></div>`).join('');
+  $('pane-ideas').innerHTML = `<h3>Ideas</h3>${list
+    || '<p class="quiet">No ideas kept yet. Say “فكرة” or “idea:” and what it is.</p>'}`
+    + `<h3>Reminders</h3>${due || '<p class="quiet">No reminders set.</p>'}`;
+}
+
+/* Two clicks to take an idea off: the first asks, the second does it. */
+$('pane-ideas').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-idea]');
+  if (!button) return;
+  if (!button.classList.contains('sure')) {
+    button.classList.add('sure');
+    button.textContent = 'Remove?';
+    setTimeout(() => { button.classList.remove('sure'); button.textContent = '×'; }, 3000);
+    return;
+  }
+  const api = window.pywebview && window.pywebview.api;
+  if (api && api.drop_idea) api.drop_idea(button.dataset.idea);
+  button.closest('.idea').remove();
+});
+
 function renderStrip(snapshot) {
   const usage = snapshot.usage || {};
   const system = snapshot.system || {};
@@ -1252,6 +1366,9 @@ function renderWeather(weather) {
 function render(snapshot) {
   state.snapshot = snapshot;
   renderMarkets(snapshot.market || {});
+  renderTalks(snapshot.talks);
+  renderProjects(snapshot.projects || {});
+  renderIdeas(snapshot.ideas || {});
   renderFeed(snapshot);
   renderStrip(snapshot);
   renderWeather(snapshot.weather);
@@ -1601,6 +1718,8 @@ window.apollo = {
   },
   visual(payload) { $('visual').innerHTML = chart(payload); },
   data(snapshot) { render(snapshot); },
+  // "Show my projects": one tab of the side panel.
+  tab(name) { showTab(String(name || '')); },
   // Trades from the stream, {symbol: {price, time}}, about once a second.
   live(batch) { applyLive(batch); },
   activity(text) {

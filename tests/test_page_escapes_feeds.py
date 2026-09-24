@@ -26,6 +26,13 @@ UNTRUSTED = re.compile(
     r"|quote\.(?:symbol|name|logo)"
     # "Add a stock" lists what apollo.py suggests; a pick is data like a quote.
     r"|pick\.(?:symbol|name)"
+    # The side panel's tabs: your record, your folders and repos, your ideas.
+    r"|talk\.(?:you|apollo|who|time)"
+    r"|session\.(?:title|project|prompt)"
+    r"|folder\.(?:name|branch|last)"
+    r"|repo\.(?:name|about)"
+    r"|idea\.(?:text|age|id)"
+    r"|reminder\.(?:text|due)"
     r"|market\.status"
     r"|weather\.text"
     r"|system\.gpu_name"

@@ -68,7 +68,8 @@ class Context:
     """
 
     def __init__(self, show=None, activity=None, turn=None, refresh=None,
-                 panels_hook=None, story_hook=None, stock_hook=None, idle_hook=None):
+                 panels_hook=None, story_hook=None, stock_hook=None, idle_hook=None,
+                 tab_hook=None):
         self.show = show or (lambda visual: None)
         self.activity = activity or (lambda text: None)
         # False by default, so a tool that changes the display can tell the
@@ -78,6 +79,7 @@ class Context:
         self.story = story_hook or (lambda number: None)
         self.stock = stock_hook or (lambda symbol: None)
         self.idle = idle_hook or (lambda: False)
+        self.tab = tab_hook or (lambda name: None)
         self.turn = current_turn() if turn is None else turn
 
 
@@ -240,6 +242,7 @@ def run(name, args=None, ctx=None):
 # importable (and testable) without Windows or the network.
 
 import briefing  # noqa: E402
+import ideas  # noqa: E402
 import journal  # noqa: E402
 import private_eye  # noqa: E402
 import clips  # noqa: E402
@@ -608,6 +611,55 @@ def _open_stock(ctx, company=""):
     return {"ok": True, **{key: shown.get(key) for key in (
         "symbol", "name", "price", "change_pct", "target", "upside", "pe")
         if shown.get(key) is not None}}
+
+
+@_tool("save_idea", "keeping that idea",
+       "Keep an idea for a new project, or a thing to remember to build, on "
+       "the Ideas list. Use this when the user says they have an idea, says "
+       "\"فكرة\", \"سجل فكرة\" or \"idea:\", or asks you to remember "
+       "something they want to make. Save it in their own words, then confirm "
+       "in a few words.",
+       _obj({"text": _str("The idea, in the user's words")}, ("text",)))
+def _save_idea(ctx, text=""):
+    if not str(text).strip():
+        return {"ok": False, "error": "There was no idea in that."}
+    idea = ideas.add(text)
+    ctx.refresh("ideas")
+    return {"ok": True, "saved": idea["text"], "count": len(ideas.all())}
+
+
+@_tool("list_ideas", "reading your ideas",
+       "The user's saved project ideas, newest first and numbered. Use this "
+       "when they ask what ideas they have, or what they wanted to build.",
+       _obj({}))
+def _list_ideas(ctx):
+    kept = ideas.all()
+    return {"ok": True, "ideas": [{"number": n, "text": i["text"], "age": i["age"]}
+                                  for n, i in enumerate(kept, 1)]}
+
+
+@_tool("drop_idea", "crossing it off",
+       "Take one idea off the list, by its number from list_ideas - when the "
+       "user says it is done, dropped or not wanted any more.",
+       _obj({"number": {"type": "integer", "description": "The idea's number"}}, ("number",)))
+def _drop_idea(ctx, number=0):
+    kept = ideas.all()
+    if not 1 <= int(number) <= len(kept):
+        return {"ok": False, "error": f"There is no idea number {number}."}
+    ideas.remove(kept[int(number) - 1]["id"])
+    ctx.refresh("ideas")
+    return {"ok": True, "dropped": kept[int(number) - 1]["text"]}
+
+
+@_tool("panel_tab", "switching the panel",
+       "Show one tab of the full display's side panel: stocks, talks (recent "
+       "conversations with Apollo), projects (Claude Code sessions, project "
+       "folders, GitHub repos) or ideas (saved ideas and reminders). Brings "
+       "the display up if it is not.",
+       _obj({"tab": _enum(("stocks", "talks", "projects", "ideas"), "Which tab")}, ("tab",)))
+def _panel_tab(ctx, tab="stocks"):
+    ctx.tab(tab)
+    return {"ok": True, "tab": tab}
 
 
 @_tool("idle_mode", "going idle",

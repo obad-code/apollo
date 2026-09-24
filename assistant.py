@@ -838,7 +838,8 @@ def _run_tool(block, ui):
                 panels_hook=getattr(ui, "panels", None),
                 story_hook=getattr(ui, "story", None),
                 stock_hook=getattr(ui, "stock", None),
-                idle_hook=getattr(ui, "idle", None))))
+                idle_hook=getattr(ui, "idle", None),
+                tab_hook=getattr(ui, "tab", None))))
         return f"Failed: unknown tool '{block.name}'."
     except Exception as e:
         return f"Failed: {type(e).__name__}: {e}"
@@ -1647,7 +1648,8 @@ def tool_runner(ui):
                             panels_hook=getattr(ui, "panels", None),
                             story_hook=getattr(ui, "story", None),
                             stock_hook=getattr(ui, "stock", None),
-                            idle_hook=getattr(ui, "idle", None))
+                            idle_hook=getattr(ui, "idle", None),
+                            tab_hook=getattr(ui, "tab", None))
         return tools.run(name, args, ctx)
     return run
 

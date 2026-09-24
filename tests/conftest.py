@@ -45,3 +45,16 @@ def private_finds(tmp_path, monkeypatch):
     except ImportError:
         return
     monkeypatch.setattr(private_eye, "PATH", str(tmp_path / "finds.json"))
+
+
+@pytest.fixture(autouse=True)
+def private_ideas(tmp_path, monkeypatch):
+    """...its own ideas, and no git or GitHub reached for the Projects tab."""
+    try:
+        import ideas
+        import projects
+    except ImportError:
+        return
+    monkeypatch.setattr(ideas, "PATH", str(tmp_path / "ideas.json"))
+    monkeypatch.setattr(projects, "snapshot",
+                        lambda: {"sessions": [], "folders": [], "repos": []})
