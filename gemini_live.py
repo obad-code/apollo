@@ -61,6 +61,8 @@ import sounddevice as sd
 from google import genai
 from google.genai import types
 
+import interests
+
 log = logging.getLogger("apollo.gemini")
 
 # Asking for `output_audio_transcription` means every reply carries text parts
@@ -128,17 +130,19 @@ SYSTEM_INSTRUCTION = (
     "or stock_quote (they draw it on screen) and speak only the numbers they "
     "return. Open TradingView only when asked.\n\n"
     "Safety: sleep, restart, shut down and sign out need the user's explicit yes. "
-    "Ask first; call system_power with confirmed=true only after they say yes.\n\n"
-    "About the user: they follow Apple, Microsoft, Nvidia, Tesla, Amazon, "
-    "Alphabet and Meta, the S&P 500 and Nasdaq, and care about Marvel, GTA 6, "
-    "PlayStation, gaming and movies. They live in Riyadh."
+    "Ask first; call system_power with confirmed=true only after they say yes."
 )
 
 
 def system_instruction(now=None):
-    """The instruction plus the date and time, fixed when a session opens."""
+    """The instruction, what Apollo knows about you, and the date and time -
+    fixed when a session opens. What it knows comes from `interests`, which
+    learns it a day at a time from the record of what you say and open; it
+    starts from the list this instruction used to carry by hand."""
     now = now or datetime.now()
-    return SYSTEM_INSTRUCTION + f"\n\nRight now it is {now:%A %d %B %Y, %H:%M} in Riyadh."
+    return (SYSTEM_INSTRUCTION
+            + "\n\n" + interests.summary(interests.load())
+            + f"\n\nRight now it is {now:%A %d %B %Y, %H:%M} in Riyadh.")
 
 
 def _config(auto_vad=False, tools=None, instruction=None):

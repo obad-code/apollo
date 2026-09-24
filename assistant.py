@@ -761,6 +761,15 @@ def _note_usage(response):
         pass
 
 
+def ask_once(system, prompt, max_tokens=2000):
+    """One plain question to Claude - no tools, no chat history - and the
+    text of its answer. For Apollo's own background work (see `interests`),
+    not for anything you say to it."""
+    response = _send(dict(model=CLAUDE_MODEL, max_tokens=max_tokens, system=system,
+                          messages=[{"role": "user", "content": prompt}]))
+    return _text_of(response)
+
+
 def _text_of(response):
     """Every text block in a response, joined - tool turns can interleave them."""
     return " ".join(b.text for b in response.content if b.type == "text").strip()

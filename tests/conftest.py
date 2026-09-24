@@ -25,3 +25,13 @@ def private_journal(tmp_path, monkeypatch):
     except ImportError:          # before the module exists
         return
     monkeypatch.setattr(journal, "ROOT", str(tmp_path / "journal"))
+
+
+@pytest.fixture(autouse=True)
+def private_interests(tmp_path, monkeypatch):
+    """...and its own profile: nothing here may read or change the real one."""
+    try:
+        import interests
+    except ImportError:
+        return
+    monkeypatch.setattr(interests, "PATH", str(tmp_path / "profile.json"))

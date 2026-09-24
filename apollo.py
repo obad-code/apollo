@@ -111,6 +111,7 @@ import assistant  # noqa: E402
 import briefing  # noqa: E402
 import clips  # noqa: E402
 import dataservice  # noqa: E402
+import interests  # noqa: E402
 import journal  # noqa: E402
 import live  # noqa: E402
 import orb as orb_module  # noqa: E402
@@ -962,6 +963,7 @@ class Apollo:
         self.clips = None          # the replay buffer, once recording
         self.data = None           # the world, refreshed on a timer
         self.ticker = None         # prices as they trade, with a Finnhub key
+        self.learner = None        # learns your interests from the record
         self.intro_wanted = False  # the word, once; see `check_intro`
         self.intro_until = 0.0     # ...playing until then (monotonic)
         self.schedule = briefing.Schedule()   # has today's recap happened?
@@ -1114,6 +1116,8 @@ class Apollo:
             self.data.stop()
         if self.ticker is not None:
             self.ticker.stop()
+        if self.learner is not None:
+            self.learner.stop()
         if self.orb:
             self.orb.close()
         if self.tray:
@@ -1566,6 +1570,12 @@ class Apollo:
             log.info("live prices on")
         else:
             log.info("no %s; prices refresh once a minute", live.KEY_NAME)
+
+        # What you care about, learned from each finished day of the record
+        # (journal.py) by one question to Claude, and read by Gemini at the
+        # start of every session.
+        self.learner = interests.Learner(assistant.ask_once).start()
+        log.info("learning from the record")
 
         # CTRL+1. A thread of its own so it answers during a turn as well as
         # between them; `run_loop` reads its flag and does the actual
