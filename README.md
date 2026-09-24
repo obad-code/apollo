@@ -1,2 +1,2 @@
 # apollo
-ai ass
+ai assistant
