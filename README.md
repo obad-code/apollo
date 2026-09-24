@@ -199,7 +199,7 @@ so unlike Thmanyah it may be shared with the code.
 
 **The intro.** As Apollo starts, the display holds the screen for about
 three and a half seconds (`INTRO_SECONDS`): black glass with soft pale
-shapes behind, the name tilted away and settling out of its scramble, and
+shapes behind, the name upright and settling out of its scramble, and
 then the tube switching off - the picture collapsing to a bright line and
 the line to nothing - before Apollo settles into the overlay. It is skipped when a
 full-screen program was already up, so a game or a film is left alone.
