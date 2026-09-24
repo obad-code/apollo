@@ -254,6 +254,10 @@ already holds - the level only, nothing is recorded or sent - and a sentence
 wakes it where a click or a cough does not. It will not fall asleep over a
 full-screen program, so a film or a game is left alone.
 
+It also goes idle when you ask - *"ادخل وضع الخمول"*, *"idle mode"* - once
+it has finished saying it will, and when you lock the PC (Win+L). Either
+way, only something you do after asking wakes it.
+
 A conversation can happen while it is open, and it stays open for it: LYLA and
 the panels step aside while there is an answer on screen, then come back.
 

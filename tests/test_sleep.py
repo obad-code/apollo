@@ -57,6 +57,7 @@ class FakeVoice:
 
 def make(monkeypatch, busy=False):
     monkeypatch.setattr(apollo, "screen_busy", lambda: busy)
+    monkeypatch.setattr(apollo, "pc_locked", lambda: False)
     log = Log()
     app = apollo.Apollo.__new__(apollo.Apollo)
     app.presence = presence.Presence(apollo.AFK_SECONDS)

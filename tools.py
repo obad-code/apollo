@@ -68,7 +68,7 @@ class Context:
     """
 
     def __init__(self, show=None, activity=None, turn=None, refresh=None,
-                 panels_hook=None, story_hook=None, stock_hook=None):
+                 panels_hook=None, story_hook=None, stock_hook=None, idle_hook=None):
         self.show = show or (lambda visual: None)
         self.activity = activity or (lambda text: None)
         # False by default, so a tool that changes the display can tell the
@@ -77,6 +77,7 @@ class Context:
         self.panels = panels_hook or (lambda state: None)
         self.story = story_hook or (lambda number: None)
         self.stock = stock_hook or (lambda symbol: None)
+        self.idle = idle_hook or (lambda: False)
         self.turn = current_turn() if turn is None else turn
 
 
@@ -607,6 +608,19 @@ def _open_stock(ctx, company=""):
     return {"ok": True, **{key: shown.get(key) for key in (
         "symbol", "name", "price", "change_pct", "target", "upside", "pe")
         if shown.get(key) is not None}}
+
+
+@_tool("idle_mode", "going idle",
+       "Put Apollo into idle mode now: the screen becomes the idle screen - the "
+       "name, the time and a fact - until the user touches a key or the mouse "
+       "or speaks. Use this when they ask for idle mode, to sleep, to rest or "
+       "to go quiet, or say \"ادخل وضع الخمول\" or \"نام\". Confirm in two "
+       "or three words.",
+       _obj({}))
+def _idle_mode(ctx):
+    if ctx.idle() is False:
+        return {"ok": False, "error": "Idle mode isn't available right now."}
+    return {"ok": True, "idle": True}
 
 
 @_tool("next_earnings", "checking the earnings date",

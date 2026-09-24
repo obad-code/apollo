@@ -510,6 +510,19 @@ class Overlay:
         )
 
 
+def pc_locked():
+    """True while Windows is locked (Win+L): the input desktop is the secure
+    one then, and an ordinary process is refused it."""
+    try:
+        handle = ctypes.windll.user32.OpenInputDesktop(0, False, 0x0100)
+    except (AttributeError, OSError):
+        return False
+    if not handle:
+        return True
+    ctypes.windll.user32.CloseDesktop(handle)
+    return False
+
+
 def screen_busy():
     """True while a full-screen program has the screen.
 
@@ -880,6 +893,15 @@ class WebReporter:
                 f"window.apollo.story && window.apollo.story({number})")
         except Exception:
             return None
+
+    def idle(self):
+        """You asked for idle mode by voice."""
+        app = self._app
+        if app is None:
+            return False
+        log.info("idle mode asked for")
+        app.request_idle()
+        return True
 
     def stock(self, symbol):
         """Open `symbol` out of its card on the display ("" closes it).
@@ -1381,6 +1403,10 @@ class Apollo:
         if self.orb is not None:
             self.orb.set_activity(text)
 
+    def request_idle(self):
+        """Idle mode, because you asked. The watcher does it (check_presence)."""
+        self.idle_requested = time.monotonic()
+
     def toggle_peek(self):
         """CTRL+`: open the full display by hand, or put it away."""
         if getattr(self, "ui", None) is None:
@@ -1472,6 +1498,20 @@ class Apollo:
         follows you rather than following Apollo's own window.
         """
         now = time.monotonic()
+        # Locking the PC is asking for idle mode: once per lock, so waking it
+        # on the lock screen does not put it straight back to sleep.
+        locked = pc_locked()
+        if locked and not getattr(self, "_was_locked", False):
+            log.info("the PC was locked: idle mode")
+            self.request_idle()
+        self._was_locked = locked
+        # Asked for by voice: once Apollo has finished saying it will, or his
+        # own voice would be the thing that wakes him.
+        if (getattr(self, "idle_requested", None) is not None
+                and not getattr(self, "turn_busy", False)):
+            self.idle_requested = None
+            self.presence.sleep_now(now)
+            self.apply_mode()
         # Only asked on the way to sleep; see `screen_busy`.
         busy = (idle >= self.presence.afk_seconds and not self.presence.asleep
                 and screen_busy())

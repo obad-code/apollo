@@ -32,6 +32,7 @@ class Presence:
         self.afk_open = False
         self.asleep = False
         self._touched = None      # the last sign of you that was not input
+        self._slept_at = None     # when you asked it to sleep; see `sleep_now`
 
     @property
     def full(self):
@@ -54,6 +55,21 @@ class Presence:
         """
         self._touched = now
 
+    # How long after an asked-for sleep a sign of you still counts as the
+    # asking: letting go of the chord you pressed to say it.
+    GRACE = 0.5
+
+    def sleep_now(self, now):
+        """Asleep at once, because you asked - by voice, or by locking the PC.
+
+        Everything up to now was part of asking: the chord, your sentence,
+        Apollo saying it will. So only something after `now` wakes it.
+        """
+        self.asleep = True
+        self._slept_at = now
+        if not self.peek_open:
+            self.afk_open = True
+
     def check(self, idle, now=None, screen_busy=False):
         """Feed seconds-since-last-input. True if `full` or `asleep` changed.
 
@@ -64,6 +80,10 @@ class Presence:
         if self._touched is not None and now is not None:
             idle = min(idle, max(0.0, now - self._touched))
         before = (self.full, self.asleep)
+        if self._slept_at is not None and now is not None:
+            if now - idle <= self._slept_at + self.GRACE:
+                return False                  # nothing since you asked
+            self._slept_at = None
         if idle < self.afk_seconds:
             self.asleep = False
         elif not self.asleep and not screen_busy:
