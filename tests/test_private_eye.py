@@ -94,10 +94,27 @@ def test_a_dead_source_does_not_stop_the_others():
 
 
 def test_only_the_best_few_are_kept_and_they_are_saved():
-    many = {"GTA 6": [item(f"GTA 6 story {i}", hours_old=i + 1) for i in range(12)]}
+    many = {name: [item(f"{name} story {i}", hours_old=i + 1) for i in range(6)]
+            for name in ("GTA 6", "Nvidia", "Tesla")}
     finds = eye(many).run()
     assert len(finds) == private_eye.KEEP
     assert titles(private_eye.load()) == titles(finds)
+
+
+def test_a_find_that_is_not_about_its_interest_is_left_out():
+    """Hacker News matched "Apple" anywhere in a post - a Rust framework, an
+    Ask HN - and they came back as finds about Apple."""
+    finds = eye({"Nvidia": [item("Topcoat pushes server apps with Rust"),
+                            item("Ask HN: how would you know you learned something?"),
+                            item("NVIDIA's new driver doubles frame rates")]}).run()
+    assert titles(finds) == ["NVIDIA's new driver doubles frame rates"]
+
+
+def test_no_one_interest_takes_the_whole_list():
+    finds = eye({"GTA 6": [item(f"GTA 6 story {i}", hours_old=i + 1) for i in range(6)],
+                 "Nvidia": [item("Nvidia story", hours_old=20)]}).run()
+    assert sum(f["interest"] == "GTA 6" for f in finds) <= private_eye.PER_INTEREST
+    assert "Nvidia story" in titles(finds)
 
 
 def test_a_useful_find_raises_its_interest_and_a_useless_one_lowers_it_and_goes():
@@ -187,3 +204,12 @@ def test_a_find_is_rated_from_the_display():
     assert api.rate_find(find["id"], False) is True
     assert private_eye.load() == []
     assert poked == [("finds",)]
+
+
+def test_a_kept_find_that_is_not_about_its_interest_goes_on_the_next_run():
+    """Finds kept from before the check existed are held to it as well."""
+    private_eye._write({"finds": [dict(item("Topcoat pushes server apps with Rust"),
+                                       id="old1", interest="Nvidia", score=0.9,
+                                       found_at=NOW - 60)], "seen": ["old1"]})
+    finds = eye({"Nvidia": [item("Nvidia new GPU")]}).run()
+    assert titles(finds) == ["Nvidia new GPU"]

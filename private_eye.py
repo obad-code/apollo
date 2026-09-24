@@ -33,6 +33,7 @@ PATH = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
                     "Apollo", "finds.json")
 
 KEEP = 5                 # finds kept at a time
+PER_INTEREST = 2         # ...and no more than this about any one interest
 SEARCHES = 6             # interests searched each run, strongest first
 PER_SOURCE = 6           # results taken from each source for each search
 MAX_AGE = 3 * 86400      # older than this, it is not news to anyone
@@ -75,9 +76,13 @@ def parse_hn(body):
 
 
 def hacker_news(query):
-    return parse_hn(_get("https://hn.algolia.com/api/v1/search_by_date?"
-                         + urllib.parse.urlencode({"query": query, "tags": "story",
-                                                   "hitsPerPage": PER_SOURCE})))
+    # Titles only, and the last three days: searched everywhere, "Apple"
+    # matched stories that only mentioned it in passing.
+    return parse_hn(_get("https://hn.algolia.com/api/v1/search?"
+                         + urllib.parse.urlencode({
+                             "query": query, "tags": "story", "hitsPerPage": PER_SOURCE,
+                             "restrictSearchableAttributes": "title",
+                             "numericFilters": f"created_at_i>{int(time.time() - MAX_AGE)}"})))
 
 
 def parse_reddit(body):
@@ -165,6 +170,18 @@ def _key(title):
     return re.sub(r"[^a-z0-9؀-ۿ]+", " ", str(title).lower()).strip()
 
 
+def _about(title, interest):
+    """Whether a title is about the interest it was found for: its name, or a
+    telling word of its search. A source that matched the word somewhere in
+    the body - or in a comment - does not make the story about it."""
+    padded = f" {_key(title)} "
+    name = _key(interest.get("name", ""))
+    if name and f" {name} " in padded:
+        return True
+    words = {w for w in (_key(interest.get("query", "")) + " " + name).split() if len(w) >= 4}
+    return any(f" {w} " in padded for w in words)
+
+
 def _id(candidate):
     basis = candidate.get("link") or _key(candidate.get("title", ""))
     return hashlib.sha1(basis.encode("utf-8")).hexdigest()[:12]
@@ -212,6 +229,8 @@ class PrivateEye:
                         continue
                     if any(d in title.lower() for d in dislikes):
                         continue
+                    if not _about(title, interest):
+                        continue
                     find = dict(result, title=title, when=when, interest=interest["name"])
                     find["id"] = _id(find)
                     if find["id"] in seen:
@@ -222,8 +241,12 @@ class PrivateEye:
                     if key not in candidates or find["score"] > candidates[key]["score"]:
                         candidates[key] = find
         # What was already found stays while it is fresh and still earns its place.
+        queries = {i["name"]: i.get("query", "") for i in profile.get("interests", [])}
         for old in data["finds"]:
             if now - old.get("found_at", 0) > KEEP_FOUND:
+                continue
+            if not _about(old.get("title", ""), {"name": old.get("interest", ""),
+                                                 "query": queries.get(old.get("interest"), "")}):
                 continue
             key = _key(old.get("title", ""))
             others = [n for n in names if n != old.get("interest")]
@@ -231,7 +254,15 @@ class PrivateEye:
                                                    others, now))
             if key not in candidates or rescored["score"] >= candidates[key]["score"]:
                 candidates[key] = rescored
-        best = sorted(candidates.values(), key=lambda f: -f["score"])[:KEEP]
+        best, per = [], {}
+        for find in sorted(candidates.values(), key=lambda f: -f["score"]):
+            # Varied: one strong interest does not take the whole list.
+            if per.get(find["interest"], 0) >= PER_INTEREST:
+                continue
+            per[find["interest"]] = per.get(find["interest"], 0) + 1
+            best.append(find)
+            if len(best) == KEEP:
+                break
         for find in best:
             find.setdefault("found_at", now)
             find.pop("points", None)
