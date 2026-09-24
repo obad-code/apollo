@@ -13,6 +13,7 @@
 import { Shader } from './shader.js';
 import { Lyla } from './lyla.js';
 import { DotFlow, FRAMES } from './dotflow.js';
+import { LedWord } from './ledword.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -132,7 +133,36 @@ const asleep = { on: false, timer: null, last: '' };
 
 const shader = new Shader($('shader'));
 shader.start();
-window.addEventListener('resize', () => shader.resize());
+
+/* The name in lit cells, in its three places: under the ring, on the idle
+ * screen, and in the intro as Apollo comes up. */
+const wordmark = new LedWord($('wordmark'), { rows: 10, glow: 0.8, fill: 0.86 });
+const sleepWord = new LedWord($('sleep-word'), { rows: 15 });
+const introWord = new LedWord($('intro-word'), { rows: 20, glow: 1.15 });
+wordmark.sweep(0.9);
+
+window.addEventListener('resize', () => {
+  shader.resize();
+  for (const word of [wordmark, sleepWord, introWord]) word.resize();
+});
+
+const INTRO_OFF_AT = 2850;       // ms: the tube switches off...
+const INTRO_GONE_AT = 3500;      // ...and is gone, just before apollo.py lets go
+
+function playIntro() {
+  const box = $('intro');
+  clearTimeout(box._off);
+  clearTimeout(box._gone);
+  box.classList.remove('off');
+  box.classList.add('on');
+  introWord.resize();              // it had no size while it was not shown
+  introWord.sweep(1.1, 0.25);
+  box._off = setTimeout(() => box.classList.add('off'), INTRO_OFF_AT);
+  box._gone = setTimeout(() => {
+    box.classList.remove('on', 'off');
+    introWord.stop();
+  }, INTRO_GONE_AT);
+}
 
 const lyla = new Lyla($('lyla'), {
   label: $('lyla-label'), icon: $('lyla-icon'),
@@ -1264,10 +1294,17 @@ function setSleep(on) {
     // Under the idle screen only the dots are seen; nothing else earns frames.
     lyla.stop();
     ringStop();
+    wordmark.stop();
+    sleepWord.resize();
+    sleepWord.sweep(1.4, 0.5);     // as the idle screen fades in
     tickSleep();
     nextFact();
     asleep.timer = setInterval(nextFact, FACT_EVERY);
-  } else if (state.mode === 'full') {
+  } else {
+    sleepWord.stop();
+  }
+  if (!on && state.mode === 'full') {
+    wordmark.sweep(0.9);
     ringStart();
     if ($('lyla-block').dataset.hidden !== 'true') lyla.start();
   }
@@ -1513,10 +1550,12 @@ window.apollo = {
     // a window nobody can see is a GPU burning for nothing.
     if (name === 'full') {
       shader.start();
-      if (!asleep.on) { lyla.start(); ringStart(); }
+      if (!asleep.on) { lyla.start(); ringStart(); wordmark.sweep(0.9); }
+      else sleepWord.start();
       enter();
     } else {
       shader.stop(); lyla.stop(); ringStop();
+      wordmark.stop(); sleepWord.stop();
       unlight();
       unlightCard();
     }
@@ -1525,6 +1564,8 @@ window.apollo = {
   panels(state) { setPanels(state); },
   briefing(payload) { if (payload) render(payload); },
   sleep(on) { setSleep(on); },
+  // As Apollo comes up: the name, once, and the tube switching off.
+  intro() { playIntro(); },
   // "Open story three": opens it and says what it is. 0 closes it.
   story(number) {
     number = Number(number) || 0;

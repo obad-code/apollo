@@ -246,6 +246,9 @@ BRIEF_SETTLE = 25.0
 # over whatever was there. The very next keypress, mouse movement or sentence
 # wakes it (see `presence.Presence`).
 AFK_SECONDS = 10 * 60
+# The word, once, as Apollo comes up (see `Apollo.play_intro`): long enough
+# for the page's sweep, hold and switch-off, and not a moment longer.
+INTRO_SECONDS = 3.6
 
 # SHQueryUserNotificationState's answers that mean someone is using the
 # machine without touching it: a full-screen program (a film in a browser, a
@@ -821,6 +824,10 @@ class WebReporter:
         """Asleep: the display is the idle screen. Awake: it is itself."""
         self._call("sleep", bool(on))
 
+    def intro(self):
+        """Play the word, as Apollo comes up."""
+        self._call("intro")
+
     def story(self, number):
         """Open story `number` on the display's feed (0 closes it).
 
@@ -921,6 +928,7 @@ class Apollo:
         self.clips = None          # the replay buffer, once recording
         self.data = None           # the world, refreshed on a timer
         self.ticker = None         # prices as they trade, with a Finnhub key
+        self.intro_on = False      # the word is playing; see `play_intro`
         self.schedule = briefing.Schedule()   # has today's recap happened?
         self.briefing_thread = None
         self.prayer_thread = None
@@ -1048,6 +1056,7 @@ class Apollo:
                               on_visual=self.on_visual,
                               on_activity=self.on_activity,
                               app=self)
+        self.play_intro()
         threading.Thread(target=self.worker, daemon=True).start()
 
     def on_closed(self):
@@ -1091,7 +1100,32 @@ class Apollo:
         method to decide when a turn starts. It decides between the ambient
         overlay and the full display, and that is all.
         """
+        if getattr(self, "intro_on", False):
+            return Overlay.FULL
         return Overlay.FULL if self.presence.full else Overlay.ORB
+
+    def play_intro(self):
+        """APOLLO in lit cells, on the whole screen, as Apollo comes up.
+
+        The display holds the screen for INTRO_SECONDS while the page plays
+        it - the cells light in a sweep, hold, and the tube switches off -
+        and then Apollo is whatever it would have been: the overlay, or the
+        display if Ctrl+` was pressed meanwhile. Not over a full-screen
+        program: a game or a film that was up first is left alone.
+        """
+        if screen_busy():
+            return False
+        self.intro_on = True
+        self.apply_mode()
+        self.ui.intro()
+        timer = threading.Timer(INTRO_SECONDS, self.end_intro)
+        timer.daemon = True
+        timer.start()
+        return True
+
+    def end_intro(self):
+        self.intro_on = False
+        self.apply_mode()
 
     def apply_mode(self):
         """Swap between the overlay and the full display.

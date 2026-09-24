@@ -82,7 +82,8 @@
 
   <section id="core">
     <canvas id="ring" width="520" height="520"></canvas>
-    <div id="wordmark">APOLLO</div>
+    <!-- The name in lit cells (ledword.js). -->
+    <canvas id="wordmark" role="img" aria-label="Apollo"></canvas>
     <div id="hint" class="caption">Hold Ctrl+Alt to talk</div>
     <!-- Only while it is working: the dot matrix and what it is doing. -->
     <div id="thinking"></div>
@@ -109,10 +110,19 @@
 <!-- Asleep: ten quiet minutes, and this is all there is. -->
 <section id="sleep" aria-hidden="true">
   <div id="sleep-copy">
-    <div id="sleep-name"><span id="sleep-word">Apollo</span><span id="sleep-tag"></span></div>
+    <div id="sleep-name"><canvas id="sleep-word" role="img" aria-label="Apollo"></canvas><span id="sleep-tag"></span></div>
     <p id="sleep-fact"></p>
   </div>
   <div id="sleep-wake">Press any key or say anything to wake Apollo</div>
+</section>
+
+<!-- As Apollo comes up: the name in lit cells on black, soft shapes behind
+     it, and then the tube switches off. A few seconds, once. -->
+<section id="intro" aria-hidden="true">
+  <div class="blob one"></div>
+  <div class="blob two"></div>
+  <div class="blob three"></div>
+  <div id="intro-tilt"><canvas id="intro-word" role="img" aria-label="Apollo"></canvas></div>
 </section>
 
 <!-- Under this page's own directory on purpose: pywebview roots its HTTP
