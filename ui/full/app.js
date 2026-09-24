@@ -135,12 +135,13 @@ const shader = new Shader($('shader'));
 shader.start();
 
 /* The name in lit cells, in its three places: under the ring, on the idle
- * screen, and in the intro as Apollo comes up. Upright, in VT323 - a CRT
- * terminal's own letters - and arriving scrambled. */
-const CRT_FONT = '"VT323", "Consolas", monospace';
-const wordmark = new LedWord($('wordmark'), { rows: 12, glow: 0.8, fill: 0.9, font: CRT_FONT, weight: 400 });
-const sleepWord = new LedWord($('sleep-word'), { rows: 16, font: CRT_FONT, weight: 400 });
-const introWord = new LedWord($('intro-word'), { rows: 22, glow: 1.15, font: CRT_FONT, weight: 400 });
+ * screen, and in the intro as Apollo comes up. Upright, in Orbitron at its
+ * heaviest drawn at four fifths of its width - a little taller than it
+ * comes - and arriving scrambled. */
+const NAME = { font: '"Orbitron", "Segoe UI", sans-serif', weight: 900, stretch: 0.8 };
+const wordmark = new LedWord($('wordmark'), { ...NAME, rows: 12, glow: 0.8, fill: 0.9 });
+const sleepWord = new LedWord($('sleep-word'), { ...NAME, rows: 16 });
+const introWord = new LedWord($('intro-word'), { ...NAME, rows: 22, glow: 1.15 });
 wordmark.scramble(0.75);
 // The scramble-text component's own trigger: point at the name and it goes again.
 $('wordmark').addEventListener('pointerenter', () => wordmark.scramble(0.75));

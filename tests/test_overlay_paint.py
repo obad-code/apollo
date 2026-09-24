@@ -28,15 +28,45 @@ def pixel(bitmap, x, y):
     return (colour.A, colour.R, colour.G, colour.B)
 
 
-def test_the_card_is_black_and_its_colours_are_yellow_phosphor():
-    """A black card now, with the drifting colour a CRT's yellow: amber, gold,
-    ember and a touch of the green-yellow a tube glows at its brightest."""
+def test_the_card_is_black_and_its_lights_span_the_colours():
+    """A black card with a gradient of colours drifting in it - rose, sky,
+    sun, iris, mint, the display's own lights - not one amber smear."""
+    import colorsys
+
     card = overlay_paint.PALETTE["card"]
     assert max(card) <= 16, card
-    for name, _home, _drift, _period, _strength in overlay_paint.BLOBS:
+    families = set()
+    for name, _home, _drift, _period, strength in overlay_paint.BLOBS:
         r, g, b = overlay_paint.PALETTE[name]
-        # Yellow light: red and green high, blue low.
-        assert r >= 190 and g >= 130 and b <= 110, (name, (r, g, b))
+        hue, _light, saturation = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+        assert saturation > 0.6, (name, "a washed-out light reads as grey on black")
+        families.add(int(hue * 360 // 60))
+        assert strength >= 0.45, (name, "too faint to be seen")
+    assert len(families) >= 4, f"only {len(families)} colour families: {families}"
+
+
+def test_the_colour_reaches_up_the_card(draw, surface):
+    """Half way up the card - where the words are - there is colour, not
+    just black: the old veil held every light down in the bottom strip."""
+    bitmap, graphics = surface
+    backdrop = overlay_paint.Backdrop(draw)
+    lit = []
+    for t in (0.0, 4.0, 8.0, 12.0):
+        graphics.Clear(draw.Color.FromArgb(0, 0, 0, 0))
+        backdrop.panel(graphics, 30, 0, 500, 200, t=t)
+        lit.append(max(sum(pixel(bitmap, x, 100)[1:]) for x in range(60, 500, 20)))
+    card = sum(overlay_paint.PALETTE["card"])
+    assert min(lit) > card + 90, f"the middle of the card is dark: {lit}"
+
+
+def test_the_gradient_reads_smooth(draw, surface):
+    """Scanlines, but faint: at a third off every third row they striped the
+    colour into a grille, and the gradient stopped reading as one."""
+    bitmap, graphics = surface
+    overlay_paint.Backdrop(draw).panel(graphics, 30, 0, 500, 200, t=3.0)
+    light = [sum(pixel(bitmap, 250, y)[1:]) for y in range(120, 196)]
+    drops = [1 - light[i] / light[i - 1] for i in range(1, len(light)) if light[i - 1] > 60]
+    assert drops and max(drops) < 0.18, f"a row drops by {max(drops):.0%}"
 
 
 def test_the_ink_is_light_enough_to_read_on_the_card():

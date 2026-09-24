@@ -188,14 +188,15 @@ one is a number Apollo actually has.
 
 **The name.** Wherever Apollo writes its name - under the ring on the full
 display, on the idle screen, and in the intro - it is an LED sign on an old
-tube: VT323, the lettering of a DEC VT320 terminal, upright, used as a
-stencil over a grid of small lit cells, with a bloom, the three colours
-landing a hair apart, a flicker, scanlines and now and then a bright band
-rolling down (`ui/full/ledword.js`). It arrives scrambled, like the
-scramble-text component: every letter a random symbol, settling into the
-word from the left. Point at it on the display and it scrambles again.
-VT323 is under the SIL Open Font License (`ui/full/fonts/vt323/OFL.txt`),
-so unlike Thmanyah it may be shared with the code.
+tube: Orbitron at its heaviest, upright and drawn a little taller than it
+comes, used as a stencil over a grid of small lit cells, with a bloom, the
+three colours landing a hair apart, a flicker, scanlines and now and then a
+bright band rolling down (`ui/full/ledword.js`). It arrives scrambled, like
+the scramble-text component: every letter a random symbol, settling into
+the word from the left. Point at it on the display and it scrambles again.
+Orbitron is under the SIL Open Font License
+(`ui/full/fonts/orbitron/OFL.txt`), so unlike Thmanyah it may be shared
+with the code.
 
 **The intro.** As Apollo starts, the display holds the screen for about
 three and a half seconds (`INTRO_SECONDS`): black glass with soft pale

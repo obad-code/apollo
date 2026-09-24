@@ -16,6 +16,10 @@
 //     scanlines. The corners go dark the way a tube's did. Over the dots, the
 //     bloom: the same lights, unbroken, as a haze - the glow a bright tube
 //     threw past its own phosphors.
+//   - the set it is on: the picture flickers, a brighter band rolls up it,
+//     static crawls over it, and now and then a few lines tear sideways for
+//     a frame. The flicker, the band and the tear are decided in JavaScript
+//     once a frame and handed in; the static is hashed here per pixel.
 // Dimmed throughout: the panels sit on it and have to stay readable.
 
 const VERTEX = `
@@ -29,6 +33,11 @@ uniform vec2 resolution;
 uniform float time;
 uniform float sleep;      // 0 awake, 1 asleep - eased, so the sky changes slowly
 uniform float pitch;      // dot spacing at the edge of the screen, in pixels
+uniform float flicker;    // the tube's brightness this frame: ~0.96-1, now and then a dip
+uniform float roll;       // the rolling band's height, 0..1 up the screen (off it when there is none)
+uniform float tear;       // how far a torn band of lines is pushed sideways
+uniform float tearAt;     // ...and where that band is, 0..1 up the screen
+uniform float grain;      // a fresh seed every frame, for the static
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
@@ -117,6 +126,8 @@ void main() {
   float aspect = resolution.x / resolution.y;
   vec2 uv = gl_FragCoord.xy / resolution;
   vec2 p = uv * 2.0 - 1.0;                         // -1..1 on both axes
+  // A torn band: a few lines pushed sideways, for a frame or two.
+  p.x += tear * exp(-pow((uv.y - tearAt) * 38.0, 2.0));
 
   // The fisheye: sampled nearer the middle there, so the middle swells and
   // the corners pinch. r2 runs 0 at the centre to 1 in a corner.
@@ -141,26 +152,32 @@ void main() {
   float radius = mix(0.10, 0.44, clamp(bright * 1.15, 0.0, 1.0));
   float edge = 0.9 / (pitch * (1.0 - k + k * r2 * 3.0));   // a pixel, in cells
   // The three guns do not quite converge away from the middle.
-  vec2 miss = p * r2 * 0.055;
+  vec2 miss = p * r2 * 0.075;
   float red   = smoothstep(radius + edge, radius - edge, length(f - miss));
   float green = smoothstep(radius + edge, radius - edge, length(f));
   float blue  = smoothstep(radius + edge, radius - edge, length(f + miss));
   vec3 dots = lit * vec3(red, green, blue);
 
   // A halo round each dot, so the grid glows rather than sitting on black.
-  float halo = exp(-length(f) * 5.0) * 0.18;
+  float halo = exp(-length(f) * 4.2) * 0.24;
 
   // The bloom: the lights again, unbroken and unfolded, as a haze over the
   // whole field - a wash of their colour, and more of it where they are
   // brightest. Taken at this pixel, not at the dot's centre, or it would
   // come out in squares the size of the grid. Asleep, the dusk has none.
   vec3 haze = lights(plane, t / 1.5) * (1.0 - sleep);
-  vec3 bloom = haze * 0.16 + haze * haze * 0.30;
+  vec3 bloom = haze * 0.20 + haze * haze * 0.46;
 
   vec3 colour = dots * 0.92 + lit * (halo + 0.06) + bloom;
 
   // Scanlines, every other row.
-  colour *= 0.86 + 0.14 * sin(gl_FragCoord.y * 3.14159);
+  colour *= 0.80 + 0.20 * sin(gl_FragCoord.y * 3.14159);
+
+  // The rolling band, a little brighter where it passes.
+  colour *= 1.0 + 0.24 * exp(-pow((uv.y - roll) * 7.0, 2.0));
+  // Static, finer than the dots, new every frame.
+  colour += (hash(gl_FragCoord.xy * 0.73 + grain) - 0.5) * 0.05;
+  colour *= flicker;
 
   // The tube's corners: dark, and rounded by the same bend.
   vec2 corner = abs(bent);
@@ -185,7 +202,13 @@ export class Shader {
     this.sleepValue = 0.0;
     this.sleepTarget = 0.0;
     this.frame = null;
-    this.skip = false;
+    this.last = 0;
+    // The set's misbehaviour, decided a frame at a time (see `_set`).
+    this.flicker = 1.0;
+    this.roll = -1.0;
+    this.rollWait = 3.0;
+    this.tear = 0.0;
+    this.tearAt = 0.5;
     if (this.gl) this._build();
   }
 
@@ -217,6 +240,11 @@ export class Shader {
     this.clock = gl.getUniformLocation(program, 'time');
     this.sleepUniform = gl.getUniformLocation(program, 'sleep');
     this.pitchUniform = gl.getUniformLocation(program, 'pitch');
+    this.flickerUniform = gl.getUniformLocation(program, 'flicker');
+    this.rollUniform = gl.getUniformLocation(program, 'roll');
+    this.tearUniform = gl.getUniformLocation(program, 'tear');
+    this.tearAtUniform = gl.getUniformLocation(program, 'tearAt');
+    this.grainUniform = gl.getUniformLocation(program, 'grain');
     this.resize();
   }
 
@@ -240,22 +268,58 @@ export class Shader {
   // a few seconds, the way light changes.
   sleep(on) { this.sleepTarget = on ? 1 : 0; }
 
+  /* One frame of an old set: a flicker that is never quite still and now
+   * and then dips, a brighter band rolling up the picture every few seconds,
+   * and once in a while a few lines torn sideways. `dt` in seconds. Quieter
+   * asleep - the idle screen is meant to be restful. */
+  _set(dt) {
+    const calm = 1 - this.sleepValue * 0.7;
+    this.flicker = 1 - (Math.random() * 0.04
+                        + (Math.random() < 0.01 ? 0.12 : 0)) * calm;
+    if (this.roll > -0.5) {
+      this.roll += dt * 0.32;
+      if (this.roll > 1.25) { this.roll = -1; this.rollWait = 3 + Math.random() * 6; }
+    } else if ((this.rollWait -= dt) <= 0) {
+      this.roll = -0.25;
+    }
+    if (this.tear > 0.0004) {
+      this.tear *= 0.55;
+    } else {
+      this.tear = 0;
+      if (Math.random() < 0.006 * calm) {
+        this.tear = 0.004 + Math.random() * 0.006;
+        this.tearAt = Math.random();
+      }
+    }
+  }
+
   draw() {
     if (!this.gl) return;
-    this.gl.uniform1f(this.clock, this.time);
-    this.gl.uniform1f(this.sleepUniform, this.sleepValue);
-    this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
+    const gl = this.gl;
+    gl.uniform1f(this.clock, this.time);
+    gl.uniform1f(this.sleepUniform, this.sleepValue);
+    gl.uniform1f(this.flickerUniform, this.flicker);
+    gl.uniform1f(this.rollUniform, this.roll);
+    gl.uniform1f(this.tearUniform, this.tear);
+    gl.uniform1f(this.tearAtUniform, this.tearAt);
+    gl.uniform1f(this.grainUniform, Math.random() * 97.0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
   start() {
     if (!this.gl || this.frame !== null) return;
-    const tick = () => {
-      // Thirty frames a second: everything here drifts over tens of seconds,
-      // and a full-resolution pass every frame would be GPU spent on nothing.
-      this.skip = !this.skip;
-      if (!this.skip) {
-        this.time += 0.05 * this.rate;
-        this.sleepValue += (this.sleepTarget - this.sleepValue) * 0.035;
+    this.last = performance.now();
+    const tick = (now) => {
+      // Thirty frames a second, whatever the screen's own rate: everything
+      // here drifts over tens of seconds, and a full-resolution pass every
+      // refresh of a 144Hz screen would be GPU spent on nothing. Time is
+      // taken from the clock, so the drift is the same speed on any screen.
+      if (now - this.last >= 1000 / 30 - 1) {
+        const dt = Math.min(0.1, (now - this.last) / 1000);
+        this.last = now;
+        this.time += dt * 1.5 * this.rate;
+        this.sleepValue += (this.sleepTarget - this.sleepValue) * Math.min(1, dt * 1.05);
+        this._set(dt);
         this.draw();
       }
       this.frame = requestAnimationFrame(tick);

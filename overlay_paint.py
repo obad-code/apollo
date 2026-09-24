@@ -12,9 +12,10 @@ is a handful of DrawImage calls and the things that genuinely move.
 
 The card hangs out of the top edge of the screen, so its top corners are
 square - that edge is above the screen. It was cream; it is black now, a
-tube's glass with a yellow phosphor glow drifting low in it, the printed dots
-kept, scanlines over all of it, and light ink. Apollo's own mark kept its
-colours.
+tube's glass with five coloured lights drifting slowly through it - the full
+display's own rose, sky, sun, iris and mint - overlapping into one moving
+gradient, the printed dots kept, faint scanlines, and light ink. Apollo's own
+mark kept its colours.
 """
 
 import math
@@ -26,12 +27,14 @@ PALETTE = {
     "ink": (255, 239, 208),       # Apollo's own words, warm white
     "you": (224, 206, 170),       # yours, and the line under them
     "caption": (184, 162, 122),
-    # The four colours that drift across its lower half: a yellow phosphor
-    # at its different heats, from straw to ember.
-    "gold": (255, 198, 58),
-    "ember": (255, 132, 30),
-    "straw": (255, 224, 96),
-    "phosphor": (255, 176, 44),   # amber: a green-yellow here read as olive
+    # The five lights that drift through it: the full display's colours, so
+    # the two halves of Apollo glow the same. It was one amber, which read
+    # as a brown smear at the foot of the card.
+    "rose": (255, 70, 150),
+    "sky": (40, 186, 255),
+    "sun": (255, 158, 40),
+    "iris": (138, 92, 255),
+    "mint": (40, 226, 158),
     # The ring, the charts and the cards, at the brightness a black card
     # needs - the darker set was for cream paper.
     "amber": (255, 190, 70),
@@ -43,27 +46,32 @@ PALETTE = {
     "white": (255, 246, 224),
 }
 
-# Each blob: colour, where it rests (as a fraction of the card), how far it
-# wanders, how long one loop takes, and how strong it is. All four sit low,
-# because the mask above keeps colour out of the card's upper half - which is
-# the part that hides above the screen's edge.
-BLOBS = (("gold", (0.14, 1.14), (0.26, 0.12), 9.0, 0.46),
-         ("ember", (0.46, 1.18), (0.30, 0.13), 11.0, 0.40),
-         ("straw", (0.86, 1.16), (0.28, 0.12), 10.0, 0.38),
-         ("phosphor", (0.66, 1.08), (0.22, 0.10), 13.0, 0.30))
+# Each light: colour, where it rests (as a fraction of the card), how far it
+# wanders, how long one loop takes, and how strong it is. Spread across the
+# card and wandering wide, on long loops of their own lengths, so they cross
+# and mix into different gradients all the time and never in step. Two sit
+# up where the words are; none reaches the strip above the screen's edge,
+# which the veil keeps black.
+BLOBS = (("rose", (0.12, 0.95), (0.30, 0.22), 17.0, 0.58),
+         ("sky", (0.88, 0.90), (0.28, 0.24), 19.0, 0.56),
+         ("sun", (0.50, 1.10), (0.38, 0.16), 23.0, 0.50),
+         ("iris", (0.70, 0.62), (0.26, 0.20), 21.0, 0.50),
+         ("mint", (0.30, 0.66), (0.24, 0.18), 26.0, 0.46))
 
-# Where the paper stops covering the colour, as fractions of the card's
-# height: opaque paper down to the first, clear by the second.
-SCRIM = (0.24, 0.82)
+# Where the glass stops covering the colour, as fractions of the card's
+# height: opaque down to the first - the strip that hides above the screen -
+# and clear by the second.
+SCRIM = (0.12, 0.60)
 
 DOT_ALPHA = 30           # light dots, faint, on the black
 DOT_EVERY = 9
 DOT_INK = (255, 226, 160)
 
 # A tube's scanlines: one darker row in every three, over the colour and the
-# dots alike. Drawn once into a bitmap like the rest.
+# dots alike, drawn once into a bitmap like the rest. Faint: at 30% they
+# striped the gradient into a grille and it stopped reading as one.
 SCANLINE_EVERY = 3
-SCANLINE_ALPHA = 0.30
+SCANLINE_ALPHA = 0.12
 # The design lays a noise tile over the card as well. It is left out: in GDI+
 # it costs a SetPixel per pixel to build, and at the card's size the dot grid
 # carries the same texture for the price of one blit.
@@ -211,7 +219,7 @@ def veil(draw, w, h, colour):
         # the clear one at the card's foot rather than stopping at the scrim.
         blend = draw.Drawing2D.ColorBlend(5)
         blend.Colors = [draw.Color.FromArgb(*alpha(colour, 1.0)),
-                        draw.Color.FromArgb(*alpha(colour, 0.96)),
+                        draw.Color.FromArgb(*alpha(colour, 1.0)),
                         draw.Color.FromArgb(*alpha(colour, 0.42)),
                         draw.Color.FromArgb(0, *colour),
                         draw.Color.FromArgb(0, *colour)]
@@ -225,7 +233,7 @@ def veil(draw, w, h, colour):
 
 
 class Backdrop:
-    """The card: paper, four colours drifting under it, and a printed grid.
+    """The card: glass, five lights drifting under it, and a printed grid.
 
     The order is the design's: blobs at the bottom, a mask that keeps them out
     of the upper half, the paper's scrim over them, then the dot grid on top.
@@ -265,9 +273,9 @@ class Backdrop:
         self._veil = veil(draw, w, h, PALETTE["card"])
         self._dots = dot_grid(draw, w, h)
         self._lines = scanlines(draw, w, h)
-        # Wider than the card: a blob that only just reaches the edge reads as
-        # a disc, and the design's blobs all spill past it.
-        size = int(max(w, h) * 1.25)
+        # Wider than the card: a light that only just reaches the edge reads
+        # as a disc, and these are meant to spill past it and into each other.
+        size = int(max(w, h) * 1.3)
         self._blobs = [(spec, nebula(draw, size, PALETTE[spec[0]], spec[4]))
                        for spec in BLOBS]
 

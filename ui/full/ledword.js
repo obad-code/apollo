@@ -92,6 +92,14 @@ export class LedWord {
     this.size = size;
     this.cap = (cap * size) / 100;
     this.wordWidth = (probe.width * size) / 100;
+    // Where each letter of the word sits, and how wide it is: a scrambled
+    // glyph goes in its letter's place, so nothing moves when it settles.
+    m.font = this._face(size);
+    const letters = [...this.text];
+    this.slots = letters.map((ch, i) => ({
+      x: m.measureText(letters.slice(0, i).join('')).width,
+      w: m.measureText(ch).width,
+    }));
 
     const cellH = this.cap / this.rows;
     const cellW = cellH * this.aspect;
@@ -131,14 +139,13 @@ export class LedWord {
       ctx.fillText(text, -this.wordWidth / 2, 0);
       return;
     }
-    // Mid-scramble, each glyph in its own letter's slot and no wider: the
+    // Mid-scramble, each glyph in its own letter's place and no wider: the
     // symbols and blocks come from whatever font has them, some far wider
     // than a letter, and would otherwise shove the word about and spill
     // off the edge.
-    const chars = [...text];
-    const slot = this.wordWidth / Math.max(1, [...this.text].length);
-    chars.forEach((ch, i) => {
-      ctx.fillText(ch, -this.wordWidth / 2 + i * slot, 0, slot * 0.96);
+    [...text].forEach((ch, i) => {
+      const slot = this.slots[i];
+      if (slot) ctx.fillText(ch, -this.wordWidth / 2 + slot.x, 0, Math.max(1, slot.w));
     });
   }
 

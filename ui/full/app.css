@@ -2,11 +2,11 @@
    that holds at 2560x1440 and at 1920x1080. Nothing here paints a background
    except the dot field behind it - the panels are smoked glass over it. */
 
-/* VT323: the lettering of a DEC VT320's screen, for Apollo's name in lit
-   cells (ledword.js). SIL Open Font License - fonts/vt323/OFL.txt - so,
-   unlike Thmanyah, it may travel with the code. */
-@font-face { font-family: "VT323"; font-weight: 400; font-display: block;
-             src: url("fonts/vt323/VT323-Regular.ttf") format("truetype"); }
+/* Orbitron, for Apollo's name in lit cells (ledword.js). A variable font,
+   400 to 900. SIL Open Font License - fonts/orbitron/OFL.txt - so, unlike
+   Thmanyah, it may travel with the code. */
+@font-face { font-family: "Orbitron"; font-weight: 400 900; font-display: block;
+             src: url("fonts/orbitron/Orbitron-Variable.ttf") format("truetype"); }
 
 /* Thmanyah, carried with Apollo rather than expected from the system, and
    served from under this page because pywebview roots its server here. One
