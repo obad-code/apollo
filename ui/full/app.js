@@ -16,7 +16,7 @@ import { DotFlow, FRAMES } from './dotflow.js';
 import { LedWord } from './ledword.js';
 import { bootLines, typed } from './boot.js';
 import * as Tiles from './tiles.js';
-import * as Planet from './planet.js';
+import * as Rings from './rings.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -245,53 +245,19 @@ lyla.start();
 document.addEventListener('pointerdown', (event) => lyla.follow(event.clientX, event.clientY));
 document.addEventListener('pointermove', (event) => lyla.pointer(event.clientX, event.clientY));
 
-/* Apollo's shape: a planet of quantum dots, turning in space (planet.js has
- * where they are). Every dot is a small light of its own - the seas in blues
- * and cyans, the land in ambers and greens, ice at the poles - lit from the
- * upper left, its night side dark but for a few city lights on the land, a
- * blue rim of air round it, and a ring of dots round its middle whose far
- * side goes behind it. It turns slowly and breathes with your voice. Busy,
- * it turns faster and its lights come up; listening, its dots stir with
- * your voice; speaking, it goes towards white and a white bloom lifts off
- * it. */
+/* Apollo's shape: a circle, as the old display drew it (rings.js has the
+ * dots). In amber #FFB000: a scope's faint graticule - a bezel with its ticks
+ * and a grid across it - a dark lens in the middle, and inside the bezel five
+ * rings of lit dots joined round each ring, turning against each other and
+ * breathing with your voice. While Apollo is busy they brighten, thicken and
+ * turn faster, a scan bar runs down the glass and a wave goes out from the
+ * middle over and over; while it is listening the rings take a gradient,
+ * cyan in the middle to amber and orange at the edge; and while it speaks
+ * they go towards white and a white bloom lifts off the middle. */
 const ring = $('ring').getContext('2d');
-const SURFACE = Planet.sphere(1100).map((p, i) => {
-  const h = Planet.height(p);
-  const polar = Math.abs(p.y) > 0.86;
-  const kind = polar ? 'ice' : h > 0.22 ? 'land' : h > 0 ? 'green' : h > -0.12 ? 'shore'
-             : h < -0.9 ? 'deep' : 'sea';
-  // A few of the land's dots are towns: they are what shows on the night side.
-  return { ...p, kind, town: h > 0 && !polar && ((i * 7919) % 100) < 38, seed: (i * 0.61803) % 1 };
-});
-const RING_DOTS = Planet.ringDots(260);
-// Where the light comes from, as the planet is seen: up and to the left, and
-// a little towards you (x right, y down, z to you).
-const SUN = (() => { const v = [-0.55, -0.52, 0.65]; const l = Math.hypot(...v); return v.map((c) => c / l); })();
-const LIGHTS = {
-  sea: [70, 150, 255], deep: [40, 90, 230], shore: [90, 220, 255], land: [255, 186, 70],
-  green: [120, 230, 140], ice: [220, 240, 255], town: [255, 206, 120], ring: [255, 204, 130],
-  white: [255, 255, 255],
-};
-// Each light drawn once as a small glow, and stamped where the dots are.
-const glows = {};
-function glowOf(name) {
-  if (glows[name]) return glows[name];
-  const [r, g, b] = LIGHTS[name];
-  const c = document.createElement('canvas');
-  c.width = c.height = 32;
-  const x = c.getContext('2d');
-  const grad = x.createRadialGradient(16, 16, 0, 16, 16, 16);
-  const hot = [r, g, b].map((v) => Math.round(v + (255 - v) * 0.55)).join(',');
-  grad.addColorStop(0, `rgba(${hot},1)`);
-  grad.addColorStop(0.22, `rgba(${r},${g},${b},0.95)`);
-  grad.addColorStop(0.5, `rgba(${r},${g},${b},0.28)`);
-  grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
-  x.fillStyle = grad;
-  x.fillRect(0, 0, 32, 32);
-  glows[name] = c;
-  return c;
-}
-const core = { spin: 0, env: 0, talk: 0, listen: 0, pace: 0.18 };
+const AMBER = [255, 176, 0];
+const LISTEN = [[90, 215, 255], [127, 227, 255], [255, 227, 168], [255, 122, 46]];
+const core = { clock: 0, env: 0, talk: 0, listen: 0, spin: 1 };
 let lastFrame = performance.now();
 let ringFrame = null;
 
@@ -299,114 +265,158 @@ function drawRing(now) {
   const dt = Math.min(0.05, (now - lastFrame) / 1000);
   lastFrame = now;
   const phase = state.phase;
-  // Eased, not followed: the raw level jumps every packet, and a planet that
+  // Eased, not followed: the raw level jumps every packet, and a ring that
   // jumps with it reads as a fault rather than as breathing.
   state.levelSmooth += (state.level - state.levelSmooth)
                      * (1 - Math.exp(-dt / (state.level > state.levelSmooth ? 0.05 : 0.28)));
-  const level = state.levelSmooth;
-  core.env = Planet.ease(core.env, phase === 'idle' ? 0 : 1, dt, 0.35);
-  core.talk = Planet.ease(core.talk, phase === 'speaking' ? 1 : 0, dt, 0.2);
-  core.listen = Planet.ease(core.listen, phase === 'listening' ? 1 : 0, dt, 0.3);
-  core.pace = Planet.ease(core.pace, phase === 'thinking' ? 1.4 : 0.18 + 0.5 * core.env, dt, 0.5);
-  core.spin += dt * core.pace;
-  const env = core.env, talk = core.talk, t = now / 1000;
+  core.env = Rings.ease(core.env, phase === 'idle' ? 0 : 1, dt, 0.35);
+  core.talk = Rings.ease(core.talk, phase === 'speaking' ? 1 : 0, dt, 0.2);
+  core.listen = Rings.ease(core.listen, phase === 'listening' ? 1 : 0, dt, 0.3);
+  core.spin = Rings.ease(core.spin, phase === 'thinking' ? 3.2 : 1 + 1.2 * core.env + 3.4 * core.talk, dt, 0.4);
+  core.clock += dt * 1000 * core.spin;
+  const env = core.env, w = core.talk, t = now;
 
-  // Drawn at the canvas's own size on the screen, in the screen's pixels;
-  // `px` is one CSS pixel.
+  // Drawn at the canvas's own size on the screen, in the screen's pixels, so
+  // a line of one is a line of one; `px` is one CSS pixel.
   const canvas = $('ring');
   const px = Math.min(2, window.devicePixelRatio || 1);
   const want = Math.max(1, Math.round(canvas.clientWidth * px));
   if (canvas.width !== want) { canvas.width = want; canvas.height = want; }
   const size = canvas.width;
   const cx = size / 2, cy = size / 2;
-  // The ring reaches nearly two radii out, so the planet is a quarter of the
-  // canvas across its radius.
-  const R = size * 0.245 * (1 + 0.05 * level);
-  const dotScale = Math.max(0.6, R / (82 * px)) * px;
+  const coreR = size * 0.4 * (1 + 0.06 * state.levelSmooth);
+  // Towards white while it speaks.
+  const rgb = AMBER.map((v) => Math.round(v + (255 - v) * w)).join(',');
   ring.clearRect(0, 0, size, size);
 
-  const stamp = (name, x, y, radius, alpha) => {
-    if (alpha <= 0.01) return;
-    ring.globalAlpha = Math.min(1, alpha);
-    const reach = radius * 3.2;
-    ring.drawImage(glowOf(name), x - reach, y - reach, reach * 2, reach * 2);
-  };
-  const ringSeen = RING_DOTS.map((d) => Planet.project(d, core.spin * 0.6));
-  const ringDot = (p, i) => {
-    const x = cx + p.x * R, y = cy + p.y * R;
-    const r = (0.9 + 0.35 * p.z) * dotScale * (1 + 0.5 * env + 0.6 * talk);
-    const flicker = 0.7 + 0.3 * Math.sin(t * 1.7 + i * 1.3);
-    stamp(talk > 0.3 ? 'white' : 'ring', x, y, r, (0.58 + 0.3 * env + 0.3 * talk) * flicker);
-  };
+  // The dark lens the rings sit round, gone while Apollo is busy.
+  const lensA = 1 - env;
+  if (lensA > 0.004) {
+    const lens = ring.createRadialGradient(cx, cy, coreR * 0.4, cx, cy, coreR * 0.78);
+    lens.addColorStop(0, `rgba(0,0,0,${(0.78 * lensA).toFixed(3)})`);
+    lens.addColorStop(0.78, `rgba(0,0,0,${(0.78 * lensA).toFixed(3)})`);
+    lens.addColorStop(1, 'rgba(0,0,0,0)');
+    ring.fillStyle = lens;
+    ring.beginPath();
+    ring.arc(cx, cy, coreR * 0.78, 0, Math.PI * 2);
+    ring.fill();
+  }
 
   ring.globalCompositeOperation = 'lighter';
-  // The far side of the ring, where the planet does not hide it.
-  ringSeen.forEach((p, i) => {
-    if (p.z < 0 && Math.hypot(p.x, p.y) > 1.02) ringDot(p, i);
-  });
 
-  // Its air: a blue rim, brighter while Apollo is busy.
-  const air = ring.createRadialGradient(cx, cy, R * 0.92, cx, cy, R * 1.34);
-  air.addColorStop(0, `rgba(110,180,255,${(0.34 + 0.2 * env).toFixed(3)})`);
-  air.addColorStop(0.35, `rgba(80,140,255,${(0.14 + 0.1 * env).toFixed(3)})`);
-  air.addColorStop(1, 'rgba(60,110,255,0)');
-  ring.globalAlpha = 1;
-  ring.fillStyle = air;
-  ring.beginPath();
-  ring.arc(cx, cy, R * 1.34, 0, Math.PI * 2);
-  ring.fill();
-
-  // The body: dark, a little lighter towards the light - it hides the far
-  // side's dots but for a trace, and is what the lit dots sit on.
-  ring.globalCompositeOperation = 'source-over';
-  const body = ring.createRadialGradient(cx + SUN[0] * R * 0.5, cy + SUN[1] * R * 0.5, R * 0.1, cx, cy, R);
-  body.addColorStop(0, 'rgba(26,48,104,0.92)');
-  body.addColorStop(1, 'rgba(3,7,20,0.96)');
-  ring.fillStyle = body;
-  ring.beginPath();
-  ring.arc(cx, cy, R, 0, Math.PI * 2);
-  ring.fill();
-
-  // The surface: the side facing you, lit by where the light falls. Its dots
-  // stir with your voice while Apollo is listening.
-  ring.globalCompositeOperation = 'lighter';
-  const stir = 0.05 * core.listen * level;
-  SURFACE.forEach((d, i) => {
-    const p = Planet.project(d, core.spin);
-    if (p.z < -0.02) return;
-    const lift = 1 + stir * Math.sin(t * 9 + d.seed * 40);
-    const x = cx + p.x * R * lift, y = cy + p.y * R * lift;
-    const day = Math.max(0, Math.min(1, (p.x * SUN[0] + p.y * SUN[1] + p.z * SUN[2] + 0.15) / 0.5));
-    const r = (0.75 + 0.55 * p.z) * dotScale * (1 + 0.5 * env + 0.7 * talk);
-    const twinkle = 0.82 + 0.18 * Math.sin(t * 2.3 + d.seed * 60);
-    // Lit by day; by night only its towns, and the air's blue at the edge.
-    let bright = (0.12 + 1.05 * day) * twinkle * (0.85 + 0.3 * env);
-    let light = d.kind;
-    if (day < 0.25 && d.town) { light = 'town'; bright = Math.max(bright, 0.55 * twinkle); }
-    stamp(light, x, y, r, bright);
-    if (talk > 0.01) stamp('white', x, y, r, talk * 0.6 * twinkle);
-    // The limb: the dots at the edge catch the air's blue.
-    if (p.z < 0.35) stamp('shore', x, y, r * 0.9, (0.35 - p.z) * 0.9);
-  });
-
-  // The near side of the ring, over the planet.
-  ringSeen.forEach((p, i) => { if (p.z >= 0) ringDot(p, i); });
-
-  // Speaking: a white bloom lifting off it.
-  if (talk > 0.004) {
-    const reach = Math.min(R * 1.9, size / 2);
-    const flick = 0.82 + 0.18 * Math.sin(t * 26);
-    const bloom = ring.createRadialGradient(cx, cy, R * 0.2, cx, cy, reach);
-    bloom.addColorStop(0, `rgba(255,255,255,${(0.26 * talk * flick).toFixed(3)})`);
-    bloom.addColorStop(0.45, `rgba(235,244,255,${(0.1 * talk * flick).toFixed(3)})`);
+  // The white bloom while Apollo speaks - kept inside the canvas.
+  if (w > 0.004) {
+    const reach = Math.min(coreR * 1.7, size / 2);
+    const flick = 0.82 + 0.18 * Math.sin(t * 0.026);
+    const bloom = ring.createRadialGradient(cx, cy, coreR * 0.15, cx, cy, reach);
+    bloom.addColorStop(0, `rgba(255,255,255,${(0.3 * w * flick).toFixed(3)})`);
+    bloom.addColorStop(0.42, `rgba(255,248,232,${(0.13 * w * flick).toFixed(3)})`);
     bloom.addColorStop(1, 'rgba(255,255,255,0)');
-    ring.globalAlpha = 1;
     ring.fillStyle = bloom;
     ring.beginPath();
     ring.arc(cx, cy, reach, 0, Math.PI * 2);
     ring.fill();
+    ring.lineWidth = 2 * px;
+    ring.strokeStyle = `rgba(255,255,255,${(0.5 * w).toFixed(3)})`;
+    ring.shadowBlur = 40 * w * px;
+    ring.shadowColor = `rgba(255,255,255,${(0.8 * w).toFixed(3)})`;
+    ring.beginPath();
+    ring.arc(cx, cy, coreR * 0.7, 0, Math.PI * 2);
+    ring.stroke();
+    ring.shadowBlur = 0;
   }
-  ring.globalAlpha = 1;
+
+  // The scope's graticule: never off, a dim floor at rest.
+  const scope = Math.min(1, Math.max(env, 0.24) * 1.4);
+  ring.lineWidth = px;
+  ring.strokeStyle = `rgba(${rgb},${(0.2 * scope).toFixed(3)})`;
+  ring.beginPath();
+  ring.arc(cx, cy, coreR * 1.04, 0, Math.PI * 2);
+  ring.stroke();
+  ring.strokeStyle = `rgba(${rgb},${(0.12 * scope).toFixed(3)})`;
+  for (let g = -2; g <= 2; g++) {
+    const o = g * coreR * 0.3;
+    ring.beginPath();
+    ring.moveTo(cx - coreR * 0.86, cy + o); ring.lineTo(cx + coreR * 0.86, cy + o);
+    ring.moveTo(cx + o, cy - coreR * 0.86); ring.lineTo(cx + o, cy + coreR * 0.86);
+    ring.stroke();
+  }
+  ring.strokeStyle = `rgba(${rgb},${(0.3 * scope).toFixed(3)})`;
+  ring.beginPath();
+  for (let k = 0; k < 36; k++) {
+    const a = (k / 36) * Math.PI * 2, r0 = coreR * 1.04, r1 = r0 - coreR * (k % 3 ? 0.025 : 0.05);
+    ring.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+    ring.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+  }
+  ring.stroke();
+
+  // The rings: joined round, a lit dot at each join. Listening, they take
+  // the gradient, cross-faded in so they never drop out.
+  const pulse = 0.82 + 0.18 * Math.sin(t * 0.0016) + 0.12 * env * Math.sin(t * 0.0052)
+              + 0.25 * w + 0.2 * state.levelSmooth;
+  let tint = null;
+  if (core.listen > 0.02) {
+    tint = ring.createRadialGradient(cx, cy, coreR * 0.1, cx, cy, coreR * 1.02);
+    LISTEN.forEach((c, i) => tint.addColorStop([0, 0.38, 0.62, 1][i], `rgb(${c.join(',')})`));
+  }
+  const mix = Math.min(1, core.listen * 1.4);
+  const stroke = (style, alpha, draw) => {
+    if (alpha <= 0.004) return;
+    ring.globalAlpha = Math.min(1, alpha);
+    ring.strokeStyle = style;
+    ring.fillStyle = style;
+    draw();
+    ring.globalAlpha = 1;
+  };
+  Rings.LAYERS.forEach((layer, li) => {
+    const lay = (1 - li * 0.07) * (1 + 0.25 * env) * (1 + 1.5 * w);
+    const dots = Rings.layerDots(li, core.clock).map((d) => [cx + d.x * coreR, cy + d.y * coreR]);
+    const lineA = (0.3 + 0.38 * env + 0.3 * w) * pulse * lay;
+    ring.lineWidth = (1 + 2.4 * env + 1.8 * w) * px;
+    ring.shadowBlur = (12 + 18 * env + 30 * w) * px;
+    ring.shadowColor = `rgba(${rgb},${Math.min(1, 0.7 * lay).toFixed(3)})`;
+    const round = () => {
+      ring.beginPath();
+      dots.forEach(([x, y], k) => (k ? ring.lineTo(x, y) : ring.moveTo(x, y)));
+      ring.closePath();
+      ring.stroke();
+    };
+    stroke(`rgb(${rgb})`, lineA * (tint ? 1 - mix : 1), round);
+    if (tint) stroke(tint, lineA * mix, round);
+    ring.shadowBlur = (14 + 16 * env + 34 * w) * px;
+    dots.forEach(([x, y], k) => {
+      const flare = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.0024 * core.spin + k * 0.8 + li * 1.7));
+      const r = (1.6 + 0.9 * flare) * (1 + 1.1 * env + 0.9 * w) * px;
+      const dot = () => { ring.beginPath(); ring.arc(x, y, r, 0, Math.PI * 2); ring.fill(); };
+      const dotA = 0.92 * flare * lay;
+      stroke(`rgb(${rgb})`, dotA * (tint ? 1 - mix : 1), dot);
+      if (tint) stroke(tint, dotA * mix, dot);
+    });
+  });
+  ring.shadowBlur = 0;
+
+  // A scan bar drifting down inside the bezel.
+  const scanY = cy - coreR * 0.94 + ((t * 0.055 * px) % (coreR * 1.88));
+  const half = Math.sqrt(Math.max(0, (coreR * 0.94) ** 2 - (scanY - cy) ** 2));
+  ring.lineWidth = 2 * px;
+  ring.strokeStyle = `rgba(${rgb},${(0.14 * scope).toFixed(3)})`;
+  ring.beginPath();
+  ring.moveTo(cx - half, scanY); ring.lineTo(cx + half, scanY);
+  ring.stroke();
+
+  // While Apollo works, a wave going out from the middle, over and over.
+  if (env > 0.004) {
+    const period = env > 0.5 ? 1100 : 3400;
+    const wave = (t % period) / period;
+    ring.lineWidth = 1.4 * px;
+    ring.strokeStyle = `rgba(255,176,0,${(0.3 * env * (1 - wave) ** 2).toFixed(3)})`;
+    ring.shadowBlur = 18 * px;
+    ring.shadowColor = `rgba(${rgb},0.7)`;
+    ring.beginPath();
+    ring.arc(cx, cy, coreR * 0.3 + wave * (size / 2 - 4 * px - coreR * 0.3), 0, Math.PI * 2);
+    ring.stroke();
+    ring.shadowBlur = 0;
+  }
   ring.globalCompositeOperation = 'source-over';
   ringFrame = requestAnimationFrame(drawRing);
 }

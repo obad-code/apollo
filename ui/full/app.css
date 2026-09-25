@@ -976,7 +976,7 @@ body.switching #stage { animation: channel .5s steps(6, end); }
 body.roomless #stage { padding-bottom: var(--dock-room); }
 #lyla { transition: opacity .26s ease-out; }
 body.roomless #lyla { opacity: 0; transition: opacity .45s ease-in-out; }
-body.roomless #ring { width: 480px; height: 480px; }
+body.roomless #ring { width: 400px; height: 400px; }
 
 /* --- ultra mode ---------------------------------------------------------------------
    Every display on the screen at once, as tiles on a grid of twelve columns
@@ -1116,7 +1116,7 @@ body.sweeping #ultra-sweep { animation: sweep .9s cubic-bezier(.45, 0, .2, 1) fo
 
 /* Apollo's own display: the ring and the name, smaller. */
 body.ultra #core { align-items: center; justify-content: center; }
-body.ultra #ring { width: 190px; height: 190px; }
+body.ultra #ring { width: 150px; height: 150px; }
 body.ultra #hint { margin-top: 8px; }
 body.ultra.listening #core, body.ultra.thinking #core, body.ultra.answering #core { transform: none; }
 
@@ -1235,9 +1235,8 @@ body:not(.ultra) .away { display: none !important; }
         align-items: center; justify-content: center;
         transition: transform .36s cubic-bezier(.32,.72,0,1); }
 body.answering #core { transition: transform .6s cubic-bezier(.32,.72,0,1); }
-/* Apollo is a planet of dots in space, and behind it a soft glow - its air's
-   blue with a little of Apollo's amber in it - lifted into the ground under
-   it rather than laid over it, breathing slowly. */
+/* Apollo is a circle: its rings, and behind them a warm amber glow, lifted
+   into the ground under it rather than laid over it, breathing slowly. */
 @keyframes ap-orb-glow {
   0%, 100% { opacity: .75; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.06); }
@@ -1246,11 +1245,11 @@ body.answering #core { transition: transform .6s cubic-bezier(.32,.72,0,1); }
 #orb .glow {
   position: absolute; inset: -14%; border-radius: 50%; pointer-events: none;
   mix-blend-mode: screen; filter: blur(16px);
-  background: radial-gradient(closest-side, rgba(90, 150, 255, .28), rgba(255, 150, 60, .08) 55%, rgba(0, 0, 0, 0));
+  background: radial-gradient(closest-side, rgba(255, 186, 70, .55), rgba(255, 90, 40, .16) 62%, rgba(0, 0, 0, 0));
   animation: ap-orb-glow 6.4s ease-in-out infinite;
 }
 body.offscreen #orb .glow, body.asleep #orb .glow { animation-play-state: paused; }
-#ring { position: relative; width: 400px; height: 400px; }
+#ring { position: relative; width: 320px; height: 320px; }
 /* The name as a neon sign, the way the old display had it: the one place on
    the display that is a name and not a number. Melete, each letter pulsing
    on its own a little after the one before - its red and blue parting and
@@ -1580,7 +1579,7 @@ body.revealing #stage { animation: display-arrive .9s cubic-bezier(.2, .7, .3, 1
 @media (max-width: 1920px) {
   :root { --gutter: 34px; }
   #clock { font-size: 54px; }
-  #ring { width: 340px; height: 340px; }
+  #ring { width: 260px; height: 260px; }
   #peek { width: 300px; height: 190px; }
   #chart-peek { width: 350px; height: 232px; }
   .stock-row { grid-template-columns: minmax(0, 1fr) 64px 80px 78px;
@@ -1598,9 +1597,9 @@ body.revealing #stage { animation: display-arrive .9s cubic-bezier(.2, .7, .3, 1
   #sleep-fact { font-size: 19px; }
   #sleep-copy { left: 56px; bottom: 60px; }
   #sleep-wake { right: 56px; bottom: 64px; }
-  body.roomless #ring { width: 400px; height: 400px; }
+  body.roomless #ring { width: 320px; height: 320px; }
   body.ultra #stage { gap: 10px; padding: 18px 20px var(--dock-room); }
-  body.ultra #ring { width: 150px; height: 150px; }
+  body.ultra #ring { width: 118px; height: 118px; }
   body.ultra #clock { font-size: 48px; }
   .dchip { padding: 8px 9px; letter-spacing: .1em; }
   #tile-config { width: 326px; }
