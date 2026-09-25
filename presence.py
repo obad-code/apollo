@@ -33,6 +33,7 @@ class Presence:
         self.asleep = False
         self._touched = None      # the last sign of you that was not input
         self._slept_at = None     # when you asked it to sleep; see `sleep_now`
+        self._sleep_grace = self.GRACE
 
     @property
     def full(self):
@@ -59,14 +60,17 @@ class Presence:
     # asking: letting go of the chord you pressed to say it.
     GRACE = 0.5
 
-    def sleep_now(self, now):
-        """Asleep at once, because you asked - by voice, or by locking the PC.
+    def sleep_now(self, now, grace=None):
+        """Asleep at once, because you asked - by voice, by locking the PC,
+        or by Idle on the display's bar.
 
         Everything up to now was part of asking: the chord, your sentence,
-        Apollo saying it will. So only something after `now` wakes it.
+        Apollo saying it will. So only something after `now` wakes it - after
+        `grace` more seconds, for a click, whose hand is still on the mouse.
         """
         self.asleep = True
         self._slept_at = now
+        self._sleep_grace = self.GRACE if grace is None else grace
         if not self.peek_open:
             self.afk_open = True
 
@@ -81,7 +85,7 @@ class Presence:
             idle = min(idle, max(0.0, now - self._touched))
         before = (self.full, self.asleep)
         if self._slept_at is not None and now is not None:
-            if now - idle <= self._slept_at + self.GRACE:
+            if now - idle <= self._slept_at + self._sleep_grace:
                 return False                  # nothing since you asked
             self._slept_at = None
         if idle < self.afk_seconds:

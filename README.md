@@ -282,7 +282,13 @@ leaves it); **Expanded**, every display at once (ultra mode, below); and
 **OSIRIS**, the map laid into the display (below). Click one, or ask -
 *"clear mode"*, *"الوضع الصافي"*, *"الوضع الموسع"*, *"رجع الوضع العادي"* -
 and the display comes up if it has to and switches, leaving one mode before
-arriving in the next. Beside them, **LYLA** puts her room away - she stops,
+arriving in the next. Beside them, Apollo's own: **Idle** puts him into idle
+mode now (the idle screen), **Away** is *"I'm going out"* (the PC kept up
+with Claude open until you are back at it) and **Hands-free** is always
+listening, what `Ctrl+1` does - the last two lit while they are on. A click
+on Idle or Away gives your hand a few seconds to leave the mouse before a
+touch counts as you being back (`CLICK_GRACE`). In ultra mode's bar they are
+there too, as icons. And **LYLA** puts her room away - she stops,
 the room fades, and the panels and the ring grow into the space - and brings
 it back; the choice is kept, and *"hide Lyla"* does the same.
 

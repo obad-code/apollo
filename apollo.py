@@ -247,6 +247,10 @@ PEEK_CHORD = (VK_CTRL, 0xC0)                     # VK_OEM_3, the backtick key
 QUIT_HOTKEY = "ctrl+alt+shift+q"                 # for messages and the README
 PEEK_HOTKEY = "ctrl+`"
 
+# A click on the display's bar - Idle, Away - still has its hand on the mouse
+# for a moment after: this long of it is part of asking, not you coming back.
+CLICK_GRACE = 4.0
+
 # Whether the day's recap plays by itself, the first time you are at the
 # machine each day. Off: it came every time Apollo started, you could not get
 # a word in over it, and it was more in the way than it was worth. It is still
@@ -885,6 +889,11 @@ class WebReporter:
         """Asleep: the display is the idle screen. Awake: it is itself."""
         self._call("sleep", bool(on))
 
+    def states(self, states):
+        """Which of Apollo's own modes are on - away, hands-free - for the
+        display's bar to light."""
+        self._call("states", dict(states))
+
     def intro(self):
         """Play the word, as Apollo comes up."""
         self._call("intro")
@@ -1004,12 +1013,13 @@ class Api:
     what keeps it out.
     """
 
-    def __init__(self, quit, open_link=None, desk=None, poke=None, osiris=None):
+    def __init__(self, quit, open_link=None, desk=None, poke=None, osiris=None, app=None):
         self._quit = quit
         self._open_link = open_link
         self._desk = desk or stockdesk.StockDesk()
         self._poke = poke or (lambda *keys: None)
         self._osiris = osiris
+        self._app = app
 
     def quit(self):
         self._quit()
@@ -1071,6 +1081,32 @@ class Api:
             return False
         self._osiris.close()
         return True
+
+    # Apollo's own modes, from the display's bar: the idle screen now, away
+    # mode, and hands-free listening. Each is asked of the app, which does it
+    # on its watcher the way it does when you say it.
+
+    def idle(self):
+        if self._app is None:
+            return False
+        self._app.request_idle(grace=CLICK_GRACE)
+        return True
+
+    def away(self):
+        if self._app is None:
+            return False
+        self._app.request_away(grace=CLICK_GRACE)
+        return True
+
+    def listen(self, on):
+        if self._app is None:
+            return False
+        self._app.set_listening(bool(on))
+        return True
+
+    def states(self):
+        """Which of them are on, for the bar to light."""
+        return self._app.mode_states() if self._app is not None else {}
 
     def set_panel(self, name, shown):
         """A panel shown or hidden from the display itself - LYLA's room, by
@@ -1156,7 +1192,7 @@ class Apollo:
             background_color="#000000",
             js_api=Api(self.quit, open_link=self.open_link,
                        desk=stockdesk.StockDesk(poke=self.poke_data),
-                       poke=self.poke_data, osiris=self.osiris),
+                       poke=self.poke_data, osiris=self.osiris, app=self),
         )
         self.window.events.shown += self.on_shown
         self.window.events.loaded += self.on_loaded
@@ -1470,6 +1506,8 @@ class Apollo:
                 laid_out = getattr(ui, "display", None)
                 if laid_out is not None:
                     laid_out({"action": "layout", "layout": displays.state()})
+                # ...and which of Apollo's own modes are on, for the bar.
+                self._tell_states()
 
         if orb is None:                   # no native layer yet: just cut
             self.overlay.show_page(mode)
@@ -1632,13 +1670,42 @@ class Apollo:
         if self.orb is not None:
             self.orb.set_activity(text)
 
-    def request_away(self):
-        """You said you are going out. The watcher does it (check_presence)."""
+    def request_away(self, grace=None):
+        """You said you are going out, or pressed Away. The watcher does it
+        (check_presence)."""
         self.away_requested = True
+        self.away_grace = grace
 
-    def request_idle(self):
-        """Idle mode, because you asked. The watcher does it (check_presence)."""
+    def request_idle(self, grace=None):
+        """Idle mode, because you asked or pressed Idle. The watcher does it
+        (check_presence)."""
         self.idle_requested = time.monotonic()
+        self.idle_grace = grace
+
+    def mode_states(self):
+        """Which of Apollo's own modes are on, for the display's bar."""
+        gone = getattr(self, "away", None)
+        toggle = getattr(self, "listen_toggle", None)
+        return {"away": bool(gone is not None and gone.away),
+                "listening": bool(toggle is not None and toggle.enabled.is_set())}
+
+    def _tell_states(self):
+        ui = getattr(self, "ui", None)
+        states = getattr(ui, "states", None) if ui is not None else None
+        if states is not None:
+            states(self.mode_states())
+
+    def set_listening(self, on):
+        """Hands-free on or off from the display's bar: the same switch as
+        Ctrl+1, read by the run loop between turns."""
+        toggle = getattr(self, "listen_toggle", None)
+        if toggle is None:
+            return
+        if on:
+            toggle.enabled.set()
+        else:
+            toggle.enabled.clear()
+        self.on_listen_toggle(bool(on))
 
     def toggle_peek(self):
         """CTRL+`: open the full display by hand, or put it away."""
@@ -1748,18 +1815,20 @@ class Apollo:
         if getattr(self, "away", None) is not None:
             if getattr(self, "away_requested", False) and not getattr(self, "turn_busy", False):
                 self.away_requested = False
-                if self.away.leaving(now):
+                if self.away.leaving(now, getattr(self, "away_grace", None)):
                     self.keeper.apply(True)
+                    self._tell_states()
             touched = self.presence._touched
             here = idle if touched is None else min(idle, max(0.0, now - touched))
             if self.away.update(now, here):
                 self.keeper.apply(self.away.away)
+                self._tell_states()
         # Asked for by voice: once Apollo has finished saying it will, or his
         # own voice would be the thing that wakes him.
         if (getattr(self, "idle_requested", None) is not None
                 and not getattr(self, "turn_busy", False)):
             self.idle_requested = None
-            self.presence.sleep_now(now)
+            self.presence.sleep_now(now, getattr(self, "idle_grace", None))
             self.apply_mode()
         # Only asked on the way to sleep; see `screen_busy`.
         busy = (idle >= self.presence.afk_seconds and not self.presence.asleep
@@ -1924,6 +1993,9 @@ class Apollo:
         ui = getattr(self, "ui", None)
         if ui is not None and ui.alive:
             ui.note("Always-listening ON" if listening else "Always-listening OFF")
+            states = getattr(ui, "states", None)
+            if states is not None:
+                states({**self.mode_states(), "listening": bool(listening)})
 
     def close_live(self):
         """Shut the Gemini session down, once, from whichever path got here.

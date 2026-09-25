@@ -36,18 +36,22 @@ class Away:
     def __init__(self):
         self.away = False
         self.since = None           # when you went
+        self.grace = self.GRACE
 
-    def leaving(self, now):
-        """You said you are going out. True if that changed anything."""
+    def leaving(self, now, grace=None):
+        """You said you are going out - or pressed Away on the display's bar,
+        whose hand is still on the mouse for `grace` seconds after. True if
+        that changed anything."""
         changed = not self.away
         self.away = True
         self.since = now
+        self.grace = self.GRACE if grace is None else grace
         return changed
 
     def update(self, now, idle):
         """`idle` is seconds since you last touched the PC or talked to Apollo.
         True if that brought you back."""
-        if self.away and now - idle > self.since + self.GRACE:
+        if self.away and now - idle > self.since + self.grace:
             self.away = False
             return True
         return False

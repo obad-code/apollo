@@ -142,6 +142,8 @@ const state = {
   panels: {},             // which panels apollo.py last said are shown
   osiris: false,          // OSIRIS laid into the normal display, and Apollo in its colours
   clear: false,           // clear mode: nothing on the screen but Apollo and the sign
+  away: false,            // away mode, as apollo.py last said
+  listening: false,       // hands-free, as apollo.py last said
   modeTicket: 0,          // the mode last asked for, so an older one stops half way
   osirisReturn: false,    // ...and taken into ultra mode, to go back when it ends
   osirisTicket: 0,        // the last placing of the map asked for; older ones stand down
@@ -2209,6 +2211,28 @@ document.addEventListener('click', (event) => {
   if (button) setMode(button.dataset.mode);
 });
 
+/* Apollo's own modes, beside the display's: the idle screen now, away mode
+ * and hands-free listening. apollo.py does them - they are the machine's,
+ * not the page's - and says when away or hands-free changes, so they light
+ * while they are on. Idle needs no light: the idle screen is all there is
+ * while it is on. */
+function renderOwnModes() {
+  document.querySelectorAll('[data-act="away"]').forEach((b) =>
+    b.setAttribute('aria-pressed', state.away ? 'true' : 'false'));
+  document.querySelectorAll('[data-act="listen"]').forEach((b) =>
+    b.setAttribute('aria-pressed', state.listening ? 'true' : 'false'));
+}
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-act]');
+  const api = bridge();
+  if (!button || !api) return;
+  const act = button.dataset.act;
+  if (act === 'idle' && api.idle) api.idle();
+  if (act === 'away' && api.away) api.away();
+  if (act === 'listen' && api.listen) api.listen(!state.listening);
+});
+
 $('room-toggle').addEventListener('click', () => {
   const shown = !roomShown();
   setPanels({ lyla: shown });
@@ -2338,6 +2362,7 @@ function applyLayout() {
   renderSummaries();
   renderModes();
   applySkin();
+  if (state.fitConsoles) requestAnimationFrame(state.fitConsoles);
 }
 
 /* Apollo in OSIRIS's colours: while the map is laid into the normal display,
@@ -2684,6 +2709,18 @@ function renderSummaries() {
       knob.style.setProperty('--turn', `${knob.dataset.turn}deg`);
     }
   }));
+  // Beside the bar, never over it: a desk that would touch it steps away.
+  const fit = () => {
+    const bar = $('ultra-bar').getBoundingClientRect();
+    document.querySelectorAll('.console').forEach((desk) => {
+      desk.classList.remove('squeezed');
+      if (!ultraOn()) return;
+      const box = desk.getBoundingClientRect();
+      if (box.width && box.right + 8 > bar.left && box.left - 8 < bar.right) desk.classList.add('squeezed');
+    });
+  };
+  window.addEventListener('resize', fit);
+  state.fitConsoles = fit;
   const began = Date.now();
   const read = (name, text) => {
     const element = document.querySelector(`[data-read="${name}"]`);
@@ -3220,6 +3257,13 @@ window.apollo = {
   panels(state) { setPanels(state); },
   briefing(payload) { if (payload) render(payload); },
   sleep(on) { setSleep(on); },
+  // Which of Apollo's own modes are on - away, hands-free - for the bar.
+  states(states) {
+    const given = states || {};
+    if ('away' in given) state.away = Boolean(given.away);
+    if ('listening' in given) state.listening = Boolean(given.listening);
+    renderOwnModes();
+  },
   // As Apollo comes up: the name, once, blurring away into the display.
   intro() { playIntro(); },
   // OSIRIS in the display, or not - by voice, or its window closed itself.

@@ -201,10 +201,12 @@
 <div id="peek" class="peek" aria-hidden="true"></div>
 <div id="chart-peek" class="peek" aria-hidden="true"></div>
 
-<!-- Along the bottom edge: every mode, the one that is on lit - the normal
-     display, clear (nothing but Apollo), expanded (ultra mode, every display
-     at once) and OSIRIS (modes.js) - and LYLA's room in or out. By voice
-     too: "clear mode", "الوضع الموسع". -->
+<!-- Along the bottom edge: every mode, the one that is on lit - the
+     display's (modes.js): normal, clear (nothing but Apollo), expanded (ultra
+     mode, every display at once) and OSIRIS; Apollo's own: idle (the idle
+     screen, now), away (the PC kept up with Claude open while you are out)
+     and hands-free (always listening, Ctrl+1); and LYLA's room in or out.
+     By voice too: "clear mode", "الوضع الموسع", "ادخل وضع الخمول", "أنا طالع". -->
 <nav id="dock" aria-label="Modes">
   <div class="modes" role="group" aria-label="Modes">
     <button class="mode" type="button" data-mode="normal" data-sfx="none" aria-pressed="true"
@@ -215,6 +217,17 @@
             title="Every display at once, ready for work"><i class="led"></i>Expanded</button>
     <button class="mode" type="button" data-mode="osiris" data-sfx="none" aria-pressed="false"
             title="OSIRIS, inside Apollo"><svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg>OSIRIS</button>
+  </div>
+  <div class="modes own" role="group" aria-label="Apollo's own modes">
+    <button class="mode" type="button" data-act="idle" data-sfx="none" aria-pressed="false"
+            title="Idle mode now: the idle screen, until you touch a key or the mouse or speak">
+      <svg class="mode-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M11.5 10.2A5.2 5.2 0 0 1 5.8 4.5 5.2 5.2 0 1 0 11.5 10.2Z"/></svg>Idle</button>
+    <button class="mode" type="button" data-act="away" data-sfx="rev" aria-pressed="false"
+            title="I'm away: the PC stays up with Claude open until you are back at it">
+      <svg class="mode-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 14V2.5h6.5V14M9.5 8H14M11.8 5.7 14 8l-2.2 2.3M6.8 8.2v.1"/></svg>Away</button>
+    <button class="mode" type="button" data-act="listen" data-sfx="press" aria-pressed="false"
+            title="Hands-free: Apollo always listening, no keys - Ctrl+1 does the same">
+      <svg class="mode-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a2.3 2.3 0 0 1 2.3 2.3v3.4a2.3 2.3 0 0 1-4.6 0V4.1A2.3 2.3 0 0 1 8 1.8ZM3.8 7.4a4.2 4.2 0 0 0 8.4 0M8 11.6v2.6"/></svg>Hands-free</button>
   </div>
   <button id="room-toggle" class="hud-button" type="button" data-sfx="none" aria-pressed="true" title="Show or hide LYLA's room">
     <i class="led"></i><span>LYLA</span><em>ROOM ON</em>
@@ -233,6 +246,18 @@
             title="Every display at once, ready for work"><i class="led"></i>Expanded</button>
     <button class="mode" type="button" data-mode="osiris" data-sfx="none" aria-pressed="false"
             title="OSIRIS, inside Apollo"><svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg>OSIRIS</button>
+  </div>
+  <i class="bar-rule" aria-hidden="true"></i>
+  <div class="modes own" role="group" aria-label="Apollo's own modes">
+    <button class="mode" type="button" data-act="idle" data-sfx="none" aria-pressed="false"
+            title="Idle mode now: the idle screen, until you touch a key or the mouse or speak">
+      <svg class="mode-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M11.5 10.2A5.2 5.2 0 0 1 5.8 4.5 5.2 5.2 0 1 0 11.5 10.2Z"/></svg>Idle</button>
+    <button class="mode" type="button" data-act="away" data-sfx="rev" aria-pressed="false"
+            title="I'm away: the PC stays up with Claude open until you are back at it">
+      <svg class="mode-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 14V2.5h6.5V14M9.5 8H14M11.8 5.7 14 8l-2.2 2.3M6.8 8.2v.1"/></svg>Away</button>
+    <button class="mode" type="button" data-act="listen" data-sfx="press" aria-pressed="false"
+            title="Hands-free: Apollo always listening, no keys - Ctrl+1 does the same">
+      <svg class="mode-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a2.3 2.3 0 0 1 2.3 2.3v3.4a2.3 2.3 0 0 1-4.6 0V4.1A2.3 2.3 0 0 1 8 1.8ZM3.8 7.4a4.2 4.2 0 0 0 8.4 0M8 11.6v2.6"/></svg>Hands-free</button>
   </div>
   <i class="bar-rule" aria-hidden="true"></i>
   <div id="ultra-chips"></div>

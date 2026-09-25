@@ -863,7 +863,7 @@ body.roomless:not(.ultra) #gauge-foot { margin-left: 0; }
 
 #dock {
   position: fixed; left: 50%; bottom: 22px; z-index: 20; transform: translateX(-50%);
-  display: flex; gap: 10px; transition: opacity .26s ease-out;
+  display: flex; gap: 8px; transition: opacity .26s ease-out;
 }
 .hud-button {
   font: inherit; font-size: 11px; font-weight: 800; letter-spacing: .2em; cursor: pointer;
@@ -893,6 +893,13 @@ body.answering #dock { opacity: .18; }
   backdrop-filter: blur(8px) saturate(1.2);
 }
 #ultra-bar .modes { padding: 0; background: none; border: 0; backdrop-filter: none; }
+/* Tighter on ultra mode's bar, which carries every display too: Apollo's
+   own three by their icons alone (their names on the pointer). */
+.mode { white-space: nowrap; }
+#ultra-bar .mode { padding: 8px 10px; letter-spacing: .1em; }
+#ultra-bar .own .mode { font-size: 0; gap: 0; padding: 8px 9px; }
+#ultra-bar .own .mode-icon { width: 15px; height: 15px; }
+#ultra-bar .dchip { padding: 8px 8px; letter-spacing: .1em; }
 .mode {
   font: 700 11px var(--hud); letter-spacing: .16em; text-transform: uppercase; cursor: pointer;
   display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px;
@@ -903,6 +910,13 @@ body.answering #dock { opacity: .18; }
 .mode .led { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 214, 150, .16);
              transition: background .2s, box-shadow .2s; }
 .mode .eye { width: 18px; height: 11px; }
+.mode .mode-icon { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5;
+                   stroke-linecap: round; stroke-linejoin: round; }
+/* Apollo's own, lit while on: away in amber, hands-free in the cyan of listening. */
+.own .mode[aria-pressed="true"] { background: rgba(255, 176, 0, .16); color: var(--amber-bright);
+                                  border-color: rgba(255, 176, 0, .5); }
+.own .mode[data-act="listen"][aria-pressed="true"] { background: rgba(90, 215, 255, .14); color: #7fe3ff;
+                                                     border-color: rgba(90, 215, 255, .5); }
 .mode[aria-pressed="true"] { background: var(--paper); color: #121012; text-shadow: none; }
 .mode[aria-pressed="true"] .led { background: #121012; }
 .mode[data-mode="osiris"][aria-pressed="true"] { background: #00e5ff; color: #04121a; }
@@ -1747,21 +1761,22 @@ body.clear:not(.ultra):not(.osiris-map):not(.listening):not(.answering) #clear-s
    dial that turns, and readouts that tick. */
 
 .console {
-  display: none; position: fixed; bottom: 14px; z-index: 19; width: 290px; padding: 9px 11px 10px;
+  display: none; position: fixed; bottom: 14px; z-index: 19; width: 246px; padding: 9px 10px 10px;
   border-radius: 12px; background: rgba(9, 8, 7, .84); border: 1px solid rgba(255, 214, 150, .12);
   backdrop-filter: blur(8px) saturate(1.2); color: var(--caption);
   font: 700 11px var(--hud); letter-spacing: .12em; text-transform: uppercase;
 }
 body.ultra .console { display: block; }
 body.answering .console { opacity: .18; }
-#console-left { left: 16px; }
-#console-right { right: 16px; }
+#console-left { left: 12px; }
+#console-right { right: 12px; }
 .console-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .console-head b { color: var(--amber-bright); font-weight: 800; letter-spacing: .18em; }
 .console-read { margin-left: auto; font-style: normal; font-variant-numeric: tabular-nums; color: rgba(127, 227, 255, .8); }
 .beacon { width: 7px; height: 7px; border-radius: 50%; background: #ff4d4d;
           box-shadow: 0 0 8px rgba(255, 77, 77, .9); animation: console-blink 1.4s steps(2, jump-none) infinite; }
-.console-row { display: flex; align-items: flex-end; gap: 6px; }
+.console-row { display: flex; align-items: flex-end; gap: 5px; }
+.console-row .arm, .console-row .flip { min-width: 0; }
 .console-row button { font: inherit; letter-spacing: .1em; cursor: pointer; }
 /* A toggle: its light, its lever, its label. */
 .flip {
@@ -1779,8 +1794,8 @@ body.answering .console { opacity: .18; }
 .flip span { font-size: 9.5px; }
 /* An armed button: fired, it flashes and settles. */
 .arm {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; height: 40px;
-  font-size: 10px; letter-spacing: .06em;
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 3px; height: 40px;
+  font-size: 9.5px; letter-spacing: .02em;
   border-radius: 6px; color: var(--amber-bright); background: rgba(255, 176, 0, .08);
   border: 1px solid rgba(255, 176, 0, .35); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .35);
 }
@@ -1790,12 +1805,12 @@ body.answering .console { opacity: .18; }
 .arm:active { transform: translateY(1px); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .35); }
 /* The dial: a knurled knob with its mark, a quarter turn at a time. */
 .knob {
-  --turn: 0deg; flex: none; position: relative; width: 38px; height: 38px; border-radius: 50%;
+  --turn: 0deg; flex: none; position: relative; width: 32px; height: 32px; border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #4a4034, #16130f 70%);
   border: 1px solid rgba(255, 214, 150, .3); box-shadow: 0 0 0 3px rgba(255, 214, 150, .06);
   transform: rotate(var(--turn)); transition: transform .25s cubic-bezier(.2, .8, .2, 1);
 }
-.knob i { position: absolute; left: 50%; top: 4px; width: 2px; height: 10px; margin-left: -1px;
+.knob i { position: absolute; left: 50%; top: 3px; width: 2px; height: 9px; margin-left: -1px;
           border-radius: 1px; background: var(--amber-bright); box-shadow: 0 0 6px rgba(255, 176, 0, .8); }
 .console-leds { display: flex; gap: 5px; margin-top: 9px; }
 .console-leds i { width: 10px; height: 4px; border-radius: 1px; animation: console-blink 1.6s steps(2, jump-none) infinite; }
@@ -1816,10 +1831,11 @@ body.answering .console { opacity: .18; }
   0% { background: currentColor; color: #121012; box-shadow: 0 0 24px currentColor; }
   100% { box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .35); }
 }
-/* The tiles make room for the desk over the bar - and where the bar needs
-   the width, the desk steps away. */
+/* The tiles make room for the desk over the bar - and wherever the bar needs
+   the width, the desk steps away (app.js measures: .squeezed). */
 @media (min-width: 1900px) { body.ultra #stage { padding-bottom: 142px; } }
 @media (max-width: 1899px) { body.ultra .console { display: none; } }
+body.ultra .console.squeezed { display: none; }
 @media (max-width: 1920px) {
   body.clear:not(.ultra):not(.osiris-map) #ring { width: 560px; height: 348px; }
 }
