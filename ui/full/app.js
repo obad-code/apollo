@@ -19,6 +19,7 @@ import * as Tiles from './tiles.js';
 import * as Globe from './globe.js';
 import { Sfx } from './sfx.js';
 import { LylaAgent } from './lylaagent.js';
+import * as Feed from './feed.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -243,7 +244,7 @@ const lylaDoing = {
  * sound (data-sfx, or played where it does its work) - and a sound for each
  * change worth hearing: Apollo listening, your words heard, the answer
  * coming, the display up and away, asleep and awake. LYLA has her own two.
- * SFX in the dock mutes them all, kept with the layout. */
+ * Always on. */
 const sfx = new Sfx();
 const PRESSABLE = 'button, .tab, .chip, [data-sfx]';
 let hovered = null;
@@ -832,9 +833,12 @@ function renderChips() {
 }
 
 function renderFeed(snapshot) {
-  $('headlines-head').innerHTML = 'Feed' + stale('news');
-  renderChips();
   const items = feedItems(snapshot).slice(0, 11);
+  // Over the list: how much is in it, from how many places, how new.
+  const line = Feed.summaryLine(items);
+  $('headlines-head').innerHTML = 'Feed' + stale('news')
+    + (line ? `<span class="feed-sum">${esc(line)}</span>` : '');
+  renderChips();
   // Folded, only the newest few are drawn; they keep their numbers, and the
   // rest are still there to be asked for by number.
   const folded = Boolean(state.layout.feedFolded);
@@ -850,16 +854,26 @@ function renderFeed(snapshot) {
   // What a story says, where it says more than its title - a post's text is
   // its title already.
   const gistOf = (item) => (item.summary && item.summary !== item.title ? String(item.summary) : '');
-  $('stories').innerHTML = drawn.map((item, i) => `
+  // Beside each, its picture - or its source's initials on a tile tinted for
+  // what it is about, which is also what shows if the picture will not load.
+  const thumb = (item) => `<span class="thumb t-${esc(String(item.topic).replace(/\s+/g, '-'))}">`
+    + `<b>${esc(Feed.initials(item.source) || '•')}</b>${safeImage(item.image)
+      ? `<img src="${esc(safeImage(item.image))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+      : ''}</span>`;
+  const chosen = TOPICS[state.topic];
+  $('stories').innerHTML = drawn.map((item, i) => {
+    const tag = Feed.topicTag(item.topic, chosen);
+    return `
     <div class="story${item.moving ? ' moving' : ''}" data-i="${i}">
       <span class="num">${numbered(i)}</span>
       <span class="what">${esc(String(item.title).slice(0, 150))}</span>
-      ${gistOf(item) ? `<span class="gist">${esc(gistOf(item).slice(0, 180))}</span>` : ''}
-      <span class="who"><b>${esc(item.source)}</b> · ${esc(item.age)}${
+      ${gistOf(item) ? `<span class="gist">${esc(gistOf(item).slice(0, 260))}</span>` : ''}
+      <span class="who"><b>${esc(item.source)}</b> · ${esc(item.age)}${tag ? ` · <em>${esc(tag)}</em>` : ''}${
         item.moving ? ' · <i>market-moving</i>' : ''}${
         item.eye ? ' · <i class="eye">Private Eye</i>' : ''}</span>
-      ${item.image ? '<span class="pic"></span>' : ''}
-    </div>`).join('')
+      ${thumb(item)}
+    </div>`;
+  }).join('')
     || '<div class="story empty"><span class="num">—</span><span class="what">Nothing has come in yet</span>'
      + '<span class="who">the feeds are quiet</span></div>';
   if (items.length > drawn.length) {
@@ -998,6 +1012,9 @@ $('feed').addEventListener('pointerleave', () => {
   unlight();
   feedPeek.leave();
 });
+$('stories').addEventListener('error', (event) => {
+  if (event.target.tagName === 'IMG') event.target.remove();
+}, true);
 $('stories').addEventListener('click', (event) => {
   const row = event.target.closest('.story');
   if (row && row.classList.contains('rest')) setFeedFolded(false);
@@ -2132,15 +2149,6 @@ $('room-toggle').addEventListener('click', () => {
   if (api && api.set_panel) api.set_panel('lyla', shown);
 });
 
-/* SFX in the dock: the display's sounds off, or on again - heard going off,
- * and coming back. Kept with the layout. */
-$('sfx-toggle').addEventListener('click', () => {
-  const muting = !state.layout.muted;
-  if (muting) sfx.play('down');
-  changeLayout(Tiles.setMuted(state.layout, muting), { animate: false });
-  if (!muting) sfx.play('rev');
-});
-
 /* --- ultra mode -------------------------------------------------------------------
  *
  * Every display on the screen at once, ready for work: the markets, the feed,
@@ -2248,10 +2256,6 @@ function applyLayout() {
   fold.setAttribute('aria-pressed', folded ? 'true' : 'false');
   fold.title = folded ? 'All the stocks back' : 'Fold the stocks away to a few';
   fold.querySelector('span').textContent = folded ? 'ALL' : 'FOLD';
-  sfx.muted = Boolean(layout.muted);
-  const sound = $('sfx-toggle');
-  sound.setAttribute('aria-pressed', layout.muted ? 'false' : 'true');
-  sound.querySelector('em').textContent = layout.muted ? 'OFF' : 'ON';
   const feedFolded = Boolean(layout.feedFolded);
   $('headlines').classList.toggle('folded', feedFolded);
   const feedFold = $('feed-fold');

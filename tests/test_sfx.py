@@ -3,8 +3,8 @@ for Web Audio that writes down what it was asked to do. Nothing is played
 from a file: every sound is made on the spot from a few oscillators and a
 little noise, each shaped by its own envelope - so each one has to start
 from silence and end in it (or it clicks), stay short and quiet (they are
-the interface's, not the music's), and let go of what it made. Muted, it
-makes nothing at all. And every sound the page and LYLA ask for by name is
+the interface's, not the music's), and let go of what it made. There is
+no switching them off: they are always on. And every sound the page and LYLA ask for by name is
 one there is a recipe for."""
 import json
 import pathlib
@@ -152,22 +152,6 @@ def test_a_context_still_waiting_for_a_gesture_is_woken(tmp_path):
         const sfx = new S.Sfx({ make: () => ctx });
         sfx.play('press');
         return ctx.resumed;""") == 1
-
-
-def test_muted_it_makes_nothing(tmp_path):
-    nodes, played = run(tmp_path, """
-        const ctx = new Fake();
-        const sfx = new S.Sfx({ make: () => ctx, muted: true });
-        const played = sfx.play('hud');
-        return [ctx.nodes.length, played];""")
-    assert played is False and nodes <= 1
-
-
-def test_unmuted_again_it_plays(tmp_path):
-    assert run(tmp_path, """
-        const sfx = new S.Sfx({ make: () => new Fake(), muted: true });
-        sfx.muted = false;
-        return sfx.play('hud');""") is True
 
 
 def test_the_same_sound_twice_at_once_is_played_once(tmp_path):

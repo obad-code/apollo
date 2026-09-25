@@ -603,7 +603,7 @@ body.ultra #markets.folded #panel-tabs .fold { display: flex; }
 
 /* One item in the feed, whoever it came from. */
 .story {
-  position: relative; display: grid; grid-template-columns: 30px 1fr; gap: 0 10px;
+  position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 0 10px;
   padding: 11px 24px; cursor: pointer; color: var(--amber-bright); line-height: 1.34;
   border-bottom: 1px solid rgba(255, 240, 210, 0.055);
   transition: color .35s cubic-bezier(.215, .61, .355, 1);
@@ -623,7 +623,8 @@ body.ultra #feed-fold { display: none; }
 #headlines.folded #feed { flex: none; }
 #headlines.folded .story { padding-top: 8px; padding-bottom: 8px; }
 #headlines.folded .story .what { -webkit-line-clamp: 1; font-size: 14px; }
-#headlines.folded .story .gist, #headlines.folded .story .who { display: none; }
+#headlines.folded .story .gist, #headlines.folded .story .who,
+#headlines.folded .story .thumb { display: none; }
 .story.rest { grid-template-columns: 1fr; padding-top: 8px; padding-bottom: 8px; border-bottom: 0; }
 .story.rest b { font: 800 11px var(--hud); letter-spacing: .16em; text-transform: uppercase;
                 color: var(--caption); }
@@ -631,8 +632,8 @@ body.ultra #feed-fold { display: none; }
                   border: 1px dashed rgba(255, 214, 150, .35); color: var(--amber-bright); }
 .story.rest:hover b { color: var(--amber-bright); }
 
-/* What the story says, in one line, where it says more than its title. */
-.story .gist { grid-column: 2; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 1;
+/* What the story says, in two lines, where it says more than its title. */
+.story .gist { grid-column: 2; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2;
                -webkit-box-orient: vertical; margin-top: 3px; font-size: 12px; font-weight: 500;
                line-height: 1.4; color: rgba(255, 212, 138, .6); transition: color .35s; }
 .story.lit .gist { color: rgba(18, 16, 18, .66); }
@@ -643,12 +644,33 @@ body.ultra #feed-fold { display: none; }
 .story .who i { font-style: normal; color: var(--down); }
 .story .who i.eye { color: var(--accent-hot); }
 .story.lit .who i.eye { color: rgba(18, 16, 18, .62); }
-.story .pic { position: absolute; right: 22px; top: 50%; width: 6px; height: 6px;
-              margin-top: -3px; border-radius: 50%; background: rgba(240, 217, 160, .35); }
+.story .who em { font-style: normal; color: rgba(255, 224, 170, .82); }
+.story.lit .who em { color: rgba(18, 16, 18, .7); }
+/* Its picture, beside it - or its source's initials on a tile tinted for
+   what it is about, which is also what is left if the picture will not
+   load. */
+.story .thumb {
+  grid-column: 3; grid-row: 1 / span 3; align-self: start; position: relative; overflow: hidden;
+  display: grid; place-items: center; width: 78px; height: 56px; margin: 2px 0 0 6px;
+  border-radius: 8px; border: 1px solid rgba(255, 214, 150, .16);
+  background: linear-gradient(135deg, rgba(255, 176, 0, .22), rgba(255, 90, 40, .07));
+}
+.story .thumb b { font: 900 16px var(--hud); letter-spacing: .06em; color: rgba(255, 228, 176, .85); }
+.story .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.story .thumb.t-gaming { background: linear-gradient(135deg, rgba(95, 227, 154, .24), rgba(40, 120, 90, .08)); }
+.story .thumb.t-marvel { background: linear-gradient(135deg, rgba(255, 90, 90, .26), rgba(140, 20, 30, .08)); }
+.story .thumb.t-movies { background: linear-gradient(135deg, rgba(190, 130, 255, .24), rgba(80, 40, 140, .08)); }
+.story .thumb.t-markets { background: linear-gradient(135deg, rgba(120, 220, 255, .22), rgba(30, 90, 140, .08)); }
+.story .thumb.t-posts { background: linear-gradient(135deg, rgba(255, 107, 122, .26), rgba(120, 30, 50, .08)); }
+.story.lit .thumb { border-color: rgba(18, 16, 18, .28); }
+/* Over the list, beside its name: how much is in it and how new. */
+.feed-sum { margin-left: 14px; font-size: 11px; font-weight: 600; letter-spacing: .12em;
+            color: rgba(255, 212, 138, .5); white-space: nowrap; }
+/* In ultra mode the tile's own controls have that corner. */
+body.ultra .feed-sum { display: none; }
 /* Under the bar: dark on paper, and no phosphor bleed on paper. */
 .story.lit { color: #121012; text-shadow: none; }
 .story.lit .num, .story.lit .who, .story.lit .who b { color: rgba(18, 16, 18, .62); }
-.story.lit .pic { background: rgba(18, 16, 18, .35); }
 /* A post that moves the market is the one thing here worth a mark. */
 .story.moving { box-shadow: inset 2px 0 0 rgba(255, 107, 122, .6); }
 .story.empty { cursor: default; }
@@ -1651,6 +1673,7 @@ body.revealing #stage { animation: display-arrive .9s cubic-bezier(.2, .7, .3, 1
   .stock-row .mini { width: 100%; }
   .story { padding: 9px 24px; }
   .story .what { font-size: 14px; }
+  .story .thumb { width: 68px; height: 50px; }
   #story h3 { font-size: 19px; }
   #story .text { font-size: 14px; }
   .stock-head .price { font-size: 26px; }

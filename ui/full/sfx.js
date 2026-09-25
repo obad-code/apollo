@@ -5,8 +5,8 @@
  *
  * SOUNDS is the recipes, schedule() builds one into a context, and Sfx is
  * the player the page keeps: it makes its context only when first asked,
- * wakes it if it is still waiting for a gesture, plays nothing muted, and
- * plays a sound only once when it is asked for twice at once - a pointer
+ * wakes it if it is still waiting for a gesture, and plays a sound only
+ * once when it is asked for twice at once - a pointer
  * sweeping over a row of buttons ticks, it does not buzz. tests/test_sfx.py
  * runs it against a stand-in for Web Audio.
  *
@@ -187,9 +187,8 @@ export function schedule(ctx, out, name, when) {
  * page); nothing is made until the first sound is asked for. */
 export class Sfx {
   constructor({ make = () => new (window.AudioContext || window.webkitAudioContext)(),
-                muted = false, volume = 1, gap = 0.05 } = {}) {
+                volume = 1, gap = 0.05 } = {}) {
     this.make = make;
-    this.muted = muted;
     this.volume = volume;
     this.gap = gap;
     this.ctx = null;
@@ -200,7 +199,7 @@ export class Sfx {
 
   /* Sound `name`, now. True when it was played. */
   play(name) {
-    if (this.muted || this.broken || !SOUNDS[name]) return false;
+    if (this.broken || !SOUNDS[name]) return false;
     if (!this.ctx) {
       try {
         this.ctx = this.make();

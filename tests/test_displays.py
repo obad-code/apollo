@@ -91,13 +91,13 @@ def test_the_feed_stays_folded_across_a_restart():
     assert displays.state()["feedFolded"] is True
 
 
-def test_the_sounds_stay_muted_across_a_restart():
+def test_a_layout_saved_muted_comes_back_without_it():
+    # The SFX switch is gone and the sounds are always on.
     layout = displays.default()
-    assert layout["muted"] is False
     layout["muted"] = True
     displays.save(layout)
     displays._memo = None                          # as if Apollo restarted
-    assert displays.state()["muted"] is True
+    assert "muted" not in displays.state()
 
 
 def test_a_file_that_is_not_a_layout_is_the_default(tmp_path):

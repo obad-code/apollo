@@ -260,18 +260,21 @@ wires, a line of what she is doing that changes every few seconds and the
 workflows ticking up (`ui/full/lylaagent.js`; nothing on it is live yet,
 and it says PREVIEW; a click or Escape shuts it); under it
 headlines on what you follow and Trump's posts with the market-moving ones
-flagged, each with a line of what it says, with OSIRIS's eye under them; and
+flagged, each with two lines of what it says, what it is about, and its
+picture beside it - or, where it came without one, its source's initials on
+a tile tinted for its topic - under a line saying how many stories there
+are, from how many sources, and how new the newest is (`ui/full/feed.js`),
+with OSIRIS's eye under them; and
 LYLA in her room along the bottom. The lists - the stocks, the indices, the
 feed and its chips, the side panel's tabs - are drawn the way a CRT tool
 would: each letter glowing, its red and blue landing a hair either side of
 it, and the whole list seen through a halftone of dots.
 
-Along the bottom edge, three buttons. **LYLA** puts her room away - she stops,
+Along the bottom edge, two buttons. **LYLA** puts her room away - she stops,
 the room fades, and the panels and the ring grow into the space - and brings
 it back; the choice is kept, and *"hide Lyla"* does the same. **ULTRA**
-brings every display up at once (below). **SFX** turns the display's sounds
-off and on, and the choice is kept. The eye under the feed opens **OSIRIS**
-(below).
+brings every display up at once (below). The eye under the feed opens
+**OSIRIS** (below).
 
 **Sounds.** The display makes its own, on the spot, with Web Audio - a few
 oscillators and a little noise, swept and shaped like an old synth's blips,
@@ -284,7 +287,7 @@ Apollo starts listening with a rising pair, your words heard with a soft
 chime and the answer coming with a bright flick - none on thinking, which
 begins before there is anything to have heard. The intro has a slow swell,
 sleep and waking their own sweeps, and LYLA her two from the old page.
-They are short and quiet, under Apollo's voice.
+They are short and quiet, under Apollo's voice, and always on.
 
 The panel on the left has four tabs. **Markets** is the stocks. **Talks**
 is what you said to Apollo and what came back, newest first, from the record.
@@ -811,7 +814,8 @@ The only thing left is your API key.
 | `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
 | `ui/full/lylaagent.js` | LYLA's agent card, a preview before she is an agent: the pipeline, its moving parts and what opens and shuts it - ported from a React component to plain JS and SVG, so there is still no build step (`tests/test_lyla_agent.py`). |
-| `ui/full/sfx.js` | The display's sounds, synthesized with Web Audio: the recipes, and the player that mutes and keeps a sound from doubling up (`tests/test_sfx.py`). |
+| `ui/full/feed.js` | The feed's rows, fuller: a source's initials for its tile, what a story is about, and the line over the list (`tests/test_feed_rows.py`). |
+| `ui/full/sfx.js` | The display's sounds, synthesized with Web Audio: the recipes, and the player that keeps a sound from doubling up (`tests/test_sfx.py`). |
 | `ui/fonts/thmanyah/` | Thmanyah Sans, as OTFs — what the overlay loads privately at runtime. |
 | `ui/full/fonts/` | The same weights as WOFF2, under the page because pywebview's server roots there - and beside them IBM Plex Mono, Melete, Orbitron and VT323, each with its licence. |
 | `ui/legacy/index.html` | The old generated design, frozen. Nothing in the run reads it. |

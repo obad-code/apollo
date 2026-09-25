@@ -1331,11 +1331,6 @@ class Apollo:
                 return
             log.info("intro")
             self.intro_until = now + INTRO_SECONDS
-            # The layout before anything else: it says whether the display's
-            # sounds are muted, and the intro makes one.
-            laid_out = getattr(self.ui, "display", None)
-            if laid_out is not None:
-                laid_out({"action": "layout", "layout": displays.state()})
             # Told first, while the page is still hidden, so the display is
             # never seen for a frame on its way to the intro.
             self.ui.intro()
