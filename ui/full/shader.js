@@ -1,5 +1,5 @@
-// The display's ground: a field of dots, each lit by the colour drifting
-// underneath it, seen through the bulge of an old tube.
+// The display's ground: an old set's own pixels, each lit by the colour
+// drifting underneath it, seen through the bulge of the tube.
 //
 // Plain WebGL - three.js would be 600 KB to draw two triangles. Three layers,
 // all in one pass:
@@ -8,14 +8,15 @@
 //     always moving, and blooming towards white where they cross. Asleep,
 //     it settles into a dusk horizon instead - navy overhead, the last
 //     orange low down - which is the idle screen's sky.
-//   - the dots: a halftone of that colour. Each dot takes the colour at its
-//     own centre and grows with its brightness, so the gradient is drawn in
-//     dots rather than washed across the screen.
-//   - the glass: a fisheye that swells the middle of the grid and pinches its
-//     corners, the three guns landing a hair apart towards the edges, and the
-//     scanlines. The corners go dark the way a tube's did. Over the dots, the
+//   - the pixels: a slot mask, as fine as a set's - cells of a red, a green
+//     and a blue slot, six screen pixels across, alternate columns half a
+//     cell apart. Each cell shows the colour at its own centre, so the
+//     gradient is drawn in the set's pixels rather than washed across.
+//   - the glass: a fisheye that swells the middle of the picture and pinches
+//     its corners, which go dark the way a tube's did. Over the pixels, the
 //     bloom: the same lights, unbroken, as a haze - the glow a bright tube
-//     threw past its own phosphors.
+//     threw past its own phosphors - and each cell's colour bleeding round
+//     it.
 //   - the set it is on: the picture flickers, a brighter band rolls up it,
 //     static crawls over it, and now and then a few lines tear sideways for
 //     a frame. The flicker, the band and the tear are decided in JavaScript
@@ -32,7 +33,7 @@ precision highp float;
 uniform vec2 resolution;
 uniform float time;
 uniform float sleep;      // 0 awake, 1 asleep - eased, so the sky changes slowly
-uniform float pitch;      // dot spacing at the edge of the screen, in pixels
+uniform float pitch;      // one cell of the mask - red, green and blue slot - in device pixels
 uniform float flicker;    // the tube's brightness this frame: ~0.96-1, now and then a dip
 uniform float roll;       // the rolling band's height, 0..1 up the screen (off it when there is none)
 uniform float tear;       // how far a torn band of lines is pushed sideways
@@ -122,56 +123,63 @@ vec3 colourAt(vec2 q, float t, float aspect) {
   return mix(awake, dusk(q, t, aspect), sleep);
 }
 
+// Where the picture is for a point on the glass: the fisheye samples nearer
+// the middle there, so the middle swells and the corners pinch. A torn band
+// pushes a few lines of the picture sideways - the picture, not the glass.
+const float K = 0.30;
+vec2 bend(vec2 uv) {
+  vec2 p = uv * 2.0 - 1.0;                         // -1..1 on both axes
+  p.x += tear * exp(-pow((uv.y - tearAt) * 38.0, 2.0));
+  float r2 = dot(p, p) * 0.5;                      // 0 at the centre, 1 in a corner
+  return p * (1.0 - K + K * r2 * 1.35);
+}
+
 void main() {
   float aspect = resolution.x / resolution.y;
   vec2 uv = gl_FragCoord.xy / resolution;
-  vec2 p = uv * 2.0 - 1.0;                         // -1..1 on both axes
-  // A torn band: a few lines pushed sideways, for a frame or two.
-  p.x += tear * exp(-pow((uv.y - tearAt) * 38.0, 2.0));
-
-  // The fisheye: sampled nearer the middle there, so the middle swells and
-  // the corners pinch. r2 runs 0 at the centre to 1 in a corner.
-  float r2 = dot(p, p) * 0.5;
-  float k = 0.30;
-  vec2 bent = p * (1.0 - k + k * r2 * 1.35);
-
-  // The grid, in dots, on the bent plane.
+  vec2 bent = bend(uv);
   vec2 plane = bent * vec2(aspect, 1.0);
-  float across = resolution.y / pitch * 0.5;
-  vec2 g = plane * across;
-  vec2 id = floor(g);
-  vec2 f = fract(g) - 0.5;
-
-  // Each dot is one flat colour: the field at its own centre.
-  vec2 centre = (id + 0.5) / across;
   float t = time;
-  vec3 lit = colourAt(centre, t, aspect);
-  float bright = max(lit.r, max(lit.g, lit.b));
 
-  // Its size follows its brightness - the halftone.
-  float radius = mix(0.10, 0.44, clamp(bright * 1.15, 0.0, 1.0));
-  float edge = 0.9 / (pitch * (1.0 - k + k * r2 * 3.0));   // a pixel, in cells
-  // The three guns do not quite converge away from the middle.
-  vec2 miss = p * r2 * 0.075;
-  float red   = smoothstep(radius + edge, radius - edge, length(f - miss));
-  float green = smoothstep(radius + edge, radius - edge, length(f));
-  float blue  = smoothstep(radius + edge, radius - edge, length(f + miss));
-  vec3 dots = lit * vec3(red, green, blue);
+  // The mask: a set's own pixels, on the glass, square to the screen's -
+  // cells of three slots, red, green and blue, alternate columns of cells
+  // set half a cell apart, the way a slot mask is. It is not bent: the
+  // phosphors are where they are, and it is the picture landing on them
+  // that the tube bends. Bending them too would only draw moire.
+  vec2 px = gl_FragCoord.xy;
+  float column = floor(px.x / pitch);
+  float shift = mod(column, 2.0) * 0.5;
+  float row = floor(px.y / pitch + shift);
+  vec2 inCell = vec2(fract(px.x / pitch), fract(px.y / pitch + shift));
 
-  // A halo round each dot, so the grid glows rather than sitting on black.
-  float halo = exp(-length(f) * 4.2) * 0.24;
+  // Each cell shows one flat colour: the picture where its centre falls.
+  vec2 centre = vec2(column + 0.5, row + 0.5 - shift) * pitch;
+  vec3 lit = colourAt(bend(centre / resolution) * vec2(aspect, 1.0), t, aspect);
 
-  // The bloom: the lights again, unbroken and unfolded, as a haze over the
-  // whole field - a wash of their colour, and more of it where they are
-  // brightest. Taken at this pixel, not at the dot's centre, or it would
-  // come out in squares the size of the grid. Asleep, the dusk has none.
+  // Which slot this pixel is on, and how far into it: lit along its middle,
+  // soft at its sides, with a dark seam between one cell and the next.
+  float third = inCell.x * 3.0;
+  float slot = floor(third);
+  float across = fract(third);
+  vec3 gun = vec3(slot < 0.5 ? 1.0 : 0.0, abs(slot - 1.0) < 0.5 ? 1.0 : 0.0, slot > 1.5 ? 1.0 : 0.0);
+  float shape = smoothstep(0.0, 0.3, across) * smoothstep(1.0, 0.7, across)
+              * smoothstep(0.0, 0.16, inCell.y) * smoothstep(1.0, 0.84, inCell.y);
+  // One slot in three is lit for each colour, so each is driven harder -
+  // seen from a chair away the three add back up to the colour.
+  vec3 phosphors = lit * gun * shape * 2.3;
+
+  // The bloom, turned up: the lights again, unbroken and unfolded, as a haze
+  // over the whole field - the glow a bright tube threw past its own
+  // phosphors, and far more of it where the lights are brightest and cross.
+  // Taken at this pixel, not at the cell's centre, or it would come out in
+  // cells. Asleep, the dusk has none.
   vec3 haze = lights(plane, t / 1.5) * (1.0 - sleep);
-  vec3 bloom = haze * 0.20 + haze * haze * 0.46;
+  vec3 bloom = haze * 0.10 + haze * haze * 0.90;
+  // ...and each cell's own colour bleeding round it, so the mask glows
+  // rather than sitting on black.
+  vec3 halation = lit * 0.12;
 
-  vec3 colour = dots * 0.92 + lit * (halo + 0.06) + bloom;
-
-  // Scanlines, every other row.
-  colour *= 0.80 + 0.20 * sin(gl_FragCoord.y * 3.14159);
+  vec3 colour = phosphors * 0.85 + halation + bloom;
 
   // The rolling band, a little brighter where it passes.
   colour *= 1.0 + 0.24 * exp(-pow((uv.y - roll) * 7.0, 2.0));
@@ -192,7 +200,7 @@ void main() {
 `;
 
 export class Shader {
-  constructor(canvas, { scale = 1, pitch = 15 } = {}) {
+  constructor(canvas, { scale = 1, pitch = 6 } = {}) {
     this.canvas = canvas;
     this.scale = scale;
     this.pitch = pitch;
@@ -250,15 +258,17 @@ export class Shader {
 
   resize() {
     if (!this.gl) return;
-    // Full resolution: a dot grid rendered at half size and stretched is a
-    // grid of smudges.
-    const width = Math.max(1, Math.floor(window.innerWidth * this.scale));
-    const height = Math.max(1, Math.floor(window.innerHeight * this.scale));
+    // The screen's own pixels: a mask of slots two pixels wide, rendered any
+    // smaller and stretched, is a smudge. On a scaled screen the cells keep
+    // their size on the glass.
+    const ratio = window.devicePixelRatio || 1;
+    const width = Math.max(1, Math.floor(window.innerWidth * ratio * this.scale));
+    const height = Math.max(1, Math.floor(window.innerHeight * ratio * this.scale));
     this.canvas.width = width;
     this.canvas.height = height;
     this.gl.viewport(0, 0, width, height);
     this.gl.uniform2f(this.resolution, width, height);
-    this.gl.uniform1f(this.pitchUniform, this.pitch * this.scale);
+    this.gl.uniform1f(this.pitchUniform, Math.max(3, Math.round(this.pitch * ratio * this.scale)));
     this.draw();
   }
 

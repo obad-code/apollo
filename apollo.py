@@ -121,6 +121,7 @@ import projects  # noqa: E402
 import orb as orb_module  # noqa: E402
 import overlay_content  # noqa: E402
 import overlay_state  # noqa: E402
+import panels  # noqa: E402
 import prayer  # noqa: E402
 import presence  # noqa: E402
 import reminders  # noqa: E402
@@ -1011,6 +1012,12 @@ class Api:
         journal.opened(str(what or ""), str(title or ""), str(source or ""))
         return True
 
+    def set_panel(self, name, shown):
+        """A panel shown or hidden from the display itself - LYLA's room, by
+        the button along the bottom - and kept that way, as if it had been
+        asked for out loud."""
+        return (panels.show if shown else panels.hide)(str(name or ""))
+
 
 class Apollo:
     def __init__(self):
@@ -1275,6 +1282,11 @@ class Apollo:
                 data = getattr(self, "data", None)
                 if data is not None:
                     ui.data(data.snapshot)
+                # ...and the panels the way they were left: hidden by voice or
+                # by the button, and still hidden after a restart.
+                shown = getattr(ui, "panels", None)
+                if shown is not None:
+                    shown(panels.state())
 
         if orb is None:                   # no native layer yet: just cut
             self.overlay.show_page(mode)

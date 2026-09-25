@@ -25,6 +25,15 @@ const CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`░▒▓█▀▄■□▪▫●○
 
 const randomChar = () => CHARS[Math.floor(Math.random() * CHARS.length)] || '?';
 
+/* Where each letter goes when the word is set with room between its letters:
+ * the place the font gives it (`prefixes`, the width of everything before
+ * it), moved along by `gap` for every letter before it. `full` is the
+ * font's own width for the whole word. */
+export function spaced(prefixes, widths, full, gap) {
+  const slots = prefixes.map((x, i) => ({ x: x + i * gap, w: widths[i] }));
+  return { slots, width: full + Math.max(0, prefixes.length - 1) * gap };
+}
+
 /* The word with its first `progress` of letters settled and the rest noise. */
 export function scrambled(target, progress) {
   const settled = Math.floor(target.length * progress);
@@ -114,6 +123,7 @@ export class LedWord {
     text = 'APOLLO', rows = 16, aspect = 2.1, gap = 0.34, colour = [255, 246, 230],
     glow = 1, stretch = 1, lean = 0, fps = 30, fill = 0.9,
     font = DEFAULT_FONT, weight = 900, bulge = 0.22,
+    tracking = 0,          // extra room between the letters, in cap heights
   } = {}) {
     this.canvas = canvas;
     // The word is drawn in 2D onto `surface`; the glass bends that onto the
@@ -122,7 +132,7 @@ export class LedWord {
     this.surface = this.glass ? document.createElement('canvas') : canvas;
     this.ctx = this.surface.getContext('2d');
     Object.assign(this, { text, rows, aspect, gap, colour, glow, stretch, lean, fps, fill,
-                          font, weight, bulge });
+                          font, weight, bulge, tracking });
     this.shown = text;         // what the stencil says right now
     this.cells = [];
     this.frame = null;
@@ -170,19 +180,23 @@ export class LedWord {
     m.font = this._face(100);
     const probe = m.measureText(this.text);
     const cap = probe.actualBoundingBoxAscent || 72;
-    const wide = probe.width * this.stretch + cap * Math.abs(this.lean);
+    const letters = [...this.text];
+    const tracked = probe.width + Math.max(0, letters.length - 1) * this.tracking * cap;
+    const wide = tracked * this.stretch + cap * Math.abs(this.lean);
     const size = Math.min((height * this.fill) / cap, (width * 0.94) / wide) * 100;
     this.size = size;
     this.cap = (cap * size) / 100;
-    this.wordWidth = (probe.width * size) / 100;
     // Where each letter of the word sits, and how wide it is: a scrambled
     // glyph goes in its letter's place, so nothing moves when it settles.
+    // The room between the letters is added to those places.
     m.font = this._face(size);
-    const letters = [...this.text];
-    this.slots = letters.map((ch, i) => ({
-      x: m.measureText(letters.slice(0, i).join('')).width,
-      w: m.measureText(ch).width,
-    }));
+    const set = spaced(
+      letters.map((_, i) => m.measureText(letters.slice(0, i).join('')).width),
+      letters.map((ch) => m.measureText(ch).width),
+      m.measureText(this.text).width,
+      this.tracking * this.cap);
+    this.slots = set.slots;
+    this.wordWidth = set.width;
 
     const cellH = this.cap / this.rows;
     const cellW = cellH * this.aspect;
@@ -218,14 +232,15 @@ export class LedWord {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = '#fff';
-    if (text === this.text) {
+    if (text === this.text && !this.tracking) {
       ctx.fillText(text, -this.wordWidth / 2, 0);
       return;
     }
-    // Mid-scramble, each glyph in its own letter's place and no wider: the
-    // symbols and blocks come from whatever font has them, some far wider
-    // than a letter, and would otherwise shove the word about and spill
-    // off the edge.
+    // Letter by letter, each in its own place: the word set with room
+    // between its letters, or mid-scramble, where every glyph also stays no
+    // wider than its letter - the symbols and blocks come from whatever font
+    // has them, some far wider than a letter, and would otherwise shove the
+    // word about and spill off the edge.
     [...text].forEach((ch, i) => {
       const slot = this.slots[i];
       if (slot) ctx.fillText(ch, -this.wordWidth / 2 + slot.x, 0, Math.max(1, slot.w));

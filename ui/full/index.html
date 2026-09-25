@@ -6,8 +6,9 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<!-- The dot field under everything: CRT phosphors in a halftone, seen through
-     a fisheye (shader.js). Nothing else paints a background. -->
+<!-- The ground under everything: an old set's own pixels, a slot mask lit by
+     drifting colour and seen through a fisheye (shader.js). Nothing else
+     paints a background. -->
 <canvas id="shader"></canvas>
 <!-- The two washes under the stock curves, defined once: an id per card would
      be seven ids for two gradients. -->
@@ -44,6 +45,14 @@
   <aside id="status-block" class="rise">
     <div id="dots"></div>
     <div id="market-clock" class="caption">&nbsp;</div>
+    <!-- The machine and the day's talking, as an old set's meters: rows of
+         lit segments rather than a strip of numbers. -->
+    <div id="gauges">
+      <div class="gauge" data-gauge="cpu"><span class="tag">CPU</span><i class="bar"></i><b>—</b></div>
+      <div class="gauge" data-gauge="gpu"><span class="tag">GPU</span><i class="bar"></i><b>—</b></div>
+      <div class="gauge" data-gauge="ram"><span class="tag">RAM</span><i class="bar"></i><b>—</b></div>
+      <div id="gauge-foot" class="caption">&nbsp;</div>
+    </div>
     <div id="note" class="note"></div>
   </aside>
 
@@ -85,13 +94,6 @@
     <article id="story" aria-hidden="true"></article>
   </section>
 
-  <section id="strip" class="panel rise">
-    <div class="strip-item"><span class="tag">Tokens today</span><span id="tokens">—</span></div>
-    <div class="strip-item"><span class="tag">System</span><span id="system">—</span></div>
-    <div class="strip-item"><span class="tag">Clips</span><span id="clips">—</span></div>
-    <div class="strip-item right"><span class="tag">Updated</span><span id="updated">—</span></div>
-  </section>
-
   <section id="core">
     <canvas id="ring" width="520" height="520"></canvas>
     <!-- The name in lit cells (ledword.js). -->
@@ -118,6 +120,14 @@
 <!-- The picture that follows the pointer beside the feed. Outside the panels,
      so the panel's rounded clip does not cut it off. -->
 <div id="peek" aria-hidden="true"></div>
+
+<!-- Along the bottom edge: LYLA's room in or out. Without it, the panels and
+     the ring take the room back. -->
+<nav id="dock">
+  <button id="room-toggle" type="button" aria-pressed="true" title="Show or hide LYLA's room">
+    <i class="led"></i><span>LYLA</span><em>ROOM ON</em>
+  </button>
+</nav>
 
 <!-- Asleep: ten quiet minutes, and this is all there is. -->
 <section id="sleep" aria-hidden="true">

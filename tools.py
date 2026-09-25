@@ -484,7 +484,8 @@ def _save_clip(ctx, seconds=60):
 
 @_tool("hide_panel", "clearing it off the display",
        "Take a panel off the full display - the stocks, the news feed, the "
-       "clock, the status dots, the bottom strip, Lyla, or Apollo's own ring. "
+       "clock, the status dots, the system gauges, Lyla's room, or Apollo's own "
+       "ring. Hiding Lyla gives her room back to the stocks and the ring. "
        "Use this when the user asks to hide, remove or close part of the "
        "display. Pass what they called it.",
        _obj({"panel": {"type": "string",

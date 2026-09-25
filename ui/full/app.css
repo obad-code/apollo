@@ -42,6 +42,7 @@
              src: url("fonts/thmanyahserifdisplay-Black.woff2") format("woff2"); }
 
 :root {
+  --dock-room: 104px;              /* the bottom edge, with LYLA's room put away */
   --amber: #e8b958;
   --amber-bright: #f0d9a0;
   --you: #d2eef3;
@@ -100,17 +101,17 @@ html, body {
   position: relative;
   height: 100%;
   padding: var(--gutter);
-  /* LYLA's room runs along the bottom of the window; nothing is laid over it. */
+  /* LYLA's room runs along the bottom of the window; nothing is laid over it.
+     Without her it is only the dock's height, and the panels take the rest. */
   padding-bottom: var(--room);
   display: grid;
   grid-template-columns: 30% 1fr 30%;
-  grid-template-rows: auto 1fr auto auto;
+  grid-template-rows: auto 1fr auto;
   gap: 24px 32px;
   grid-template-areas:
     "clock   core     status"
     "markets core     headlines"
-    "markets lyla     headlines"
-    "strip   strip    strip";
+    "markets lyla     headlines";
 }
 
 /* --- the panels ---------------------------------------------------------- */
@@ -180,7 +181,7 @@ html, body {
 .index .value { font-size: 27px; font-weight: 900; color: var(--amber-bright); }
 .index .move { font-size: 14px; margin-left: 6px; }
 
-.index .value, #hhmm, #seconds, #tokens {
+.index .value, #hhmm, #seconds, #gauges b, #gauge-foot {
   font-variant-numeric: tabular-nums;   /* a proportional face wanders */
 }
 
@@ -628,11 +629,66 @@ html, body {
 #story button:disabled { cursor: default; transform: none; }
 #story.shown h3 span, #story.shown .text span { opacity: 1; transform: none; filter: none; }
 
-/* --- the bottom strip ----------------------------------------------------- */
+/* --- the gauges ----------------------------------------------------------------
+   The machine as an old set's meters: sixteen segments a row, lit from the
+   left, the last few warmer and the last three red, like a level meter.
+   What the strip along the bottom used to say, in a corner. */
 
-#strip { grid-area: strip; display: flex; align-items: center; gap: 44px;
-         padding: 16px 26px; font-size: 13px; color: rgba(216, 210, 196, 0.75); }
-.strip-item.right { margin-left: auto; }
+#gauges { margin-top: 12px; display: inline-grid; gap: 5px; justify-items: end; }
+.gauge { display: flex; align-items: center; gap: 10px; }
+.gauge .tag { margin: 0; font-size: 10px; letter-spacing: .2em; min-width: 30px; text-align: right; }
+.gauge .bar { display: flex; gap: 3px; }
+.gauge .bar s {
+  display: block; width: 9px; height: 7px; border-radius: 1.5px;
+  background: rgba(255, 214, 150, .08); text-decoration: none;
+  transition: background .25s ease-out, box-shadow .25s ease-out;
+}
+.gauge .bar s.on { background: var(--amber-bright); box-shadow: 0 0 6px rgba(240, 190, 90, .7); }
+.gauge .bar s.on.warm { background: #ffb347; box-shadow: 0 0 7px rgba(255, 150, 40, .75); }
+.gauge .bar s.on.hot { background: var(--down); box-shadow: 0 0 8px rgba(255, 90, 100, .8); }
+.gauge b { min-width: 38px; text-align: right; font-size: 12px; font-weight: 800;
+           color: var(--amber-bright); }
+#gauge-foot { margin-top: 3px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+#gauge-foot .fresh { color: var(--up); }
+#gauge-foot .fresh.old { color: var(--down); }
+
+/* --- the dock -------------------------------------------------------------------
+   Along the bottom edge of the screen, under LYLA's floor. */
+
+#dock {
+  position: fixed; left: 50%; bottom: 22px; z-index: 20; transform: translateX(-50%);
+  display: flex; gap: 10px; transition: opacity .26s ease-out;
+}
+#dock button {
+  font: inherit; font-size: 11px; font-weight: 800; letter-spacing: .2em; cursor: pointer;
+  display: flex; align-items: center; gap: 10px; padding: 9px 18px 9px 14px;
+  color: var(--amber-bright); background: var(--panel); border-radius: 999px;
+  border: 1px solid rgba(255, 214, 150, .14); backdrop-filter: blur(7px) saturate(1.2);
+  text-shadow: 0 0 7px rgba(255, 150, 0, .35);
+  transition: border-color .25s, background .25s, transform .2s ease-out;
+}
+#dock button:hover { border-color: rgba(255, 214, 150, .42); transform: translateY(-1px); }
+#dock button em { font-style: normal; font-size: 9px; letter-spacing: .18em; color: var(--caption); }
+#dock .led {
+  width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 214, 150, .16);
+  transition: background .25s, box-shadow .25s;
+}
+#dock [aria-pressed="true"] .led { background: var(--amber-bright);
+                                   box-shadow: 0 0 8px rgba(255, 190, 90, .9); }
+body.answering #dock { opacity: .18; }
+body.asleep #dock { opacity: 0; pointer-events: none; }
+
+/* --- without LYLA's room ------------------------------------------------------
+   The button, or "hide Lyla": her room fades, and the panels and the ring
+   grow into the space she leaves. */
+
+#stage { transition: opacity .6s ease-out, padding-bottom .55s cubic-bezier(.32, .72, 0, 1); }
+body.roomless #stage { padding-bottom: var(--dock-room); }
+#lyla { transition: opacity .26s ease-out; }
+body.roomless #lyla { opacity: 0; transition: opacity .45s ease-in-out; }
+#ring, #wordmark { transition: width .55s cubic-bezier(.32, .72, 0, 1), height .55s cubic-bezier(.32, .72, 0, 1); }
+body.roomless #ring { width: 340px; height: 340px; }
+body.roomless #wordmark { width: 620px; height: 138px; }
 
 /* --- the core ------------------------------------------------------------- */
 
@@ -644,7 +700,7 @@ body.answering #core { transition: transform .6s cubic-bezier(.32,.72,0,1); }
 /* The name, in lit cells (ledword.js): the one place on the display that is
    a name and not a number. */
 /* Room round the word for its glow to fade out in. */
-#wordmark { display: block; width: 380px; height: 104px; margin-top: -8px; }
+#wordmark { display: block; width: 470px; height: 104px; margin-top: -8px; }
 #hint { margin-top: 14px; color: rgba(127, 224, 238, 0.6); transition: opacity .35s; }
 
 /* --- the dot matrix, while it is working ----------------------------------- */
@@ -750,7 +806,6 @@ body.answering #clock-block,
 body.answering #status-block,
 body.answering #lyla-block,
 body.answering #lyla { opacity: .18; transition: opacity .45s ease-in-out; }
-#lyla { transition: opacity .26s ease-out; }
 body.answering #core { transform: translateY(-64px) scale(.78); }
 body.answering #hint { opacity: 0; }
 
@@ -772,11 +827,10 @@ body.asleep #sleep { opacity: 1; visibility: visible;
 body.asleep #stage,
 body.asleep #lyla,
 body.asleep #peek { opacity: 0 !important; pointer-events: none; transition: opacity .8s ease-in-out; }
-#stage { transition: opacity .6s ease-out; }
 
 #sleep-copy { position: absolute; left: 72px; bottom: 80px; max-width: 640px; }
 #sleep-name { display: flex; align-items: baseline; gap: 22px; }
-#sleep-word { display: block; width: 660px; height: 190px; margin: -20px 0 -20px -34px; }
+#sleep-word { display: block; width: 780px; height: 190px; margin: -20px 0 -20px -34px; }
 #sleep-tag { font-size: 15px; font-weight: 900; letter-spacing: .16em;
              text-transform: uppercase; color: rgba(255, 246, 230, .62); }
 #sleep-fact { margin-top: 26px; min-height: 3em; font-size: 22px; line-height: 1.5;
@@ -882,7 +936,7 @@ body.asleep #peek { opacity: 0 !important; pointer-events: none; transition: opa
 @media (max-width: 1920px) {
   :root { --gutter: 34px; }
   #clock { font-size: 54px; }
-  #wordmark { width: 300px; height: 82px; }
+  #wordmark { width: 370px; height: 82px; }
   #ring { width: 200px; height: 200px; }
   #peek { width: 300px; height: 190px; }
   .story { padding: 9px 24px; }
@@ -892,8 +946,10 @@ body.asleep #peek { opacity: 0 !important; pointer-events: none; transition: opa
   .stock-head .price { font-size: 26px; }
   .stock-head .who b { font-size: 21px; }
   .facts b { font-size: 15px; }
-  #sleep-word { width: 530px; height: 152px; }
+  #sleep-word { width: 620px; height: 152px; }
   #sleep-fact { font-size: 19px; }
   #sleep-copy { left: 56px; bottom: 60px; }
   #sleep-wake { right: 56px; bottom: 64px; }
+  body.roomless #ring { width: 270px; height: 270px; }
+  body.roomless #wordmark { width: 500px; height: 110px; }
 }

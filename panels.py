@@ -31,8 +31,10 @@ PANELS = {
               "الساعة", "الوقت", "التاريخ", "الطقس"),
     "status": ("status", "dots", "indicators",
                "الحالة", "المؤشرات"),
-    "strip": ("strip", "tokens", "usage", "system", "cost", "clips",
-              "الشريط", "الاستهلاك", "النظام"),
+    # Still "strip" on disk, so a choice saved before the strip became the
+    # system gauges carries over.
+    "strip": ("system gauges", "gauges", "meters", "system", "strip", "tokens",
+              "usage", "cost", "clips", "العدادات", "الشريط", "الاستهلاك", "النظام"),
     "lyla": ("lyla", "lila", "robot", "ليلى", "ليلا", "الروبوت"),
     "core": ("core", "ring", "apollo", "wordmark",
              "الحلقة", "ابولو", "أبولو"),

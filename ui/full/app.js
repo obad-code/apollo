@@ -127,6 +127,8 @@ const state = {
   tab: 'stocks',          // which of the side panel's tabs is showing
   projects: null,         // the projects last drawn, for their clicks
   liveTimer: null,        // takes LIVE off the panel when the trades stop
+  panels: {},             // which panels apollo.py last said are shown
+  roomTimer: null,        // stops LYLA once her room has faded
 };
 
 // Whether the display is the idle screen. Up here because the clock, which
@@ -141,8 +143,9 @@ shader.start();
 /* The name in lit cells, in its three places: under the ring, on the idle
  * screen, and in the intro as Apollo comes up. Upright, in Orbitron at its
  * heaviest drawn at four fifths of its width - a little taller than it
- * comes - and arriving scrambled. */
-const NAME = { font: '"Orbitron", "Segoe UI", sans-serif', weight: 900, stretch: 0.8 };
+ * comes - with room between the letters, and arriving scrambled. */
+const NAME = { font: '"Orbitron", "Segoe UI", sans-serif', weight: 900, stretch: 0.8,
+               tracking: 0.3 };
 const wordmark = new LedWord($('wordmark'), { ...NAME, rows: 12, glow: 0.8, fill: 0.62, bulge: 0.18 });
 const sleepWord = new LedWord($('sleep-word'), { ...NAME, rows: 16, fill: 0.7 });
 // In the intro the name is lit in the boot screen's own green phosphor.
@@ -1390,20 +1393,42 @@ $('pane-ideas').addEventListener('click', (event) => {
   button.closest('.idea').remove();
 });
 
-function renderStrip(snapshot) {
-  const usage = snapshot.usage || {};
+/* The gauges in the corner: the machine as rows of lit segments, and under
+ * them the day's talking, the clips, and how fresh all of it is. */
+const SEGMENTS = 16;
+
+function gaugeBar(bar, pct) {
+  if (bar.children.length !== SEGMENTS) {
+    bar.innerHTML = '<s></s>'.repeat(SEGMENTS);
+    [...bar.children].forEach((segment, i) => {
+      if (i >= SEGMENTS - 3) segment.classList.add('hot');
+      else if (i >= SEGMENTS - 6) segment.classList.add('warm');
+    });
+  }
+  const lit = pct === null ? 0 : Math.round((Math.max(0, Math.min(100, pct)) / 100) * SEGMENTS);
+  [...bar.children].forEach((segment, i) => segment.classList.toggle('on', i < lit));
+}
+
+function renderGauges(snapshot) {
   const system = snapshot.system || {};
+  const old = STALE_AFTER.system && snapshot.stamps && snapshot.stamps.system
+    && Date.now() / 1000 - snapshot.stamps.system > STALE_AFTER.system;
+  for (const gauge of document.querySelectorAll('.gauge')) {
+    const value = Number(system[gauge.dataset.gauge]);
+    const known = Number.isFinite(value) && !old;
+    gaugeBar(gauge.querySelector('.bar'), known ? value : null);
+    gauge.querySelector('b').textContent = known ? `${Math.round(value)}%` : '—';
+  }
+  const usage = snapshot.usage || {};
   const clips = snapshot.clips || {};
-  $('tokens').textContent = usage.tokens
-    ? `${usage.tokens.toLocaleString()} · approx $${(usage.cost || 0).toFixed(2)}`
-    : '—';
-  $('system').innerHTML =
-    `CPU ${system.cpu ?? '—'}% · GPU ${system.gpu ?? '—'}% · RAM ${system.ram ?? '—'}%${stale('system')}`;
-  $('clips').textContent = clips.saved_today !== undefined
-    ? `${clips.saved_today} today · last ${clips.seconds || 60}s buffered` : '—';
+  const said = [];
+  said.push(usage.tokens ? `${usage.tokens.toLocaleString()} tokens · $${(usage.cost || 0).toFixed(2)}`
+                         : '0 tokens');
+  if (clips.saved_today !== undefined) said.push(`${clips.saved_today} clip${clips.saved_today === 1 ? '' : 's'}`);
   const age = snapshot.updated ? Math.max(0, Date.now() / 1000 - snapshot.updated) : null;
-  $('updated').textContent = age === null ? '—'
-    : age < 60 ? 'just now' : `${Math.floor(age / 60)}m ago`;
+  const fresh = age === null ? '' : age < 60 ? 'live' : `${Math.floor(age / 60)}m ago`;
+  $('gauge-foot').innerHTML = said.join(' · ')
+    + (fresh ? ` · <span class="fresh${age >= 180 ? ' old' : ''}">● ${fresh}</span>` : '');
 }
 
 function renderWeather(weather) {
@@ -1426,7 +1451,7 @@ function render(snapshot) {
   renderProjects(snapshot.projects || {});
   renderIdeas(snapshot.ideas || {});
   renderFeed(snapshot);
-  renderStrip(snapshot);
+  renderGauges(snapshot);
   renderWeather(snapshot.weather);
   enter();
 }
@@ -1549,7 +1574,7 @@ function setSleep(on) {
   if (!on && state.mode === 'full') {
     wordmark.scramble(0.75);
     ringStart();
-    if ($('lyla-block').dataset.hidden !== 'true') lyla.start();
+    if (roomShown()) lyla.start();
   }
 }
 
@@ -1558,10 +1583,13 @@ function setSleep(on) {
  * and everything else on the screen would jump. */
 const PANEL_OF = {
   markets: 'markets', feed: 'headlines', clock: 'clock-block',
-  status: 'status-block', strip: 'strip', lyla: 'lyla-block', core: 'core',
+  status: 'status-block', strip: 'gauges', lyla: 'lyla-block', core: 'core',
 };
 
 function setPanels(wanted) {
+  // What is asked for on top of what was last said: the button changes one
+  // panel, and must not bring back the others that were put away.
+  wanted = state.panels = { ...state.panels, ...wanted };
   for (const [panel, id] of Object.entries(PANEL_OF)) {
     const element = $(id);
     if (!element) continue;
@@ -1582,11 +1610,36 @@ function setPanels(wanted) {
       else setTimeout(hide, 260);
     }
   }
-  // LYLA's room is a full-window canvas, not a grid cell, so it is hidden by
-  // stopping her rather than by leaving an empty canvas on screen.
-  if (wanted.lyla === false) lyla.stop();
-  else if (state.phase === 'idle') lyla.start();
+  setRoom(wanted.lyla !== false);
 }
+
+/* LYLA's room, in or out - the button along the bottom, or "hide Lyla". Her
+ * room is a full-window canvas, not a grid cell: it fades, she stops, and
+ * the stage gives the space to the panels and the ring. */
+function roomShown() { return !document.body.classList.contains('roomless'); }
+
+function setRoom(shown) {
+  const button = $('room-toggle');
+  button.setAttribute('aria-pressed', shown ? 'true' : 'false');
+  button.querySelector('em').textContent = shown ? 'ROOM ON' : 'ROOM OFF';
+  if (shown === roomShown()) return;
+  document.body.classList.toggle('roomless', !shown);
+  clearTimeout(state.roomTimer);
+  if (shown) {
+    if (state.mode === 'full' && !asleep.on) lyla.start();
+  } else {
+    state.roomTimer = setTimeout(() => { if (!roomShown()) lyla.stop(); }, 460);
+  }
+  // The name redraws its cells at its new size once the stage has settled.
+  setTimeout(() => wordmark.resize(), 600);
+}
+
+$('room-toggle').addEventListener('click', () => {
+  const shown = !roomShown();
+  setPanels({ lyla: shown });
+  const api = window.pywebview && window.pywebview.api;
+  if (api && api.set_panel) api.set_panel('lyla', shown);
+});
 
 /* --- the choreography ------------------------------------------------------ */
 
@@ -1795,7 +1848,7 @@ window.apollo = {
     // a window nobody can see is a GPU burning for nothing.
     if (name === 'full') {
       shader.start();
-      if (!asleep.on) { lyla.start(); ringStart(); wordmark.scramble(0.75); }
+      if (!asleep.on) { if (roomShown()) lyla.start(); ringStart(); wordmark.scramble(0.75); }
       else sleepWord.start();
       enter();
     } else {
