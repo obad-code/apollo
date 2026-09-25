@@ -128,13 +128,16 @@
   <div id="sleep-wake">Press any key or say anything to wake Apollo</div>
 </section>
 
-<!-- As Apollo comes up: the name in lit cells on black, soft shapes behind
-     it, and then the tube switches off. A few seconds, once. -->
+<!-- As Apollo comes up: an old machine boots on a green tube - its checks
+     typed out, the name in lit cells, the prompt - and then the tube
+     switches off. A few seconds, once. -->
 <section id="intro" aria-hidden="true">
-  <div class="blob one"></div>
-  <div class="blob two"></div>
-  <div class="blob three"></div>
-  <div id="intro-tilt"><canvas id="intro-word" role="img" aria-label="Apollo"></canvas></div>
+  <div id="intro-screen">
+    <pre id="intro-log" class="lit"><span class="text"></span><span class="cursor">_</span></pre>
+    <div id="intro-stage"><canvas id="intro-word" role="img" aria-label="Apollo"></canvas></div>
+    <div id="intro-ready" class="lit"><span class="text"></span><span class="cursor">_</span></div>
+    <div id="intro-foot" class="lit"></div>
+  </div>
 </section>
 
 <!-- Under this page's own directory on purpose: pywebview roots its HTTP

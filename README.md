@@ -203,10 +203,13 @@ Orbitron is under the SIL Open Font License
 with the code.
 
 **The intro.** As Apollo starts, the display holds the screen for about
-three and a half seconds (`INTRO_SECONDS`): black glass with soft pale
-shapes behind, the name upright and settling out of its scramble, and
-then the tube switching off - the picture collapsing to a bright line and
-the line to nothing - before Apollo settles into the overlay. It is skipped when a
+three and a half seconds (`INTRO_SECONDS`) and boots like an old machine
+on a green tube (`ui/full/boot.js`): the tube opens out of a bright line,
+its checks type themselves out top left in VT323 - memory, voice link,
+market feed, Private Eye, neural core - the name settles out of its
+scramble in green phosphor, `> SYSTEM ONLINE` types under it, and then the
+tube switches off - the picture collapsing to a bright line and the line
+to nothing - before Apollo settles into the overlay. It is skipped when a
 full-screen program was already up, so a game or a film is left alone.
 
 The full display is the whole screen: a field of dots behind everything - a

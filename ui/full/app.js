@@ -14,6 +14,7 @@ import { Shader } from './shader.js';
 import { Lyla } from './lyla.js';
 import { DotFlow, FRAMES } from './dotflow.js';
 import { LedWord } from './ledword.js';
+import { bootLines, typed } from './boot.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -144,7 +145,9 @@ shader.start();
 const NAME = { font: '"Orbitron", "Segoe UI", sans-serif', weight: 900, stretch: 0.8 };
 const wordmark = new LedWord($('wordmark'), { ...NAME, rows: 12, glow: 0.8, fill: 0.62, bulge: 0.18 });
 const sleepWord = new LedWord($('sleep-word'), { ...NAME, rows: 16, fill: 0.7 });
-const introWord = new LedWord($('intro-word'), { ...NAME, rows: 22, glow: 1.15 });
+// In the intro the name is lit in the boot screen's own green phosphor.
+const introWord = new LedWord($('intro-word'), { ...NAME, rows: 22, glow: 1.15,
+                                                 colour: [168, 255, 192] });
 wordmark.scramble(0.75);
 // The scramble-text component's own trigger: point at the name and it goes again.
 $('wordmark').addEventListener('pointerenter', () => wordmark.scramble(0.75));
@@ -156,15 +159,39 @@ window.addEventListener('resize', () => {
 
 const INTRO_OFF_AT = 2850;       // ms: the tube switches off...
 const INTRO_GONE_AT = 3500;      // ...and is gone, just before apollo.py lets go
+const BOOT = bootLines();
+const READY = '> SYSTEM ONLINE';
+const READY_AT = 1.7;            // s: once the name has settled
+
+const pad = (n) => String(n).padStart(2, '0');
+const stamp = (d) => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}  `
+                   + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
 function playIntro() {
   const box = $('intro');
   clearTimeout(box._off);
   clearTimeout(box._gone);
+  cancelAnimationFrame(box._typing);
   box.classList.remove('off');
   box.classList.add('on');
   introWord.resize();              // it had no size while it was not shown
-  introWord.scramble(1.0, 0.35);
+  introWord.scramble(1.0, 0.5);
+
+  // The boot lines type themselves out, then the prompt under the name.
+  const log = $('intro-log'), ready = $('intro-ready');
+  $('intro-foot').textContent = `APOLLO/OS   ${stamp(new Date())}`;
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const began = performance.now();
+  const type = (now) => {
+    const t = still ? 60 : (now - began) / 1000;
+    log.querySelector('.text').textContent = typed(BOOT, t);
+    log.querySelector('.cursor').classList.toggle('gone', t >= READY_AT);
+    ready.querySelector('.text').textContent = typed([READY], t, { start: READY_AT, rate: 34 });
+    ready.classList.toggle('shown', t >= READY_AT);
+    if (box.classList.contains('on')) box._typing = requestAnimationFrame(type);
+  };
+  box._typing = requestAnimationFrame(type);
+
   box._off = setTimeout(() => box.classList.add('off'), INTRO_OFF_AT);
   box._gone = setTimeout(() => {
     box.classList.remove('on', 'off');
