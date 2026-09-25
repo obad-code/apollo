@@ -196,10 +196,11 @@ graticule round a dark lens, in amber, with a warm glow behind (`ui/full/rings.j
 has the dots) - and in 3D, the way the old display's own 3D had it: each ring
 a latitude of one sphere, meridians joining them pole to pole, the sphere
 turning slowly and tipped towards you, its near side brighter and its far
-side dim behind it. A faint scan line runs down the glass, top to bottom,
-gliding from side to side and swaying as it goes. While Apollo works the
-rings brighten and quicken, the line with them, and a wave goes out from
-the middle; listening, they take a gradient, cyan in the
+side dim behind it. Each dot is joined up the sphere to the nearest dots of
+the ring above it, not round its own ring; as the rings turn against each
+other the joins lean over and hand across to the next dot, fading rather
+than jumping, so the lines sway. While Apollo works the rings brighten and quicken and a wave
+goes out from the middle; listening, they take a gradient, cyan in the
 middle to orange at the edge; speaking, they go white and bloom. Under it
 the name is a neon sign: Melete, 19px, spaced a fifth of a letter apart, in
 #FFF0CE, each letter pulsing on its own a little after the one before, the

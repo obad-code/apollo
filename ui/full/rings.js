@@ -12,10 +12,9 @@
  *
  * And in 3D, as the old display's own 3D had them: each ring a latitude of
  * one sphere, meridians joining them pole to pole, the sphere turning slowly
- * about its axis and tipped towards you (sphereDots, meridian, view). On the
- * screen x runs right and y down; z comes towards you.
- *
- * And the scan line down the glass, gliding and swaying (scanLine). */
+ * about its axis and tipped towards you (sphereDots, meridian, view), and
+ * each dot joined up to the ring above it (links). On the screen x runs
+ * right and y down; z comes towards you. */
 
 export const LAYERS = [
   { r: 0.26, n: 6, sp: 0.00046 },
@@ -54,13 +53,45 @@ export function sphereDots(index, clock) {
   const layer = LAYERS[index];
   const from = ((LATITUDE[index] + 0.5) / LAYERS.length) * Math.PI;   // down from the top pole
   const round = Math.sin(from), y = -Math.cos(from);
-  const turn = clock * layer.sp * (index % 2 === 0 ? 1 : -1) + index * 0.4;
+  const turn = spinOf(index, clock);
   const dots = [];
   for (let k = 0; k < layer.n; k++) {
     const a = turn + (k / layer.n) * Math.PI * 2;
     dots.push({ x: Math.cos(a) * round, y, z: Math.sin(a) * round });
   }
   return dots;
+}
+
+/* Layer `index`'s joins to the ring right above it on the sphere, at `clock`:
+ * each of its dots joined up to the nearest dot of that ring - or, while it
+ * sits between two, to both, the nearer the stronger. `weight` is how much
+ * of the join is drawn, the two coming to one whole, eased (smoothstep) so
+ * that as the rings turn against each other the join leans over and hands
+ * across to the next dot without a jump: the lines sway. `k` is the dot
+ * here and `j` the one above. The ring round the top pole has none. */
+export function links(index, clock) {
+  const up = LATITUDE.indexOf(LATITUDE[index] - 1);
+  if (up < 0) return [];
+  const here = sphereDots(index, clock), above = sphereDots(up, clock);
+  const m = LAYERS[up].n;
+  const turnHere = spinOf(index, clock), turnUp = spinOf(up, clock);
+  const joins = [];
+  here.forEach((from, k) => {
+    // How many of the upper ring's gaps round from its first dot this one sits.
+    let at = ((turnHere - turnUp) / (Math.PI * 2) + k / LAYERS[index].n) * m;
+    at -= Math.floor(at / m) * m;
+    const j = Math.floor(at), f = at - j;
+    const smooth = (x) => x * x * (3 - 2 * x);
+    for (const [to, weight] of [[j % m, smooth(1 - f)], [(j + 1) % m, smooth(f)]]) {
+      if (weight > 0) joins.push({ k, j: to, weight, from, to: above[to] });
+    }
+  });
+  return joins;
+}
+
+/* How far layer `index` has turned at `clock`. */
+function spinOf(index, clock) {
+  return clock * LAYERS[index].sp * (index % 2 === 0 ? 1 : -1) + index * 0.4;
 }
 
 /* Meridian `m` of eight, pole to pole in `steps` steps. */
@@ -93,23 +124,4 @@ export function view(p, spin) {
  * Apollo speaking come and go - eased, frame by frame, at any frame rate. */
 export function ease(current, target, dt, seconds) {
   return current + (target - current) * (1 - Math.exp(-dt / seconds));
-}
-
-// The scan line's reach: the inside of the bezel, in core radii.
-const GLASS = 0.94;
-
-/* The scan line at `clock`: one line down the glass, top to bottom, gliding
- * from side to side and back on slow waves - no wrap, so it never jumps -
- * and swaying as it goes, like a pendulum: its foot trailing the way it is
- * moving, with a slower wobble of its own. `x` is where it crosses the
- * middle and `tilt` its lean from upright, in radians; `a` and `b` are where
- * it meets the bezel, top and bottom. */
-export function scanLine(clock) {
-  const x = 0.6 * Math.sin(clock * 0.00036) + 0.1 * Math.sin(clock * 0.00097 + 1.3);
-  const tilt = -0.12 * Math.cos(clock * 0.00036) + 0.03 * Math.sin(clock * 0.0013 + 0.4);
-  const dx = Math.sin(tilt), dy = Math.cos(tilt);
-  const along = x * dx;
-  const half = Math.sqrt(along * along - (x * x - GLASS * GLASS));
-  const end = (s) => ({ x: x + s * dx, y: s * dy });
-  return { x, tilt, a: end(-along - half), b: end(-along + half) };
 }

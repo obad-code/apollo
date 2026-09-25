@@ -248,11 +248,12 @@ document.addEventListener('pointermove', (event) => lyla.pointer(event.clientX, 
 /* Apollo's shape: a circle, as the old display drew it, in 3D (rings.js has
  * the dots). In amber #FFB000: a scope's faint graticule - a bezel with its ticks
  * and a grid across it - a dark lens in the middle, and inside the bezel five
- * rings of lit dots joined round each ring, turning against each other and
- * breathing with your voice - each ring a latitude of one sphere, meridians
- * joining them, the sphere turning slowly and tipped towards you. While Apollo is busy they brighten, thicken and
- * turn faster, a scan line glides and sways across the glass quicker and a
- * wave goes out from the
+ * rings of lit dots, turning against each other and breathing with your
+ * voice - each ring a latitude of one sphere, faint meridians pole to pole,
+ * the sphere turning slowly and tipped towards you - and each dot joined up
+ * to the nearest dots of the ring above, the joins leaning over and handing
+ * across as the rings turn, so they sway. While Apollo is busy they brighten, thicken and
+ * turn faster, a scan bar runs down the glass and a wave goes out from the
  * middle over and over; while it is listening the rings take a gradient,
  * cyan in the middle to amber and orange at the edge; and while it speaks
  * they go towards white and a white bloom lifts off the middle. */
@@ -352,8 +353,8 @@ function drawRing(now) {
   }
   ring.stroke();
 
-  // The rings: joined round, a lit dot at each join. Listening, they take
-  // the gradient, cross-faded in so they never drop out.
+  // The rings: a lit dot at each point, each joined up to the ring above.
+  // Listening, they take the gradient, cross-faded in so they never drop out.
   const pulse = 0.82 + 0.18 * Math.sin(t * 0.0016) + 0.12 * env * Math.sin(t * 0.0052)
               + 0.25 * w + 0.2 * state.levelSmooth;
   let tint = null;
@@ -383,8 +384,12 @@ function drawRing(now) {
   const segs = [];
   Rings.LAYERS.forEach((layer, li) => {
     const lay = (1 - li * 0.07) * (1 + 0.25 * env) * (1 + 1.5 * w);
-    const pts = Rings.sphereDots(li, core.clock).map(seen);
-    pts.forEach((a, k) => segs.push({ a, b: pts[(k + 1) % pts.length], li, k, lay, node: true }));
+    Rings.sphereDots(li, core.clock).map(seen).forEach((a, k) => segs.push({ a, b: a, li, k, lay, dot: true }));
+    // Up the sphere, not round it: each dot to the nearest of the ring above,
+    // leaning and handing over as the rings turn against each other.
+    for (const J of Rings.links(li, core.clock)) {
+      segs.push({ a: seen(J.from), b: seen(J.to), lay, join: J.weight });
+    }
   });
   for (let m = 0; m < 8; m++) {
     const line = Rings.meridian(m, 16).map(seen);
@@ -395,16 +400,18 @@ function drawRing(now) {
   segs.sort((p, q) => (p.a.z + p.b.z) - (q.a.z + q.b.z));
   for (const S of segs) {
     const depth = 0.3 + 0.35 * (S.a.z + S.b.z + 2) / 2;          // 0.3 far .. 1 near
-    const lineA = (0.48 + 0.3 * env + 0.3 * w) * pulse * S.lay * depth * (S.node ? 1 : 0.6);
-    ring.lineWidth = (1 + 2.4 * env + 1.8 * w) * px * S.a.sc * (S.node ? 1 : 0.7);
-    // Blur on the rings only: a blurred stroke per meridian step would cost
-    // a frame's time for lines that are meant to be faint.
-    ring.shadowBlur = S.node ? (8 + 12 * env + 24 * w) * px * depth : 0;
-    ring.shadowColor = `rgba(${rgb},${Math.min(1, 0.7 * S.lay * depth).toFixed(3)})`;
-    const line = () => { ring.beginPath(); ring.moveTo(S.a.x, S.a.y); ring.lineTo(S.b.x, S.b.y); ring.stroke(); };
-    stroke(`rgb(${rgb})`, lineA * (tint ? 1 - mix : 1), line);
-    if (tint) stroke(tint, lineA * mix, line);
-    if (!S.node) continue;
+    if (!S.dot) {
+      const lineA = (0.48 + 0.3 * env + 0.3 * w) * pulse * S.lay * depth * (S.join ?? 0.6);
+      ring.lineWidth = (1 + 2.4 * env + 1.8 * w) * px * S.a.sc * (S.join ? 1 : 0.7);
+      // Blur on the joins only: a blurred stroke per meridian step would
+      // cost a frame's time for lines that are meant to be faint.
+      ring.shadowBlur = S.join ? (8 + 12 * env + 24 * w) * px * depth * S.join : 0;
+      ring.shadowColor = `rgba(${rgb},${Math.min(1, 0.7 * S.lay * depth).toFixed(3)})`;
+      const line = () => { ring.beginPath(); ring.moveTo(S.a.x, S.a.y); ring.lineTo(S.b.x, S.b.y); ring.stroke(); };
+      stroke(`rgb(${rgb})`, lineA * (tint ? 1 - mix : 1), line);
+      if (tint) stroke(tint, lineA * mix, line);
+      continue;
+    }
     const flare = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.0024 * core.spin + S.k * 0.8 + S.li * 1.7));
     const r = (1.6 + 0.9 * flare) * (1 + 1.1 * env + 0.9 * w) * px * S.a.sc;
     ring.shadowBlur = (14 + 16 * env + 34 * w) * px * depth;
@@ -421,27 +428,14 @@ function drawRing(now) {
   ring.arc(cx, cy, coreR * 1.02, -2.5, -1.5);
   ring.stroke();
 
-  // A scan line down the glass, gliding from side to side and swaying as it
-  // goes - on the rings' own clock, so it quickens with them, smoothly.
-  // Brightest across the middle, fading out towards the bezel, with a soft
-  // glow so it reads over the meridians and the screen's own stripes.
-  const scan = Rings.scanLine(core.clock);
-  const [ax, ay] = [cx + scan.a.x * coreR, cy + scan.a.y * coreR];
-  const [bx, by] = [cx + scan.b.x * coreR, cy + scan.b.y * coreR];
-  const scanA = 0.12 + 0.22 * scope;
-  const beam = ring.createLinearGradient(ax, ay, bx, by);
-  beam.addColorStop(0, `rgba(${rgb},0)`);
-  beam.addColorStop(0.5, `rgba(${rgb},${scanA.toFixed(3)})`);
-  beam.addColorStop(1, `rgba(${rgb},0)`);
+  // A scan bar drifting down inside the bezel.
+  const scanY = cy - coreR * 0.94 + ((t * 0.055 * px) % (coreR * 1.88));
+  const half = Math.sqrt(Math.max(0, (coreR * 0.94) ** 2 - (scanY - cy) ** 2));
   ring.lineWidth = 2 * px;
-  ring.strokeStyle = beam;
-  ring.shadowBlur = 10 * px;
-  ring.shadowColor = `rgba(${rgb},${(scanA * 1.6).toFixed(3)})`;
+  ring.strokeStyle = `rgba(${rgb},${(0.14 * scope).toFixed(3)})`;
   ring.beginPath();
-  ring.moveTo(ax, ay);
-  ring.lineTo(bx, by);
+  ring.moveTo(cx - half, scanY); ring.lineTo(cx + half, scanY);
   ring.stroke();
-  ring.shadowBlur = 0;
 
   // While Apollo works, a wave going out from the middle, over and over.
   if (env > 0.004) {

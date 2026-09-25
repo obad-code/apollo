@@ -1,7 +1,7 @@
 """Apollo's shape (ui/full/rings.js), run under node: a circle, drawn as the
 old display drew it - rings of lit dots nested inside one another, each
-turning the other way from the one inside it, the dots joined round each
-ring - and the pace it turns at, eased rather than jumped."""
+turning the other way from the one inside it, each dot joined up to the
+ring above - and the pace it turns at, eased rather than jumped."""
 import json
 import math
 import pathlib
@@ -118,35 +118,60 @@ def test_seen_it_is_tipped_towards_you_and_turning_about_its_axis(tmp_path):
     assert all(abs(length(p) - 1) < 1e-9 for p in (pole0, spot0, spot1))
 
 
-# --- the scan line ---------------------------------------------------------------
-# One line down the glass, top to bottom, gliding from side to side and back
-# and swaying a little as it goes, like a pendulum - never wrapping round or
-# jumping, never leaving the bezel.
+# --- joined up and down ----------------------------------------------------------
+# Each point joined to the points of the ring above it - up the sphere, not
+# round it - to the nearest one, or the nearest two while it sits between
+# them. As the rings turn against each other the joins lean one way, then
+# hand over to the next point, fading across rather than jumping, so the
+# lines sway.
 
-def scan(tmp_path, times):
-    return run(tmp_path, f"{list(times)}.map((c) => R.scanLine(c))")
-
-
-def test_the_scan_line_runs_top_to_bottom_across_the_glass(tmp_path):
-    for s in scan(tmp_path, range(0, 60000, 1500)):
-        (x0, y0), (x1, y1) = (s["a"]["x"], s["a"]["y"]), (s["b"]["x"], s["b"]["y"])
-        assert math.hypot(x0, y0) == pytest.approx(0.94) and math.hypot(x1, y1) == pytest.approx(0.94)
-        assert y0 < -0.5 and y1 > 0.5                                  # top to bottom
-        assert abs(x1 - x0) < 0.35 * (y1 - y0)                        # upright, give or take a sway
+def latitudes(tmp_path):
+    return sorted(run(tmp_path, "R.LAYERS.map((_, i) => R.sphereDots(i, 0)[0].y)"))
 
 
-def test_it_glides_from_side_to_side_and_sways(tmp_path):
-    lines = scan(tmp_path, range(0, 40000, 250))
-    xs = [s["x"] for s in lines]
-    tilts = [s["tilt"] for s in lines]
-    assert min(xs) < -0.5 and max(xs) > 0.5 and max(abs(x) for x in xs) < 0.94
-    assert min(tilts) < -0.05 and max(tilts) > 0.05 and max(abs(a) for a in tilts) < 0.2
+def test_the_top_ring_has_nothing_above_it(tmp_path):
+    ys = run(tmp_path, "R.LAYERS.map((_, i) => R.sphereDots(i, 0)[0].y)")
+    top = ys.index(min(ys))
+    assert run(tmp_path, f"R.links({top}, 1234)") == []
 
 
-def test_it_moves_smoothly_never_jumping(tmp_path):
-    lines = scan(tmp_path, range(0, 40000, 16))                       # a frame at a time
-    steps = [abs(b["x"] - a["x"]) for a, b in zip(lines, lines[1:])]
-    turns = [abs(b["tilt"] - a["tilt"]) for a, b in zip(lines, lines[1:])]
-    assert max(steps) < 0.01 and max(turns) < 0.003
-    speeds = [b - a for a, b in zip(steps, steps[1:])]
-    assert max(abs(s) for s in speeds) < 0.0005                       # it eases, never lurches
+def test_every_other_point_is_joined_to_the_ring_right_above_it(tmp_path):
+    ys = latitudes(tmp_path)
+    for i, n in enumerate([6, 10, 14, 20, 28]):
+        links = run(tmp_path, f"R.links({i}, 1234)")
+        here = run(tmp_path, f"R.sphereDots({i}, 1234)")[0]["y"]
+        if here == pytest.approx(ys[0]):
+            continue
+        above = ys[ys.index(min(ys, key=lambda y: abs(y - here))) - 1]
+        assert {l["k"] for l in links} == set(range(n))            # every point
+        for l in links:
+            assert l["from"]["y"] == pytest.approx(here)
+            assert l["to"]["y"] == pytest.approx(above)              # one ring up
+            assert abs(length(l["to"]) - 1) < 1e-9
+
+
+def test_each_point_is_joined_to_its_nearest_one_or_two_and_never_less_than_whole(tmp_path):
+    for i in range(5):
+        links = run(tmp_path, f"R.links({i}, 5678)")
+        by_point = {}
+        for l in links:
+            assert 0 < l["weight"] <= 1
+            by_point.setdefault(l["k"], []).append(l)
+        for joins in by_point.values():
+            assert 1 <= len(joins) <= 2
+            assert sum(j["weight"] for j in joins) == pytest.approx(1)
+            for j in joins:                                         # straight up, near enough
+                lean = math.atan2(j["to"]["z"], j["to"]["x"]) - math.atan2(j["from"]["z"], j["from"]["x"])
+                lean = (lean + math.pi) % (2 * math.pi) - math.pi
+                assert abs(lean) <= 2 * math.pi / 6 + 1e-9
+
+
+def test_the_joins_lean_and_hand_over_smoothly_never_jumping(tmp_path):
+    frames = run(tmp_path, "Array.from({ length: 400 }, (_, f) => R.links(4, f * 16)"
+                           ".map((l) => [l.k, l.j, l.weight]))")
+    weights = [{(k, j): w for k, j, w in frame} for frame in frames]
+    steps = [abs(b.get(key, 0) - a.get(key, 0))
+             for a, b in zip(weights, weights[1:]) for key in set(a) | set(b)]
+    assert max(steps) < 0.05                                        # a frame never jumps
+    handed = [set(a) != set(b) for a, b in zip(weights, weights[1:])]
+    assert any(handed)                                              # but they do hand over
