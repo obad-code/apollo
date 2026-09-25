@@ -34,6 +34,7 @@ export class El {
   setAttribute(k, v) { this.attrs[k] = String(v); }
   getAttribute(k) { return this.attrs[k]; }
   querySelector(sel) { return this.parts[sel] || (this.parts[sel] = new El()); }
+  querySelectorAll() { return []; }
   addEventListener() {}
 }
 export class Clock {
@@ -91,8 +92,10 @@ def test_the_card_draws_the_whole_pipeline(tmp_path):
 
 
 def test_it_says_it_is_a_preview_not_live(tmp_path):
+    import re
     html = run(tmp_path, "return A.markup();")
-    assert "PREVIEW" in html and "LIVE" not in html
+    shown = re.sub(r'data-live="[^"]*"', "", html)       # what it says until it is live
+    assert "PREVIEW" in shown and "LIVE" not in shown
 
 
 def test_it_is_set_in_the_display_s_own_face(tmp_path):
@@ -162,3 +165,75 @@ def test_opening_and_shutting_it_is_heard_and_marked(tmp_path):
 def test_shown_twice_it_runs_once(tmp_path):
     jobs, heard = run(tmp_path, MADE + "agent.show(); agent.show(); return [clock.jobs.size, heard];")
     assert jobs == 2 and heard == ["hud"]
+
+
+
+# --- live: when you command her ------------------------------------------------------
+# The same card, running for real: what you said, where it went, how long it
+# took. No more demo lines once it is live.
+
+LIVE = MADE + """
+const runs = () => root.querySelector('.agent-count').textContent;
+const latency = () => root.querySelector('.agent-latency').textContent;
+"""
+
+
+def test_a_command_takes_the_card_live(tmp_path):
+    live, jobs, text, counted = run(tmp_path, LIVE + """
+        agent.show();
+        agent.live({ stage: 'received', text: 'hey lyla sort my notes' });
+        clock.advance(300);
+        return [root.classList.contains('live'), clock.jobs.size, line(), runs()];""")
+    assert live is True and jobs == 0                     # the demo has stopped
+    assert text == 'Received: "hey lyla sort my notes"' and counted == "1"
+
+
+def test_it_says_where_it_went_and_how_long_it_took(tmp_path):
+    lines = run(tmp_path, LIVE + """
+        agent.live({ stage: 'received', text: 'hey lyla' });
+        clock.advance(300);
+        agent.live({ stage: 'asking' });
+        clock.advance(300);
+        const asking = line();
+        agent.live({ stage: 'done', text: 'Your notes are sorted.', ms: 1840 });
+        clock.advance(300);
+        return [asking, line(), latency()];""")
+    assert "Claude" in lines[0]
+    assert "1840 ms" in lines[1] and "Your notes are sorted." in lines[1]
+    assert lines[2] == "1840 ms"
+
+
+def test_the_latency_is_the_average_of_the_runs(tmp_path):
+    assert run(tmp_path, LIVE + """
+        for (const ms of [1000, 3000]) {
+          agent.live({ stage: 'received', text: 'x' });
+          agent.live({ stage: 'done', text: 'y', ms });
+        }
+        clock.advance(300);
+        return [runs(), latency()];""") == ["2", "2000 ms"]
+
+
+def test_an_error_says_so(tmp_path):
+    text = run(tmp_path, LIVE + """
+        agent.live({ stage: 'received', text: 'x' });
+        agent.live({ stage: 'error', text: 'could not reach the API' });
+        clock.advance(300);
+        return line();""")
+    assert text.startswith("Error:") and "API" in text
+
+
+def test_a_long_command_is_cut_to_a_line(tmp_path):
+    text = run(tmp_path, LIVE + """
+        agent.live({ stage: 'received', text: 'word '.repeat(60) });
+        clock.advance(300);
+        return line();""")
+    assert len(text) < 100 and text.endswith('…"')
+
+
+def test_live_it_reopens_without_the_demo(tmp_path):
+    jobs = run(tmp_path, LIVE + """
+        agent.live({ stage: 'received', text: 'x' });
+        clock.advance(300);
+        agent.hide(); agent.show();
+        return clock.jobs.size;""")
+    assert jobs == 0

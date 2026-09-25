@@ -22,6 +22,7 @@ import projects
 import reminders
 import sysinfo
 import talks
+import trading
 import usage
 import watchlist
 import weather
@@ -35,7 +36,11 @@ age_words = feeds.age_words
 INTERVALS = {"market": 60, "news": 600, "posts": 300, "weather": 900, "system": 5,
              "prayer": 300,
              "finds": 60,
-             "talks": 15, "projects": 300, "ideas": 15, "insiders": 21600}
+             "talks": 15, "projects": 300, "ideas": 15, "insiders": 21600,
+             "trading": 600}
+# Trading mode's board is only read while it is wanted: this long after the
+# page last asked for it (it asks again while trading mode stays up).
+TRADING_FOR = 1800
 SPARK_POINTS = 24
 
 
@@ -47,6 +52,7 @@ class DataService:
                          "usage": {}, "prayer": {}, "finds": [], "talks": [],
                          "projects": {"sessions": [], "folders": [], "repos": []},
                          "ideas": {"ideas": [], "reminders": []}, "insiders": {},
+                         "trading": {},
                          "updated": 0.0,
                          # When each reader last came back with something. A
                          # reader that fails keeps its last good value, and the
@@ -57,6 +63,7 @@ class DataService:
         self._thread = None
         self._stopping = threading.Event()
         self._wake = threading.Event()      # see `poke`
+        self._trading_until = 0.0           # see `want_trading`
 
     def start(self):
         if self._thread is None or not self._thread.is_alive():
@@ -79,6 +86,13 @@ class DataService:
         for key in keys or tuple(INTERVALS):
             self._due[key] = 0.0
         self._wake.set()
+
+    def want_trading(self, seconds=TRADING_FOR):
+        """Trading mode is up: read its board now and keep it fresh for
+        `seconds`. Nothing reads it otherwise - it is a dozen requests to
+        sources with limits of their own."""
+        self._trading_until = time.monotonic() + seconds
+        self.poke("trading")
 
     def _run(self):
         while not self._stopping.is_set():
@@ -111,6 +125,13 @@ class DataService:
 
     # -- one reader each; none of them may raise, and each returns whether it
     #    actually brought something back, so a failure ages rather than blanks.
+
+    def _read_trading(self):
+        if time.monotonic() > self._trading_until:
+            return False
+        board = trading.board()
+        self.snapshot["trading"] = board
+        return bool(board.get("picks") or board.get("trending") or board.get("buys"))
 
     def _read_market(self):
         # Named `watched`, not `watchlist`: the latter is the module this

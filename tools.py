@@ -261,6 +261,7 @@ import panels  # noqa: E402
 import prayer  # noqa: E402
 import pc_control  # noqa: E402
 import reminders  # noqa: E402
+import trading  # noqa: E402
 import watchlist  # noqa: E402
 
 
@@ -560,32 +561,65 @@ def _ultra_mode(ctx, on=True):
 
 # The display's modes, as the bar along its bottom has them, and the other
 # things people call them.
-MODES = ("normal", "clear", "expanded", "osiris")
+MODES = ("normal", "clear", "trading", "agents", "expanded", "osiris")
 _MODE_WORDS = {"ultra": "expanded", "ultra mode": "expanded", "work": "expanded",
                "expand": "expanded", "map": "osiris", "the map": "osiris",
                "regular": "normal", "default": "normal", "usual": "normal",
-               "clean": "clear", "focus": "clear"}
+               "clean": "clear", "focus": "clear", "trade": "trading",
+               "trader": "trading", "stocks": "trading", "market": "trading",
+               "agent": "agents", "lyla": "agents"}
 
 
 @_tool("display_mode", "switching the display",
        "Put Apollo's full display into one of its modes - the ones on the bar "
        "along its bottom: normal (the usual display), clear (nothing on the "
-       "screen but Apollo and the sign saying to press Ctrl+Alt), expanded "
-       "(ultra mode: every display at once as tiles) or osiris (the OSIRIS map "
-       "laid into the display). Use this when the user asks for a mode by name "
-       "- \"clear mode\", \"الوضع الصافي\", \"رجع الوضع العادي\", \"الوضع "
-       "الموسع\", \"وضع اوزيرس\". Confirm in a few words.",
-       _obj({"mode": _str("normal, clear, expanded or osiris")}, ("mode",)))
+       "screen but Apollo and the sign saying to press Ctrl+Alt), trading (the "
+       "trading desk: insider and Congress buying, market-moving filings and "
+       "news, what traders are on and the read of their next picks), agents "
+       "(the agents, LYLA's pipeline), expanded (ultra mode: every display at "
+       "once as tiles) or osiris (the OSIRIS map laid into the display). Use "
+       "this when the user asks for a mode by name - \"clear mode\", \"trading "
+       "mode\", \"وضع التداول\", \"وضع الوكلاء\", \"الوضع الصافي\", \"رجع "
+       "الوضع العادي\", \"الوضع الموسع\", \"وضع اوزيرس\". Confirm in a few words.",
+       _obj({"mode": _str("normal, clear, trading, agents, expanded or osiris")}, ("mode",)))
 def _display_mode(ctx, mode="normal"):
     said = str(mode or "").strip().lower()
     wanted = _MODE_WORDS.get(said, said)
     if wanted not in MODES:
         return {"ok": False, "error": f"There is no {mode} mode - the modes are normal, "
-                                      "clear, expanded and OSIRIS."}
+                                      "clear, trading, agents, expanded and OSIRIS."}
     ctx.activity("switching the display")
     if ctx.display({"action": "mode", "mode": wanted}) is False:
         return {"ok": False, "error": "The display isn't up to switch modes right now."}
     return {"ok": True, "mode": wanted}
+
+
+@_tool("trading_read", "reading the trading desk",
+       "The trading desk's read, now: what traders on StockTwits, Reddit (and X, "
+       "if it is set up) are piling into and how bullish they are, which "
+       "companies' insiders are buying - several at once is the strongest sign "
+       "- what members of Congress bought, the serious SEC filings and the "
+       "market-moving headlines, and the next picks where those agree, each "
+       "with its reasons. Use this when the user asks what traders are buying, "
+       "what the next pick is, what insiders or Congress are buying, or for "
+       "sensitive stock news - \"وش يشترون التريدرز\", \"وش السهم الجاي\". "
+       "Give the picks and their reasons in a few sentences, and say it is a "
+       "read of the crowd and the filings, not advice.",
+       _obj({}))
+def _trading_read(ctx):
+    ctx.activity("reading the trading desk")
+    board = trading.board()
+    return {"ok": True, "verdict": board["verdict"],
+            "picks": [{"ticker": p["ticker"], "name": p["name"], "reasons": p["reasons"],
+                       "bullish": None if p["bull"] is None else round(p["bull"] * 100)}
+                      for p in board["picks"]],
+            "insider_clusters": [{"ticker": c["ticker"], "insiders": c["insiders"],
+                                  "value": round(c["value"])} for c in board["clusters"][:5]],
+            "congress_buys": [{"ticker": t["ticker"], "member": t["member"], "amount": t["amount"]}
+                              for t in board["congress"] if t["side"] == "buy"][:5],
+            "filings": [{"company": f["company"], "ticker": f["ticker"],
+                         "what": [i["label"] for i in f["items"]]} for f in board["filings"][:5]],
+            "headlines": [n["title"] for n in board["news"][:5]]}
 
 
 # What "put everything back" sounds like: every display back in the grid.

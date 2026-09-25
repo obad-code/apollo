@@ -141,7 +141,7 @@ const state = {
   liveTimer: null,        // takes LIVE off the panel when the trades stop
   panels: {},             // which panels apollo.py last said are shown
   osiris: false,          // OSIRIS laid into the normal display, and Apollo in its colours
-  clear: false,           // clear mode: nothing on the screen but Apollo and the sign
+  view: 'normal',         // which view of the display: normal, clear, trading or agents
   away: false,            // away mode, as apollo.py last said
   listening: false,       // hands-free, as apollo.py last said
   modeTicket: 0,          // the mode last asked for, so an older one stops half way
@@ -276,6 +276,8 @@ lyla.start();
  * on it - opens the pipeline card over the feed, and shuts it; so does
  * Escape. Out of sight with her block, in ultra mode and under the map. */
 const agent = new LylaAgent($('lyla-agent'), { sound: (name) => sfx.play(name) });
+// ...and the same card in agents mode, which has its own sound for arriving.
+const agentsCard = new LylaAgent($('agent-lyla'));
 function toggleAgent() {
   agent.toggle();
   $('lyla-agent-toggle').setAttribute('aria-expanded', agent.open ? 'true' : 'false');
@@ -1142,7 +1144,7 @@ document.addEventListener('keydown', (event) => {
   closeStock();
   if (state.configFor) closeConfig();
   else if (ultraOn() && state.layout.focus) focusDisplay(null);
-  else if (state.clear && !ultraOn() && !state.osiris) setMode('normal');
+  else if (state.view !== 'normal' && !ultraOn() && !state.osiris) setMode('normal');
 });
 
 /* --- the stocks, picked the way the feed is -----------------------------------
@@ -1902,8 +1904,140 @@ function render(snapshot) {
   renderToday(snapshot);
   renderSystem(snapshot);
   renderSummaries();
+  renderTrading(snapshot.trading);
   enter();
 }
+
+/* --- trading mode ------------------------------------------------------------------
+ *
+ * The desk (trading.py reads it): the read of the next picks where the
+ * signals agree, what traders are on, the filings and headlines that move a
+ * price, insiders buying their own stock, Congress's disclosed trades, and
+ * the traders you follow on X - or, until X is set up, where your own
+ * stocks turn up on the desk. Everything off a source goes through esc(). */
+
+// What the display asks apollo.py for while the desk is up: read it now,
+// and again every quarter of an hour it stays up.
+function wantTrading() {
+  const api = bridge();
+  if (api && api.trading) api.trading();
+}
+setInterval(() => { if (state.view === 'trading' && state.mode === 'full') wantTrading(); }, 15 * 60 * 1000);
+
+const cash = (value) => {
+  const n = Number(value) || 0;
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${Math.round(n / 1e3)}k`;
+  return `$${Math.round(n)}`;
+};
+const pct = (share) => `${Math.round((Number(share) || 0) * 100)}%`;
+const bullBar = (share) => (share === null || share === undefined ? '<span class="bull none">no votes</span>'
+  : `<span class="bull"><i style="width:${Math.round(Number(share) * 100)}%"></i></span><span class="bull-n">${pct(share)}</span>`);
+
+function renderTrading(board) {
+  if (!board || !board.updated) return;
+  const key = String(board.updated);
+  if (key === state.deskKey) return;
+  state.deskKey = key;
+  $('desk-verdict').textContent = String(board.verdict || '');
+  $('desk-age').textContent = `updated ${words(Date.now() / 1000 - board.updated)} ago`;
+  const body = (id) => $(id).querySelector('.desk-body');
+  const empty = (text) => `<p class="desk-empty">${esc(text)}</p>`;
+
+  const picks = board.picks || [];
+  const top = Math.max(1, ...picks.map((pick) => Number(pick.score) || 0));
+  body('desk-read').innerHTML = picks.map((pick, i) => `
+    <div class="pick">
+      <span class="pick-n">${i + 1}</span>
+      <div class="pick-main">
+        <div class="pick-line"><b>${esc(pick.ticker)}</b><span class="pick-name">${esc(pick.name)}</span>${bullBar(pick.bull)}</div>
+        <span class="score"><i style="width:${Math.round((Number(pick.score) || 0) / top * 100)}%"></i></span>
+        <ul>${(pick.reasons || []).map((reason) => `<li>${esc(reason)}</li>`).join('')}</ul>
+        ${pick.summary ? `<p class="pick-why">${esc(pick.summary)}</p>` : ''}
+      </div>
+    </div>`).join('') || empty('Nothing stands out yet.');
+
+  const hot = (board.trending || []).slice(0, 10);
+  const movers = (board.reddit || []).slice(0, 6);
+  body('desk-traders').innerHTML = `
+    <h4>Trending on StockTwits</h4>
+    ${hot.map((name, i) => `
+      <div class="desk-row"><span class="rank">${i + 1}</span><b>${esc(name.symbol)}</b>
+        <span class="grow">${esc(name.name)}</span>${bullBar(name.bull)}</div>`).join('') || empty('StockTwits is quiet or unreachable.')}
+    <h4>Most mentioned on Reddit</h4>
+    ${movers.map((mover) => `
+      <div class="desk-row"><b>${esc(mover.ticker)}</b><span class="grow">${esc(mover.name)}</span>
+        <span class="num">${Number(mover.mentions) || 0}</span>
+        <span class="rise ${Number(mover.rise) >= 1.5 ? 'up' : ''}">${(Number(mover.rise) || 0).toFixed(1)}x</span></div>`).join('') || empty('Reddit is quiet or unreachable.')}`;
+
+  const filings = board.filings || [];
+  const news = (board.news || []).slice(0, 8);
+  body('desk-sensitive').innerHTML = `
+    <h4>SEC filings - material events</h4>
+    ${board.sec_contact ? (filings.map((filing) => `
+      <div class="desk-row link w${Number(filing.weight) || 1}" data-link="${esc(filing.link)}">
+        <i class="dot"></i><b>${esc(filing.ticker || '—')}</b>
+        <span class="grow">${esc(filing.company)}<small>${(filing.items || []).map((item) => esc(item.label)).join(' · ')}</small></span>
+        <span class="when">${esc(String(filing.filed).slice(11))}</span></div>`).join('') || empty('No serious 8-K filings in the latest batch.'))
+      : empty('Off - the SEC answers only requests that name a contact. Set SEC_CONTACT to your email to turn it on.')}
+    <h4>Market-moving headlines</h4>
+    ${news.map((headline) => `
+      <div class="desk-row link${headline.moving ? ' moving' : ''}" data-link="${esc(headline.link)}">
+        <span class="grow">${esc(headline.title)}<small>${esc(headline.source)} · ${esc(headline.age)}</small></span></div>`).join('') || empty('No headlines right now.')}`;
+
+  const clusters = (board.clusters || []).slice(0, 6);
+  const buys = (board.buys || []).slice(0, 8);
+  body('desk-insiders').innerHTML = `
+    <h4>Cluster buys - several insiders at once</h4>
+    ${clusters.map((buy) => `
+      <div class="desk-row"><b>${esc(buy.ticker)}</b><span class="grow">${esc(buy.company)}<small>${esc(buy.industry)}</small></span>
+        <span class="tag up">${Number(buy.insiders) || 0} insiders</span><span class="num">${cash(buy.value)}</span></div>`).join('') || empty('None in the latest filings.')}
+    <h4>Biggest purchases</h4>
+    ${buys.map((buy) => `
+      <div class="desk-row"><b>${esc(buy.ticker)}</b><span class="grow">${esc(buy.insider)}<small>${esc(buy.title)} · ${esc(buy.traded)}</small></span>
+        <span class="num">${cash(buy.value)}</span></div>`).join('') || empty('None in the latest filings.')}`;
+
+  const deals = (board.congress || []).slice(0, 12);
+  body('desk-congress').innerHTML = deals.map((deal) => `
+    <div class="desk-row link" data-link="${esc(deal.link)}"><span class="tag ${deal.side === 'buy' ? 'up' : 'down'}">${deal.side === 'buy' ? 'BUY' : 'SELL'}</span>
+      <b>${esc(deal.ticker)}</b><span class="grow">${esc(deal.member)}<small>${esc(deal.chamber)} · ${esc(deal.amount)} · disclosed ${esc(deal.disclosed)}</small></span></div>`).join('')
+    || empty('No disclosed trades in the last month, or the source is down.');
+
+  const x = board.x;
+  if (x && (x.posts || []).length) {
+    $('desk-x').querySelector('h3').innerHTML = 'On X<em>the traders you follow</em>';
+    body('desk-x').innerHTML = `
+      <div class="x-tags">${Object.entries(x.tickers || {}).sort((a, b) => b[1] - a[1]).slice(0, 8)
+        .map(([ticker, n]) => `<span class="tag">${esc(ticker)} ${Number(n) || 0}</span>`).join('')}</div>
+      ${(x.posts || []).slice(0, 8).map((post) => `
+        <div class="desk-row"><span class="grow"><b>@${esc(post.who)}</b> ${esc(post.text)}</span></div>`).join('')}`;
+  } else {
+    // Until X is set up: where your own stocks turn up on the desk.
+    const mine = ((state.snapshot && state.snapshot.market && state.snapshot.market.watchlist) || []).map((q) => q.symbol);
+    const seen = (ticker) => [
+      (board.trending || []).some((t) => t.symbol === ticker) && 'trending',
+      (board.reddit || []).some((t) => t.ticker === ticker) && 'Reddit',
+      [...(board.clusters || []), ...(board.buys || [])].some((t) => t.ticker === ticker) && 'insiders buying',
+      (board.congress || []).some((t) => t.ticker === ticker) && 'Congress',
+      picks.some((t) => t.ticker === ticker) && 'a pick',
+    ].filter(Boolean);
+    $('desk-x').querySelector('h3').innerHTML = 'Your stocks<em>where they turn up on the desk</em>';
+    body('desk-x').innerHTML = mine.map((ticker) => {
+      const where = seen(ticker);
+      return `<div class="desk-row"><b>${esc(ticker)}</b><span class="grow">${where.length ? esc(where.join(' · ')) : '<small>not on the desk</small>'}</span></div>`;
+    }).join('') + `<p class="desk-empty">${board.sources && board.sources.x === 'off'
+      ? 'To follow traders on X, give Apollo an X API bearer token (X_BEARER_TOKEN) and the accounts (X_TRADERS). X charges about half a cent a post; Apollo reads at most X_DAILY_READS a day.'
+      : 'X is set up, but nothing came back this time.'}</p>`;
+  }
+}
+
+// A filing, a headline or a disclosure opens in your browser.
+$('trading').addEventListener('click', (event) => {
+  const row = event.target.closest('[data-link]');
+  const api = bridge();
+  if (row && row.dataset.link && api && api.open_link) api.open_link(row.dataset.link);
+});
 
 /* --- asleep ------------------------------------------------------------------
  *
@@ -2066,7 +2200,7 @@ function setPanels(wanted) {
 /* LYLA's room is out while OSIRIS is up or ultra mode is, and back the way
  * it was after. */
 function applyRoom(options) {
-  setRoom(!state.osiris && !ultraOn() && !state.clear && state.panels.lyla !== false, options);
+  setRoom(!state.osiris && !ultraOn() && state.view === 'normal' && state.panels.lyla !== false, options);
 }
 
 /* LYLA's room, in or out - the button along the bottom, or "hide Lyla". Her
@@ -2150,14 +2284,16 @@ window.addEventListener('resize', () => scheduleOsiris(300));
 /* --- the modes -----------------------------------------------------------------
  *
  * One at a time, on the bar along the bottom (modes.js): normal, clear,
- * expanded and OSIRIS - clicked there, or asked for by voice. Expanded is
- * ultra mode and OSIRIS the map, switches the page already had; clear is
- * new: nothing on the screen but Apollo and the sign to press Ctrl+Alt. A
- * mode asked for throws the switches it needs in order, leaving before
- * arriving, each after the last one's channel change has settled. */
+ * trading, agents, expanded and OSIRIS - clicked there, or asked for by
+ * voice. Expanded is ultra mode and OSIRIS the map, switches the page
+ * already had; the other four are views of the display: the display itself,
+ * clear (nothing on the screen but Apollo and the sign to press Ctrl+Alt),
+ * the trading desk, and the agents. A mode asked for throws the switches it
+ * needs in order, leaving before arriving, each after the last one's
+ * channel change has settled. */
 
 function modeFlags() {
-  return { ultra: ultraOn(), osiris: state.osiris, clear: state.clear };
+  return { ultra: ultraOn(), osiris: state.osiris, view: state.view };
 }
 
 function renderModes() {
@@ -2166,21 +2302,28 @@ function renderModes() {
     button.setAttribute('aria-pressed', button.dataset.mode === mode ? 'true' : 'false'));
 }
 
-/* Clear mode: the panels, the clock, LYLA and her room all away, and Apollo
- * alone in the middle of the screen, bigger, with the sign under him. */
-function setClear(on) {
-  on = Boolean(on);
-  if (on === state.clear) return;
-  state.clear = on;
-  sfx.play(on ? 'hud' : 'down');
+/* A view of the display: normal, or one that puts the panels, the clock,
+ * LYLA and her room away for something else - Apollo alone with his sign
+ * (clear), the trading desk, or the agents. */
+function setView(view) {
+  view = Modes.VIEWS.includes(view) ? view : 'normal';
+  if (view === state.view) return;
+  const was = state.view;
+  state.view = view;
+  const back = view === 'normal';
+  sfx.play(back ? 'down' : 'hud');
   closeStory();
   closeStock();
   unlight();
   unlightRow();
   if (agent.open) toggleAgent();
+  if (view === 'trading') wantTrading();
+  if (was === 'agents') agentsCard.hide();
   renderModes();
   channelChange(() => {
-    document.body.classList.toggle('clear', on);
+    for (const name of ['clear', 'trading', 'agents']) document.body.classList.toggle(name, view === name);
+    document.body.classList.toggle('viewing', view !== 'normal');
+    if (view === 'agents') agentsCard.show();
     applyRoom({ quiet: true });
   });
 }
@@ -2199,7 +2342,7 @@ async function setMode(mode) {
     } else if (what === 'osiris') {
       setOsiris(on);
     } else {
-      setClear(on);
+      setView(on);
     }
     if (i < steps.length - 1) await new Promise((done) => setTimeout(done, 560));
   }
@@ -3257,6 +3400,13 @@ window.apollo = {
   panels(state) { setPanels(state); },
   briefing(payload) { if (payload) render(payload); },
   sleep(on) { setSleep(on); },
+  // A step of LYLA's run, as it happens - both of her cards go live.
+  agent(event) {
+    const step = event || {};
+    if (step.agent && step.agent !== 'LYLA') return;
+    agent.live(step);
+    agentsCard.live(step);
+  },
   // Which of Apollo's own modes are on - away, hands-free - for the bar.
   states(states) {
     const given = states || {};

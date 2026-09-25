@@ -193,6 +193,31 @@
        over the feed (lylaagent.js). A preview - nothing on it is live yet. -->
   <section id="lyla-agent" aria-label="LYLA's agent pipeline, a preview"></section>
 
+  <!-- Trading mode: the desk (trading.py reads it, app.js lays it out).
+       What traders are piling into and the read of their next picks, who
+       is buying their own company's stock, what Congress disclosed, and the
+       filings and headlines that move a price. -->
+  <section id="trading" aria-label="Trading desk">
+    <header class="desk-head">
+      <b>TRADING DESK</b><span id="desk-verdict">Reading the desk…</span><em id="desk-age"></em>
+    </header>
+    <div class="desk-grid">
+      <article class="desk-panel" id="desk-read"><h3>The read<em>next picks, where the signals agree</em></h3><div class="desk-body"></div></article>
+      <article class="desk-panel" id="desk-traders"><h3>Traders<em>StockTwits · Reddit</em></h3><div class="desk-body"></div></article>
+      <article class="desk-panel" id="desk-sensitive"><h3>Sensitive<em>SEC filings · market-moving news</em></h3><div class="desk-body"></div></article>
+      <article class="desk-panel" id="desk-insiders"><h3>Insiders<em>buying their own stock</em></h3><div class="desk-body"></div></article>
+      <article class="desk-panel" id="desk-congress"><h3>Congress<em>disclosed trades</em></h3><div class="desk-body"></div></article>
+      <article class="desk-panel" id="desk-x"><h3>On X<em>the traders you follow</em></h3><div class="desk-body"></div></article>
+    </div>
+    <footer class="desk-foot">A read of the crowd and the filings - not advice.</footer>
+  </section>
+
+  <!-- Agents mode: every agent as its pipeline. LYLA, for now - live while
+       you command her. -->
+  <section id="agents" aria-label="Agents">
+    <header class="agents-head"><b>AGENTS</b><span>LYLA</span><em>Say “hey LYLA” and what you need - her pipeline runs live here.</em></header>
+    <div id="agent-lyla" class="agent-card"></div>
+  </section>
 </main>
 
 <!-- The pictures that follow the pointer beside the feed and beside the
@@ -213,6 +238,10 @@
             title="The display as it always is"><i class="led"></i>Normal</button>
     <button class="mode" type="button" data-mode="clear" data-sfx="none" aria-pressed="false"
             title="Nothing but Apollo"><i class="led"></i>Clear</button>
+    <button class="mode" type="button" data-mode="trading" data-sfx="none" aria-pressed="false"
+            title="The trading desk: insiders, Congress, sensitive news, traders and the read of their next picks"><i class="led"></i>Trading</button>
+    <button class="mode" type="button" data-mode="agents" data-sfx="none" aria-pressed="false"
+            title="The agents, each as its pipeline - LYLA, for now"><i class="led"></i>Agents</button>
     <button class="mode" type="button" data-mode="expanded" data-sfx="none" aria-pressed="false"
             title="Every display at once, ready for work"><i class="led"></i>Expanded</button>
     <button class="mode" type="button" data-mode="osiris" data-sfx="none" aria-pressed="false"
@@ -242,6 +271,10 @@
             title="The display as it always is"><i class="led"></i>Normal</button>
     <button class="mode" type="button" data-mode="clear" data-sfx="none" aria-pressed="false"
             title="Nothing but Apollo"><i class="led"></i>Clear</button>
+    <button class="mode" type="button" data-mode="trading" data-sfx="none" aria-pressed="false"
+            title="The trading desk: insiders, Congress, sensitive news, traders and the read of their next picks"><i class="led"></i>Trading</button>
+    <button class="mode" type="button" data-mode="agents" data-sfx="none" aria-pressed="false"
+            title="The agents, each as its pipeline - LYLA, for now"><i class="led"></i>Agents</button>
     <button class="mode" type="button" data-mode="expanded" data-sfx="none" aria-pressed="false"
             title="Every display at once, ready for work"><i class="led"></i>Expanded</button>
     <button class="mode" type="button" data-mode="osiris" data-sfx="none" aria-pressed="false"

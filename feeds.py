@@ -297,6 +297,14 @@ def headlines(topic, limit=5):
     return found[:limit]
 
 
+def search(query, limit=10):
+    """Google News for any query, newest first. Its search takes OR and
+    quotes and `when:1d`, which Bing's RSS does not: asked for market-moving
+    words, Bing answers with evergreen explainers."""
+    return [dict(story, summary="", image="")
+            for story in _read(_url_for(query), parse_news)][:limit]
+
+
 def posts(hours=24, limit=5):
     """Trump's posts from the last `hours`, market-moving ones first."""
     body = _cached_or_fetch(POSTS_URL, POSTS_TTL)

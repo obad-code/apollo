@@ -1724,14 +1724,20 @@ def answer_with_agent(name, said, ui):
     AGENT only when one of the seven was called by name, and `agents.handle`
     is the single door through to `ask_claude`.
     """
+    card = _agent_card(name, ui)
+    card(stage="received", text=said)
+    card(stage="asking")
+    started = time.monotonic()
     try:
         reply = agents.handle(name, said, ui, ask=ask_claude)
     except anthropic.APIConnectionError as e:
+        card(stage="error", text="couldn't reach the API")
         ui.note(f"Error: couldn't reach the API. Check your internet.\n  {e}")
         return
     except anthropic.APIStatusError as e:
         # Covers auth, rate limit, 400s and 5xx - all of them report the real
         # message from the API rather than just the status code.
+        card(stage="error", text=api_error_detail(e))
         ui.note(f"Error: {api_error_detail(e)}")
         return
 
@@ -1739,11 +1745,31 @@ def answer_with_agent(name, said, ui):
     # before either the screen or the voice sees it: `spoken` is the sentences
     # and nothing else, so the tag can never be read out.
     spoken, visual = overlay_content.split_reply(reply)
+    card(stage="done", text=spoken, ms=int((time.monotonic() - started) * 1000))
     ui.turn(name, spoken, visual)
     journal.answered(spoken, who=name)
 
     ui.status(SPEAKING)
     speak(spoken)
+
+
+def _agent_card(name, ui):
+    """LYLA's pipeline card, told each step of her run as it happens - the
+    display brought up in agents mode for it first. Her card is the only
+    one there is; for the other agents this does nothing."""
+    show = getattr(ui, "agent", None)
+    if name != agents.LYLA or show is None:
+        return lambda **event: None
+    bring = getattr(ui, "ask_display", None)
+    if bring is not None:
+        bring({"action": "mode", "mode": "agents"})
+
+    def tell(**event):
+        try:
+            show({"agent": name, **event})
+        except Exception:  # noqa: BLE001 - a card that cannot be told never costs the turn
+            log.debug("agent card failed", exc_info=True)
+    return tell
 
 
 def agent_interrupt(ui):

@@ -1,9 +1,13 @@
-/* LYLA as an agent - a pre-design, before she is one. The card her HP block
- * opens over the feed: a pipeline drawn as it will run once she is real -
- * your query coming in, a search for what matters to it, LYLA working, and
- * three things going out - with dots running along the wires, a line of
- * what she is doing that changes every few seconds, and a count of
- * workflows ticking up. Nothing on it is live yet, and it says PREVIEW.
+/* LYLA as an agent. The card her HP block opens over the feed, and the one
+ * agents mode shows: a pipeline - your command coming in, where it is sent,
+ * LYLA working, and what goes out - with dots running along the wires, a
+ * line of what is happening, and the runs counted.
+ *
+ * Until you first command her it is a preview, and says PREVIEW: a demo
+ * run on a loop. The moment you do (apollo.py calls `live`), it goes LIVE
+ * and shows the real thing - what you said, that it was routed to her by
+ * name, that she is asking Claude, and the reply with how long it took (or
+ * the error) - and the demo stops for good.
  *
  * Ported from a React component (ai-agent-pipeline, framer-motion) to this
  * page's own JS, SVG and CSS, so the display still needs no build step: the
@@ -50,6 +54,10 @@ const DOTS = [
 ];
 
 const count = (n) => n.toLocaleString('en-US');
+const short = (text, most = 64) => {
+  const said = String(text || '').replace(/\s+/g, ' ').trim();
+  return said.length > most ? `${said.slice(0, most - 1).trimEnd()}…` : said;
+};
 
 const wire = (d, strong, arrow) =>
   `<path d="${d}" fill="none" stroke="rgba(0,82,255,${strong ? 0.22 : 0.15})" stroke-width="1.5"`
@@ -60,24 +68,25 @@ const dot = ([p, dur, delay, r, opacity]) =>
   + `<animateMotion dur="${dur}s" repeatCount="indefinite" begin="${delay}s" path="${PATHS[p]}"/></circle>`;
 
 // A box on the pipeline: its kind over its name, and a tag under it.
-const node = (x, w, kind, name, tag, nameSize = 12) => `
+// Each label carries what it says once the card is live (data-live).
+const node = (x, w, [kind, liveKind], [name, liveName], [tag, liveTag], nameSize = 12) => `
     <rect x="${x}" y="66" width="${w}" height="44" rx="8" fill="#141414" stroke="rgba(255,255,255,0.09)" stroke-width="0.5"/>
-    <text x="${x + w / 2}" y="83" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.28)" letter-spacing=".07em">${kind}</text>
-    <text x="${x + w / 2}" y="100" text-anchor="middle" font-size="${nameSize}" fill="rgba(255,255,255,0.82)">${name}</text>
-    <text x="${x + w / 2}" y="122" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,0.18)">${tag}</text>`;
+    <text x="${x + w / 2}" y="83" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.28)" letter-spacing=".07em" data-live="${liveKind}">${kind}</text>
+    <text x="${x + w / 2}" y="100" text-anchor="middle" font-size="${nameSize}" fill="rgba(255,255,255,0.82)" data-live="${liveName}">${name}</text>
+    <text x="${x + w / 2}" y="122" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,0.18)" data-live="${liveTag}">${tag}</text>`;
 
 // One of the three things going out, with its light: steady when done,
 // pulsing while it is still going.
-const output = (y, name, colour, pulse = '') => `
+const output = (y, [name, liveName], colour, pulse = '') => `
     <rect x="448" y="${y}" width="116" height="30" rx="7" fill="#111" stroke="rgba(255,255,255,0.07)" stroke-width="0.5"/>
-    <text x="490" y="${y + 18.5}" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.62)">${name}</text>
-    <circle cx="550" cy="${y + 8}" r="3" fill="${colour}" ${pulse ? `class="agent-status" style="${pulse}"` : 'opacity="0.95"'}/>`;
+    <text x="490" y="${y + 18.5}" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.62)" data-live="${liveName}">${name}</text>
+    <circle class="agent-out${pulse ? ' agent-status' : ''}" cx="550" cy="${y + 8}" r="3" fill="${colour}" ${pulse ? `style="${pulse}"` : 'opacity="0.95"'}/>`;
 
 /* The card, whole. */
 export function markup() {
   return `
   <div class="agent-head">
-    <span class="agent-live"><i></i>LYLA · AGENT PIPELINE · PREVIEW</span>
+    <span class="agent-live"><i></i><span data-live="LYLA · AGENT PIPELINE · LIVE">LYLA · AGENT PIPELINE · PREVIEW</span></span>
     <span class="agent-meta">3 agents · 0 errors</span>
   </div>
   <svg class="agent-map" width="100%" viewBox="0 0 580 172" aria-hidden="true">
@@ -89,8 +98,8 @@ export function markup() {
     ${wire(PATHS.p1, true, true)}${wire(PATHS.p2, true, true)}
     ${wire(PATHS.p3)}${wire(PATHS.p4)}${wire(PATHS.p5)}
     ${DOTS.map(dot).join('')}
-    ${node(16, 100, 'TRIGGER', 'User Query', 'node-01')}
-    ${node(158, 110, 'VECTOR DB', 'Semantic Search', 'pinecone', 11)}
+    ${node(16, 100, ['TRIGGER', 'TRIGGER'], ['User Query', 'Your command'], ['node-01', 'Ctrl+Alt'])}
+    ${node(158, 110, ['VECTOR DB', 'ROUTER'], ['Semantic Search', 'Called by name'], ['pinecone', 'agents.py'], 11)}
     <rect x="306" y="53" width="105" height="70" rx="10" fill="#050D1C" stroke="#0052FF" stroke-width="1"/>
     <rect x="318" y="53.5" width="80" height="1" rx="0.5" fill="rgba(51,117,255,0.5)"/>
     <text x="358" y="78" text-anchor="middle" font-size="9.5" fill="rgba(51,117,255,0.65)" letter-spacing=".07em">LYLA</text>
@@ -99,19 +108,19 @@ export function markup() {
     <circle class="agent-think" cx="358" cy="113" r="2.8" fill="#0052FF" style="animation-delay:.4s"/>
     <circle class="agent-think" cx="370" cy="113" r="2.8" fill="#0052FF" style="animation-delay:.8s"/>
     <text x="358" y="139" text-anchor="middle" font-size="8.5" fill="rgba(0,82,255,0.4)">claude</text>
-    ${output(35, 'Email Draft', '#22c55e')}
-    ${output(73, 'CRM Update', '#f59e0b', 'animation-duration:1.9s')}
-    ${output(111, 'Report Gen', '#f59e0b', 'animation-duration:2.2s;animation-delay:.35s')}
+    ${output(35, ['Email Draft', 'Voice reply'], '#22c55e')}
+    ${output(73, ['CRM Update', 'On screen'], '#f59e0b', 'animation-duration:1.9s')}
+    ${output(111, ['Report Gen', 'Journal'], '#f59e0b', 'animation-duration:2.2s;animation-delay:.35s')}
   </svg>
   <div class="agent-say">
     <span class="agent-prompt">›</span>
     <div class="agent-line"></div>
   </div>
   <div class="agent-stats">
-    <div><small>WORKFLOWS</small><b class="agent-count"></b></div>
-    <div><small>TOKENS</small><b>4.2M</b></div>
-    <div><small>AVG LATENCY</small><b>342ms</b></div>
-    <div class="agent-stack"><small>STACK</small><em>Claude · Pinecone</em></div>
+    <div><small data-live="RUNS">WORKFLOWS</small><b class="agent-count"></b></div>
+    <div><small data-live="LAST">TOKENS</small><b class="agent-last">4.2M</b></div>
+    <div><small>AVG LATENCY</small><b class="agent-latency">342ms</b></div>
+    <div class="agent-stack"><small>STACK</small><em data-live="Claude · agents.py">Claude · Pinecone</em></div>
   </div>`;
 }
 
@@ -125,10 +134,17 @@ export class LylaAgent {
     this.workflows = FIRST_WORKFLOWS;
     this.jobs = [];
     this.leaving = null;
+    this.isLive = false;
+    this.runs = 0;
+    this.errors = 0;
+    this.times = [];
     root.innerHTML = markup();
     root.setAttribute('aria-hidden', 'true');
     this.line = root.querySelector('.agent-line');
     this.count = root.querySelector('.agent-count');
+    this.last = root.querySelector('.agent-last');
+    this.latency = root.querySelector('.agent-latency');
+    this.meta = root.querySelector('.agent-meta');
     this.line.textContent = MESSAGES[this.message];
     this.count.textContent = count(this.workflows);
   }
@@ -142,10 +158,85 @@ export class LylaAgent {
     this.root.classList.add('open');
     this.root.setAttribute('aria-hidden', 'false');
     this.sound('hud');
+    if (!this.isLive) this.demo();
+  }
+
+  /* The preview's loop: the demo's lines, and its workflows ticking up. */
+  demo() {
     this.jobs = [
       this.timers.setInterval(() => this.nextLine(), MESSAGE_EVERY),
       this.timers.setInterval(() => this.nextWorkflow(), WORKFLOW_EVERY),
     ];
+  }
+
+  stopDemo() {
+    for (const job of this.jobs) this.timers.clearInterval(job);
+    this.jobs = [];
+  }
+
+  /* A run of hers, as it happens: `stage` is received (with what you
+   * said), asking, done (with the reply and how many ms it took) or error
+   * (with what went wrong). */
+  live(event) {
+    const { stage, text = '', ms = 0 } = event || {};
+    if (!this.isLive) this.goLive();
+    if (stage === 'received') {
+      this.runs += 1;
+      this.count.textContent = count(this.runs);
+      this.outputs('wait');
+      this.say(`Received: "${short(text, 60)}"`);
+    } else if (stage === 'asking') {
+      this.say('Routed to LYLA - called by name. Asking Claude…');
+    } else if (stage === 'done') {
+      const took = Math.round(Number(ms) || 0);
+      this.times.push(took);
+      const average = this.times.reduce((a, b) => a + b, 0) / this.times.length;
+      this.last.textContent = `${took} ms`;
+      this.latency.textContent = `${Math.round(average)} ms`;
+      this.outputs('ok');
+      this.say(`Done in ${took} ms: ${short(text, 44)}`);
+    } else if (stage === 'error') {
+      this.errors += 1;
+      this.meta.textContent = `1 agent · ${this.errors} error${this.errors === 1 ? '' : 's'}`;
+      this.outputs('err');
+      this.say(`Error: ${short(text, 70)}`);
+    }
+  }
+
+  /* From the preview to the real thing: every label to what it says live,
+   * the demo's numbers cleared, and the demo stopped. */
+  goLive() {
+    this.isLive = true;
+    this.stopDemo();
+    this.root.classList.add('live');
+    this.root.querySelectorAll('[data-live]').forEach((el) => { el.textContent = el.dataset.live; });
+    this.meta.textContent = '1 agent · 0 errors';
+    this.count.textContent = '0';
+    this.last.textContent = '—';
+    this.latency.textContent = '—';
+  }
+
+  /* The three things going out: waiting on her, done, or failed. */
+  outputs(state) {
+    this.root.querySelectorAll('.agent-out').forEach((dot) => {
+      dot.classList.remove('wait', 'ok', 'err', 'agent-status');
+      dot.classList.add(state);
+    });
+  }
+
+  /* A line of its own, out with the old one and in from below. */
+  say(text) {
+    if (this.leaving !== null) this.timers.clearTimeout(this.leaving);
+    const line = this.line;
+    line.classList.add('leaving');
+    this.leaving = this.timers.setTimeout(() => {
+      this.leaving = null;
+      line.textContent = text;
+      line.classList.remove('leaving');
+      line.classList.add('arriving');
+      void line.offsetWidth;
+      line.classList.remove('arriving');
+    }, LEAVE_FOR);
   }
 
   hide() {
@@ -153,8 +244,7 @@ export class LylaAgent {
     this.root.classList.remove('open');
     this.root.setAttribute('aria-hidden', 'true');
     this.sound('down');
-    for (const job of this.jobs) this.timers.clearInterval(job);
-    this.jobs = [];
+    this.stopDemo();
     if (this.leaving !== null) this.timers.clearTimeout(this.leaving);
     this.leaving = null;
     this.line.classList.remove('leaving', 'arriving');

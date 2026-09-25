@@ -278,8 +278,10 @@ it, and the whole list seen through a halftone of dots.
 nothing on the screen but Apollo, bigger, in the middle of it, and under
 him a sign - *Press Ctrl + Alt to command Apollo* - with his answer still
 shown while he gives it and the bar faint until you point at it (Escape
-leaves it); **Expanded**, every display at once (ultra mode, below); and
-**OSIRIS**, the map laid into the display (below). Click one, or ask -
+leaves it); **Trading**, the trading desk (below); **Agents**, the agents
+as their pipelines - LYLA, for now (below); **Expanded**, every display at
+once (ultra mode, below); and **OSIRIS**, the map laid into the display
+(below). Click one, or ask -
 *"clear mode"*, *"الوضع الصافي"*, *"الوضع الموسع"*, *"رجع الوضع العادي"* -
 and the display comes up if it has to and switches, leaving one mode before
 arriving in the next. Beside them, Apollo's own: **Idle** puts him into idle
@@ -413,6 +415,50 @@ no miner and nothing that touches a wallet. It does carry tools that look at
 the machine they run on - a scan of your own PC's local ports and addresses,
 a Bluetooth scanner, live location - and each runs only when you open that
 tool; Bluetooth and location still ask first.
+
+**Trading mode.** **Trading** on the bar, or *"trading mode"* / *"وضع
+التداول"*, turns the display into a trading desk of six displays
+(`trading.py` reads them, every ten minutes while the desk is up and not at
+all otherwise):
+
+- **The read** - the next picks, where the signals agree: each ticker scored
+  by how many kinds of signal point at it (trending with traders, bullish
+  messages, Reddit mentions rising, insiders buying, Congress buying, the
+  traders you follow on X) and how strongly, with its reasons and the
+  crowd's own summary of why it is talking about it. Agreement ranks first:
+  two kinds of signal beat one strong one.
+- **Traders** - what is trending on StockTwits, with how bullish its tagged
+  messages are, and the most mentioned stocks on Reddit's finance
+  communities (ApeWisdom), with how fast the mentions are rising.
+- **Sensitive** - the SEC's feed of 8-K current reports ranked by how
+  serious the event is (bankruptcy, restatement, delisting notice, change
+  of control, deals signed or ended, executives leaving...), and
+  market-moving headlines (Finnhub's market news and a search for halts,
+  FDA decisions, deals, probes, guidance cuts, downgrades). The SEC answers
+  only requests that name a contact, so its filings wait for your email in
+  `SEC_CONTACT`.
+- **Insiders** - OpenInsider's screens of Form 4 filings: cluster buys
+  (several insiders of one company buying at once, the strongest insider
+  signal) and the biggest open-market purchases.
+- **Congress** - House and Senate trades disclosed under the STOCK Act.
+- **On X** - the traders you follow, if you give Apollo an X API bearer
+  token (`X_BEARER_TOKEN`) and their accounts (`X_TRADERS`, comma-separated).
+  X has no free tier: reads cost about half a cent a post, so Apollo reads
+  at most `X_DAILY_READS` a day (100 unless you say). Until then the panel
+  shows where your own stocks turn up on the desk.
+
+Click a filing, a headline or a disclosure to open it. By voice, *"what are
+traders buying?"* / *"وش السهم الجاي"* gives the read in a few sentences
+(the `trading_read` tool). It is a read of the crowd and the filings, not
+advice, and the desk says so.
+
+**Agents mode.** **Agents** on the bar, or *"agents mode"*: each agent as
+its pipeline card - only LYLA, for now. Until you first command her it is a
+preview on a loop and says PREVIEW. Say *"hey LYLA, ..."* and the display
+comes up in agents mode and her card goes LIVE: your command, routed to her
+by name, her asking Claude, then the reply with how long it took (or the
+error), her runs counted and her latency averaged. The card on her HP block
+runs live the same way.
 
 **Ultra mode.** **Expanded** on the bar along the bottom, or *"ultra mode"* /
 *"وضع الشغل"* / *"جهز الشاشة للشغل"*, gets Apollo ready for work: a channel
@@ -837,6 +883,7 @@ The only thing left is your API key.
 | `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
 | `ui/full/lylaagent.js` | LYLA's agent card, a preview before she is an agent: the pipeline, its moving parts and what opens and shuts it - ported from a React component to plain JS and SVG, so there is still no build step (`tests/test_lyla_agent.py`). |
+| `trading.py` | Trading mode's desk: insiders (OpenInsider), Congress, the SEC's 8-K filings, market-moving news, StockTwits and Reddit, X when it is set up, and the read of the next picks (`tests/test_trading.py`). |
 | `ui/full/modes.js` | The display's modes - normal, clear, expanded, OSIRIS - and the switches to throw, in order, from one to another (`tests/test_modes.py`). |
 | `ui/full/feed.js` | The feed's rows, fuller: a source's initials for its tile, what a story is about, and the line over the list (`tests/test_feed_rows.py`). |
 | `ui/full/sfx.js` | The display's sounds, synthesized with Web Audio: the recipes, and the player that keeps a sound from doubling up (`tests/test_sfx.py`). |

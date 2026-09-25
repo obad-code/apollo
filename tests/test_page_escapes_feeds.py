@@ -22,7 +22,12 @@ UNTRUSTED = re.compile(
     # The feed merges headlines and posts into one `item`. Renaming a field
     # must not quietly drop it out of this check - which is what happened
     # when it did, and the count fell from eleven to six without a failure.
-    r"|item\.(?:title|source|age|summary|image|link|interest|id)"
+    r"|item\.(?:title|source|age|summary|image|link|interest|id|label)"
+    # The trading desk (trading.py): every name on it came off a source.
+    r"|pick\.(?:ticker|name|summary)|name\.(?:symbol|name)|mover\.(?:ticker|name)"
+    r"|filing\.(?:ticker|company|link|filed)|headline\.(?:title|source|age|link)"
+    r"|buy\.(?:ticker|company|industry|insider|title|traded)"
+    r"|deal\.(?:ticker|member|chamber|amount|disclosed|link)|post\.(?:who|text)|reason"
     r"|quote\.(?:symbol|name|logo)"
     # "Add a stock" lists what apollo.py suggests; a pick is data like a quote.
     r"|pick\.(?:symbol|name)"

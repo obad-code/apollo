@@ -26,33 +26,41 @@ def run(tmp_path, body):
 
 
 def flags(**on):
-    return json.dumps({"ultra": False, "osiris": False, "clear": False, **on})
+    return json.dumps({"ultra": False, "osiris": False, "view": "normal", **on})
 
 
 def test_the_modes_on_the_bar(tmp_path):
-    assert run(tmp_path, "M.MODES.map((m) => m.id)") == ["normal", "clear", "expanded", "osiris"]
+    assert run(tmp_path, "M.MODES.map((m) => m.id)") == ["normal", "clear", "trading", "agents",
+                                                        "expanded", "osiris"]
 
 
-@pytest.mark.parametrize("on,mode", [({}, "normal"), ({"clear": True}, "clear"),
-                                     ({"ultra": True}, "expanded"), ({"osiris": True}, "osiris")])
+@pytest.mark.parametrize("on,mode", [({}, "normal"), ({"view": "clear"}, "clear"),
+                                     ({"view": "trading"}, "trading"), ({"view": "agents"}, "agents"),
+                                     ({"ultra": True}, "expanded"), ({"osiris": True}, "osiris"),
+                                     ({"ultra": True, "view": "clear"}, "expanded")])
 def test_which_is_on(tmp_path, on, mode):
     assert run(tmp_path, f"M.current({flags(**on)})") == mode
 
 
 @pytest.mark.parametrize("on,wanted,steps", [
-    ({}, "clear", [["clear", True]]),
-    ({"clear": True}, "normal", [["clear", False]]),
-    ({"ultra": True}, "clear", [["ultra", False], ["clear", True]]),
-    ({"clear": True}, "expanded", [["clear", False], ["ultra", True]]),
+    ({}, "clear", [["view", "clear"]]),
+    ({"view": "clear"}, "normal", [["view", "normal"]]),
+    ({"view": "clear"}, "trading", [["view", "trading"]]),
+    ({"view": "trading"}, "agents", [["view", "agents"]]),
+    ({"ultra": True}, "clear", [["ultra", False], ["view", "clear"]]),
+    ({"ultra": True}, "trading", [["ultra", False], ["view", "trading"]]),
+    ({"view": "clear"}, "expanded", [["view", "normal"], ["ultra", True]]),
     ({"ultra": True}, "osiris", [["ultra", False], ["osiris", True]]),
-    ({"osiris": True}, "clear", [["osiris", False], ["clear", True]]),
+    ({"osiris": True}, "clear", [["osiris", False], ["view", "clear"]]),
+    ({"osiris": True}, "agents", [["osiris", False], ["view", "agents"]]),
+    ({"view": "trading"}, "osiris", [["view", "normal"], ["osiris", True]]),
     ({"osiris": True}, "expanded", [["ultra", True]]),        # the map goes with it, as a tile
     ({}, "normal", []),
-    ({"clear": True}, "clear", []),
+    ({"view": "clear"}, "clear", []),
 ])
 def test_the_steps_between_them(tmp_path, on, wanted, steps):
     assert run(tmp_path, f"M.plan({flags(**on)}, {json.dumps(wanted)})") == steps
 
 
 def test_a_mode_there_is_not_changes_nothing(tmp_path):
-    assert run(tmp_path, f"M.plan({flags(clear=True)}, 'party')") == []
+    assert run(tmp_path, f"M.plan({flags(view='clear')}, 'party')") == []

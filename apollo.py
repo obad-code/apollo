@@ -894,6 +894,11 @@ class WebReporter:
         display's bar to light."""
         self._call("states", dict(states))
 
+    def agent(self, event):
+        """A step of an agent's run - LYLA's, for now - for her pipeline card
+        on the display: received, asking, done or error."""
+        self._call("agent", dict(event))
+
     def intro(self):
         """Play the word, as Apollo comes up."""
         self._call("intro")
@@ -1107,6 +1112,14 @@ class Api:
     def states(self):
         """Which of them are on, for the bar to light."""
         return self._app.mode_states() if self._app is not None else {}
+
+    def trading(self):
+        """Trading mode is up: its board is read now, and kept fresh for the
+        next half hour (the page asks again while it stays up)."""
+        if self._app is None:
+            return False
+        self._app.want_trading()
+        return True
 
     def set_panel(self, name, shown):
         """A panel shown or hidden from the display itself - LYLA's room, by
@@ -1681,6 +1694,12 @@ class Apollo:
         (check_presence)."""
         self.idle_requested = time.monotonic()
         self.idle_grace = grace
+
+    def want_trading(self):
+        """Trading mode wants its board: read it now, and keep it fresh."""
+        data = getattr(self, "data", None)
+        if data is not None:
+            data.want_trading()
 
     def mode_states(self):
         """Which of Apollo's own modes are on, for the display's bar."""
