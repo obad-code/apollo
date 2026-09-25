@@ -251,7 +251,8 @@ document.addEventListener('pointermove', (event) => lyla.pointer(event.clientX, 
  * rings of lit dots joined round each ring, turning against each other and
  * breathing with your voice - each ring a latitude of one sphere, meridians
  * joining them, the sphere turning slowly and tipped towards you. While Apollo is busy they brighten, thicken and
- * turn faster, a scan bar runs down the glass and a wave goes out from the
+ * turn faster, a scan line glides and sways across the glass quicker and a
+ * wave goes out from the
  * middle over and over; while it is listening the rings take a gradient,
  * cyan in the middle to amber and orange at the edge; and while it speaks
  * they go towards white and a white bloom lifts off the middle. */
@@ -420,14 +421,27 @@ function drawRing(now) {
   ring.arc(cx, cy, coreR * 1.02, -2.5, -1.5);
   ring.stroke();
 
-  // A scan bar drifting down inside the bezel.
-  const scanY = cy - coreR * 0.94 + ((t * 0.055 * px) % (coreR * 1.88));
-  const half = Math.sqrt(Math.max(0, (coreR * 0.94) ** 2 - (scanY - cy) ** 2));
+  // A scan line down the glass, gliding from side to side and swaying as it
+  // goes - on the rings' own clock, so it quickens with them, smoothly.
+  // Brightest across the middle, fading out towards the bezel, with a soft
+  // glow so it reads over the meridians and the screen's own stripes.
+  const scan = Rings.scanLine(core.clock);
+  const [ax, ay] = [cx + scan.a.x * coreR, cy + scan.a.y * coreR];
+  const [bx, by] = [cx + scan.b.x * coreR, cy + scan.b.y * coreR];
+  const scanA = 0.12 + 0.22 * scope;
+  const beam = ring.createLinearGradient(ax, ay, bx, by);
+  beam.addColorStop(0, `rgba(${rgb},0)`);
+  beam.addColorStop(0.5, `rgba(${rgb},${scanA.toFixed(3)})`);
+  beam.addColorStop(1, `rgba(${rgb},0)`);
   ring.lineWidth = 2 * px;
-  ring.strokeStyle = `rgba(${rgb},${(0.14 * scope).toFixed(3)})`;
+  ring.strokeStyle = beam;
+  ring.shadowBlur = 10 * px;
+  ring.shadowColor = `rgba(${rgb},${(scanA * 1.6).toFixed(3)})`;
   ring.beginPath();
-  ring.moveTo(cx - half, scanY); ring.lineTo(cx + half, scanY);
+  ring.moveTo(ax, ay);
+  ring.lineTo(bx, by);
   ring.stroke();
+  ring.shadowBlur = 0;
 
   // While Apollo works, a wave going out from the middle, over and over.
   if (env > 0.004) {

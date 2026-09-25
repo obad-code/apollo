@@ -116,3 +116,37 @@ def test_seen_it_is_tipped_towards_you_and_turning_about_its_axis(tmp_path):
     assert math.dist((spot0["x"], spot0["y"]), (spot1["x"], spot1["y"])) > 0.3
     assert pole0["y"] < -0.5 and pole0["z"] > 0            # the top pole leans towards you
     assert all(abs(length(p) - 1) < 1e-9 for p in (pole0, spot0, spot1))
+
+
+# --- the scan line ---------------------------------------------------------------
+# One line down the glass, top to bottom, gliding from side to side and back
+# and swaying a little as it goes, like a pendulum - never wrapping round or
+# jumping, never leaving the bezel.
+
+def scan(tmp_path, times):
+    return run(tmp_path, f"{list(times)}.map((c) => R.scanLine(c))")
+
+
+def test_the_scan_line_runs_top_to_bottom_across_the_glass(tmp_path):
+    for s in scan(tmp_path, range(0, 60000, 1500)):
+        (x0, y0), (x1, y1) = (s["a"]["x"], s["a"]["y"]), (s["b"]["x"], s["b"]["y"])
+        assert math.hypot(x0, y0) == pytest.approx(0.94) and math.hypot(x1, y1) == pytest.approx(0.94)
+        assert y0 < -0.5 and y1 > 0.5                                  # top to bottom
+        assert abs(x1 - x0) < 0.35 * (y1 - y0)                        # upright, give or take a sway
+
+
+def test_it_glides_from_side_to_side_and_sways(tmp_path):
+    lines = scan(tmp_path, range(0, 40000, 250))
+    xs = [s["x"] for s in lines]
+    tilts = [s["tilt"] for s in lines]
+    assert min(xs) < -0.5 and max(xs) > 0.5 and max(abs(x) for x in xs) < 0.94
+    assert min(tilts) < -0.05 and max(tilts) > 0.05 and max(abs(a) for a in tilts) < 0.2
+
+
+def test_it_moves_smoothly_never_jumping(tmp_path):
+    lines = scan(tmp_path, range(0, 40000, 16))                       # a frame at a time
+    steps = [abs(b["x"] - a["x"]) for a, b in zip(lines, lines[1:])]
+    turns = [abs(b["tilt"] - a["tilt"]) for a, b in zip(lines, lines[1:])]
+    assert max(steps) < 0.01 and max(turns) < 0.003
+    speeds = [b - a for a, b in zip(steps, steps[1:])]
+    assert max(abs(s) for s in speeds) < 0.0005                       # it eases, never lurches

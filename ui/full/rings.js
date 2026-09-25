@@ -13,7 +13,9 @@
  * And in 3D, as the old display's own 3D had them: each ring a latitude of
  * one sphere, meridians joining them pole to pole, the sphere turning slowly
  * about its axis and tipped towards you (sphereDots, meridian, view). On the
- * screen x runs right and y down; z comes towards you. */
+ * screen x runs right and y down; z comes towards you.
+ *
+ * And the scan line down the glass, gliding and swaying (scanLine). */
 
 export const LAYERS = [
   { r: 0.26, n: 6, sp: 0.00046 },
@@ -91,4 +93,23 @@ export function view(p, spin) {
  * Apollo speaking come and go - eased, frame by frame, at any frame rate. */
 export function ease(current, target, dt, seconds) {
   return current + (target - current) * (1 - Math.exp(-dt / seconds));
+}
+
+// The scan line's reach: the inside of the bezel, in core radii.
+const GLASS = 0.94;
+
+/* The scan line at `clock`: one line down the glass, top to bottom, gliding
+ * from side to side and back on slow waves - no wrap, so it never jumps -
+ * and swaying as it goes, like a pendulum: its foot trailing the way it is
+ * moving, with a slower wobble of its own. `x` is where it crosses the
+ * middle and `tilt` its lean from upright, in radians; `a` and `b` are where
+ * it meets the bezel, top and bottom. */
+export function scanLine(clock) {
+  const x = 0.6 * Math.sin(clock * 0.00036) + 0.1 * Math.sin(clock * 0.00097 + 1.3);
+  const tilt = -0.12 * Math.cos(clock * 0.00036) + 0.03 * Math.sin(clock * 0.0013 + 0.4);
+  const dx = Math.sin(tilt), dy = Math.cos(tilt);
+  const along = x * dx;
+  const half = Math.sqrt(along * along - (x * x - GLASS * GLASS));
+  const end = (s) => ({ x: x + s * dx, y: s * dy });
+  return { x, tilt, a: end(-along - half), b: end(-along + half) };
 }
