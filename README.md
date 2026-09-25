@@ -189,13 +189,16 @@ one is a number Apollo actually has.
 
 ### The full display
 
-**Apollo's shape and its name.** On the full display Apollo is a circle,
-the way the old display drew it: five rings of lit dots nested inside one
-another, each turning against the one inside it, on a scope's faint
-graticule round a dark lens, in amber, with a warm glow behind (`ui/full/rings.js`
-has the dots). While Apollo works the rings brighten and quicken and a wave
-goes out from the middle; listening, they take a gradient, cyan in the
-middle to orange at the edge; speaking, they go white and bloom. Under it
+**Apollo's shape and its name.** On the full display Apollo is a planet
+made of quantum dots, turning in space: eleven hundred small lights spread
+evenly over a sphere - its seas in blues and cyans, its land in ambers and
+greens, ice at the poles - lit from the upper left, its night side dark but
+for a few towns, a blue rim of air round it, and a ring of amber dots round
+its middle whose far side passes behind it (`ui/full/planet.js` has where the
+dots are). It is tipped on its axis and seen from a little above, and it
+breathes with your voice. While Apollo works it turns faster and its lights
+come up; listening, its dots stir with your voice; speaking, it goes white
+and a bloom lifts off it. Under it
 the name is a neon sign: Melete, 19px, spaced a fifth of a letter apart, in
 #FFF0CE, each letter pulsing on its own a little after the one before, the
 first O a tube on its way out, a warm bloom breathing behind and three dots
@@ -231,15 +234,13 @@ the display stays open, as if Ctrl+` had been pressed; Ctrl+` puts it away.
 It is skipped when a full-screen program was already up, so a game or a
 film is left alone and Apollo stays in the overlay.
 
-The full display is the whole screen. Behind everything, an old set's own
-pixels (`ui/full/shader.js`): a slot mask as fine as a TV's - cells of a red,
-a green and a blue slot, six screen pixels across, laid on lightly - lit by
-a CRT gradient: one wide band of light leaning across the tube from the top
-left to the bottom right, warm below it (red, orange, yellow), pale along its
-ridge and cool above it (teal, blue, night), with soft scanlines and faint
-wavy ripples crawling up the glass - bulged by a fisheye, swaying and
-wandering slowly, and breathing rather than flickering: it is meant to be
-restful to look at for hours. Over it: the clock with the date in both
+The full display is the whole screen. Behind everything, space
+(`ui/full/shader.js`): black, with two faint clouds of blue drifting through
+it, seen through a lattice of tiny triangles - the set's own pixels, if its
+pixels were triangles - pointing up and down in turn, each lit flat by the
+blue at its middle, and a few of them stars, twinkling bluish white; soft
+scanlines over it, bulged by a fisheye, and breathing rather than
+flickering: it is meant to be restful to look at for hours. Over it: the clock with the date in both
 calendars, Riyadh's weather, the next prayer and who on your list reports
 this week; your watchlist, and under it the status line - the links to
 Gemini, Claude and the mic, the market's hours, the machine as rows of lit
@@ -781,8 +782,8 @@ The only thing left is your API key.
 | `ui/full/index.html` | The full display. Written by hand — edit it directly. |
 | `ui/full/app.js` | Its panels, its bridge (`window.apollo.*`) and its motion. |
 | `ui/full/app.css` | Its skin: the overlay's palette, the CRT surface, the grid. |
-| `ui/full/shader.js` | The ground: an old set's slot mask lit by the CRT gradient, in plain WebGL. |
-| `ui/full/rings.js` | Apollo's shape as data: its five rings of dots, which way each turns, and the easing of their pace. No DOM, so node tests it (`tests/test_rings.py`). |
+| `ui/full/shader.js` | The ground: black space, blue haze and stars through a lattice of tiny triangles, in plain WebGL. |
+| `ui/full/planet.js` | Apollo's shape as data: the planet's dots, which are land, its tilt and turn, its ring, and the easing of its pace. No DOM, so node tests it (`tests/test_planet.py`). |
 | `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
 | `ui/fonts/thmanyah/` | Thmanyah Sans, as OTFs — what the overlay loads privately at runtime. |

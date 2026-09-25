@@ -1,30 +1,25 @@
-// The display's ground: an old set's own pixels, each lit by a broad band
-// of colour drifting underneath it, seen through the bulge of the tube.
+// The display's ground: space. Black, with a faint blue haze drifting
+// through it, seen through a lattice of tiny triangles - the set's own pixels,
+// if its pixels were triangles - and through the bulge of the tube.
 //
 // Plain WebGL - three.js would be 600 KB to draw two triangles. All in one
 // pass:
-//   - the colour: one wide band of light leaning across the tube from the
-//     top left to the bottom right - warm below it, going red to orange to
-//     yellow, pale along its ridge, and cool above it, going teal to blue
-//     to night - the CRT gradient of the reference picture. It sways a few
-//     degrees and wanders, slowly: it is meant to be restful to look at for
-//     hours. Asleep, it settles into a dusk horizon instead - navy
+//   - the colour: near black, and in it two soft clouds of blue drifting on
+//     slow loops of their own, with a wider, fainter wash round the middle
+//     where Apollo is. Asleep, it settles into a dusk horizon instead - navy
 //     overhead, the last orange low down - which is the idle screen's sky.
-//   - the pixels: a slot mask, as fine as a set's - cells of a red, a green
-//     and a blue slot, six screen pixels across, alternate columns half a
-//     cell apart - laid lightly over the colour, so the gradient reads
-//     smooth from a chair away and shows its pixels up close. Over them,
-//     soft scanlines, and faint ripples crawling up the glass the way the
-//     reference picture has them.
+//   - the pixels: tiny triangles, point up and point down in turn, row after
+//     row, each smaller than its place so that black shows between them, and
+//     each lit flat by the colour at its own middle. A few of them are stars:
+//     brighter, bluish white, each twinkling on its own.
 //   - the glass: a fisheye that swells the middle of the picture and pinches
-//     its corners, which go dark the way a tube's did.
+//     its corners, which go dark the way a tube's did; soft scanlines over it.
 //   - the set it is on: lit, not still - a breath of brightness a second or
 //     so, and now and then the faintest dip - never anything you would call
 //     a flicker. Decided in JavaScript once a frame and handed in; a
 //     whisper of static is hashed here per pixel.
 // Drawn at 55 frames a second or more, on evenly spaced frames of the
-// screen's own rate, so that what little moves moves smoothly. Dimmed
-// throughout: the panels sit on it and have to stay readable.
+// screen's own rate, so that what little moves moves smoothly.
 
 const VERTEX = `
 attribute vec2 position;
@@ -36,7 +31,7 @@ precision highp float;
 uniform vec2 resolution;
 uniform float time;
 uniform float sleep;      // 0 awake, 1 asleep - eased, so the sky changes slowly
-uniform float pitch;      // one cell of the mask - red, green and blue slot - in device pixels
+uniform float pitch;      // one triangle of the lattice, side to side, in device pixels
 uniform float flicker;    // the tube's brightness this frame: a breath under 1
 uniform float shimmer;    // how much the lines shimmer against each other this frame
 uniform float grain;      // a fresh seed every frame, for the static
@@ -57,48 +52,25 @@ float fbm(vec2 p) {
   return value;
 }
 
-// The band's colour at u, across it: warm below the ridge (u < 0), cool
-// above it (u > 0), pale along it - the stops read off the reference
-// picture and brightened a little, since the whole ground is dimmed under
-// the panels. With OSIRIS up, the same band in its colours: gold on the warm
-// side, its cyan and blue on the cool, the night a void.
-vec3 ramp(float u) {
-  vec3 c0 = mix(vec3(0.30, 0.07, 0.07), vec3(0.22, 0.16, 0.05), osiris);
-  vec3 c1 = mix(vec3(0.62, 0.20, 0.10), vec3(0.58, 0.44, 0.12), osiris);
-  vec3 c2 = mix(vec3(0.80, 0.46, 0.17), vec3(0.83, 0.69, 0.22), osiris);
-  vec3 c3 = mix(vec3(0.78, 0.70, 0.30), vec3(0.94, 0.82, 0.38), osiris);
-  vec3 c4 = mix(vec3(0.68, 0.74, 0.66), vec3(0.80, 0.92, 0.90), osiris);
-  vec3 c5 = mix(vec3(0.36, 0.60, 0.74), vec3(0.00, 0.80, 0.95), osiris);
-  vec3 c6 = mix(vec3(0.14, 0.42, 0.66), vec3(0.10, 0.40, 0.85), osiris);
-  vec3 c7 = mix(vec3(0.07, 0.13, 0.28), vec3(0.03, 0.05, 0.16), osiris);
-  vec3 c = c0;
-  c = mix(c, c1, smoothstep(-1.70, -1.05, u));
-  c = mix(c, c2, smoothstep(-1.05, -0.60, u));
-  c = mix(c, c3, smoothstep(-0.60, -0.25, u));
-  c = mix(c, c4, smoothstep(-0.25, 0.05, u));
-  c = mix(c, c5, smoothstep(0.05, 0.45, u));
-  c = mix(c, c6, smoothstep(0.45, 0.95, u));
-  c = mix(c, c7, smoothstep(0.95, 1.60, u));
-  return c;
+// One soft cloud: a gaussian of the given size round the given point.
+float lamp(vec2 q, vec2 at, float size) {
+  vec2 d = q - at;
+  return exp(-dot(d, d) / (size * size));
 }
 
-// The band, awake, at s. q is centred and aspect-correct: x runs about
-// -1.8..1.8 on a 16:9 screen, y -1..1, upwards. The ridge leans from the top
-// left down to the bottom right and sways a few degrees either way while its
-// middle wanders; it is not quite straight, but carries a long, slow wave.
-// Brightest in the middle of the screen, so both far corners - the warm
-// one low on the left and the cool one high on the right - go dark, as in
-// the picture. (No backticks in here: this is a template string, and one
-// would end it.)
-vec3 band(vec2 q, float s) {
-  float lean = -0.85 + 0.10 * sin(s * 0.070) + 0.05 * sin(s * 0.043 + 1.7);
-  vec2 along = vec2(cos(lean), sin(lean));
-  vec2 across = vec2(-along.y, along.x);
-  vec2 middle = vec2(-0.20 + 0.30 * sin(s * 0.037), 0.06 * cos(s * 0.029));
-  vec2 d = q - middle;
-  float v = dot(d, along);
-  float u = dot(d, across) + 0.10 * sin(v * 1.2 + s * 0.090) + 0.05 * sin(v * 2.7 - s * 0.061);
-  return ramp(u) * mix(0.55, 1.0, exp(-v * v / 9.0));
+// Space, awake, at s. q is centred and aspect-correct: x runs about -1.8..1.8
+// on a 16:9 screen, y -1..1, upwards. Two clouds of blue - a deep one high on
+// the left, a paler one low on the right - drifting on their own slow loops,
+// a faint wash round the middle, and a floor of blue so that every triangle
+// is just there in the dark. With OSIRIS up, its gold and cyan instead.
+// (No backticks in here: this is a template string, and one would end it.)
+vec3 space(vec2 q, float s) {
+  vec3 deep = mix(vec3(0.10, 0.28, 0.95), vec3(0.83, 0.69, 0.22), osiris);
+  vec3 pale = mix(vec3(0.06, 0.55, 0.88), vec3(0.00, 0.90, 1.00), osiris);
+  float a = lamp(q, vec2(-1.00 + 0.30 * sin(s * 0.050), 0.40 + 0.20 * cos(s * 0.041)), 1.15);
+  float b = lamp(q, vec2(1.05 + 0.25 * cos(s * 0.043), -0.45 + 0.20 * sin(s * 0.037)), 0.95);
+  float c = lamp(q, vec2(0.20 * sin(s * 0.031), 0.05 * cos(s * 0.027)), 1.6);
+  return deep * a * 0.36 + pale * b * 0.26 + deep * c * 0.10 + mix(vec3(0.05, 0.09, 0.22), vec3(0.08), osiris) * 0.4;
 }
 
 // The same dots at dusk: the idle screen's sky, from its reference photo.
@@ -130,7 +102,7 @@ vec3 dusk(vec2 q, float t, float aspect) {
 }
 
 vec3 colourAt(vec2 q, float t, float aspect) {
-  vec3 awake = band(q, t);
+  vec3 awake = space(q, t);
   if (sleep <= 0.001) return awake;
   // The idle sky keeps the slow pace it always had: it is meant to be restful.
   return mix(awake, dusk(q, t * 0.38, aspect), sleep);
@@ -152,39 +124,45 @@ void main() {
   vec2 plane = bent * vec2(aspect, 1.0);
   float t = time;
 
-  // The colour, taken at this pixel: the band is broad and smooth, and
-  // sampling it a cell at a time would only draw the cells' edges into it.
-  vec3 lit = colourAt(plane, t, aspect);
-
-  // The mask: a set's own pixels, on the glass, square to the screen's -
-  // cells of three slots, red, green and blue, alternate columns of cells
-  // set half a cell apart, the way a slot mask is. It is not bent: the
-  // phosphors are where they are, and it is the picture landing on them
-  // that the tube bends. Laid on lightly - a fifth of the way from the
-  // plain colour to the slots - so the band stays a gradient.
+  // The lattice: rows of tiny triangles, a row's height a triangle's, every
+  // other row set half a triangle along and pointing the other way. It is
+  // not bent: the phosphors are where they are, and it is the picture
+  // landing on them that the tube bends.
   vec2 px = gl_FragCoord.xy;
-  float column = floor(px.x / pitch);
-  float shift = mod(column, 2.0) * 0.5;
-  vec2 inCell = vec2(fract(px.x / pitch), fract(px.y / pitch + shift));
-  float third = inCell.x * 3.0;
-  float slot = floor(third);
-  float across = fract(third);
-  vec3 gun = vec3(slot < 0.5 ? 1.0 : 0.0, abs(slot - 1.0) < 0.5 ? 1.0 : 0.0, slot > 1.5 ? 1.0 : 0.0);
-  float shape = smoothstep(0.0, 0.3, across) * smoothstep(1.0, 0.7, across)
-              * smoothstep(0.0, 0.16, inCell.y) * smoothstep(1.0, 0.84, inCell.y);
-  vec3 colour = lit * mix(vec3(1.0), gun * shape * 2.5, 0.22);
+  float rowH = pitch * 0.866;
+  float row = floor(px.y / rowH);
+  float odd = mod(row, 2.0);
+  float across = px.x / pitch + odd * 0.5;
+  float col = floor(across);
+  // Where in its triangle this pixel is: 0 at the point, 1 along the base.
+  float fy = fract(px.y / rowH);
+  float fromPoint = odd > 0.5 ? fy : 1.0 - fy;
+  // Each triangle shrunk about its middle, so there is black between them.
+  vec2 middle = vec2(0.5, 0.6667);
+  vec2 p = middle + (vec2(fract(across), fromPoint) - middle) / 0.72;
+  float inside = min(1.0 - p.y, (p.y * 0.5 - abs(p.x - 0.5)) * 1.79);
+  float shape = smoothstep(0.0, 1.4 / (rowH * 0.72), inside);
+
+  // Each triangle lit flat by the colour at its own middle.
+  vec2 centre = vec2((col + 0.5 - odd * 0.5) * pitch,
+                     (row + (odd > 0.5 ? 0.6667 : 0.3333)) * rowH);
+  vec3 lit = colourAt(bend(centre / resolution) * vec2(aspect, 1.0), t, aspect);
+  // A few are stars: bluish white, twinkling each on its own. None at dusk.
+  float which = hash(vec2(col, row) * 0.731 + 11.3);
+  float star = step(0.992, which) * (0.45 + 0.55 * sin(t * (1.1 + which * 2.3) + which * 91.0))
+             * (1.0 - sleep);
+  lit += vec3(0.62, 0.78, 1.0) * max(star, 0.0) * 1.3;
+  // ...and a little of the colour between them too, as haze, so the clouds
+  // read as clouds and not only as brighter triangles.
+  vec3 colour = lit * shape + colourAt(plane, t, aspect) * 0.10;
 
   // Soft scanlines: one screen row in three a little darker.
   colour *= mod(floor(px.y), 3.0) < 1.0 ? 0.88 : 1.0;
-  // The ripples of the reference picture: faint wavy lines across the glass,
-  // a dozen pixels apart, crawling slowly up it. None at dusk.
-  float wave = sin(px.y * 0.52 + 2.2 * sin(px.x * 0.011 + t * 0.35) - t * 0.8);
-  colour *= 1.0 + 0.035 * wave * (1.0 - sleep);
   // The lines breathing against each other, a pair of screen rows at a
   // time - barely.
   colour *= 1.0 + (hash(vec2(floor(px.y * 0.5), grain * 0.37)) - 0.5) * 0.02 * shimmer;
-  // A whisper of static, finer than the pixels, new every frame.
-  colour += (hash(px * 0.73 + grain) - 0.5) * 0.015;
+  // A whisper of static, finer than the triangles, new every frame.
+  colour += (hash(px * 0.73 + grain) - 0.5) * 0.008;
   colour *= flicker;
 
   // The tube's corners: dark, and rounded by the same bend.
@@ -193,10 +171,9 @@ void main() {
              * smoothstep(1.55, 0.95, length(corner));
   colour *= mix(0.25, 1.0, tube);
 
-  // Dim enough to read over, and a floor that is not quite black - darker
-  // still with OSIRIS up, whose ground is a void with a little blue in it.
-  float dim = 0.62 * mix(1.0, 0.62, osiris);
-  vec3 ground = mix(vec3(0.014, 0.012, 0.018), vec3(0.016, 0.016, 0.040), osiris);
+  // Black under it all, with the least blue in it - a void with OSIRIS up.
+  float dim = 0.9 * mix(1.0, 0.7, osiris);
+  vec3 ground = mix(vec3(0.004, 0.005, 0.010), vec3(0.010, 0.010, 0.030), osiris);
   gl_FragColor = vec4(colour * dim + ground, 1.0);
 }
 `;
@@ -235,7 +212,7 @@ export function framesPerDraw(interval) {
 }
 
 export class Shader {
-  constructor(canvas, { scale = 1, pitch = 6 } = {}) {
+  constructor(canvas, { scale = 1, pitch = 10 } = {}) {
     this.canvas = canvas;
     this.scale = scale;
     this.pitch = pitch;
@@ -295,9 +272,9 @@ export class Shader {
 
   resize() {
     if (!this.gl) return;
-    // The screen's own pixels: a mask of slots two pixels wide, rendered any
-    // smaller and stretched, is a smudge. On a scaled screen the cells keep
-    // their size on the glass.
+    // The screen's own pixels: triangles a few pixels across, rendered any
+    // smaller and stretched, are a smudge. On a scaled screen they keep their
+    // size on the glass.
     const ratio = window.devicePixelRatio || 1;
     const width = Math.max(1, Math.floor(window.innerWidth * ratio * this.scale));
     const height = Math.max(1, Math.floor(window.innerHeight * ratio * this.scale));
