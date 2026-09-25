@@ -63,3 +63,56 @@ def test_its_pace_is_eased_not_jumped(tmp_path):
     assert 0 < steps[0] < 0.1                       # one frame moves it a little
     assert 0.95 < steps[1] <= 1                     # a second gets it nearly there
     assert steps[2] == 1                            # no time, no change
+
+
+# --- in 3D -----------------------------------------------------------------------
+# The same five rings, as the old display's own 3D had them: each a latitude
+# of one sphere - the few-dotted ones near the poles, the many-dotted one
+# round the equator - still turning against each other, with meridians
+# joining them, the whole sphere turning slowly and tipped towards you.
+
+def length(p):
+    return math.sqrt(p["x"] ** 2 + p["y"] ** 2 + p["z"] ** 2)
+
+
+def test_each_ring_is_a_latitude_of_one_sphere(tmp_path):
+    for i in range(5):
+        dots = run(tmp_path, f"R.sphereDots({i}, 1234)")
+        assert all(abs(length(d) - 1) < 1e-9 for d in dots)
+        heights = {round(d["y"], 9) for d in dots}
+        assert len(heights) == 1                         # all at one latitude
+
+
+def test_the_few_dotted_rings_sit_near_the_poles_and_the_most_dotted_round_the_middle(tmp_path):
+    rims = run(tmp_path, "R.LAYERS.map((_, i) => Math.hypot(R.sphereDots(i, 0)[0].x, R.sphereDots(i, 0)[0].z))")
+    counts = [l["n"] for l in run(tmp_path, "R.LAYERS")]
+    assert rims[counts.index(28)] == pytest.approx(1.0, abs=0.05)     # the equator
+    assert rims[counts.index(6)] < 0.5 and rims[counts.index(10)] < 0.5
+    tops = run(tmp_path, "R.LAYERS.map((_, i) => R.sphereDots(i, 0)[0].y)")
+    assert (tops[counts.index(6)] < 0) != (tops[counts.index(10)] < 0)   # one pole each
+
+
+def test_on_the_sphere_they_still_turn_against_each_other(tmp_path):
+    turns = run(tmp_path, """R.LAYERS.map((_, i) => {
+        const a = R.sphereDots(i, 1000)[0], b = R.sphereDots(i, 2000)[0];
+        return Math.sign(a.z * b.x - a.x * b.z); })""")
+    assert all(t != 0 for t in turns)
+    assert all(a == -b for a, b in zip(turns, turns[1:]))
+
+
+def test_meridians_run_pole_to_pole(tmp_path):
+    line = run(tmp_path, "R.meridian(0, 16)")
+    assert all(abs(length(p) - 1) < 1e-9 for p in line)
+    assert line[0]["y"] == pytest.approx(-1) and line[-1]["y"] == pytest.approx(1)
+    other = run(tmp_path, "R.meridian(3, 16)")
+    assert other[8]["x"] != pytest.approx(line[8]["x"])
+
+
+def test_seen_it_is_tipped_towards_you_and_turning_about_its_axis(tmp_path):
+    pole0, pole1, spot0, spot1 = run(tmp_path, """[R.view({ x: 0, y: -1, z: 0 }, 0),
+        R.view({ x: 0, y: -1, z: 0 }, 1.2), R.view({ x: 1, y: 0, z: 0 }, 0),
+        R.view({ x: 1, y: 0, z: 0 }, 1.2)]""")
+    assert pole0 == pytest.approx(pole1)                   # the axis stays put
+    assert math.dist((spot0["x"], spot0["y"]), (spot1["x"], spot1["y"])) > 0.3
+    assert pole0["y"] < -0.5 and pole0["z"] > 0            # the top pole leans towards you
+    assert all(abs(length(p) - 1) < 1e-9 for p in (pole0, spot0, spot1))

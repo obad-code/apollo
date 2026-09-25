@@ -134,7 +134,7 @@ edge of the screen and retracts when it is done:
 
 | | What you see |
 |---|---|
-| **At rest** | A CD, hanging off the top edge with two fifths of it in view: silver, a clear hub, and three bands of tape on it - green, yellow and red at the rim - in lengths, so you can see it turn. It turns slowly, faster while you speak, and a rainbow stays on it where the light falls. Your wallpaper shows through its hub and round its glow. |
+| **At rest** | A CD, hanging off the top edge with two fifths of it in view: black, a clear hub, a thin blue rim, and four bands of tape on it - blue, green, yellow and red at the rim - each laid in tiny triangles pointing the way it turns, so you can see it turn. It turns slowly, faster while you speak, and a rainbow stays on it where the light falls. Your wallpaper shows through its hub and round its glow. |
 | **While you talk** | The panel drops down: Apollo's three-ring orb on the left, your words in cyan as they are transcribed, and a word underneath saying it is listening. Under the panel's edge, a glowing horizon and a dome of sparkles that brighten and speed up with your voice. |
 | **While it works** | The orb spins up, and the line under your words says what it is doing - *searching the web*, *fetching NVDA*, *saving the clip*. |
 | **When it answers** | The reply in warm white, each word rising out of a blur. An answer that rests on real numbers brings a chart with it - violet into cyan into amber, with the last reading marked - and one that is two to six figures brings borderless cards instead. |
@@ -193,7 +193,10 @@ one is a number Apollo actually has.
 the way the old display drew it: five rings of lit dots nested inside one
 another, each turning against the one inside it, on a scope's faint
 graticule round a dark lens, in amber, with a warm glow behind (`ui/full/rings.js`
-has the dots). While Apollo works the rings brighten and quicken and a wave
+has the dots) - and in 3D, the way the old display's own 3D had it: each ring
+a latitude of one sphere, meridians joining them pole to pole, the sphere
+turning slowly and tipped towards you, its near side brighter and its far
+side dim behind it. While Apollo works the rings brighten and quicken and a wave
 goes out from the middle; listening, they take a gradient, cyan in the
 middle to orange at the edge; speaking, they go white and bloom. Under it
 the name is a neon sign: Melete, 19px, spaced a fifth of a letter apart, in

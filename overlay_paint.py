@@ -719,25 +719,26 @@ def horizon(g, draw, x, y, w, fade=1.0):
 
 # --- Apollo at rest, as a CD ----------------------------------------------------
 #
-# A silver disc with a hole in the middle and a clear hub round it, and three
-# bands of tape on it - green inside, then yellow, then red at the edge - each
-# in lengths with a little silver between them, so that the disc's turning
-# shows. Over it, a rainbow where the light catches the tracks, the way a CD
-# throws one: it stays where the light is while the disc turns under it, so
-# it is a layer of its own. Both are worked out in numpy, once per size, and
-# drawn each frame as two bitmaps - one turned, one not.
+# A black disc with a hole in the middle and a clear hub round it, and four
+# bands of tape on it - blue inside, then green, then yellow, then red at the
+# edge - each laid in tiny triangles, every one pointing the way the disc
+# turns, so that its turning shows. Over it, a rainbow where the light
+# catches the tracks, the way a CD throws one: it stays where the light is
+# while the disc turns under it, so it is a layer of its own. Both are worked
+# out in numpy, once per size, and drawn each frame as two bitmaps - one
+# turned, one not.
 
 CD_HOLE = 0.15           # the hole, as a fraction of the disc's radius
 CD_HUB = 0.34            # ...the clear hub round it, out to here
 CD_MIRROR = 0.38         # ...and a bright ring where the tracks start
-CD_TAPES = ((0.42, 0.54, (46, 196, 96)),      # green, innermost
-            (0.60, 0.72, (252, 206, 44)),     # yellow
-            (0.78, 0.92, (232, 44, 52)))      # red, at the edge
-CD_LENGTHS = (7, 9, 11)  # lengths of tape round each band
-CD_GAP = 0.14            # the silver between two lengths, as a share of one
-CD_SILVER = (206, 210, 216)
+CD_TAPES = ((0.40, 0.50, (60, 130, 255)),      # blue, innermost
+            (0.54, 0.64, (46, 196, 96)),       # green
+            (0.68, 0.78, (252, 206, 44)),      # yellow
+            (0.82, 0.94, (232, 44, 52)))       # red, at the edge
+CD_TIP = 0.78            # how far along its place a triangle reaches; the rest is black
+CD_BLACK = (14, 15, 20)
 CD_RAINBOW = (70.0, 250.0)   # where the light falls on it, degrees (90 is down)
-CD_HALO = (255, 236, 200)
+CD_HALO = (120, 170, 255)    # the faint light round its rim: blue
 
 
 def _cd_polar(size):
@@ -769,11 +770,10 @@ def cd_disc(size, radius):
     the disc `radius` pixels round the middle."""
     r, theta = _cd_polar(size)
     R = float(radius)
-    # Silver, with the tracks' fine grooves in it and a little darker towards
-    # the rim, where a real one catches less light.
-    shade = 0.86 + 0.05 * np.sin(r * 2.7) - 0.10 * (r / R)
+    # Black, with the tracks' fine grooves just showing in it.
+    shade = 1.0 + 0.35 * np.sin(r * 2.7)
     colour = np.empty((size, size, 3))
-    colour[:] = CD_SILVER
+    colour[:] = CD_BLACK
     colour *= shade[..., None]
     cover = _between(r, R * CD_HOLE, R)
 
@@ -782,29 +782,37 @@ def cd_disc(size, radius):
     colour[hub] = (225, 230, 236)
     hub_cover = 0.3 + 0.12 * np.sin(r * 3.0) + 0.3 * np.exp(-((r - R * CD_HOLE) / 1.6) ** 2)
     cover = np.where(hub, cover * hub_cover, cover)
-    # The bright ring where the tracks start.
+    # The bright ring where the tracks start, a little blue.
     mirror = _between(r, R * CD_HUB, R * CD_MIRROR)
-    colour = colour * (1 - mirror[..., None]) + np.array((240, 244, 250)) * mirror[..., None]
+    colour = colour * (1 - mirror[..., None]) + np.array((196, 214, 248)) * mirror[..., None]
 
-    # The tapes: each band in lengths, a light line along its middle like the
-    # sheen on a strip of tape, darker at its edges.
-    for (low, high, tint), lengths in zip(CD_TAPES, CD_LENGTHS):
-        band = _between(r, R * low, R * high)
-        along = (theta / (2 * np.pi) * lengths + low * 3.0) % 1.0
-        # Across the gap, smoothed over a pixel of its arc.
-        per_pixel = lengths / np.maximum(2 * np.pi * r, 1.0)
-        laid = np.clip((along - CD_GAP) / per_pixel + 0.5, 0.0, 1.0) \
-             * np.clip((1.0 - along) / per_pixel + 0.5, 0.0, 1.0)
-        tape = band * laid
-        middle = R * (low + high) / 2.0
-        gloss = np.exp(-((r - middle) / (R * (high - low) * 0.22)) ** 2)
-        lit = np.array(tint, dtype=np.float64)[None, None, :] * (0.88 + 0.10 * gloss[..., None])
-        lit = lit + 40.0 * gloss[..., None] * 0.35
+    # The tapes: each band laid in tiny triangles, one after another round
+    # it, each with its base across the band and its point the way the disc
+    # turns (clockwise on the screen, as theta runs). About as long as the
+    # band is wide, so a band carries twenty to forty of them.
+    for low, high, tint in CD_TAPES:
+        middle = (low + high) / 2.0
+        count = max(8, int(round(2 * np.pi * middle / (1.3 * (high - low)))))
+        half = R * (high - low) / 2.0                      # the band's half width, pixels
+        place = 2 * np.pi * np.maximum(r, 1.0) / count     # one triangle's place, pixels along
+        along = (theta / (2 * np.pi) * count + low * 7.0) % 1.0
+        # Pixels from the triangle's base, forward along the band; just before
+        # the base (the end of the last place) counts as a little behind it.
+        ahead = np.where(along < 0.5, along, along - 1.0) * place
+        tip = CD_TIP * place
+        width = half * np.clip(1.0 - ahead / tip, 0.0, 1.0)
+        across = np.abs(r - R * middle)
+        inside = np.clip(width - across + 0.5, 0.0, 1.0) \
+               * np.clip(ahead + 0.5, 0.0, 1.0) * np.clip(tip - ahead + 0.5, 0.0, 1.0)
+        tape = inside * _between(r, R * low, R * high)
+        gloss = np.exp(-(across / (half * 0.45)) ** 2)
+        lit = np.array(tint, dtype=np.float64)[None, None, :] * (0.88 + 0.12 * gloss[..., None]) \
+            + 14.0 * gloss[..., None]
         colour = colour * (1 - tape[..., None]) + lit * tape[..., None]
 
-    # The rim, a shade darker.
+    # The rim: a thin line of blue light round the black.
     rim = _between(r, R - 1.5, R)
-    colour = colour * (1 - 0.25 * rim[..., None])
+    colour = colour * (1 - rim[..., None]) + np.array((70, 120, 220)) * rim[..., None]
     return _premultiplied(colour, cover)
 
 

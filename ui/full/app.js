@@ -245,11 +245,12 @@ lyla.start();
 document.addEventListener('pointerdown', (event) => lyla.follow(event.clientX, event.clientY));
 document.addEventListener('pointermove', (event) => lyla.pointer(event.clientX, event.clientY));
 
-/* Apollo's shape: a circle, as the old display drew it (rings.js has the
- * dots). In amber #FFB000: a scope's faint graticule - a bezel with its ticks
+/* Apollo's shape: a circle, as the old display drew it, in 3D (rings.js has
+ * the dots). In amber #FFB000: a scope's faint graticule - a bezel with its ticks
  * and a grid across it - a dark lens in the middle, and inside the bezel five
  * rings of lit dots joined round each ring, turning against each other and
- * breathing with your voice. While Apollo is busy they brighten, thicken and
+ * breathing with your voice - each ring a latitude of one sphere, meridians
+ * joining them, the sphere turning slowly and tipped towards you. While Apollo is busy they brighten, thicken and
  * turn faster, a scan bar runs down the glass and a wave goes out from the
  * middle over and over; while it is listening the rings take a gradient,
  * cyan in the middle to amber and orange at the edge; and while it speaks
@@ -257,7 +258,7 @@ document.addEventListener('pointermove', (event) => lyla.pointer(event.clientX, 
 const ring = $('ring').getContext('2d');
 const AMBER = [255, 176, 0];
 const LISTEN = [[90, 215, 255], [127, 227, 255], [255, 227, 168], [255, 122, 46]];
-const core = { clock: 0, env: 0, talk: 0, listen: 0, spin: 1 };
+const core = { clock: 0, env: 0, talk: 0, listen: 0, spin: 1, turn: 0 };
 let lastFrame = performance.now();
 let ringFrame = null;
 
@@ -368,32 +369,56 @@ function drawRing(now) {
     draw();
     ring.globalAlpha = 1;
   };
+  // In 3D: the five rings on one sphere, each a latitude, meridians joining
+  // them pole to pole, the sphere turning slowly about its axis and tipped
+  // towards you (rings.js), seen in perspective - the near side bigger and
+  // brighter, the far side drawn first and dimmer - so it reads as round.
+  core.turn += dt * (0.12 + 0.35 * env + 0.6 * w);
+  const seen = (p) => {
+    const v = Rings.view(p, core.turn);
+    const sc = 5 / (5 - v.z);
+    return { x: cx + v.x * coreR * sc, y: cy + v.y * coreR * sc, z: v.z, sc };
+  };
+  const segs = [];
   Rings.LAYERS.forEach((layer, li) => {
     const lay = (1 - li * 0.07) * (1 + 0.25 * env) * (1 + 1.5 * w);
-    const dots = Rings.layerDots(li, core.clock).map((d) => [cx + d.x * coreR, cy + d.y * coreR]);
-    const lineA = (0.3 + 0.38 * env + 0.3 * w) * pulse * lay;
-    ring.lineWidth = (1 + 2.4 * env + 1.8 * w) * px;
-    ring.shadowBlur = (12 + 18 * env + 30 * w) * px;
-    ring.shadowColor = `rgba(${rgb},${Math.min(1, 0.7 * lay).toFixed(3)})`;
-    const round = () => {
-      ring.beginPath();
-      dots.forEach(([x, y], k) => (k ? ring.lineTo(x, y) : ring.moveTo(x, y)));
-      ring.closePath();
-      ring.stroke();
-    };
-    stroke(`rgb(${rgb})`, lineA * (tint ? 1 - mix : 1), round);
-    if (tint) stroke(tint, lineA * mix, round);
-    ring.shadowBlur = (14 + 16 * env + 34 * w) * px;
-    dots.forEach(([x, y], k) => {
-      const flare = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.0024 * core.spin + k * 0.8 + li * 1.7));
-      const r = (1.6 + 0.9 * flare) * (1 + 1.1 * env + 0.9 * w) * px;
-      const dot = () => { ring.beginPath(); ring.arc(x, y, r, 0, Math.PI * 2); ring.fill(); };
-      const dotA = 0.92 * flare * lay;
-      stroke(`rgb(${rgb})`, dotA * (tint ? 1 - mix : 1), dot);
-      if (tint) stroke(tint, dotA * mix, dot);
-    });
+    const pts = Rings.sphereDots(li, core.clock).map(seen);
+    pts.forEach((a, k) => segs.push({ a, b: pts[(k + 1) % pts.length], li, k, lay, node: true }));
   });
+  for (let m = 0; m < 8; m++) {
+    const line = Rings.meridian(m, 16).map(seen);
+    for (let i = 1; i < line.length; i++) {
+      segs.push({ a: line[i - 1], b: line[i], lay: 0.5 * (1 + 1.5 * w), node: false });
+    }
+  }
+  segs.sort((p, q) => (p.a.z + p.b.z) - (q.a.z + q.b.z));
+  for (const S of segs) {
+    const depth = 0.3 + 0.35 * (S.a.z + S.b.z + 2) / 2;          // 0.3 far .. 1 near
+    const lineA = (0.48 + 0.3 * env + 0.3 * w) * pulse * S.lay * depth * (S.node ? 1 : 0.6);
+    ring.lineWidth = (1 + 2.4 * env + 1.8 * w) * px * S.a.sc * (S.node ? 1 : 0.7);
+    // Blur on the rings only: a blurred stroke per meridian step would cost
+    // a frame's time for lines that are meant to be faint.
+    ring.shadowBlur = S.node ? (8 + 12 * env + 24 * w) * px * depth : 0;
+    ring.shadowColor = `rgba(${rgb},${Math.min(1, 0.7 * S.lay * depth).toFixed(3)})`;
+    const line = () => { ring.beginPath(); ring.moveTo(S.a.x, S.a.y); ring.lineTo(S.b.x, S.b.y); ring.stroke(); };
+    stroke(`rgb(${rgb})`, lineA * (tint ? 1 - mix : 1), line);
+    if (tint) stroke(tint, lineA * mix, line);
+    if (!S.node) continue;
+    const flare = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.0024 * core.spin + S.k * 0.8 + S.li * 1.7));
+    const r = (1.6 + 0.9 * flare) * (1 + 1.1 * env + 0.9 * w) * px * S.a.sc;
+    ring.shadowBlur = (14 + 16 * env + 34 * w) * px * depth;
+    const dot = () => { ring.beginPath(); ring.arc(S.a.x, S.a.y, r, 0, Math.PI * 2); ring.fill(); };
+    const dotA = 0.92 * flare * S.lay * depth;
+    stroke(`rgb(${rgb})`, dotA * (tint ? 1 - mix : 1), dot);
+    if (tint) stroke(tint, dotA * mix, dot);
+  }
   ring.shadowBlur = 0;
+  // Where the light catches the sphere, up and to the left.
+  ring.lineWidth = 2.4 * px;
+  ring.strokeStyle = 'rgba(255,244,216,0.22)';
+  ring.beginPath();
+  ring.arc(cx, cy, coreR * 1.02, -2.5, -1.5);
+  ring.stroke();
 
   // A scan bar drifting down inside the bezel.
   const scanY = cy - coreR * 0.94 + ((t * 0.055 * px) % (coreR * 1.88));

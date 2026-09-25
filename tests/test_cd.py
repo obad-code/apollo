@@ -1,8 +1,9 @@
-"""Apollo at rest, as a CD (overlay_paint.cd_disc and cd_sheen): a silver
-disc with a hole in the middle and a clear hub round it, three bands of tape
-on it - green inside, then yellow, then red at the edge - broken into lengths
-so that its turning shows, and over it a rainbow that stays where the light
-is while the disc turns under it.
+"""Apollo at rest, as a CD (overlay_paint.cd_disc and cd_sheen): a black
+disc with a hole in the middle and a clear hub round it, four bands of tape
+on it - blue inside, then green, then yellow, then red at the edge - each
+laid in tiny triangles pointing the way it turns, so that its turning shows,
+and over it a rainbow that stays where the light is while the disc turns
+under it.
 
 The pixels are worked out with numpy, so they can be checked anywhere; only
 handing them to GDI+ needs Windows."""
@@ -52,32 +53,46 @@ def test_the_hole_and_the_space_round_it_are_clear(disc, sheen):
 
 
 def test_the_hub_round_the_hole_is_clear_plastic(disc):
-    hub = at(disc, 0.27, 45)
+    hub = at(disc, 0.25, 45)
     assert 0 < hub[3] < 200                          # see-through, not solid
 
 
-def test_three_bands_of_tape_green_yellow_red_from_the_middle_out(disc):
-    def colour_of(fraction):
-        # Several angles, so a gap in the tape cannot decide it.
-        samples = [at(disc, fraction, d) for d in range(3, 360, 17)]
-        return np.median(np.array(samples), axis=0)
-    green, yellow, red = colour_of(0.48), colour_of(0.66), colour_of(0.85)
-    assert green[1] > green[0] + 60 and green[1] > green[2] + 40
-    assert yellow[0] > yellow[2] + 90 and yellow[1] > yellow[2] + 80
-    assert red[0] > red[1] + 90 and red[0] > red[2] + 90
+def round_the_circle(pixels, fraction, steps=720):
+    return [at(pixels, fraction, d * 360.0 / steps) for d in range(steps)]
 
 
-def test_the_tape_is_in_lengths_so_the_turning_shows(disc):
-    round_the_red = [at(disc, 0.85, d / 2.0) for d in range(720)]
-    reds = [p[0] - p[1] for p in round_the_red]
-    assert max(reds) > 90                            # tape
-    assert min(reds) < 30                            # ...and the silver between lengths
+def test_four_bands_of_tape_blue_green_yellow_red_from_the_middle_out(disc):
+    def brightest(fraction, channel_test):
+        return any(channel_test(p) for p in round_the_circle(disc, fraction))
+    assert brightest(0.45, lambda p: p[2] > p[0] + 90 and p[2] > p[1] + 30)       # blue
+    assert brightest(0.59, lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 40)       # green
+    assert brightest(0.73, lambda p: p[0] > p[2] + 90 and p[1] > p[2] + 80)       # yellow
+    assert brightest(0.88, lambda p: p[0] > p[1] + 90 and p[0] > p[2] + 90)       # red
 
 
-def test_the_disc_between_the_tapes_is_silver(disc):
-    between = at(disc, 0.57, 20)
-    assert between[3] > 230
-    assert max(between[:3]) - min(between[:3]) < 40   # grey, not a colour
+def lit(p):
+    return max(p[:3]) > 90
+
+
+def test_the_tape_is_tiny_triangles_not_lengths(disc):
+    # Along the middle of the red band a triangle is widest; near the band's
+    # edge only its base is there. A rectangle would cover both the same; at
+    # this size, with its point smoothed over a pixel, a triangle covers the
+    # middle at least twice as much.
+    middle = sum(lit(p) for p in round_the_circle(disc, 0.88))
+    edge = sum(lit(p) for p in round_the_circle(disc, 0.925))
+    assert middle > 2.0 * max(edge, 1)
+    # ...and they are small: many of them round the band.
+    runs = sum(1 for a, b in zip(round_the_circle(disc, 0.88), round_the_circle(disc, 0.88)[1:])
+               if lit(b) and not lit(a))
+    assert runs >= 24
+
+
+def test_the_disc_between_the_tapes_is_black(disc):
+    for fraction in (0.52, 0.66, 0.80):
+        between = at(disc, fraction, 20)
+        assert between[3] > 230                          # solid
+        assert max(between[:3]) < 70                     # ...and dark
 
 
 def test_the_edge_is_smooth_not_stepped(disc):
