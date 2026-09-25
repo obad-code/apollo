@@ -31,7 +31,7 @@ import overlay_paint  # noqa: E402
 import overlay_state  # noqa: E402
 
 WIDTH, HEIGHT = 620, 470
-OVERHANG = 130          # what apollo.Overlay.orb_overhang() works out to
+OVERHANG = 108          # what apollo.Overlay.orb_overhang() works out to
 
 
 def headless():

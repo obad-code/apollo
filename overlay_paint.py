@@ -18,8 +18,11 @@ gradient, the printed dots kept, faint scanlines, and light ink. Apollo's own
 mark kept its colours.
 """
 
+import ctypes
 import math
 import random
+
+import numpy as np
 
 PALETTE = {
     # The card itself: the glass, and the light on it.
@@ -712,3 +715,208 @@ def horizon(g, draw, x, y, w, fade=1.0):
         brush.InterpolationColors = blend
         g.FillRectangle(brush, rectangle)
         brush.Dispose()
+
+
+# --- Apollo at rest, as a CD ----------------------------------------------------
+#
+# A silver disc with a hole in the middle and a clear hub round it, and three
+# bands of tape on it - green inside, then yellow, then red at the edge - each
+# in lengths with a little silver between them, so that the disc's turning
+# shows. Over it, a rainbow where the light catches the tracks, the way a CD
+# throws one: it stays where the light is while the disc turns under it, so
+# it is a layer of its own. Both are worked out in numpy, once per size, and
+# drawn each frame as two bitmaps - one turned, one not.
+
+CD_HOLE = 0.15           # the hole, as a fraction of the disc's radius
+CD_HUB = 0.34            # ...the clear hub round it, out to here
+CD_MIRROR = 0.38         # ...and a bright ring where the tracks start
+CD_TAPES = ((0.42, 0.54, (46, 196, 96)),      # green, innermost
+            (0.60, 0.72, (252, 206, 44)),     # yellow
+            (0.78, 0.92, (232, 44, 52)))      # red, at the edge
+CD_LENGTHS = (7, 9, 11)  # lengths of tape round each band
+CD_GAP = 0.14            # the silver between two lengths, as a share of one
+CD_SILVER = (206, 210, 216)
+CD_RAINBOW = (70.0, 250.0)   # where the light falls on it, degrees (90 is down)
+CD_HALO = (255, 236, 200)
+
+
+def _cd_polar(size):
+    """Each pixel's distance from the middle of a size x size square, and its
+    angle - 0 to the right, pi/2 straight down."""
+    ys, xs = np.mgrid[0:size, 0:size].astype(np.float64) + 0.5
+    dx, dy = xs - size / 2.0, ys - size / 2.0
+    return np.hypot(dx, dy), np.arctan2(dy, dx)
+
+
+def _between(r, low, high):
+    """How much of each pixel lies between two radii, edges smoothed over a
+    pixel so a circle is round rather than stepped."""
+    return np.clip(r - low + 0.5, 0.0, 1.0) * np.clip(high - r + 0.5, 0.0, 1.0)
+
+
+def _premultiplied(colour, cover):
+    """Straight colour (h x w x 3, 0-255) and coverage (h x w, 0-1) as the
+    premultiplied RGBA bytes GDI+ and UpdateLayeredWindow take: no channel
+    brighter than its pixel's own coverage."""
+    a = np.round(np.clip(cover, 0.0, 1.0) * 255.0)
+    rgb = np.minimum(np.round(np.clip(colour, 0.0, 255.0) * np.clip(cover, 0.0, 1.0)[..., None]),
+                     a[..., None])
+    return np.dstack([rgb, a]).astype(np.uint8)
+
+
+def cd_disc(size, radius):
+    """The disc itself, the part that turns: RGBA, premultiplied, size x size,
+    the disc `radius` pixels round the middle."""
+    r, theta = _cd_polar(size)
+    R = float(radius)
+    # Silver, with the tracks' fine grooves in it and a little darker towards
+    # the rim, where a real one catches less light.
+    shade = 0.86 + 0.05 * np.sin(r * 2.7) - 0.10 * (r / R)
+    colour = np.empty((size, size, 3))
+    colour[:] = CD_SILVER
+    colour *= shade[..., None]
+    cover = _between(r, R * CD_HOLE, R)
+
+    # The hub: clear plastic, faintly ringed, a brighter lip round the hole.
+    hub = r < R * CD_HUB
+    colour[hub] = (225, 230, 236)
+    hub_cover = 0.3 + 0.12 * np.sin(r * 3.0) + 0.3 * np.exp(-((r - R * CD_HOLE) / 1.6) ** 2)
+    cover = np.where(hub, cover * hub_cover, cover)
+    # The bright ring where the tracks start.
+    mirror = _between(r, R * CD_HUB, R * CD_MIRROR)
+    colour = colour * (1 - mirror[..., None]) + np.array((240, 244, 250)) * mirror[..., None]
+
+    # The tapes: each band in lengths, a light line along its middle like the
+    # sheen on a strip of tape, darker at its edges.
+    for (low, high, tint), lengths in zip(CD_TAPES, CD_LENGTHS):
+        band = _between(r, R * low, R * high)
+        along = (theta / (2 * np.pi) * lengths + low * 3.0) % 1.0
+        # Across the gap, smoothed over a pixel of its arc.
+        per_pixel = lengths / np.maximum(2 * np.pi * r, 1.0)
+        laid = np.clip((along - CD_GAP) / per_pixel + 0.5, 0.0, 1.0) \
+             * np.clip((1.0 - along) / per_pixel + 0.5, 0.0, 1.0)
+        tape = band * laid
+        middle = R * (low + high) / 2.0
+        gloss = np.exp(-((r - middle) / (R * (high - low) * 0.22)) ** 2)
+        lit = np.array(tint, dtype=np.float64)[None, None, :] * (0.88 + 0.10 * gloss[..., None])
+        lit = lit + 40.0 * gloss[..., None] * 0.35
+        colour = colour * (1 - tape[..., None]) + lit * tape[..., None]
+
+    # The rim, a shade darker.
+    rim = _between(r, R - 1.5, R)
+    colour = colour * (1 - 0.25 * rim[..., None])
+    return _premultiplied(colour, cover)
+
+
+def _hues(hue):
+    """Hue 0-1 to a fully saturated RGB, 0-255."""
+    k = (hue[..., None] * 6.0 + np.array((0.0, 4.0, 2.0))) % 6.0
+    return 255.0 * (1.0 - np.clip(np.minimum(k, 4.0 - k), 0.0, 1.0))
+
+
+def cd_sheen(size, radius):
+    """What the light does on it, the part that stays still: a rainbow thrown
+    across the tracks where the light falls, a soft white highlight in it,
+    and a faint warm halo round the rim. RGBA, premultiplied."""
+    r, theta = _cd_polar(size)
+    R = float(radius)
+    colour = np.zeros((size, size, 3))
+    cover = np.zeros((size, size))
+    tracks = _between(r, R * CD_MIRROR, R - 1.0)
+    for i, degrees in enumerate(CD_RAINBOW):
+        centre = np.radians(degrees)
+        off = np.angle(np.exp(1j * (theta - centre)))            # -pi..pi from the light
+        strength = np.exp(-(off / 0.36) ** 2) * tracks * (0.74 if i == 0 else 0.5)
+        hue = (r / R * 1.3 + off * 0.45 + 0.05) % 1.0
+        rainbow = _hues(hue) * 0.82 + 255.0 * 0.12
+        colour = colour * (1 - strength[..., None]) + rainbow * strength[..., None]
+        cover = cover + strength * (1 - cover)
+    # A soft white highlight where the light is brightest.
+    spot_at = np.radians(CD_RAINBOW[0])
+    sx, sy = np.cos(spot_at) * R * 0.66, np.sin(spot_at) * R * 0.66
+    ys, xs = np.mgrid[0:size, 0:size].astype(np.float64) + 0.5
+    spot = np.exp(-(((xs - size / 2.0 - sx) ** 2 + (ys - size / 2.0 - sy) ** 2) / (R * 0.2) ** 2))
+    spot = spot * tracks * 0.38
+    colour = colour * (1 - spot[..., None]) + 255.0 * spot[..., None]
+    cover = cover + spot * (1 - cover)
+    # A faint warm halo just outside the rim, so it reads as lit on any desktop.
+    outside = np.clip(r - R + 0.5, 0.0, 1.0)
+    halo = 0.24 * np.exp(-((r - R) / (R * 0.07)) ** 2) * outside
+    colour = colour * (1 - halo[..., None]) + np.array(CD_HALO) * halo[..., None]
+    cover = cover + halo * (1 - cover)
+    # Each layer above was laid over the last the way premultiplied colour is
+    # (colour * (1 - a) + new * a), so `colour` is premultiplied already;
+    # back to straight colour before it is premultiplied the once. None of it
+    # in the hole or the hub.
+    straight = colour / np.where(cover > 0, cover, 1.0)[..., None]
+    cover = np.where(r < R * CD_HUB, 0.0, cover)
+    return _premultiplied(straight, cover)
+
+
+def bitmap_from_pixels(draw, pixels):
+    """A GDI+ bitmap holding `pixels` - height x width x 4, RGBA, premultiplied
+    bytes - copied in a row at a time, as the premultiplied 32bpp format lays
+    them out: blue, green, red, alpha."""
+    height, width = pixels.shape[:2]
+    kind = draw.Imaging.PixelFormat.Format32bppPArgb
+    bitmap = draw.Bitmap(width, height, kind)
+    data = bitmap.LockBits(draw.Rectangle(0, 0, width, height),
+                           draw.Imaging.ImageLockMode.WriteOnly, kind)
+    try:
+        bgra = np.ascontiguousarray(pixels[..., [2, 1, 0, 3]])
+        base = int(data.Scan0.ToInt64())
+        for row in range(height):
+            ctypes.memmove(base + row * data.Stride, bgra[row].ctypes.data, width * 4)
+    finally:
+        bitmap.UnlockBits(data)
+    return bitmap
+
+
+class Cd:
+    """Apollo at rest: the disc, turned, and the light on it, still - each a
+    bitmap made once for a size (cd_disc, cd_sheen) and drawn into place
+    every frame, faded as the rest is."""
+
+    def __init__(self, draw):
+        self.draw = draw
+        self._made = {}
+        self._fades = {}
+
+    def _bitmaps(self, radius):
+        key = max(4, int(round(radius)))
+        found = self._made.get(key)
+        if found is None:
+            # Room for the halo past the rim.
+            size = int(key * 2.5) + 4
+            found = (bitmap_from_pixels(self.draw, cd_disc(size, key)),
+                     bitmap_from_pixels(self.draw, cd_sheen(size, key)), size)
+            self._made[key] = found
+        return found
+
+    def _fade(self, scale):
+        key = min(16, max(0, int(scale * 16)))
+        found = self._fades.get(key)
+        if found is None:
+            matrix = self.draw.Imaging.ColorMatrix()
+            matrix.Matrix33 = key / 16.0
+            found = self.draw.Imaging.ImageAttributes()
+            found.SetColorMatrix(matrix)
+            self._fades[key] = found
+        return found
+
+    def draw_at(self, g, cx, cy, radius, turn_degrees, fade=1.0):
+        if fade <= 0.01:
+            return
+        disc, sheen, size = self._bitmaps(radius)
+        attributes = self._fade(fade)
+        box = self.draw.Rectangle(int(-size / 2), int(-size / 2), size, size)
+        state = g.Save()
+        try:
+            g.TranslateTransform(float(cx), float(cy))
+            g.RotateTransform(float(turn_degrees))
+            g.DrawImage(disc, box, 0, 0, size, size, self.draw.GraphicsUnit.Pixel, attributes)
+            g.RotateTransform(float(-turn_degrees))
+            g.DrawImage(sheen, box, 0, 0, size, size, self.draw.GraphicsUnit.Pixel, attributes)
+        finally:
+            g.Restore(state)
+

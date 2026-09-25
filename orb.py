@@ -12,7 +12,8 @@ the one path on Windows that gives real per-pixel alpha.
 
 What it draws, in the shape the design asks for:
 
-    at rest      the amber ring, hanging off the top edge, a quarter in view
+    at rest      a CD - red, yellow and green tape on silver - turning, hanging
+                 off the top edge with two fifths of it in view
     talking      a panel drops from the edge: Apollo's three-ring orb, your
                  words in cyan as they are transcribed, and a status word
     searching    the orb spins up and the status says what it is doing
@@ -57,11 +58,6 @@ PALETTE = overlay_paint.PALETTE
 # The bleed round light type on the black card, the way a tube's letters
 # glowed: drawn once into the cached body, so it costs nothing per frame.
 PHOSPHOR = (255, 170, 60)
-
-# The resting ring - the quarter of it that peeks down from the top edge -
-# in a yellow phosphor: the same family as the card's glow under it.
-AMBER = (255, 184, 0)
-AMBER_WARM = (255, 212, 92)
 
 # Thmanyah, which Apollo carries with him rather than expecting Windows to
 # have it. One family sets both scripts, so Arabic and English are no longer
@@ -233,7 +229,9 @@ class Orb:
 
         self.view = overlay_state.OverlayState()
         self._height = overlay_state.Spring(float(size), response=0.40)
-        self.paint = self.rings = None
+        self.paint = self.rings = self.cd = None
+        self._cd_turn = 0.0               # how far the resting disc has turned, degrees
+        self._cd_clock = None             # ...as of this moment of the clock
 
         # What is on screen: your words, Apollo's body, and what it is doing.
         self._heard = ""
@@ -268,6 +266,7 @@ class Orb:
         self._D, self._WF, self._IntPtr = D, WF, IntPtr
         self.paint = overlay_paint.Backdrop(D)
         self.rings = overlay_paint.Rings(D)
+        self.cd = overlay_paint.Cd(D)
 
         def build():
             try:
@@ -1195,64 +1194,32 @@ class Orb:
             self._fades[key] = attrs
         return attrs
 
-    # -- the resting ring ---------------------------------------------------
+    # -- the resting disc ---------------------------------------------------
     #
-    # A clock face: N points spaced evenly around one circle, so there is
-    # nothing irregular left to look accidental. Drawn from these two numbers
-    # rather than a table of hand-picked radii - the table was what made the
-    # old shape a zigzag, since every point sat at a different distance from
-    # the centre.
+    # Apollo at rest is a CD: silver, a clear hub round the hole, and three
+    # bands of tape on it - green, yellow and red at the edge - in lengths, so
+    # its turning shows (overlay_paint.Cd has the pixels). It turns slowly,
+    # and faster while you speak; the rainbow on it stays where the light is.
+    # Only its lower part hangs below the screen's edge (apollo.ORB_REVEAL).
 
-    CONSTELLATION_N = 22          # points around the circle
-    CONSTELLATION_R = 0.355       # their radius, as a fraction of the box
-    CONSTELLATION_STEP = 6        # star polygon {N/6}: the chords across it
-    CONSTELLATION_DOT = 0.011     # point radius, as a fraction of the box
-    BLOOM_LAYERS = overlay_paint.BLOOM
+    CONSTELLATION_R = 0.355       # the disc's radius, as a fraction of the box
+                                  # (the name apollo.Overlay.orb_overhang reads)
+    CD_TURN = 30.0                # degrees a second at rest...
+    CD_TURN_VOICE = 160.0         # ...and this much more at full voice
 
     def _draw_ring(self, g, ox, oy, w, h, t, fade):
-        """At rest: a ring of evenly spaced points over nothing - no ground,
-        no panel. Two sets of lines, both symmetric: the ring itself, joining
-        each point to its neighbours, and a fainter star polygon of chords
-        across the middle, which is what gives it the look of a chart rather
-        than a plain circle. The whole figure turns together, slowly, and
-        because it is regular the rotation reads as rotation rather than as
-        drift."""
+        """At rest: the disc, over nothing - no ground, no panel - turning."""
         s = min(w, h)
         cx, cy = ox + w / 2.0, oy + h / 2.0
         level = self._level
-        rot = t * 0.09
-
-        n = self.CONSTELLATION_N
-        r = s * self.CONSTELLATION_R * (1.0 + 0.035 * level)
-        points = []
-        for i in range(n):
-            # -tau/4 puts the first point at twelve o'clock.
-            angle = rot - math.tau / 4 + i * (math.tau / n)
-            points.append((cx + math.cos(angle) * r, cy + math.sin(angle) * r))
-
-        # Brighter than it was: only a quarter of it ever shows, and that
-        # quarter has to read as a lit tube's glow rather than a pencil line.
-        chord_pen = self._pen(AMBER_WARM, max(0, int(36 * fade)))
-        for i in range(n):
-            x0, y0 = points[i]
-            x1, y1 = points[(i + self.CONSTELLATION_STEP) % n]
-            g.DrawLine(chord_pen, float(x0), float(y0), float(x1), float(y1))
-
-        ring_pen = self._pen(AMBER_WARM, max(0, int(80 * fade)), 1.3)
-        for i in range(n):
-            x0, y0 = points[i]
-            x1, y1 = points[(i + 1) % n]
-            g.DrawLine(ring_pen, float(x0), float(y0), float(x1), float(y1))
-
-        dot = s * self.CONSTELLATION_DOT
-        spread = 1.0 + 0.5 * level
-        glow = 1.0 + 0.6 * level
-        brushes = overlay_paint._Brushes(self._D)
-        for i, (px, py) in enumerate(points):
-            twinkle = 0.78 + 0.22 * math.sin(t * 1.3 + i * (math.tau / n))
-            overlay_paint.bloom(g, brushes, px, py, dot, AMBER_WARM,
-                                max(0.0, min(255.0, 225 * twinkle * fade * glow)),
-                                spread)
+        radius = s * self.CONSTELLATION_R * (1.0 + 0.035 * level)
+        # Turned by how far the clock has moved since the last frame, so a
+        # change of pace with your voice never makes it jump.
+        step = 0.0 if self._cd_clock is None else max(0.0, t - self._cd_clock)
+        self._cd_clock = t
+        self._cd_turn = (self._cd_turn
+                         + step * (self.CD_TURN + self.CD_TURN_VOICE * level)) % 360.0
+        self.cd.draw_at(g, cx, cy, radius, self._cd_turn, fade)
 
     def _push(self, hbmp, x, y, w, h):
         """Hand the finished frame to the compositor, alpha and all.
