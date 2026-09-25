@@ -242,10 +242,11 @@ a CRT gradient: one wide band of light leaning across the tube from the top
 left to the bottom right, warm below it (red, orange, yellow), pale along its
 ridge and cool above it (teal, blue, night), with soft scanlines and faint
 wavy ripples crawling up the glass - bulged by a fisheye, and breathing
-rather than flickering. The gradient flows, and fast: its ridge sways and
-slides across the screen and a wave runs along it, quick enough to watch,
-quicker still while Apollo works (the idle screen's dusk keeps its slow
-pace). Over it: the clock with the date in both
+rather than flickering. The gradient flows, and fast: the band turns all
+the way round about every twenty seconds while its middle loops round the
+screen, so the warm and cool colours travel round it, and a wave runs along
+its ridge - quicker still while Apollo works. The colours themselves stay
+exactly as they are (the idle screen's dusk keeps its slow pace). Over it: the clock with the date in both
 calendars, Riyadh's weather, the next prayer and who on your list reports
 this week; your watchlist, and under it the status line - the links to
 Gemini, Claude and the mic, the market's hours, the machine as rows of lit

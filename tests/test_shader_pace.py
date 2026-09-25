@@ -86,3 +86,28 @@ def test_the_idle_sky_keeps_its_slow_pace():
     text = SHADER.read_text(encoding="utf-8")
     assert "band(q, t * FLOW)" in text
     assert "dusk(q, t * 0.38, aspect)" in text
+
+
+def test_the_colours_go_round_the_screen(tmp_path):
+    # Not just a sway: the band turns all the way round - the warm side and
+    # the cool side travelling round the screen - once every so many
+    # seconds, quick enough to watch and not so quick it spins.
+    import math
+    spin, per_second = run(tmp_path, "[S.SPIN, S.bandPerSecond(false)]")
+    once_round = 2 * math.pi / (spin * per_second)
+    assert 8 <= once_round <= 40
+
+
+def test_its_middle_circles_the_screen(tmp_path):
+    # Across and up and down both, not along one line.
+    across, up = run(tmp_path, "[S.WANDER, S.ORBIT]")
+    assert across >= 0.45 and up >= 0.25
+
+
+def test_the_colours_themselves_are_the_same():
+    # They move; they do not change. The band's eight stops, as they are.
+    text = SHADER.read_text(encoding="utf-8")
+    for stop in ("vec3(0.30, 0.07, 0.07)", "vec3(0.62, 0.20, 0.10)", "vec3(0.80, 0.46, 0.17)",
+                 "vec3(0.78, 0.70, 0.30)", "vec3(0.68, 0.74, 0.66)", "vec3(0.36, 0.60, 0.74)",
+                 "vec3(0.14, 0.42, 0.66)", "vec3(0.07, 0.13, 0.28)"):
+        assert stop in text, stop
