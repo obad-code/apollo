@@ -584,7 +584,7 @@ html, body {
 .qs-head .price { font: 700 24px/1.05 var(--hud); color: #fff3dc; }
 .qs-head .move { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .quote-shot .chart { display: block; flex: 1; width: 100%; min-height: 0; margin: 12px 0 10px; }
-.qs-foot { font: 500 10.5px/1.55 var(--hud); letter-spacing: .1em; text-transform: uppercase;
+.qs-foot { font: 500 11px/1.5 var(--hud); letter-spacing: .08em; text-transform: uppercase;
            color: #8b929c; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
            overflow: hidden; }
 .qs-foot b { color: #e8eaed; font-weight: 800; }
@@ -666,7 +666,7 @@ html, body {
 
 #gauges { margin-top: 12px; display: inline-grid; gap: 5px; justify-items: end; }
 .gauge { display: flex; align-items: center; gap: 10px; }
-.gauge .tag { margin: 0; font-size: 10px; letter-spacing: .2em; min-width: 30px; text-align: right; }
+.gauge .tag { margin: 0; font-size: 11px; letter-spacing: .18em; min-width: 34px; text-align: right; }
 .gauge .bar { display: flex; gap: 3px; }
 .gauge .bar s {
   display: block; width: 9px; height: 7px; border-radius: 1.5px;
@@ -698,7 +698,8 @@ html, body {
   transition: border-color .25s, background .25s, transform .2s ease-out;
 }
 #dock button:hover { border-color: rgba(255, 214, 150, .42); transform: translateY(-1px); }
-#dock button em { font-style: normal; font-size: 9px; letter-spacing: .18em; color: var(--caption); }
+#dock button em { font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: .12em;
+                  color: var(--caption); }
 #dock .led {
   width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 214, 150, .16);
   transition: background .25s, box-shadow .25s;
@@ -729,10 +730,10 @@ body.asleep #dock { opacity: 0; pointer-events: none; }
   font: 700 12px var(--hud); letter-spacing: .32em; color: #d4af37;
 }
 #osiris header .eye { width: 26px; height: 16px; color: #d4af37; }
-#osiris header span { font-weight: 400; font-size: 9px; letter-spacing: .26em;
+#osiris header span { font-weight: 400; font-size: 11px; letter-spacing: .2em;
                       text-transform: uppercase; color: #9b978e; }
 #osiris-close {
-  margin-left: auto; font: 700 10px var(--hud); letter-spacing: .22em; text-transform: uppercase;
+  margin-left: auto; font: 700 11px var(--hud); letter-spacing: .2em; text-transform: uppercase;
   color: #d4af37; background: rgba(212, 175, 55, .08); border: 1px solid rgba(212, 175, 55, .3);
   border-radius: 3px; padding: 6px 12px; cursor: pointer; transition: background .2s, color .2s;
 }
@@ -740,8 +741,8 @@ body.asleep #dock { opacity: 0; pointer-events: none; }
 /* Under the map's window, and seen only until it arrives - or if it cannot. */
 #osiris-view {
   flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 18px; background: #04040a;
-  font: 400 11px var(--hud); letter-spacing: .34em; text-transform: uppercase; color: #5c5a54;
+  justify-content: center; gap: 18px; padding: 24px; background: #04040a;
+  font: 400 12px var(--hud); letter-spacing: .3em; text-transform: uppercase; color: #9b978e;
 }
 #osiris-view .eye { width: 96px; height: 60px; color: rgba(212, 175, 55, .5); }
 #osiris-view .cursor { font-style: normal; animation: cursor-blink 1.06s steps(1) infinite; }
@@ -768,7 +769,7 @@ body.osiris {
   text-shadow: 0 0 6px rgba(0, 229, 255, .12);
 }
 body.osiris .panel { border-color: rgba(212, 175, 55, .15); }
-body.osiris .panel h2, body.osiris #panel-tabs .tab { font-size: 10px; letter-spacing: .3em; }
+body.osiris .panel h2, body.osiris #panel-tabs .tab { font-size: 11px; letter-spacing: .26em; }
 body.osiris #panel-tabs .tab.on { color: #d4af37; border-bottom-color: #d4af37; }
 body.osiris #clock { font-weight: 700; letter-spacing: .02em; color: #f5f0e0; }
 body.osiris #seconds { color: #00e5ff; }
@@ -797,13 +798,13 @@ body.switching #stage { animation: channel .5s steps(6, end); }
 
 /* --- without LYLA's room ------------------------------------------------------
    The button, or "hide Lyla": her room fades, and the panels and the ring
-   grow into the space she leaves. */
+   grow into the space she leaves - in one frame, under a channel change,
+   rather than stretched frame by frame. */
 
-#stage { transition: opacity .6s ease-out, padding-bottom .55s cubic-bezier(.32, .72, 0, 1); }
+#stage { transition: opacity .6s ease-out; }
 body.roomless #stage { padding-bottom: var(--dock-room); }
 #lyla { transition: opacity .26s ease-out; }
 body.roomless #lyla { opacity: 0; transition: opacity .45s ease-in-out; }
-#ring, #wordmark { transition: width .55s cubic-bezier(.32, .72, 0, 1), height .55s cubic-bezier(.32, .72, 0, 1); }
 body.roomless #ring { width: 340px; height: 340px; }
 body.roomless #wordmark { width: 620px; height: 138px; }
 

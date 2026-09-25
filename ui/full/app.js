@@ -130,6 +130,7 @@ const state = {
   panels: {},             // which panels apollo.py last said are shown
   osiris: false,          // OSIRIS laid into the display, and Apollo in its colours
   osirisTimer: null,      // ...places the map once the stage has its new shape
+  channelTimer: null,     // ends the channel change that covers a change of shape
   roomTimer: null,        // stops LYLA once her room has faded
 };
 
@@ -1674,27 +1675,43 @@ function setPanels(wanted) {
 }
 
 /* LYLA's room is out while OSIRIS is up, and back the way it was after. */
-function applyRoom() { setRoom(!state.osiris && state.panels.lyla !== false); }
+function applyRoom(options) { setRoom(!state.osiris && state.panels.lyla !== false, options); }
 
 /* LYLA's room, in or out - the button along the bottom, or "hide Lyla". Her
  * room is a full-window canvas, not a grid cell: it fades, she stops, and
  * the stage gives the space to the panels and the ring. */
 function roomShown() { return !document.body.classList.contains('roomless'); }
 
-function setRoom(shown) {
+function setRoom(shown, { quiet = false } = {}) {
   const button = $('room-toggle');
   button.setAttribute('aria-pressed', shown ? 'true' : 'false');
   button.querySelector('em').textContent = shown ? 'ROOM ON' : 'ROOM OFF';
   if (shown === roomShown()) return;
-  document.body.classList.toggle('roomless', !shown);
   clearTimeout(state.roomTimer);
-  if (shown) {
-    if (state.mode === 'full' && !asleep.on) lyla.start();
-  } else {
-    state.roomTimer = setTimeout(() => { if (!roomShown()) lyla.stop(); }, 460);
-  }
-  // The name redraws its cells at its new size once the stage has settled.
-  setTimeout(() => wordmark.resize(), 600);
+  const swap = () => {
+    document.body.classList.toggle('roomless', !shown);
+    wordmark.resize();                    // its cells, at its new size
+    if (shown) {
+      if (state.mode === 'full' && !asleep.on) lyla.start();
+    } else {
+      state.roomTimer = setTimeout(() => { if (!roomShown()) lyla.stop(); }, 460);
+    }
+  };
+  if (quiet) swap();
+  else channelChange(swap);
+}
+
+/* A change of shape on an old set: a flash and a jolt, and the new picture
+ * underneath it. The stage changes in one frame, at the dark moment - never
+ * stretched frame by frame, which would lay the whole page out again on
+ * every one of them. */
+function channelChange(swap) {
+  document.body.classList.remove('switching');
+  void document.body.offsetWidth;          // from the start, every time
+  document.body.classList.add('switching');
+  clearTimeout(state.channelTimer);
+  setTimeout(swap, 150);
+  state.channelTimer = setTimeout(() => document.body.classList.remove('switching'), 520);
 }
 
 /* --- OSIRIS --------------------------------------------------------------------
@@ -1723,24 +1740,23 @@ function setOsiris(on) {
   closeStock();
   unlight();
   unlightRow();
-  // The switch is a channel change on an old set.
-  document.body.classList.remove('switching');
-  void document.body.offsetWidth;
-  document.body.classList.add('switching');
-  setTimeout(() => document.body.classList.remove('switching'), 520);
-  document.body.classList.toggle('osiris', on);
-  $('osiris').setAttribute('aria-hidden', on ? 'false' : 'true');
   $('osiris-button').setAttribute('aria-pressed', on ? 'true' : 'false');
   shader.theme(on);
-  applyRoom();
+  // The switch is a channel change: Apollo goes into OSIRIS's colours, and
+  // LYLA's room out, at its dark moment.
+  channelChange(() => {
+    document.body.classList.toggle('osiris', on);
+    $('osiris').setAttribute('aria-hidden', on ? 'false' : 'true');
+    applyRoom({ quiet: true });
+    if (!on) wordmark.resize();
+  });
   clearTimeout(state.osirisTimer);
   if (on) {
-    // Laid over the frame once the stage has settled into its new shape.
-    state.osirisTimer = setTimeout(placeOsiris, 620);
+    // Laid over the frame once the stage has its new shape.
+    state.osirisTimer = setTimeout(placeOsiris, 320);
   } else {
     const api = bridge();
     if (api && api.osiris_close) api.osiris_close();
-    setTimeout(() => wordmark.resize(), 600);
   }
   return on;
 }
