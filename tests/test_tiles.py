@@ -249,3 +249,23 @@ def test_folded_the_feed_keeps_its_newest_few(tmp_path):
     assert run(tmp_path, "T.FEED_FOLDED") == 3
     assert run(tmp_path, "T.foldedStories([1, 2, 3, 4], false)") == [1, 2, 3, 4]
     assert run(tmp_path, "T.foldedStories(undefined, true)") == []
+
+
+# --- the sounds, on or off ---------------------------------------------------------
+# SFX in the dock mutes the display's sounds, and it stays muted - kept with
+# the layout, like the folds.
+
+def test_the_sounds_start_on(tmp_path):
+    assert run(tmp_path, "T.defaultLayout().muted") is False
+
+
+def test_muted_is_kept_only_when_really_asked_for(tmp_path):
+    kept = run(tmp_path, """[true, 'yes', 1, null].map((muted) =>
+        T.sanitize({ ...T.defaultLayout(), muted }).muted)""")
+    assert kept == [True, False, False, False]
+
+
+def test_muting_changes_nothing_else(tmp_path):
+    muted, folded = run(tmp_path, """(() => { const a = T.setMuted(T.defaultLayout(), true);
+        return [a.muted, a.folded || a.feedFolded]; })()""")
+    assert muted is True and folded is False

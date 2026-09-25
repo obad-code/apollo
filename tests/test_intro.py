@@ -117,3 +117,23 @@ def test_the_page_is_told_to_play_it():
     ui.window, ui.alive = Window(), True
     ui.intro()
     assert ui.window.scripts[-1] == "window.apollo.intro && window.apollo.intro()"
+
+
+def test_the_layout_goes_first_so_a_muted_display_boots_quietly(monkeypatch, tmp_path):
+    # The intro makes a sound (ui/full/sfx.js), and whether the display's
+    # sounds are muted is kept with the layout - which the page used to hear
+    # only after the display was open, one sound too late.
+    monkeypatch.setattr(apollo, "screen_busy", lambda: False)
+    monkeypatch.setattr(apollo.displays, "PATH", str(tmp_path / "displays.json"))
+    monkeypatch.setattr(apollo.displays, "_memo", None)
+    layout = apollo.displays.default()
+    layout["muted"] = True
+    apollo.displays.save(layout)
+    app = _app()
+    app.ui.display = lambda request: app.log.append(("display", request))
+    app.want_intro()
+    app.check_intro(now=100.0)
+    told, then = app.log[0], app.log[1]
+    assert told[0] == "display" and told[1]["action"] == "layout"
+    assert told[1]["layout"]["muted"] is True
+    assert then == "intro"

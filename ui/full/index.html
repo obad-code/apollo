@@ -76,12 +76,12 @@
     <!-- The side panel's tabs: the stocks, your talks with Apollo, your
          projects, your ideas. -->
     <h2 id="panel-tabs">
-      <span class="tab on" data-tab="stocks" id="markets-head">Markets</span>
-      <span class="tab" data-tab="talks">Talks</span>
-      <span class="tab" data-tab="projects">Projects</span>
-      <span class="tab" data-tab="ideas">Ideas</span>
+      <span class="tab on" data-tab="stocks" id="markets-head" data-sfx="tab">Markets</span>
+      <span class="tab" data-tab="talks" data-sfx="tab">Talks</span>
+      <span class="tab" data-tab="projects" data-sfx="tab">Projects</span>
+      <span class="tab" data-tab="ideas" data-sfx="tab">Ideas</span>
       <!-- The stocks folded away to a few, small, or all of them back. -->
-      <button id="stocks-fold" class="fold" type="button" aria-pressed="false"
+      <button id="stocks-fold" class="fold" type="button" data-sfx="none" aria-pressed="false"
               title="Fold the stocks away to a few">
         <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span>FOLD</span>
       </button>
@@ -106,7 +106,7 @@
   <section id="headlines" class="panel rise" data-display="feed">
     <h2 id="headlines-head">Headlines</h2>
     <!-- The feed folded away to its newest few, one line each, or all back. -->
-    <button id="feed-fold" class="fold" type="button" aria-pressed="false"
+    <button id="feed-fold" class="fold" type="button" data-sfx="none" aria-pressed="false"
             title="Fold the feed away to a few stories">
       <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span>FOLD</span>
     </button>
@@ -154,7 +154,7 @@
     <header>
       <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg>
       <b>OSIRIS</b><span>Inside Apollo</span>
-      <button id="osiris-close" type="button">Close ✕</button>
+      <button id="osiris-close" type="button" data-sfx="none">Close ✕</button>
     </header>
     <div id="osiris-view">
       <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg>
@@ -175,14 +175,23 @@
   <section id="lyla-block" class="rise">
     <canvas id="lyla-icon" width="48" height="72"></canvas>
     <div id="lyla-hp">
-      <div class="hp-head"><b>LYLA</b><span class="hp-tag">HP</span><span id="lyla-pct">88%</span></div>
+      <div class="hp-head"><b>LYLA</b><span class="hp-tag">HP</span><span id="lyla-pct">88%</span>
+        <button id="lyla-agent-toggle" class="fold" type="button" data-sfx="none" aria-expanded="false"
+                aria-controls="lyla-agent" title="LYLA as an agent - a preview">
+          <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span>AGENT</span>
+        </button>
+      </div>
       <div id="lyla-battery"><div id="lyla-bar"></div></div>
       <div id="lyla-label" class="caption">BOOTING</div>
     </div>
   </section>
 
+  <!-- LYLA as an agent, before she is one: the pipeline card her block opens
+       over the feed (lylaagent.js). A preview - nothing on it is live yet. -->
+  <section id="lyla-agent" aria-label="LYLA's agent pipeline, a preview"></section>
+
   <!-- OSIRIS's eye, under the feed. -->
-  <button id="osiris-button" class="hud-button" type="button" aria-pressed="false" title="Open OSIRIS inside Apollo">
+  <button id="osiris-button" class="hud-button" type="button" data-sfx="none" aria-pressed="false" title="Open OSIRIS inside Apollo">
     <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg><span>OSIRIS</span><em>MAP</em>
   </button>
 </main>
@@ -194,21 +203,26 @@
 <div id="chart-peek" class="peek" aria-hidden="true"></div>
 
 <!-- Along the bottom edge: LYLA's room in or out - without it, the panels
-     and the ring take the room back - and ultra mode. -->
+     and the ring take the room back - ultra mode, and the display's sounds
+     on or off. -->
 <nav id="dock">
-  <button id="room-toggle" class="hud-button" type="button" aria-pressed="true" title="Show or hide LYLA's room">
+  <button id="room-toggle" class="hud-button" type="button" data-sfx="none" aria-pressed="true" title="Show or hide LYLA's room">
     <i class="led"></i><span>LYLA</span><em>ROOM ON</em>
   </button>
-  <button id="ultra-button" class="hud-button" type="button" aria-pressed="false"
+  <button id="ultra-button" class="hud-button" type="button" data-sfx="none" aria-pressed="false"
           title="Ultra mode: every display on the screen, ready for work">
     <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg><span>ULTRA</span><em>EXPAND</em>
+  </button>
+  <button id="sfx-toggle" class="hud-button" type="button" aria-pressed="true" data-sfx="none"
+          title="The display's sounds on or off">
+    <i class="led"></i><span>SFX</span><em>ON</em>
   </button>
 </nav>
 
 <!-- Ultra mode's bar along the bottom: back to the normal display, every
      display as a switch, and the grid back when one is expanded. -->
 <nav id="ultra-bar" aria-label="Displays">
-  <button id="ultra-exit" class="hud-button" type="button" title="Back to the normal display">
+  <button id="ultra-exit" class="hud-button" type="button" data-sfx="none" title="Back to the normal display">
     <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg><span>NORMAL</span>
   </button>
   <div id="ultra-chips"></div>

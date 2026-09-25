@@ -1,7 +1,8 @@
 """Ultra mode's displays: where each one is on the screen, how big, whether it
 is shown or minimized, which one is expanded - and the words that find each
 one by voice, in either language. And whether the stocks and the feed are
-folded away to a few, which the normal display shares.
+folded away to a few, which the normal display shares, and whether the
+display's sounds are muted.
 
 The page lays them out and changes them as you drag, resize and hide them
 (ui/full/tiles.js); this keeps what it last said, so the screen you set up
@@ -79,7 +80,7 @@ def default():
     items = {d: {"shown": d != "talks", "w": SPANS[d][0], "h": SPANS[d][1], "min": False}
              for d in ORDER}
     return {"ultra": False, "focus": None, "order": list(ORDER), "items": items,
-            "layers": list(LAYERS), "folded": False, "feedFolded": False}
+            "layers": list(LAYERS), "folded": False, "feedFolded": False, "muted": False}
 
 
 def _whole(value, low, high, fallback):
@@ -122,7 +123,7 @@ def sanitize(raw):
         focus = None
     return {"ultra": raw.get("ultra") is True, "focus": focus, "order": order,
             "items": items, "layers": layers, "folded": raw.get("folded") is True,
-            "feedFolded": raw.get("feedFolded") is True}
+            "feedFolded": raw.get("feedFolded") is True, "muted": raw.get("muted") is True}
 
 
 def state():

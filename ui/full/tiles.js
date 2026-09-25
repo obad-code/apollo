@@ -46,7 +46,7 @@ export function defaultLayout() {
     items[id] = { shown: id !== 'talks', w, h, min: false };
   }
   return { ultra: false, focus: null, order: [...DISPLAYS], items, layers: [...LAYERS],
-           folded: false, feedFolded: false };
+           folded: false, feedFolded: false, muted: false };
 }
 
 // A number of cells, or the fallback for anything that is not a number -
@@ -92,7 +92,7 @@ export function sanitize(raw) {
   const focus = DISPLAYS.includes(raw.focus) && items[raw.focus].shown && !items[raw.focus].min
     ? raw.focus : null;
   return { ultra: raw.ultra === true, focus, order, items, layers, folded: raw.folded === true,
-           feedFolded: raw.feedFolded === true };
+           feedFolded: raw.feedFolded === true, muted: raw.muted === true };
 }
 
 const copy = (layout) => sanitize(JSON.parse(JSON.stringify(layout)));
@@ -165,6 +165,13 @@ export function setFolded(layout, on) {
 export function setFeedFolded(layout, on) {
   const next = copy(layout);
   next.feedFolded = Boolean(on);
+  return next;
+}
+
+/* The display's sounds muted, or back on (SFX in the dock). */
+export function setMuted(layout, on) {
+  const next = copy(layout);
+  next.muted = Boolean(on);
   return next;
 }
 

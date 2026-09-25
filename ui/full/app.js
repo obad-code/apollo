@@ -17,6 +17,8 @@ import { LedWord } from './ledword.js';
 import { bootLines, typed } from './boot.js';
 import * as Tiles from './tiles.js';
 import * as Rings from './rings.js';
+import { Sfx } from './sfx.js';
+import { LylaAgent } from './lylaagent.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -199,6 +201,7 @@ function playIntro() {
   box.classList.add('on');
   introWord.resize();              // it had no size while it was not shown
   introWord.scramble(1.0, 0.5);
+  sfx.play('boot');
 
   // The boot lines type themselves out, then the prompt under the name.
   const log = $('intro-log'), ready = $('intro-ready');
@@ -235,11 +238,43 @@ const lylaDoing = {
   set textContent(text) { $('lyla-label').textContent = String(text).replace(/^LYLA\s*\/\/\s*/, ''); },
 };
 
+/* The display's sounds, made on the spot (sfx.js): a tick as the pointer
+ * comes onto a button and a click as it is pressed - or the button's own
+ * sound (data-sfx, or played where it does its work) - and a sound for each
+ * change worth hearing: Apollo listening, your words heard, the answer
+ * coming, the display up and away, asleep and awake. LYLA has her own two.
+ * SFX in the dock mutes them all, kept with the layout. */
+const sfx = new Sfx();
+const PRESSABLE = 'button, .tab, .chip, [data-sfx]';
+let hovered = null;
+document.addEventListener('pointerover', (event) => {
+  const target = event.target.closest(PRESSABLE);
+  if (target === hovered) return;
+  hovered = target;
+  if (target && event.pointerType === 'mouse') sfx.play('tick');
+});
+document.addEventListener('click', (event) => {
+  const target = event.target.closest(PRESSABLE);
+  if (!target || target.dataset.sfx === 'none') return;
+  sfx.play(target.dataset.sfx || 'press');
+}, true);
+
 const lyla = new Lyla($('lyla'), {
   label: lylaDoing, icon: $('lyla-icon'),
   bar: $('lyla-bar'), pct: $('lyla-pct'), ring: $('ring'),
+  sound: (name) => sfx.play(name),
 });
 lyla.start();
+
+/* LYLA as an agent, before she is one (lylaagent.js): her block - or AGENT
+ * on it - opens the pipeline card over the feed, and shuts it; so does
+ * Escape. Out of sight with her block, in ultra mode and under the map. */
+const agent = new LylaAgent($('lyla-agent'), { sound: (name) => sfx.play(name) });
+function toggleAgent() {
+  agent.toggle();
+  $('lyla-agent-toggle').setAttribute('aria-expanded', agent.open ? 'true' : 'false');
+}
+$('lyla-block').addEventListener('click', toggleAgent);
 
 // Click the display and LYLA comes after the pointer for a while (lyla.js).
 document.addEventListener('pointerdown', (event) => lyla.follow(event.clientX, event.clientY));
@@ -835,7 +870,7 @@ const numbered = (index) => String(index + 1).padStart(2, '0');
 
 function renderChips() {
   $('topics').innerHTML = TOPICS.map((topic, i) =>
-    `<span class="chip ${i === state.topic ? 'on' : ''}" data-topic="${i}">${esc(topic)}</span>`).join('');
+    `<span class="chip ${i === state.topic ? 'on' : ''}" data-topic="${i}" data-sfx="tab">${esc(topic)}</span>`).join('');
 }
 
 function renderFeed(snapshot) {
@@ -1062,6 +1097,7 @@ function openStory(index) {
   // A story opens across the whole feed: folded, the feed opens out first.
   if (state.layout.feedFolded) setFeedFolded(false);
   noted('story', item.title, item.source);
+  sfx.play('rev');
   const card = $('story');
   unlight();
   state.open = { index, item };
@@ -1121,6 +1157,7 @@ $('story').addEventListener('click', (event) => {
 });
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
+  if (agent.open) toggleAgent();
   closeStory();
   closeStock();
   if (state.configFor) closeConfig();
@@ -1236,7 +1273,7 @@ function stockMarkup(quote) {
     </div>
     <div class="spans">
       ${SPANS.map(([span, label]) =>
-        `<span class="chip${span === '1d' ? ' on' : ''}" data-span="${span}">${label}</span>`).join('')}
+        `<span class="chip${span === '1d' ? ' on' : ''}" data-span="${span}" data-sfx="tab">${label}</span>`).join('')}
       <span class="live-badge">Live</span>
       <span class="span-move"></span>
     </div>
@@ -1353,6 +1390,7 @@ function openStock(symbol) {
   const quote = (market.watchlist || []).find((q) => q.symbol === symbol);
   if (!quote) return null;
   noted('stock', quote.symbol, quote.name);
+  sfx.play('rev');
   unlightRow();
   const view = $('stock');
   state.stock = { symbol, quote, span: '1d', points: quote.spark || [], times: [] };
@@ -1982,6 +2020,7 @@ function setSleep(on) {
   on = Boolean(on);
   if (on === asleep.on) return;
   asleep.on = on;
+  if (state.mode === 'full') sfx.play(on ? 'sleep' : 'wake');
   document.body.classList.toggle('asleep', on);
   $('sleep').setAttribute('aria-hidden', on ? 'false' : 'true');
   shader.sleep(on);
@@ -2059,6 +2098,7 @@ function setRoom(shown, { quiet = false } = {}) {
   button.setAttribute('aria-pressed', shown ? 'true' : 'false');
   button.querySelector('em').textContent = shown ? 'ROOM ON' : 'ROOM OFF';
   if (shown === roomShown()) return;
+  if (!quiet) sfx.play(shown ? 'hud' : 'down');
   clearTimeout(state.roomTimer);
   const swap = () => {
     document.body.classList.toggle('roomless', !shown);
@@ -2103,6 +2143,7 @@ function setOsiris(on) {
   }
   if (on === state.osiris) return on;
   state.osiris = on;
+  sfx.play(on ? 'ping' : 'down');
   closeStory();
   closeStock();
   unlight();
@@ -2131,6 +2172,15 @@ $('room-toggle').addEventListener('click', () => {
   setPanels({ lyla: shown });
   const api = window.pywebview && window.pywebview.api;
   if (api && api.set_panel) api.set_panel('lyla', shown);
+});
+
+/* SFX in the dock: the display's sounds off, or on again - heard going off,
+ * and coming back. Kept with the layout. */
+$('sfx-toggle').addEventListener('click', () => {
+  const muting = !state.layout.muted;
+  if (muting) sfx.play('down');
+  changeLayout(Tiles.setMuted(state.layout, muting), { animate: false });
+  if (!muting) sfx.play('rev');
 });
 
 /* --- ultra mode -------------------------------------------------------------------
@@ -2240,6 +2290,10 @@ function applyLayout() {
   fold.setAttribute('aria-pressed', folded ? 'true' : 'false');
   fold.title = folded ? 'All the stocks back' : 'Fold the stocks away to a few';
   fold.querySelector('span').textContent = folded ? 'ALL' : 'FOLD';
+  sfx.muted = Boolean(layout.muted);
+  const sound = $('sfx-toggle');
+  sound.setAttribute('aria-pressed', layout.muted ? 'false' : 'true');
+  sound.querySelector('em').textContent = layout.muted ? 'OFF' : 'ON';
   const feedFolded = Boolean(layout.feedFolded);
   $('headlines').classList.toggle('folded', feedFolded);
   const feedFold = $('feed-fold');
@@ -2304,6 +2358,7 @@ function changeLayout(next, { animate: moving = true, save = true } = {}) {
  * kept with the layout like the stocks'. */
 function setFeedFolded(on) {
   if (Boolean(on) === Boolean(state.layout.feedFolded)) return;
+  sfx.play(on ? 'fold' : 'unfold');
   closeStory();
   unlight();
   changeLayout(Tiles.setFeedFolded(state.layout, on), { animate: false });
@@ -2314,6 +2369,7 @@ $('feed-fold').addEventListener('click', () => setFeedFolded(!state.layout.feedF
  * the layout, so it is the same tomorrow. */
 function setFolded(on) {
   if (Boolean(on) === Boolean(state.layout.folded)) return;
+  sfx.play(on ? 'fold' : 'unfold');
   closeStock();
   unlightRow();
   changeLayout(Tiles.setFolded(state.layout, on), { animate: false });
@@ -2336,6 +2392,7 @@ function setUltra(on, { quiet = false, layout = null } = {}) {
   const next = layout || Tiles.setUltra(state.layout, on);
   $('ultra-button').setAttribute('aria-pressed', on ? 'true' : 'false');
   if (on === ultraOn()) { changeLayout(next); return on; }
+  if (!quiet) sfx.play(on ? 'swipe' : 'down');
   closeStory();
   closeStock();
   unlight();
@@ -2563,7 +2620,7 @@ function renderDisplayChips() {
   $('ultra-chips').innerHTML = Tiles.DISPLAYS.map((id) => {
     const shown = layout.items[id].shown;
     return `<button type="button" class="dchip${shown ? ' on' : ''}${layout.focus === id ? ' lead' : ''}"
-              data-chip="${id}" aria-pressed="${shown ? 'true' : 'false'}"
+              data-chip="${id}" data-sfx="tab" aria-pressed="${shown ? 'true' : 'false'}"
               title="${shown ? 'Hide' : 'Show'} ${Tiles.NAMES[id]}"><i class="led"></i>${Tiles.NAMES[id]}</button>`;
   }).join('');
 }
@@ -2929,6 +2986,12 @@ function setPhase(phase) {
   if (phase === state.phase) return;
   state.phase = phase;
   lyla.setPhase(phase);
+  // Heard as the old page had it: a sound as Apollo starts listening and
+  // one as its answer comes - none on thinking, which starts before there
+  // is anything to have heard (a cough, a chord pressed by accident); your
+  // words get theirs when they arrive (turn).
+  if (phase === 'listening') sfx.play('listen');
+  if (phase === 'speaking') sfx.play('rev');
 
   const answering = phase === 'thinking' || phase === 'speaking';
   const attending = phase !== 'idle';
@@ -3045,6 +3108,7 @@ window.apollo = {
   },
   turn(who, text) {
     if (who === 'You') {
+      sfx.play('heard');
       $('you').textContent = text;
       return;
     }
@@ -3068,7 +3132,12 @@ window.apollo = {
   },
   fatal(text) { window.apollo.note(text); },
   mode(name) {
+    const was = state.mode;
     state.mode = name;
+    // The display up, or away again - not while the intro has the screen,
+    // which has its own.
+    const up = name === 'full';
+    if (was !== name && !$('intro').classList.contains('on')) sfx.play(up ? 'hud' : 'down');
     // The overlay has the screen while Apollo is at rest; a shader drawing to
     // a window nobody can see is a GPU burning for nothing.
     // Nothing on the sign moves while nobody can see it.

@@ -91,6 +91,15 @@ def test_the_feed_stays_folded_across_a_restart():
     assert displays.state()["feedFolded"] is True
 
 
+def test_the_sounds_stay_muted_across_a_restart():
+    layout = displays.default()
+    assert layout["muted"] is False
+    layout["muted"] = True
+    displays.save(layout)
+    displays._memo = None                          # as if Apollo restarted
+    assert displays.state()["muted"] is True
+
+
 def test_a_file_that_is_not_a_layout_is_the_default(tmp_path):
     pathlib.Path(displays.PATH).write_text("{not json", encoding="utf-8")
     assert displays.state() == displays.default()
@@ -144,6 +153,7 @@ RAW = [
     {"focus": ["feed"], "order": "feed", "layers": "cctv"},
     {"folded": True}, {"folded": "yes"}, {"folded": 1},
     {"feedFolded": True}, {"feedFolded": "yes"}, {"folded": True, "feedFolded": True},
+    {"muted": True}, {"muted": "yes"}, {"muted": 1, "folded": True},
 ]
 
 

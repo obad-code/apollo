@@ -253,7 +253,14 @@ segments (CPU, GPU and RAM, sixteen segments each, the last ones warm and
 then red), the day's tokens, cost and clips, and the card with each model's
 share of the day - two slim lines while LYLA's room is up, the full meters
 when it is away; LYLA's health bar at the top right, the way a game shows it
-- her portrait, her HP in segments and what she is doing; under it
+- her portrait, her HP in segments and what she is doing - with **AGENT** on
+it (or a click anywhere on the bar) dropping down LYLA's agent card over the
+feed: a preview, before she is a real agent, of the pipeline she will run -
+your query coming in, a semantic search, LYLA processing, and an email
+draft, a CRM update and a report going out - with dots running along the
+wires, a line of what she is doing that changes every few seconds and the
+workflows ticking up (`ui/full/lylaagent.js`; nothing on it is live yet,
+and it says PREVIEW; a click or Escape shuts it); under it
 headlines on what you follow and Trump's posts with the market-moving ones
 flagged, each with a line of what it says, with OSIRIS's eye under them; and
 LYLA in her room along the bottom. The lists - the stocks, the indices, the
@@ -261,11 +268,25 @@ feed and its chips, the side panel's tabs - are drawn the way a CRT tool
 would: each letter glowing, its red and blue landing a hair either side of
 it, and the whole list seen through a halftone of dots.
 
-Along the bottom edge, two buttons. **LYLA** puts her room away - she stops,
+Along the bottom edge, three buttons. **LYLA** puts her room away - she stops,
 the room fades, and the panels and the ring grow into the space - and brings
 it back; the choice is kept, and *"hide Lyla"* does the same. **ULTRA**
-brings every display up at once (below). The eye under the feed opens
-**OSIRIS** (below).
+brings every display up at once (below). **SFX** turns the display's sounds
+off and on, and the choice is kept. The eye under the feed opens **OSIRIS**
+(below).
+
+**Sounds.** The display makes its own, on the spot, with Web Audio - a few
+oscillators and a little noise, swept and shaped like an old synth's blips,
+no sound files (`ui/full/sfx.js`). A tick as the pointer comes onto a
+button and a click as it is pressed; a glassy step for tabs and chips; two
+notes down as a list folds and up as it opens; a filter opening as
+something comes up (the display, LYLA's room, her agent card) and closing
+as it goes; a sonar ping for OSIRIS and a rush of air for ultra mode.
+Apollo starts listening with a rising pair, your words heard with a soft
+chime and the answer coming with a bright flick - none on thinking, which
+begins before there is anything to have heard. The intro has a slow swell,
+sleep and waking their own sweeps, and LYLA her two from the old page.
+They are short and quiet, under Apollo's voice.
 
 The panel on the left has four tabs. **Markets** is the stocks. **Talks**
 is what you said to Apollo and what came back, newest first, from the record.
@@ -791,6 +812,8 @@ The only thing left is your API key.
 | `ui/full/rings.js` | Apollo's shape as data: its five rings of dots, which way each turns, and the easing of their pace. No DOM, so node tests it (`tests/test_rings.py`). |
 | `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
+| `ui/full/lylaagent.js` | LYLA's agent card, a preview before she is an agent: the pipeline, its moving parts and what opens and shuts it - ported from a React component to plain JS and SVG, so there is still no build step (`tests/test_lyla_agent.py`). |
+| `ui/full/sfx.js` | The display's sounds, synthesized with Web Audio: the recipes, and the player that mutes and keeps a sound from doubling up (`tests/test_sfx.py`). |
 | `ui/fonts/thmanyah/` | Thmanyah Sans, as OTFs — what the overlay loads privately at runtime. |
 | `ui/full/fonts/` | The same weights as WOFF2, under the page because pywebview's server roots there - and beside them IBM Plex Mono, Melete, Orbitron and VT323, each with its licence. |
 | `ui/legacy/index.html` | The old generated design, frozen. Nothing in the run reads it. |
