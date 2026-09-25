@@ -137,6 +137,8 @@ const state = {
   liveTimer: null,        // takes LIVE off the panel when the trades stop
   panels: {},             // which panels apollo.py last said are shown
   osiris: false,          // OSIRIS laid into the normal display, and Apollo in its colours
+  osirisReturn: false,    // ...and taken into ultra mode, to go back when it ends
+  osirisTicket: 0,        // the last placing of the map asked for; older ones stand down
   osirisTimer: null,      // ...places the map once the stage has its new shape
   channelTimer: null,     // ends the channel change that covers a change of shape
   roomTimer: null,        // stops LYLA once her room has faded
@@ -175,8 +177,9 @@ window.addEventListener('resize', () => {
   for (const word of [sleepWord, introWord]) word.resize();
 });
 
-const INTRO_OFF_AT = 2850;       // ms: the tube switches off...
+const INTRO_OFF_AT = 2700;       // ms: the boot screen blurs away into the display...
 const INTRO_GONE_AT = 3500;      // ...and is gone, just before apollo.py lets go
+const REVEAL_FOR = 1100;         // ms the display takes to come into focus
 const BOOT = bootLines();
 const READY = '> SYSTEM ONLINE';
 const READY_AT = 1.7;            // s: once the name has settled
@@ -189,6 +192,8 @@ function playIntro() {
   const box = $('intro');
   clearTimeout(box._off);
   clearTimeout(box._gone);
+  clearTimeout(box._revealed);
+  document.body.classList.remove('revealing');
   cancelAnimationFrame(box._typing);
   box.classList.remove('off');
   box.classList.add('on');
@@ -210,12 +215,17 @@ function playIntro() {
   };
   box._typing = requestAnimationFrame(type);
 
-  box._off = setTimeout(() => box.classList.add('off'), INTRO_OFF_AT);
+  box._off = setTimeout(() => {
+    box.classList.add('off');
+    document.body.classList.add('revealing');
+  }, INTRO_OFF_AT);
   box._gone = setTimeout(() => {
     box.classList.remove('on', 'off');
     introWord.stop();
     scheduleOsiris(200);           // a map kept back while the tube warmed up
   }, INTRO_GONE_AT);
+  box._revealed = setTimeout(() => document.body.classList.remove('revealing'),
+                             INTRO_OFF_AT + REVEAL_FOR);
 }
 
 /* What she is doing, under her bar. Her name is over the bar already, so the
@@ -799,10 +809,14 @@ function renderFeed(snapshot) {
   $('headlines-head').innerHTML = 'Feed' + stale('news');
   renderChips();
   const items = feedItems(snapshot).slice(0, 11);
+  // Folded, only the newest few are drawn; they keep their numbers, and the
+  // rest are still there to be asked for by number.
+  const folded = Boolean(state.layout.feedFolded);
+  const drawn = Tiles.foldedStories(items, folded);
   // A snapshot arrives every few seconds for the machine's numbers. The feed
   // is rebuilt only when the feed changed, or the row under the pointer would
   // lose its bar every five seconds.
-  const key = state.topic + '#' + items.map((item) => [item.title, item.age].join('|')).join('\n');
+  const key = state.topic + '#' + folded + '#' + items.map((item) => [item.title, item.age].join('|')).join('\n');
   if (key === state.feedKey) return;
   state.feedKey = key;
   state.feed = items;
@@ -810,7 +824,7 @@ function renderFeed(snapshot) {
   // What a story says, where it says more than its title - a post's text is
   // its title already.
   const gistOf = (item) => (item.summary && item.summary !== item.title ? String(item.summary) : '');
-  $('stories').innerHTML = items.map((item, i) => `
+  $('stories').innerHTML = drawn.map((item, i) => `
     <div class="story${item.moving ? ' moving' : ''}" data-i="${i}">
       <span class="num">${numbered(i)}</span>
       <span class="what">${esc(String(item.title).slice(0, 150))}</span>
@@ -822,7 +836,11 @@ function renderFeed(snapshot) {
     </div>`).join('')
     || '<div class="story empty"><span class="num">—</span><span class="what">Nothing has come in yet</span>'
      + '<span class="who">the feeds are quiet</span></div>';
-  $('peek').innerHTML = items.map((item) => `<div class="shot">${shot(item)}</div>`).join('');
+  if (items.length > drawn.length) {
+    $('stories').insertAdjacentHTML('beforeend',
+      `<div class="story rest"><b><i>+${items.length - drawn.length}</i>Show all</b></div>`);
+  }
+  $('peek').innerHTML = drawn.map((item) => `<div class="shot">${shot(item)}</div>`).join('');
 }
 
 /* A story's picture, or its source set large where it has none. */
@@ -956,7 +974,8 @@ $('feed').addEventListener('pointerleave', () => {
 });
 $('stories').addEventListener('click', (event) => {
   const row = event.target.closest('.story');
-  if (row && row.dataset.i !== undefined) openStory(Number(row.dataset.i));
+  if (row && row.classList.contains('rest')) setFeedFolded(false);
+  else if (row && row.dataset.i !== undefined) openStory(Number(row.dataset.i));
 });
 $('topics').addEventListener('click', (event) => {
   const chip = event.target.closest('.chip');
@@ -1007,6 +1026,8 @@ function noted(what, title, source) {
 function openStory(index) {
   const item = state.feed[index];
   if (!item) return null;
+  // A story opens across the whole feed: folded, the feed opens out first.
+  if (state.layout.feedFolded) setFeedFolded(false);
   noted('story', item.title, item.source);
   const card = $('story');
   unlight();
@@ -2056,14 +2077,15 @@ function setOsiris(on) {
   $('osiris-button').setAttribute('aria-pressed', on ? 'true' : 'false');
   // The switch is a channel change: Apollo goes into OSIRIS's colours, and
   // LYLA's room out, at its dark moment.
+  if (!on) syncOsiris();                  // gone at once
   channelChange(() => {
     document.body.classList.toggle('osiris-map', on);
     $('osiris').setAttribute('aria-hidden', on ? 'false' : 'true');
     applySkin();
     applyRoom({ quiet: true });
+    // Laid over the frame once the stage has its new shape.
+    if (on) scheduleOsiris(200);
   });
-  // Laid over the frame once the stage has its new shape - or gone.
-  scheduleOsiris(on ? 320 : 0);
   return on;
 }
 
@@ -2185,8 +2207,17 @@ function applyLayout() {
   fold.setAttribute('aria-pressed', folded ? 'true' : 'false');
   fold.title = folded ? 'All the stocks back' : 'Fold the stocks away to a few';
   fold.querySelector('span').textContent = folded ? 'ALL' : 'FOLD';
-  // Redrawn only if the fold changed: the list knows what it last drew.
-  if (state.snapshot) renderMarkets(state.snapshot.market || {});
+  const feedFolded = Boolean(layout.feedFolded);
+  $('headlines').classList.toggle('folded', feedFolded);
+  const feedFold = $('feed-fold');
+  feedFold.setAttribute('aria-pressed', feedFolded ? 'true' : 'false');
+  feedFold.title = feedFolded ? 'The whole feed back' : 'Fold the feed away to a few stories';
+  feedFold.querySelector('span').textContent = feedFolded ? 'ALL' : 'FOLD';
+  // Redrawn only if a fold changed: each list knows what it last drew.
+  if (state.snapshot) {
+    renderMarkets(state.snapshot.market || {});
+    renderFeed(state.snapshot);
+  }
   renderDisplayChips();
   renderSummaries();
   applySkin();
@@ -2236,6 +2267,16 @@ function changeLayout(next, { animate: moving = true, save = true } = {}) {
   scheduleOsiris();
 }
 
+/* The feed folded away to its newest few, a line each, or all of it back -
+ * kept with the layout like the stocks'. */
+function setFeedFolded(on) {
+  if (Boolean(on) === Boolean(state.layout.feedFolded)) return;
+  closeStory();
+  unlight();
+  changeLayout(Tiles.setFeedFolded(state.layout, on), { animate: false });
+}
+$('feed-fold').addEventListener('click', () => setFeedFolded(!state.layout.feedFolded));
+
 /* The stocks folded away to a few, small, or all of them back - kept with
  * the layout, so it is the same tomorrow. */
 function setFolded(on) {
@@ -2268,25 +2309,40 @@ function setUltra(on, { quiet = false, layout = null } = {}) {
   unlightRow();
   closeConfig();
   if (on && state.osiris) {
-    // The map laid into the normal display becomes one of ultra mode's.
+    // The map laid into the normal display becomes one of ultra mode's -
+    // and goes back into the normal display after, if it is still up.
     state.osiris = false;
+    state.osirisReturn = true;
     $('osiris-button').setAttribute('aria-pressed', 'false');
+  } else if (on) {
+    state.osirisReturn = false;
   }
+  const back = !on && state.osirisReturn && next.items.osiris.shown;
+  if (!on) state.osirisReturn = false;
   state.layout = next;
+  // Off the screen while the picture changes, and laid over wherever its
+  // frame is once it has: told before the change, it went where the frame
+  // had been, and stayed there over the display that replaced it.
+  const api = bridge();
+  if (api && api.osiris_park) api.osiris_park();
   const swap = () => {
-    document.body.classList.remove('osiris-map');
+    if (back) {
+      state.osiris = true;
+      $('osiris-button').setAttribute('aria-pressed', 'true');
+    }
+    document.body.classList.toggle('osiris-map', back);
     document.body.classList.toggle('ultra', on);
-    $('osiris').setAttribute('aria-hidden', on ? 'false' : 'true');
+    $('osiris').setAttribute('aria-hidden', on || back ? 'false' : 'true');
     movePanes(on);
     if (on) settleTiles();
     applyLayout();
     applyRoom({ quiet: true });
     if (on) powerOn();
+    scheduleOsiris(on ? 600 : 320);
   };
   if (quiet) swap();
   else channelChange(swap);
   saveLayout();
-  scheduleOsiris(on ? 900 : 0);
   return on;
 }
 
@@ -2437,14 +2493,34 @@ function syncOsiris() {
   }
 }
 
-/* Off the screen at once if the page is about to move, back over its frame
- * once the move has settled. */
+/* Everything on the stage that is moving and will stop - a display sliding
+ * to its new place, powering on, a channel change - come to rest. The sign's
+ * pulse and the like go on for ever and are not waited for. */
+function whenSettled() {
+  const stage = $('stage');
+  const moving = document.getAnimations().filter((motion) => {
+    const effect = motion.effect;
+    if (!effect || !effect.target || !stage.contains(effect.target)) return false;
+    if (motion.playState === 'finished') return false;
+    return Number.isFinite(effect.getComputedTiming().endTime);
+  });
+  return Promise.all(moving.map((motion) => motion.finished.catch(() => null)));
+}
+
+/* Off the screen at once if the page is about to move, and back over its
+ * frame once the move has settled - after `delay`, and then only once
+ * nothing on the stage is still on its way: a frame measured mid-slide is
+ * where the display was going, not where it went, and the map would stay
+ * there. Only the last one asked for places it. */
 function scheduleOsiris(delay = 480) {
   clearTimeout(state.osirisTimer);
+  const ticket = state.osirisTicket = (state.osirisTicket || 0) + 1;
   const api = bridge();
   if (osirisSpot() !== 'open') { syncOsiris(); return; }
   if (ultraOn() && api && api.osiris_park) api.osiris_park();
-  state.osirisTimer = setTimeout(syncOsiris, delay);
+  state.osirisTimer = setTimeout(() => {
+    whenSettled().then(() => { if (ticket === state.osirisTicket) syncOsiris(); });
+  }, delay);
 }
 
 /* --- the bar along the bottom ---------------------------------------------------- */
@@ -2980,7 +3056,7 @@ window.apollo = {
   panels(state) { setPanels(state); },
   briefing(payload) { if (payload) render(payload); },
   sleep(on) { setSleep(on); },
-  // As Apollo comes up: the name, once, and the tube switching off.
+  // As Apollo comes up: the name, once, blurring away into the display.
   intro() { playIntro(); },
   // OSIRIS in the display, or not - by voice, or its window closed itself.
   osiris(on) { return setOsiris(on); },

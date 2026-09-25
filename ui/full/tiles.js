@@ -1,8 +1,8 @@
 /* Ultra mode's displays, as data: which ones there are, where each sits on
  * the grid, how big it is, whether it is shown, minimized or the one
  * expanded - and the one line each says about itself when it is minimized.
- * And one thing that is the normal display's as much as ultra mode's:
- * whether the stocks are folded away to a few.
+ * And two things that are the normal display's as much as ultra mode's:
+ * whether the stocks, and the feed, are folded away to a few.
  *
  * No DOM here, so node can run it (tests/test_tiles.py). app.js lays the
  * page out from a layout, and apollo.py keeps it (displays.py), so it is
@@ -46,7 +46,7 @@ export function defaultLayout() {
     items[id] = { shown: id !== 'talks', w, h, min: false };
   }
   return { ultra: false, focus: null, order: [...DISPLAYS], items, layers: [...LAYERS],
-           folded: false };
+           folded: false, feedFolded: false };
 }
 
 // A number of cells, or the fallback for anything that is not a number -
@@ -91,7 +91,8 @@ export function sanitize(raw) {
   }
   const focus = DISPLAYS.includes(raw.focus) && items[raw.focus].shown && !items[raw.focus].min
     ? raw.focus : null;
-  return { ultra: raw.ultra === true, focus, order, items, layers, folded: raw.folded === true };
+  return { ultra: raw.ultra === true, focus, order, items, layers, folded: raw.folded === true,
+           feedFolded: raw.feedFolded === true };
 }
 
 const copy = (layout) => sanitize(JSON.parse(JSON.stringify(layout)));
@@ -160,15 +161,33 @@ export function setFolded(layout, on) {
   return next;
 }
 
-// How many stocks a folded list keeps.
+/* ...and the feed. */
+export function setFeedFolded(layout, on) {
+  const next = copy(layout);
+  next.feedFolded = Boolean(on);
+  return next;
+}
+
+// How many stocks, and how many stories, a folded list keeps.
 export const FOLDED = 4;
+export const FEED_FOLDED = 3;
+
+const firstFew = (list, folded, keep) => {
+  const all = Array.isArray(list) ? list : [];
+  return folded ? all.slice(0, keep) : all;
+};
 
 /* The stocks a list shows: folded, the first FOLDED of them in the order you
  * keep them - the ones you put first are the ones you care about first -
  * and otherwise every one. */
 export function foldedStocks(watchlist, folded) {
-  const all = Array.isArray(watchlist) ? watchlist : [];
-  return folded ? all.slice(0, FOLDED) : all;
+  return firstFew(watchlist, folded, FOLDED);
+}
+
+/* The stories the feed shows: folded, the newest FEED_FOLDED - the feed is
+ * newest first - and otherwise every one. */
+export function foldedStories(items, folded) {
+  return firstFew(items, folded, FEED_FOLDED);
 }
 
 export function setLayers(layout, layers) {

@@ -221,3 +221,31 @@ def test_unfolded_or_short_it_keeps_them_all(tmp_path):
         T.foldedStocks([1, 2], true).length]""")
     assert every == 6 and few == 2
     assert run(tmp_path, "T.foldedStocks(null, true)") == []
+
+
+# --- the feed folded -----------------------------------------------------------------
+# FOLD on the feed does for the stories what it does for the stocks: the
+# first few, one line each, and the rest a click away. Kept the same way.
+
+def test_the_feed_starts_unfolded(tmp_path):
+    assert run(tmp_path, "T.defaultLayout().feedFolded") is False
+
+
+def test_the_feed_s_fold_is_kept_only_when_really_asked_for(tmp_path):
+    kept = run(tmp_path, """[true, 'yes', 1, null].map((feedFolded) =>
+        T.sanitize({ ...T.defaultLayout(), feedFolded }).feedFolded)""")
+    assert kept == [True, False, False, False]
+
+
+def test_the_two_folds_are_their_own(tmp_path):
+    feed, stocks = run(tmp_path, """(() => { const a = T.setFeedFolded(T.defaultLayout(), true);
+        return [a.feedFolded, a.folded]; })()""")
+    assert feed is True and stocks is False
+
+
+def test_folded_the_feed_keeps_its_newest_few(tmp_path):
+    shown = run(tmp_path, "T.foldedStories([1, 2, 3, 4, 5, 6, 7], true)")
+    assert shown == [1, 2, 3]
+    assert run(tmp_path, "T.FEED_FOLDED") == 3
+    assert run(tmp_path, "T.foldedStories([1, 2, 3, 4], false)") == [1, 2, 3, 4]
+    assert run(tmp_path, "T.foldedStories(undefined, true)") == []

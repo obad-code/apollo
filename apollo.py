@@ -1311,10 +1311,11 @@ class Apollo:
         """APOLLO in lit cells, on the whole screen, as Apollo comes up.
 
         The display holds the screen for INTRO_SECONDS while the page plays
-        it - the cells light in a sweep, hold, and the tube switches off -
-        and then Apollo is whatever it would have been: the overlay, or the
-        display if Ctrl+` was pressed meanwhile. Not over a full-screen
-        program: a game or a film that was up first is left alone.
+        it - the boot lines type out, the name settles, and the picture blurs
+        away into the display under it - and then the display stays: open,
+        as if Ctrl+` had been pressed, and closed the same way. Not over a
+        full-screen program: a game or a film that was up first is left
+        alone, and Apollo stays in the overlay.
 
         On the watcher's thread, start and end, like every other change of
         mode. The first version ended on a timer thread, which raced the
@@ -1337,6 +1338,10 @@ class Apollo:
             return
         if self.intro_until and now >= self.intro_until:
             self.intro_until = 0.0
+            # The intro blurs away into the display, so the display is what
+            # is left: open it, unless Ctrl+` already did.
+            if not self.presence.full:
+                self.presence.toggle_peek()
             self.apply_mode()
 
     def apply_mode(self):

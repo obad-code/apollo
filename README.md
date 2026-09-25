@@ -226,9 +226,10 @@ on a green tube (`ui/full/boot.js`): the tube opens out of a bright line,
 its checks type themselves out top left in VT323 - memory, voice link,
 market feed, Private Eye, neural core - the name settles out of its
 scramble in green phosphor, `> SYSTEM ONLINE` types under it, and then the
-tube switches off - the picture collapsing to a bright line and the line
-to nothing - before Apollo settles into the overlay. It is skipped when a
-full-screen program was already up, so a game or a film is left alone.
+boot screen blurs away while the display comes up into focus under it - and
+the display stays open, as if Ctrl+` had been pressed; Ctrl+` puts it away.
+It is skipped when a full-screen program was already up, so a game or a
+film is left alone and Apollo stays in the overlay.
 
 The full display is the whole screen. Behind everything, an old set's own
 pixels (`ui/full/shader.js`): a slot mask as fine as a TV's - cells of a red,
@@ -278,7 +279,10 @@ it and its picture opens beside the panel; click it and the story opens out
 of its row - picture, summary, and a **Read** button that opens the article in
 your browser. Or say it: *"open story three"* opens it (bringing the display
 up if it was not) and Apollo tells you what it is. The chips along the top
-filter by topic.
+filter by topic. **FOLD**, at the feed's top right, folds it to the newest
+three stories, a line each, with how many are folded under them; **ALL**, or
+that row, brings the rest back, and so does opening a story. Kept with the
+layout, like the stocks'.
 
 The stocks work the same way - a list after the same component: each row
 is the mark and ticker with the name under it, the day's curve drawn small

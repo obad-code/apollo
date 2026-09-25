@@ -1,5 +1,6 @@
 """The word, once, as Apollo comes up: the display holds the screen for a few
-seconds while the page plays it, then Apollo is whatever it would have been.
+seconds while the page plays it, then the intro blurs away into the display
+itself, open - not back down to the overlay.
 
 Started and ended on the watcher's thread, like every other change of mode.
 It began life on a timer thread, which raced the watcher: the watcher saw
@@ -22,6 +23,9 @@ class _UI:
 class _Presence:
     full = False
 
+    def toggle_peek(self):
+        self.full = not self.full
+
 
 def _app():
     app = apollo.Apollo.__new__(apollo.Apollo)
@@ -40,7 +44,7 @@ def test_asking_for_it_changes_nothing_until_the_watcher_ticks():
     assert app.log == [] and app.desired_mode() == apollo.Overlay.ORB
 
 
-def test_the_watcher_plays_it_then_lets_go(monkeypatch):
+def test_the_watcher_plays_it_then_opens_the_display(monkeypatch):
     monkeypatch.setattr(apollo, "screen_busy", lambda: False)
     app = _app()
     app.want_intro()
@@ -52,11 +56,14 @@ def test_the_watcher_plays_it_then_lets_go(monkeypatch):
     assert len(app.log) == 2                               # still playing
     monkeypatch.setattr(apollo.time, "monotonic", lambda: 100.0 + apollo.INTRO_SECONDS + 0.1)
     app.check_intro(now=100.0 + apollo.INTRO_SECONDS + 0.1)
-    assert app.log[-1] == apollo.Overlay.ORB
+    # The name blurs away into the display, and the display stays: open, as
+    # if Ctrl+` had been pressed, and closed the same way.
+    assert app.log[-1] == apollo.Overlay.FULL
+    assert app.presence.full is True
     assert app.intro_until == 0.0
 
 
-def test_it_lets_go_to_the_display_if_that_was_asked_for_meanwhile(monkeypatch):
+def test_ctrl_backtick_during_it_is_not_undone(monkeypatch):
     monkeypatch.setattr(apollo, "screen_busy", lambda: False)
     app = _app()
     app.want_intro()
@@ -65,6 +72,7 @@ def test_it_lets_go_to_the_display_if_that_was_asked_for_meanwhile(monkeypatch):
     monkeypatch.setattr(apollo.time, "monotonic", lambda: 200.0)
     app.check_intro(now=200.0)
     assert app.log[-1] == apollo.Overlay.FULL
+    assert app.presence.full is True          # opened once, not toggled shut
 
 
 def test_not_over_a_full_screen_program(monkeypatch):

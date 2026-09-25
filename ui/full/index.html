@@ -105,6 +105,11 @@
 
   <section id="headlines" class="panel rise" data-display="feed">
     <h2 id="headlines-head">Headlines</h2>
+    <!-- The feed folded away to its newest few, one line each, or all back. -->
+    <button id="feed-fold" class="fold" type="button" aria-pressed="false"
+            title="Fold the feed away to a few stories">
+      <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span>FOLD</span>
+    </button>
     <div id="topics" class="chips"></div>
     <!-- The list from the interactive-list component: a bar that slides to
          the row under the pointer and turns its text dark. -->
@@ -229,8 +234,8 @@
 </section>
 
 <!-- As Apollo comes up: an old machine boots on a green tube - its checks
-     typed out, the name in lit cells, the prompt - and then the tube
-     switches off. A few seconds, once. -->
+     typed out, the name in lit cells, the prompt - and then it blurs away
+     into the display under it. A few seconds, once. -->
 <section id="intro" aria-hidden="true">
   <div id="intro-screen">
     <pre id="intro-log" class="lit"><span class="text"></span><span class="cursor">_</span></pre>
