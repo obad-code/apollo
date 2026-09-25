@@ -189,19 +189,17 @@ one is a number Apollo actually has.
 
 ### The full display
 
-**Apollo's shape and its name.** On the full display Apollo is a circle,
-the way the old display drew it: five rings of lit dots nested inside one
-another, each turning against the one inside it, on a scope's faint
-graticule round a dark lens, in amber, with a warm glow behind (`ui/full/rings.js`
-has the dots) - and in 3D, the way the old display's own 3D had it: each ring
-a latitude of one sphere, meridians joining them pole to pole, the sphere
-turning slowly and tipped towards you, its near side brighter and its far
-side dim behind it. Each dot is joined up the sphere to the nearest dots of
-the ring above it, not round its own ring; as the rings turn against each
-other the joins lean over and hand across to the next dot, fading rather
-than jumping, so the lines sway. While Apollo works the rings brighten and quicken and a wave
-goes out from the middle; listening, they take a gradient, cyan in the
-middle to orange at the edge; speaking, they go white and bloom. Under it
+**Apollo's shape and its name.** On the full display Apollo is a globe,
+the way a wireframe icon draws one, with a star of light at its heart: a
+wide outline, meridians pole to pole as narrower ellipses inside it,
+parallels straight across, and in the middle a four-pointed star, all in
+warm white over a warm glow (`ui/full/globe.js` has the lines). It turns
+about its upright axis, so the meridians widen and narrow as they come
+round, their near halves bright and their far halves faint behind them,
+and the star breathes with your voice. While Apollo works the globe
+brightens and turns faster and a wave goes out from the star; listening,
+the lines take a gradient, cyan in the middle to orange at the edge;
+speaking, the star grows and a white bloom lifts off it. Under it
 the name is a neon sign: Melete, 19px, spaced a fifth of a letter apart, in
 #FFF0CE, each letter pulsing on its own a little after the one before, the
 first O a tube on its way out, a warm bloom breathing behind and three dots
@@ -809,7 +807,7 @@ The only thing left is your API key.
 | `ui/full/app.js` | Its panels, its bridge (`window.apollo.*`) and its motion. |
 | `ui/full/app.css` | Its skin: the overlay's palette, the CRT surface, the grid. |
 | `ui/full/shader.js` | The ground: an old set's slot mask lit by the CRT gradient, in plain WebGL. |
-| `ui/full/rings.js` | Apollo's shape as data: its five rings of dots, which way each turns, and the easing of their pace. No DOM, so node tests it (`tests/test_rings.py`). |
+| `ui/full/globe.js` | Apollo's shape as data: the globe's meridians as it turns, its parallels, the star at its heart, and the easing of its pace. No DOM, so node tests it (`tests/test_globe.py`). |
 | `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
 | `ui/full/lylaagent.js` | LYLA's agent card, a preview before she is an agent: the pipeline, its moving parts and what opens and shuts it - ported from a React component to plain JS and SVG, so there is still no build step (`tests/test_lyla_agent.py`). |
