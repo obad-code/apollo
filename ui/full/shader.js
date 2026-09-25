@@ -5,13 +5,19 @@
 // all in one pass:
 //   - the colour: five soft lights - rose, cyan, amber, violet, green -
 //     drifting across the tube on their own slow loops, so the gradient is
-//     always moving, and blooming towards white where they cross. Asleep,
-//     it settles into a dusk horizon instead - navy overhead, the last
-//     orange low down - which is the idle screen's sky.
+//     always moving, and blooming towards white where they cross; and over
+//     them two folds of light like silk catching it, a warm one low across
+//     the tube going red to amber to gold, and a cool blue one high on the
+//     left - the CRT gradients of the reference pictures. Asleep, it
+//     settles into a dusk horizon instead - navy overhead, the last orange
+//     low down - which is the idle screen's sky.
 //   - the pixels: a slot mask, as fine as a set's - cells of a red, a green
 //     and a blue slot, six screen pixels across, alternate columns half a
 //     cell apart. Each cell shows the colour at its own centre, so the
 //     gradient is drawn in the set's pixels rather than washed across.
+//     Where the picture is brightest, faint moire rings: a fine ring
+//     pattern met by the mask, one sample a cell, beating into the broad
+//     rings a set's glass showed when it was filmed.
 //   - the glass: a fisheye that swells the middle of the picture and pinches
 //     its corners, which go dark the way a tube's did. Over the pixels, the
 //     bloom: the same lights, unbroken, as a haze - the glow a bright tube
@@ -62,6 +68,16 @@ float lamp(vec2 q, vec2 at, float size) {
   return exp(-dot(d, d) / (size * size));
 }
 
+// A fold of light across the tube, like silk catching it: bright along a
+// slow curve and falling away either side of it. The curve is two waves
+// drifting against each other, so the fold never quite repeats.
+float silk(vec2 q, float s, float y, float lift, float along, float turn, float width) {
+  float crest = y + lift * sin(q.x * along + s * 0.090 + turn)
+                  + lift * 0.45 * sin(q.x * along * 2.1 - s * 0.061 + turn * 1.7);
+  float d = (q.y - crest) / width;
+  return exp(-d * d);
+}
+
 // The lights, awake, at s seconds. q is centred and aspect-correct: x runs
 // about -1.8..1.8 on a 16:9 screen, y -1..1. Each light loops on its own
 // pair of periods (40 to 90 seconds), so they never line up the same way
@@ -75,11 +91,21 @@ vec3 lights(vec2 q, float s) {
   vec3 violet = mix(vec3(0.50, 0.32, 1.00), vec3(0.27, 0.54, 1.00), osiris);
   vec3 green  = mix(vec3(0.20, 1.00, 0.62), vec3(0.00, 0.42, 0.48), osiris);
   vec3 sum = vec3(0.0);
-  sum += rose   * lamp(q, vec2(-0.95 + 0.75 * sin(s * 0.110), 0.30 + 0.40 * cos(s * 0.083)), 0.78);
-  sum += cyan   * lamp(q, vec2( 0.95 + 0.65 * cos(s * 0.093), -0.15 + 0.45 * sin(s * 0.140)), 0.74);
-  sum += amber  * lamp(q, vec2( 0.10 + 0.95 * sin(s * 0.071 + 1.3), -0.62 + 0.30 * cos(s * 0.120)), 0.70);
-  sum += violet * lamp(q, vec2( 0.35 + 0.85 * cos(s * 0.104 + 2.1), 0.62 + 0.30 * sin(s * 0.077)), 0.72);
-  sum += green  * lamp(q, vec2(-0.45 + 0.70 * sin(s * 0.066 + 4.0), -0.30 + 0.50 * cos(s * 0.098)), 0.60) * 0.7;
+  sum += rose   * lamp(q, vec2(-0.95 + 0.75 * sin(s * 0.110), 0.30 + 0.40 * cos(s * 0.083)), 0.78) * 0.8;
+  sum += cyan   * lamp(q, vec2( 0.95 + 0.65 * cos(s * 0.093), -0.15 + 0.45 * sin(s * 0.140)), 0.74) * 0.8;
+  sum += amber  * lamp(q, vec2( 0.10 + 0.95 * sin(s * 0.071 + 1.3), -0.62 + 0.30 * cos(s * 0.120)), 0.70) * 0.8;
+  sum += violet * lamp(q, vec2( 0.35 + 0.85 * cos(s * 0.104 + 2.1), 0.62 + 0.30 * sin(s * 0.077)), 0.72) * 0.8;
+  sum += green  * lamp(q, vec2(-0.45 + 0.70 * sin(s * 0.066 + 4.0), -0.30 + 0.50 * cos(s * 0.098)), 0.60) * 0.55;
+  // The two folds of silk: the warm one low across the tube, red on the
+  // left going amber and then gold to the right, with a bright edge along
+  // its crest; the cool one high on the left, fading out across the middle.
+  vec3 ember = mix(vec3(1.00, 0.16, 0.06), vec3(0.83, 0.69, 0.22), osiris);
+  vec3 gold  = mix(vec3(1.00, 0.66, 0.12), vec3(0.94, 0.82, 0.38), osiris);
+  vec3 deep  = mix(vec3(0.08, 0.42, 1.00), vec3(0.00, 0.90, 1.00), osiris);
+  vec3 warm  = mix(ember, gold, smoothstep(-1.5, 1.3, q.x));
+  sum += warm * silk(q, s, -0.46, 0.26, 1.10, 0.0, 0.24) * 0.95;
+  sum += vec3(1.00, 0.86, 0.50) * silk(q, s, -0.33, 0.26, 1.10, 0.32, 0.06) * 0.45;
+  sum += deep * silk(q, s, 0.58, 0.18, 0.85, 2.4, 0.32) * smoothstep(0.9, -1.3, q.x) * 0.9;
   // Light adds up towards white rather than past it: where two cross, the
   // colour blooms instead of clipping to a flat patch.
   return 1.0 - exp(-sum * 1.35);
@@ -170,6 +196,15 @@ void main() {
   // One slot in three is lit for each colour, so each is driven harder -
   // seen from a chair away the three add back up to the colour.
   vec3 phosphors = lit * gun * shape * 2.3;
+
+  // Moire, where the picture is bright: a ring pattern a little finer than
+  // the mask, round a point drifting low on the left, taken once a cell -
+  // what reaches the glass is the slow beat between the rings and the
+  // cells, broad rings that are in neither.
+  vec2 ringsAt = resolution * vec2(0.20 + 0.10 * sin(t * 0.013), 0.24 + 0.08 * cos(t * 0.011));
+  float beat = cos(6.2832 * length(centre - ringsAt) / (pitch * 0.94));
+  float bright = smoothstep(0.30, 0.85, dot(lit, vec3(0.30, 0.55, 0.15))) * (1.0 - sleep);
+  phosphors *= 1.0 + 0.24 * beat * bright;
 
   // The bloom, turned up: the lights again, unbroken and unfolded, as a haze
   // over the whole field - the glow a bright tube threw past its own

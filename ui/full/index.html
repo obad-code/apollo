@@ -35,14 +35,23 @@
 <div class="scanlines"></div>
 
 <main id="stage">
-  <header id="clock-block" class="rise">
+  <!-- Every block that is a display in ultra mode says which one it is
+       (data-display): there they are tiles you can move, resize, hide and
+       expand, laid out by tiles.js. -->
+  <header id="clock-block" class="rise" data-display="today">
     <div id="clock"><span id="hhmm">--:--</span><span id="seconds">:--</span></div>
     <div id="date" class="line">&nbsp;</div>
     <div id="date-extra" class="caption">&nbsp;</div>
     <div id="weather" class="caption">&nbsp;</div>
+    <!-- Ultra mode only: the rest of the day - the next prayer, the
+         market's hours, who reports this week, what is due. -->
+    <div id="today-more" class="more"></div>
   </header>
 
-  <aside id="status-block" class="rise">
+  <!-- Under the stocks: the links to Gemini and Claude, the machine and the
+       day's talking - small while LYLA's room is up, the full meters when
+       it is away. -->
+  <aside id="status-block" class="rise" data-display="system">
     <div id="dots"></div>
     <div id="market-clock" class="caption">&nbsp;</div>
     <!-- The machine and the day's talking, as an old set's meters: rows of
@@ -53,10 +62,13 @@
       <div class="gauge" data-gauge="ram"><span class="tag">RAM</span><i class="bar"></i><b>—</b></div>
       <div id="gauge-foot" class="caption">&nbsp;</div>
     </div>
+    <!-- Ultra mode only: each model's share of the day, the machine's card,
+         and how fresh every reading is. -->
+    <div id="system-more" class="more"></div>
     <div id="note" class="note"></div>
   </aside>
 
-  <section id="markets" class="panel rise">
+  <section id="markets" class="panel rise" data-display="markets">
     <!-- The side panel's tabs: the stocks, your talks with Apollo, your
          projects, your ideas. -->
     <h2 id="panel-tabs">
@@ -82,7 +94,7 @@
     <article id="stock" aria-hidden="true"></article>
   </section>
 
-  <section id="headlines" class="panel rise">
+  <section id="headlines" class="panel rise" data-display="feed">
     <h2 id="headlines-head">Headlines</h2>
     <div id="topics" class="chips"></div>
     <!-- The list from the interactive-list component: a bar that slides to
@@ -95,7 +107,7 @@
     <article id="story" aria-hidden="true"></article>
   </section>
 
-  <section id="core">
+  <section id="core" data-display="core">
     <canvas id="ring" width="520" height="520"></canvas>
     <!-- The name in lit cells (ledword.js). -->
     <canvas id="wordmark" role="img" aria-label="Apollo"></canvas>
@@ -113,7 +125,7 @@
   <!-- OSIRIS, laid into the display: its frame, its name along the top and
        the way out. The map is a window of its own laid over the frame
        (osiris.py) - the site will not be drawn inside another page. -->
-  <section id="osiris" class="panel" aria-hidden="true">
+  <section id="osiris" class="panel" aria-hidden="true" data-display="osiris">
     <header>
       <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg>
       <b>OSIRIS</b><span>Inside Apollo</span>
@@ -122,8 +134,16 @@
     <div id="osiris-view">
       <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg>
       <p>Linking OSIRIS<i class="cursor">_</i></p>
+      <p class="too-small">Make this display bigger for the map</p>
     </div>
   </section>
+
+  <!-- Ultra mode's own displays: the side panel's tabs, each a display of
+       its own. Their lists move in here while ultra mode is on, and back
+       into the side panel after. -->
+  <section id="d-projects" class="panel tile-only" data-display="projects"><h2>Projects</h2></section>
+  <section id="d-ideas" class="panel tile-only" data-display="ideas"><h2>Ideas</h2></section>
+  <section id="d-talks" class="panel tile-only" data-display="talks"><h2>Talks</h2></section>
 
   <section id="lyla-block" class="rise">
     <canvas id="lyla-icon" width="48" height="72"></canvas>
@@ -131,6 +151,11 @@
     <div id="lyla-battery"><div id="lyla-bar"></div></div>
     <div id="lyla-pct" class="caption">88%</div>
   </section>
+
+  <!-- OSIRIS's eye, under the feed. -->
+  <button id="osiris-button" class="hud-button" type="button" aria-pressed="false" title="Open OSIRIS inside Apollo">
+    <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg><span>OSIRIS</span><em>MAP</em>
+  </button>
 </main>
 
 <!-- The pictures that follow the pointer beside the feed and beside the
@@ -140,15 +165,35 @@
 <div id="chart-peek" class="peek" aria-hidden="true"></div>
 
 <!-- Along the bottom edge: LYLA's room in or out - without it, the panels
-     and the ring take the room back - and OSIRIS. -->
+     and the ring take the room back - and ultra mode. -->
 <nav id="dock">
-  <button id="room-toggle" type="button" aria-pressed="true" title="Show or hide LYLA's room">
+  <button id="room-toggle" class="hud-button" type="button" aria-pressed="true" title="Show or hide LYLA's room">
     <i class="led"></i><span>LYLA</span><em>ROOM ON</em>
   </button>
-  <button id="osiris-button" type="button" aria-pressed="false" title="Open OSIRIS inside Apollo">
-    <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg><span>OSIRIS</span><em>MAP</em>
+  <button id="ultra-button" class="hud-button" type="button" aria-pressed="false"
+          title="Ultra mode: every display on the screen, ready for work">
+    <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg><span>ULTRA</span><em>EXPAND</em>
   </button>
 </nav>
+
+<!-- Ultra mode's bar along the bottom: back to the normal display, every
+     display as a switch, and the grid back when one is expanded. -->
+<nav id="ultra-bar" aria-label="Displays">
+  <button id="ultra-exit" class="hud-button" type="button" title="Back to the normal display">
+    <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg><span>NORMAL</span>
+  </button>
+  <div id="ultra-chips"></div>
+  <button id="ultra-grid" class="hud-button" type="button" title="Every display back in the grid">
+    <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg><span>GRID</span>
+  </button>
+  <button id="ultra-reset" class="hud-button" type="button" title="Every display back where it started"><span>RESET</span></button>
+</nav>
+
+<!-- One display's settings in ultra mode: its size, and what it shows. -->
+<div id="tile-config" role="dialog" aria-hidden="true"></div>
+
+<!-- A line of light down the glass as ultra mode brings its displays up. -->
+<div id="ultra-sweep" aria-hidden="true"></div>
 
 <!-- Asleep: ten quiet minutes, and this is all there is. -->
 <section id="sleep" aria-hidden="true">

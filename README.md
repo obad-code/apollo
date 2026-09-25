@@ -215,20 +215,26 @@ full-screen program was already up, so a game or a film is left alone.
 
 The full display is the whole screen. Behind everything, an old set's own
 pixels (`ui/full/shader.js`): a slot mask as fine as a TV's - cells of a red,
-a green and a blue slot, six screen pixels across - lit by five coloured
-lights drifting on their own slow loops, bulged by a fisheye, and blooming
-hard where the lights cross. Over it: the clock with the date in both
-calendars and Riyadh's weather; in the top right corner, the machine as rows
-of lit segments - CPU, GPU and RAM, sixteen segments each, the last ones
-warm and then red - with the day's tokens and cost, the clips saved and how
-fresh it all is under them; your watchlist; headlines on what you follow and
-Trump's posts with the market-moving ones flagged; and LYLA in her room along
+a green and a blue slot, six screen pixels across - lit by a CRT gradient:
+five coloured lights drifting on their own slow loops, and over them two
+folds of light like silk catching it, a warm one low across the tube going
+red to amber to gold and a cool blue one high on the left, with faint moire
+rings where the picture is brightest - bulged by a fisheye, and blooming
+hard where the light crosses. Over it: the clock with the date in both
+calendars and Riyadh's weather; your watchlist, and under it the status line -
+the links to Gemini, Claude and the mic, the market's hours, the machine as
+rows of lit segments (CPU, GPU and RAM, sixteen segments each, the last ones
+warm and then red) and the day's tokens, cost and clips - two slim lines while
+LYLA's room is up, the full meters when it is away; headlines on what you
+follow and Trump's posts with the market-moving ones flagged, the full height
+of the right side, with OSIRIS's eye under them; and LYLA in her room along
 the bottom.
 
 Along the bottom edge, two buttons. **LYLA** puts her room away - she stops,
 the room fades, and the panels and the ring grow into the space - and brings
-it back; the choice is kept, and *"hide Lyla"* does the same. **OSIRIS** opens
-the map (below).
+it back; the choice is kept, and *"hide Lyla"* does the same. **ULTRA**
+brings every display up at once (below). The eye under the feed opens
+**OSIRIS** (below).
 
 The panel on the left has four tabs. **Markets** is the stocks. **Talks**
 is what you said to Apollo and what came back, newest first, from the record.
@@ -330,6 +336,40 @@ no miner and nothing that touches a wallet. It does carry tools that look at
 the machine they run on - a scan of your own PC's local ports and addresses,
 a Bluetooth scanner, live location - and each runs only when you open that
 tool; Bluetooth and location still ask first.
+
+**Ultra mode.** The **ULTRA** button along the bottom, or *"ultra mode"* /
+*"وضع الشغل"* / *"جهز الشاشة للشغل"*, gets Apollo ready for work: a channel
+change, a line of light down the glass, and every display powers on one
+after another as a tile on a grid of twelve columns and twelve rows - the
+OSIRIS map in the middle, the markets and the feed either side, and along
+the bottom your projects, your ideas, Apollo himself and the system; your
+talks are one switch away. It gives more than the normal display does:
+**Today** adds the next prayer, the market's hours, who on your list reports
+or has an insider buying this week, and what is due; **System** adds what
+Gemini and Claude each took today, the turns and the cost, the graphics
+card, the clips, and how fresh every reading is.
+
+Every display is yours to arrange. Drag one by its top edge onto another and
+the two trade places; drag its bottom corner and it grows or shrinks a cell
+at a time. In its top corner: **minimize** (it folds to its name and the
+one line that matters - the indices and the biggest mover, the next prayer,
+CPU and tokens), **expand** (it takes the screen and the rest line up
+minimized down the side - click one to swap), **settings** (its size by
+name or a column and a row at a time, the feed's topic, the map's layers)
+and **hide**. The bar along the bottom switches each display on and off,
+puts the grid back, and resets the lot. By voice: *"put the projects on my
+screen"* / *"حط المشاريع على الشاشة"* pulls that display up, expanded, with
+the rest minimized - bringing the display up first if it has to; *"all of
+them"* puts the grid back; *"hide the ideas"* and *"show my talks"* work on
+ultra mode's displays while it is up. Expanded, OSIRIS dresses Apollo in its
+colours as it does on the normal display. How you left it - what is shown,
+where, how big, the map's layers - is kept (`displays.py`), so the screen
+you set up is the one you get tomorrow.
+
+The map's window can only lie over the page, never under it, so in ultra
+mode it steps aside - parked, still loaded - while a display is being moved
+or set up, while it is minimized or another one is expanded, and while
+Apollo answers, and comes back over its frame once things settle.
 
 ### Hotkeys
 
@@ -697,6 +737,7 @@ The only thing left is your API key.
 | `reminders.py` | Reminder storage and the watcher that fires them. |
 | `probes/` | Live checks against the real APIs and PC: which Gemini model to use, transcript timing, and an end-to-end tool run. |
 | `apollo.py` | The overlay host. Owns the window shapes, the tray icon, the presence watcher and the single-instance lock, and drives the page from `assistant`. |
+| `displays.py` | Ultra mode's layout, kept: which displays are shown, where and how big, which one is expanded, the map's layers - and the words, in English and Arabic, that find each display by voice. |
 | `osiris.py` | OSIRIS inside the display: the map's own window, laid over the frame the page leaves for it, owned by the display and gone whenever it goes. |
 | `orb.py` | The overlay itself: the window, the states, and the composition - ring, panel, your words, the answer, cards and chart. |
 | `overlay_paint.py` | Its paint box: the drifting CRT panel, the three-ring orb, the sparkle field and the horizon, each pre-rendered where a per-frame redraw would cost too much. |
@@ -705,7 +746,8 @@ The only thing left is your API key.
 | `ui/full/index.html` | The full display. Written by hand — edit it directly. |
 | `ui/full/app.js` | Its panels, its bridge (`window.apollo.*`) and its motion. |
 | `ui/full/app.css` | Its skin: the overlay's palette, the CRT surface, the grid. |
-| `ui/full/shader.js` | The ring shader, in plain WebGL at half resolution. |
+| `ui/full/shader.js` | The ground: an old set's slot mask lit by the CRT gradient, in plain WebGL. |
+| `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
 | `ui/fonts/thmanyah/` | Thmanyah Sans, as OTFs — what the overlay loads privately at runtime. |
 | `ui/full/fonts/` | The same weights as WOFF2, under the page because pywebview's server roots there. |

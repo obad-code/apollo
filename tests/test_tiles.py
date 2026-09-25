@@ -39,8 +39,8 @@ def test_every_display_has_a_place_and_a_name(tmp_path):
 def test_the_default_fills_the_screen_and_nothing_more(tmp_path):
     layout = run(tmp_path, "T.defaultLayout()")
     shown = [layout["items"][d] for d in layout["order"] if layout["items"][d]["shown"]]
-    # Twelve columns by six rows, every cell used once: a full screen of work.
-    assert sum(item["w"] * item["h"] for item in shown) == 12 * 6
+    # Twelve columns by twelve rows, every cell used once: a full screen of work.
+    assert sum(item["w"] * item["h"] for item in shown) == 12 * 12
     assert layout["ultra"] is False and layout["focus"] is None
     for wanted in ("osiris", "projects", "ideas", "system", "markets", "feed"):
         assert layout["items"][wanted]["shown"] is True, wanted
@@ -136,7 +136,7 @@ def test_dragging_the_corner_by_a_cell_adds_a_cell(tmp_path):
     assert run(tmp_path, f"T.spansFor({{ w: 3, h: 2, dx: 206, dy: 0, {grid} }})") == {"w": 4, "h": 2}
     assert run(tmp_path, f"T.spansFor({{ w: 3, h: 2, dx: 60, dy: 150, {grid} }})") == {"w": 3, "h": 3}
     assert run(tmp_path, f"T.spansFor({{ w: 3, h: 2, dx: -2000, dy: -2000, {grid} }})") == {"w": 2, "h": 1}
-    assert run(tmp_path, f"T.spansFor({{ w: 3, h: 2, dx: 9000, dy: 9000, {grid} }})") == {"w": 12, "h": 6}
+    assert run(tmp_path, f"T.spansFor({{ w: 3, h: 2, dx: 9000, dy: 9000, {grid} }})") == {"w": 12, "h": 12}
 
 
 def test_a_size_can_be_picked_by_name(tmp_path):

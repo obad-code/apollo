@@ -24,15 +24,15 @@ PATH = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
                     "Apollo", "layout.json")
 
 COLUMNS = 12
-ROWS = 6
+ROWS = 12
 MIN_W = 2
 
 # The order they are packed in by default (tiles.DISPLAYS), each with its
 # columns and rows.
 ORDER = ("today", "osiris", "feed", "markets", "projects", "ideas", "core", "system", "talks")
-SPANS = {"today": (3, 2), "osiris": (6, 4), "feed": (3, 4), "markets": (3, 4),
-         "projects": (2, 2), "ideas": (2, 2), "core": (2, 2), "system": (3, 2),
-         "talks": (3, 2)}
+SPANS = {"today": (3, 4), "osiris": (6, 8), "feed": (3, 8), "markets": (3, 8),
+         "projects": (2, 4), "ideas": (2, 4), "core": (2, 4), "system": (3, 4),
+         "talks": (3, 4)}
 
 # osiris.LAYERS, each one a switch in the map's settings.
 LAYERS = ("maritime", "cctv", "cctv_previews", "live_news", "earthquakes",

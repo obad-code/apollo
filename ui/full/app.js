@@ -15,6 +15,7 @@ import { Lyla } from './lyla.js';
 import { DotFlow, FRAMES } from './dotflow.js';
 import { LedWord } from './ledword.js';
 import { bootLines, typed } from './boot.js';
+import * as Tiles from './tiles.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -128,10 +129,17 @@ const state = {
   projects: null,         // the projects last drawn, for their clicks
   liveTimer: null,        // takes LIVE off the panel when the trades stop
   panels: {},             // which panels apollo.py last said are shown
-  osiris: false,          // OSIRIS laid into the display, and Apollo in its colours
+  osiris: false,          // OSIRIS laid into the normal display, and Apollo in its colours
   osirisTimer: null,      // ...places the map once the stage has its new shape
   channelTimer: null,     // ends the channel change that covers a change of shape
   roomTimer: null,        // stops LYLA once her room has faded
+  layout: Tiles.defaultLayout(),  // ultra mode's displays, as apollo.py keeps them
+  drag: null,             // the display being moved by its top edge
+  resizing: null,         // ...or resized by its corner
+  dragMoved: false,       // swallows the click that ends a drag
+  configFor: null,        // the display whose settings are open
+  saveTimer: null,        // hands the layout to apollo.py once the changes stop
+  powerTimer: null,       // ends the displays' power-on
 };
 
 // Whether the display is the idle screen. Up here because the clock, which
@@ -202,6 +210,7 @@ function playIntro() {
   box._gone = setTimeout(() => {
     box.classList.remove('on', 'off');
     introWord.stop();
+    scheduleOsiris(200);           // a map kept back while the tube warmed up
   }, INTRO_GONE_AT);
 }
 
@@ -659,7 +668,16 @@ function makePeek(el, panel, side) {
     const box = panel.getBoundingClientRect();
     const width = el.offsetWidth, height = el.offsetHeight;
     const across = (at.tx - box.left) / Math.max(1, box.width) - 0.5;
-    const x = (side === 'left' ? box.left - width - 30 : box.right + 30) + across * PEEK_WANDER * 2;
+    // The side it was given, unless there is no room there - in ultra mode a
+    // panel can be anywhere on the screen - and inside the panel's own edge
+    // when there is room on neither side.
+    const left = box.left - width - 30, right = box.right + 30;
+    const fitsLeft = left >= 12, fitsRight = right + width <= window.innerWidth - 12;
+    let x = box.right - width - 24;
+    if (fitsLeft || fitsRight) {
+      const onLeft = side === 'left' ? fitsLeft : !fitsRight;
+      x = (onLeft ? left : right) + across * PEEK_WANDER * 2;
+    }
     const y = Math.max(24, Math.min(window.innerHeight - height - 24, at.ty - height / 2));
     return [x, y];
   };
@@ -861,7 +879,11 @@ $('story').addEventListener('click', (event) => {
   }
 });
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') { closeStory(); closeStock(); }
+  if (event.key !== 'Escape') return;
+  closeStory();
+  closeStock();
+  if (state.configFor) closeConfig();
+  else if (ultraOn() && state.layout.focus) focusDisplay(null);
 });
 
 /* --- the stocks, picked the way the feed is -----------------------------------
@@ -1354,6 +1376,12 @@ const TABS = ['stocks', 'talks', 'projects', 'ideas'];
 
 function showTab(name) {
   if (!TABS.includes(name)) return;
+  // In ultra mode every tab is a display of its own: asked for, it is
+  // brought forward instead.
+  if (ultraOn()) {
+    revealDisplay(name === 'stocks' ? 'markets' : name);
+    return;
+  }
   state.tab = name;
   document.querySelectorAll('#panel-tabs .tab').forEach((tab) =>
     tab.classList.toggle('on', tab.dataset.tab === name));
@@ -1505,6 +1533,69 @@ function renderWeather(weather) {
     : 'Riyadh · weather unavailable';
 }
 
+/* Ultra mode's Today, in full: the next prayer, the market's hours, who on
+ * your list reports or has an insider buying this week, and what is due. */
+function renderToday(snapshot) {
+  const rows = [];
+  const next = snapshot.prayer || {};
+  if (next.name && next.at * 1000 > Date.now()) {
+    const minutes = Math.round((next.at * 1000 - Date.now()) / 60000);
+    const wait = minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`;
+    rows.push(`<div class="row"><span>Next prayer</span><b>${esc(next.name)} · ${clock(new Date(next.at * 1000))}</b><i>in ${wait}</i></div>`);
+  }
+  const market = snapshot.market || {};
+  if (market.status) rows.push(`<div class="row"><span>Market</span><b>${esc(market.status)}</b></div>`);
+  const watched = market.watchlist || [];
+  const reporting = watched.map((quote) => [quote, earningsIn(quote)])
+    .filter(([, days]) => days !== null && days >= 0 && days <= 7)
+    .sort((a, b) => a[1] - b[1])
+    .map(([quote, days]) => `<div class="row"><span>${esc(quote.symbol)}</span><b>Earnings ${esc(earningsWords(days))}</b></div>`)
+    .join('');
+  const insiders = snapshot.insiders || {};
+  const buying = watched.filter((quote) => (insiders[quote.symbol] || {}).recent_buy)
+    .map((quote) => `<div class="row"><span>${esc(quote.symbol)}</span><b>Insider buying</b></div>`)
+    .join('');
+  const due = ((snapshot.ideas || {}).reminders || []).map((reminder) =>
+    `<div class="row"><span>Due</span><b>${esc(reminder.text)}</b><i>${esc(reminder.due)}</i></div>`).join('');
+  $('today-more').innerHTML = rows.join('')
+    + `<h4>This week on your list</h4>${reporting + buying || '<p class="quiet">Nobody on your list reports this week.</p>'}`
+    + `<h4>Reminders</h4>${due || '<p class="quiet">Nothing due.</p>'}`;
+}
+
+const shortCount = (n) => {
+  const v = Number(n) || 0;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
+  return String(Math.round(v));
+};
+
+/* Ultra mode's System, in full: what each model took today, the day's turns
+ * and cost, the machine's card, the clips, and how fresh every reading is. */
+function renderSystem(snapshot) {
+  const usage = snapshot.usage || {};
+  const model = (name, key, voice) => {
+    const used = usage[key] || {};
+    const minutes = voice && used.seconds ? ` · ${Math.max(1, Math.round(used.seconds / 60))}m of voice` : '';
+    return `<div class="row"><span>${name}</span><b>${shortCount(used.prompt)} in · ${shortCount(used.response)} out${minutes}</b></div>`;
+  };
+  const system = snapshot.system || {};
+  const clips = snapshot.clips || {};
+  const vram = Number.isFinite(Number(system.vram)) && system.vram !== null ? `${Number(system.vram).toFixed(1)} GB in use` : '';
+  const card = system.gpu_name
+    ? `<div class="row"><span>Card</span><b>${esc(system.gpu_name)}</b><i>${vram}</i></div>` : '';
+  const stamps = snapshot.stamps || {};
+  const readings = ['market', 'news', 'posts', 'weather', 'system'].map((key) => {
+    const age = stamps[key] ? Math.max(0, Date.now() / 1000 - stamps[key]) : null;
+    const old = age !== null && age > (STALE_AFTER[key] || Infinity);
+    const said = age === null ? 'Not yet' : age < 60 ? 'Live' : `${words(age)} ago`;
+    return `<div class="row"><span>${key}</span><b class="${old ? 'down' : ''}">${said}</b></div>`;
+  }).join('');
+  $('system-more').innerHTML = `<h4>Models today</h4>${model('Gemini', 'gemini', true)}${model('Claude', 'claude', false)}`
+    + `<div class="row"><span>Turns</span><b>${Number(usage.turns) || 0}</b><i>$${(Number(usage.cost) || 0).toFixed(2)}${usage.estimated ? ' estimated' : ''}</i></div>`
+    + `<h4>Machine</h4>${card}<div class="row"><span>Clips</span><b>${Number(clips.saved_today) || 0} saved today</b><i>${Number(clips.seconds) || 60}s kept</i></div>`
+    + `<h4>Readings</h4>${readings}`;
+}
+
 function render(snapshot) {
   state.snapshot = snapshot;
   renderMarkets(snapshot.market || {});
@@ -1514,6 +1605,9 @@ function render(snapshot) {
   renderFeed(snapshot);
   renderGauges(snapshot);
   renderWeather(snapshot.weather);
+  renderToday(snapshot);
+  renderSystem(snapshot);
+  renderSummaries();
   enter();
 }
 
@@ -1620,6 +1714,7 @@ function setSleep(on) {
   if (on) {
     unlight();
     closeStory();
+    closeConfig();
     // Under the idle screen only the dots are seen; nothing else earns frames.
     lyla.stop();
     ringStop();
@@ -1659,13 +1754,14 @@ function setPanels(wanted) {
     if (show === already) continue;
     element.dataset.hidden = show ? 'false' : 'true';
     if (show) {
-      element.style.display = '';
+      element.classList.remove('away');
       animate(element, { opacity: [0, 1], transform: ['scale(.97)', 'scale(1)'] },
               { ...SPRING });
     } else {
       const done = animate(element, { opacity: [1, 0], transform: ['scale(1)', 'scale(.97)'] },
                            { duration: 0.24, ease: 'easeOut' });
-      const hide = () => { if (element.dataset.hidden === 'true') element.style.display = 'none'; };
+      // A class, not an inline style: ultra mode shows its displays by its own list.
+      const hide = () => { if (element.dataset.hidden === 'true') element.classList.add('away'); };
       // The grid reflows only once the panel has finished leaving.
       if (done && done.finished && done.finished.then) done.finished.then(hide, hide);
       else setTimeout(hide, 260);
@@ -1674,8 +1770,11 @@ function setPanels(wanted) {
   applyRoom();
 }
 
-/* LYLA's room is out while OSIRIS is up, and back the way it was after. */
-function applyRoom(options) { setRoom(!state.osiris && state.panels.lyla !== false, options); }
+/* LYLA's room is out while OSIRIS is up or ultra mode is, and back the way
+ * it was after. */
+function applyRoom(options) {
+  setRoom(!state.osiris && !ultraOn() && state.panels.lyla !== false, options);
+}
 
 /* LYLA's room, in or out - the button along the bottom, or "hide Lyla". Her
  * room is a full-window canvas, not a grid cell: it fades, she stops, and
@@ -1721,19 +1820,15 @@ function channelChange(swap) {
  * The map is a window of its own (osiris.py): this page lays out the frame
  * and says where it is, and apollo.py puts the window exactly over it. */
 
-function placeOsiris() {
-  if (!state.osiris) return;
-  const box = $('osiris-view').getBoundingClientRect();
-  const ratio = window.devicePixelRatio || 1;
-  const api = bridge();
-  if (api && api.osiris_open) {
-    api.osiris_open({ x: Math.round(box.left * ratio), y: Math.round(box.top * ratio),
-                      w: Math.round(box.width * ratio), h: Math.round(box.height * ratio) });
-  }
-}
-
 function setOsiris(on) {
   on = Boolean(on);
+  if (ultraOn()) {
+    // In ultra mode the map is one of the displays: opened, it is the one
+    // expanded, in its own colours; closed, it is taken off.
+    if (on) focusDisplay('osiris');
+    else showDisplay('osiris', false);
+    return on;
+  }
   if (on === state.osiris) return on;
   state.osiris = on;
   closeStory();
@@ -1741,32 +1836,23 @@ function setOsiris(on) {
   unlight();
   unlightRow();
   $('osiris-button').setAttribute('aria-pressed', on ? 'true' : 'false');
-  shader.theme(on);
   // The switch is a channel change: Apollo goes into OSIRIS's colours, and
   // LYLA's room out, at its dark moment.
   channelChange(() => {
-    document.body.classList.toggle('osiris', on);
+    document.body.classList.toggle('osiris-map', on);
     $('osiris').setAttribute('aria-hidden', on ? 'false' : 'true');
+    applySkin();
     applyRoom({ quiet: true });
     if (!on) wordmark.resize();
   });
-  clearTimeout(state.osirisTimer);
-  if (on) {
-    // Laid over the frame once the stage has its new shape.
-    state.osirisTimer = setTimeout(placeOsiris, 320);
-  } else {
-    const api = bridge();
-    if (api && api.osiris_close) api.osiris_close();
-  }
+  // Laid over the frame once the stage has its new shape - or gone.
+  scheduleOsiris(on ? 320 : 0);
   return on;
 }
 
 $('osiris-button').addEventListener('click', () => setOsiris(!state.osiris));
 $('osiris-close').addEventListener('click', () => setOsiris(false));
-window.addEventListener('resize', () => {
-  clearTimeout(state.osirisTimer);
-  state.osirisTimer = setTimeout(placeOsiris, 300);
-});
+window.addEventListener('resize', () => scheduleOsiris(300));
 
 $('room-toggle').addEventListener('click', () => {
   const shown = !roomShown();
@@ -1774,6 +1860,664 @@ $('room-toggle').addEventListener('click', () => {
   const api = window.pywebview && window.pywebview.api;
   if (api && api.set_panel) api.set_panel('lyla', shown);
 });
+
+/* --- ultra mode -------------------------------------------------------------------
+ *
+ * Every display on the screen at once, ready for work: the markets, the feed,
+ * OSIRIS, projects, ideas, talks, the system, today and Apollo himself, each a
+ * tile on a grid of twelve columns and twelve rows. A tile is moved by its top
+ * edge - dropped on another, the two trade places - resized by its bottom
+ * corner, and has its controls in its top corner: minimize it to its name and
+ * one line, expand it with the rest minimized down the side, its settings, and
+ * hide. The bar along the bottom switches displays on and off. By voice:
+ * "ultra mode", "put the projects on my screen", "hide the ideas".
+ *
+ * tiles.js has the rules; apollo.py keeps the layout (displays.py), so the
+ * screen you set up is the one you get tomorrow. */
+
+const TILE_OF = Object.fromEntries(
+  [...document.querySelectorAll('[data-display]')].map((tile) => [tile.dataset.display, tile]));
+// The side panel's other tabs are displays of their own in ultra mode: their
+// lists move into their tiles, and back into the side panel after.
+const PANE_TILE = { projects: 'd-projects', ideas: 'd-ideas', talks: 'd-talks' };
+const LAYER_NAMES = {
+  maritime: 'Ships', cctv: 'CCTV', cctv_previews: 'CCTV previews', live_news: 'Live news',
+  earthquakes: 'Earthquakes', global_incidents: 'Incidents', day_night: 'Day and night',
+  cables: 'Undersea cables', sdk_sea: 'Sea traffic', sdk_air: 'Air traffic', sdk_naval: 'Naval',
+};
+const ICON = {
+  grip: '<svg viewBox="0 0 12 16" aria-hidden="true"><circle cx="3.5" cy="3" r="1.4"/><circle cx="8.5" cy="3" r="1.4"/>'
+      + '<circle cx="3.5" cy="8" r="1.4"/><circle cx="8.5" cy="8" r="1.4"/><circle cx="3.5" cy="13" r="1.4"/>'
+      + '<circle cx="8.5" cy="13" r="1.4"/></svg>',
+  min: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.5h10"/></svg>',
+  focus: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9"/></svg>',
+  config: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M2.5 11.5h11"/>'
+        + '<circle cx="6" cy="4.5" r="1.9" fill="currentColor"/><circle cx="10.5" cy="11.5" r="1.9" fill="currentColor"/></svg>',
+  hide: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+};
+const EASE = 'cubic-bezier(.32, .72, 0, 1)';
+
+// Declarations, not arrows: the normal display asks them too, from code
+// that is written above this and may run before it.
+function ultraOn() { return document.body.classList.contains('ultra'); }
+function still() { return matchMedia('(prefers-reduced-motion: reduce)').matches; }
+
+// Each display's handle, controls, minimized line and corner - there, but
+// only shown in ultra mode.
+for (const [id, tile] of Object.entries(TILE_OF)) {
+  const handle = document.createElement('div');
+  handle.className = 'tile-handle';
+  handle.title = 'Drag to move it · double-click to expand it';
+  const line = document.createElement('div');
+  line.className = 'tile-min';
+  line.innerHTML = `<b>${Tiles.NAMES[id]}</b><span class="tile-sum"></span>`;
+  const controls = document.createElement('div');
+  controls.className = 'tile-ctl';
+  controls.innerHTML = `<span class="tile-grip">${ICON.grip}</span>`
+    + `<button type="button" data-tile="min" title="Minimize">${ICON.min}</button>`
+    + `<button type="button" data-tile="focus" title="Expand">${ICON.focus}</button>`
+    + `<button type="button" data-tile="config" title="Settings">${ICON.config}</button>`
+    + `<button type="button" data-tile="hide" title="Hide">${ICON.hide}</button>`;
+  const corner = document.createElement('i');
+  corner.className = 'tile-resize';
+  corner.title = 'Drag to resize';
+  tile.append(handle, line, controls, corner);
+}
+
+/* The layout onto the page: which displays are shown, where, how big, which
+ * one is expanded and which are minimized. Placed inline, since the normal
+ * display's own grid places the same blocks by id. */
+function applyLayout() {
+  const layout = state.layout;
+  const ultra = ultraOn();
+  const focusing = ultra && Boolean(layout.focus);
+  document.body.classList.toggle('focusing', focusing);
+  const railed = focusing ? Tiles.visible(layout).filter((id) => id !== layout.focus) : [];
+  $('stage').style.gridTemplateRows = focusing ? `repeat(${railed.length}, auto) minmax(0, 1fr)` : '';
+  for (const id of Tiles.DISPLAYS) {
+    const tile = TILE_OF[id];
+    if (!tile) continue;
+    const item = layout.items[id];
+    const lead = focusing && id === layout.focus;
+    const side = focusing && item.shown && !lead;
+    tile.classList.toggle('tile-off', ultra && !item.shown);
+    tile.classList.toggle('focused', lead);
+    tile.classList.toggle('railed', side);
+    tile.classList.toggle('is-min', ultra && item.shown && (side || (!focusing && item.min)));
+    tile.querySelector('[data-tile="focus"]').title = lead ? 'Back to the grid' : 'Expand';
+    tile.querySelector('[data-tile="min"]').title = item.min ? 'Restore' : 'Minimize';
+    if (!ultra) {
+      for (const name of ['grid-column', 'grid-row', 'order']) tile.style.removeProperty(name);
+      continue;
+    }
+    tile.style.order = String(layout.order.indexOf(id));
+    if (lead) {
+      tile.style.gridColumn = '1';
+      tile.style.gridRow = `1 / span ${railed.length + 1}`;
+    } else if (side) {
+      tile.style.gridColumn = '2';
+      tile.style.gridRow = 'auto';
+    } else {
+      tile.style.gridColumn = `span ${item.w}`;
+      tile.style.gridRow = `span ${item.min ? 1 : item.h}`;
+    }
+  }
+  renderDisplayChips();
+  renderSummaries();
+  applySkin();
+}
+
+/* Apollo in OSIRIS's colours: while the map is laid into the normal display,
+ * and in ultra mode while it is the display expanded. */
+function applySkin() {
+  const skin = state.osiris || (ultraOn() && state.layout.focus === 'osiris');
+  document.body.classList.toggle('osiris', skin);
+  shader.theme(skin);
+}
+
+/* A change of layout that moves displays: each one slides from where it was
+ * to where it is now, drawn by transform alone - the grid itself changes in
+ * one frame (the FLIP technique). */
+function flip(change, { skip = null } = {}) {
+  const tiles = Object.values(TILE_OF).filter((tile) => tile !== skip);
+  const before = new Map(tiles.map((tile) => [tile, tile.getBoundingClientRect()]));
+  change();
+  if (still()) return;
+  for (const tile of tiles) {
+    const was = before.get(tile);
+    const now = tile.getBoundingClientRect();
+    if (!now.width) continue;
+    if (!was.width) {                               // just switched on: it arrives
+      tile.animate([{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }],
+                   { duration: 360, easing: EASE });
+      continue;
+    }
+    const dx = was.left - now.left, dy = was.top - now.top;
+    const sx = was.width / now.width, sy = was.height / now.height;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) continue;
+    tile.animate([
+      { transformOrigin: '0 0', transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` },
+      { transformOrigin: '0 0', transform: 'none' },
+    ], { duration: 460, easing: EASE });
+  }
+}
+
+function changeLayout(next, { animate: moving = true, save = true } = {}) {
+  const run = () => { state.layout = next; applyLayout(); };
+  if (moving && ultraOn() && next.ultra) flip(run);
+  else run();
+  if (save) saveLayout();
+  if (state.configFor) renderConfig();
+  wordmark.resize();
+  scheduleOsiris();
+}
+
+/* Into apollo.py's keeping once the changes stop. */
+function saveLayout() {
+  clearTimeout(state.saveTimer);
+  state.saveTimer = setTimeout(() => {
+    const api = bridge();
+    if (api && api.save_layout) api.save_layout(state.layout);
+  }, 400);
+}
+
+/* Ultra mode on or off: a channel change, and at its dark moment the stage
+ * becomes the grid of displays - or the normal display again. */
+function setUltra(on, { quiet = false, layout = null } = {}) {
+  on = Boolean(on);
+  const next = layout || Tiles.setUltra(state.layout, on);
+  $('ultra-button').setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (on === ultraOn()) { changeLayout(next); return on; }
+  closeStory();
+  closeStock();
+  unlight();
+  unlightRow();
+  closeConfig();
+  if (on && state.osiris) {
+    // The map laid into the normal display becomes one of ultra mode's.
+    state.osiris = false;
+    $('osiris-button').setAttribute('aria-pressed', 'false');
+  }
+  state.layout = next;
+  const swap = () => {
+    document.body.classList.remove('osiris-map');
+    document.body.classList.toggle('ultra', on);
+    $('osiris').setAttribute('aria-hidden', on ? 'false' : 'true');
+    movePanes(on);
+    if (on) settleTiles();
+    applyLayout();
+    applyRoom({ quiet: true });
+    wordmark.resize();
+    if (on) powerOn();
+  };
+  if (quiet) swap();
+  else channelChange(swap);
+  saveLayout();
+  scheduleOsiris(on ? 900 : 0);
+  return on;
+}
+
+function movePanes(on) {
+  for (const [tab, tile] of Object.entries(PANE_TILE)) {
+    const pane = $(`pane-${tab}`);
+    if (on) {
+      $(tile).appendChild(pane);
+      pane.hidden = false;
+    } else {
+      $('markets').insertBefore(pane, $('stock'));
+    }
+  }
+  if (on) {
+    $('pane-stocks').hidden = false;
+    document.querySelectorAll('#panel-tabs .tab').forEach((tab) =>
+      tab.classList.toggle('on', tab.dataset.tab === 'stocks'));
+  } else {
+    showTab(state.tab);
+  }
+}
+
+/* What the entrance animations and a panel taken off by voice leave inline
+ * would outrank the tiles' own look. */
+function settleTiles() {
+  for (const element of [...Object.values(TILE_OF), $('gauges')]) {
+    element.style.removeProperty('opacity');
+    element.style.removeProperty('transform');
+  }
+}
+
+/* Coming up for work: the displays power on one after another, under a line
+ * of light running down the glass. */
+function powerOn() {
+  if (still()) return;
+  const shown = Tiles.visible(state.layout);
+  shown.forEach((id, i) => {
+    const tile = TILE_OF[id];
+    tile.style.setProperty('--i', String(i));
+    tile.classList.remove('powering');
+    void tile.offsetWidth;                          // from the start, every time
+    tile.classList.add('powering');
+  });
+  document.body.classList.remove('sweeping');
+  void document.body.offsetWidth;
+  document.body.classList.add('sweeping');
+  clearTimeout(state.powerTimer);
+  state.powerTimer = setTimeout(() => {
+    for (const tile of Object.values(TILE_OF)) tile.classList.remove('powering');
+    document.body.classList.remove('sweeping');
+  }, 900 + shown.length * 70);
+}
+
+/* "Put it on my screen": ultra mode if it is not, that display expanded,
+ * the rest minimized beside it. null puts the grid back. */
+function focusDisplay(id) {
+  const next = Tiles.focus(state.layout, id || null);
+  if (!ultraOn()) {
+    if (id) setUltra(true, { layout: next });
+    return;
+  }
+  changeLayout(next);
+}
+
+function showDisplay(id, shown) {
+  if (!Tiles.NAMES[id]) return;
+  let next = Tiles.setShown(state.layout, id, shown);
+  if (shown) next = Tiles.setMin(next, id, false);
+  if (!ultraOn()) {
+    if (shown) setUltra(true, { layout: Tiles.setUltra(next, true) });
+    else changeLayout(next, { animate: false });
+    return;
+  }
+  changeLayout(next);
+  if (shown) pulse(id);
+}
+
+/* A display asked for that is already there: brought forward - out of the
+ * rail, or out of being minimized - and lit up for a moment. */
+function revealDisplay(id) {
+  const item = state.layout.items[id];
+  if (!item) return;
+  if (state.layout.focus && state.layout.focus !== id) focusDisplay(id);
+  else if (!item.shown || item.min) changeLayout(Tiles.setMin(Tiles.setShown(state.layout, id, true), id, false));
+  pulse(id);
+}
+
+function pulse(id) {
+  const tile = TILE_OF[id];
+  if (!tile) return;
+  tile.classList.remove('pulse-tile');
+  void tile.offsetWidth;
+  tile.classList.add('pulse-tile');
+}
+
+/* The layout apollo.py kept, as the display opens: taken as it is. */
+function adoptLayout(raw) {
+  const next = Tiles.sanitize(raw);
+  if (next.ultra !== ultraOn()) { setUltra(next.ultra, { quiet: true, layout: next }); return; }
+  changeLayout(next, { animate: false, save: false });
+}
+
+/* --- the map among the displays -----------------------------------------------
+ * The map is a window laid over its frame (osiris.py), and a window can only
+ * lie over the page, never under it: whatever the page drew where the map is
+ * would be hidden. So it is parked - off the screen, still loaded - while
+ * anything is moving, while its settings or another display's are open,
+ * while it is minimized or another display is expanded, and while Apollo
+ * answers; and put back over its frame once things have settled. */
+
+function osirisSpot() {
+  // Never over the intro: the map waits for the tube to have warmed up.
+  if ($('intro').classList.contains('on')) {
+    return (ultraOn() ? state.layout.items.osiris.shown : state.osiris) ? 'park' : 'close';
+  }
+  if (!ultraOn()) return state.osiris ? 'open' : 'close';
+  const layout = state.layout;
+  const item = layout.items.osiris;
+  if (!item.shown) return 'close';
+  if (item.min || (layout.focus && layout.focus !== 'osiris')) return 'park';
+  if (state.drag || state.resizing || state.configFor) return 'park';
+  if (state.phase === 'thinking' || state.phase === 'speaking') return 'park';
+  return 'open';
+}
+
+function syncOsiris() {
+  const api = bridge();
+  const spot = osirisSpot();
+  if (spot === 'open') {
+    const view = $('osiris-view');
+    const box = view.getBoundingClientRect();
+    // Too small a frame for the map to be any use: it says so instead.
+    const small = box.width < 200 || box.height < 200;
+    view.classList.toggle('small', small);
+    if (small) {
+      if (api && api.osiris_park) api.osiris_park();
+      return;
+    }
+    const ratio = window.devicePixelRatio || 1;
+    if (api && api.osiris_open) {
+      api.osiris_open({ x: Math.round(box.left * ratio), y: Math.round(box.top * ratio),
+                        w: Math.round(box.width * ratio), h: Math.round(box.height * ratio) });
+    }
+  } else if (spot === 'park') {
+    if (api && api.osiris_park) api.osiris_park();
+  } else if (api && api.osiris_close) {
+    api.osiris_close();
+  }
+}
+
+/* Off the screen at once if the page is about to move, back over its frame
+ * once the move has settled. */
+function scheduleOsiris(delay = 480) {
+  clearTimeout(state.osirisTimer);
+  const api = bridge();
+  if (osirisSpot() !== 'open') { syncOsiris(); return; }
+  if (ultraOn() && api && api.osiris_park) api.osiris_park();
+  state.osirisTimer = setTimeout(syncOsiris, delay);
+}
+
+/* --- the bar along the bottom ---------------------------------------------------- */
+
+function renderDisplayChips() {
+  const layout = state.layout;
+  $('ultra-chips').innerHTML = Tiles.DISPLAYS.map((id) => {
+    const shown = layout.items[id].shown;
+    return `<button type="button" class="dchip${shown ? ' on' : ''}${layout.focus === id ? ' lead' : ''}"
+              data-chip="${id}" aria-pressed="${shown ? 'true' : 'false'}"
+              title="${shown ? 'Hide' : 'Show'} ${Tiles.NAMES[id]}"><i class="led"></i>${Tiles.NAMES[id]}</button>`;
+  }).join('');
+}
+
+function renderSummaries() {
+  if (!ultraOn()) return;
+  const extra = { clock: $('hhmm').textContent, phase: state.phase,
+                  layers: state.layout.layers.length, feed: state.feed };
+  for (const [id, tile] of Object.entries(TILE_OF)) {
+    const line = tile.querySelector('.tile-sum');
+    if (line) line.textContent = Tiles.summary(id, state.snapshot || {}, extra);
+  }
+}
+
+$('ultra-button').addEventListener('click', () => setUltra(!ultraOn()));
+$('ultra-exit').addEventListener('click', () => setUltra(false));
+$('ultra-grid').addEventListener('click', () => focusDisplay(null));
+$('ultra-chips').addEventListener('click', (event) => {
+  const chip = event.target.closest('[data-chip]');
+  if (chip) showDisplay(chip.dataset.chip, !state.layout.items[chip.dataset.chip].shown);
+});
+// Two clicks, the first saying what the second does: a layout you built
+// should not go to a stray click.
+$('ultra-reset').addEventListener('click', (event) => {
+  const button = event.currentTarget;
+  const label = button.querySelector('span');
+  clearTimeout(button._undo);
+  if (!button.classList.contains('sure')) {
+    button.classList.add('sure');
+    label.textContent = 'RESET ALL?';
+    button._undo = setTimeout(() => { button.classList.remove('sure'); label.textContent = 'RESET'; }, 3000);
+    return;
+  }
+  button.classList.remove('sure');
+  label.textContent = 'RESET';
+  changeLayout(Tiles.setLayers(Tiles.setUltra(Tiles.defaultLayout(), true), state.layout.layers));
+  powerOn();
+});
+
+/* --- a display's controls ----------------------------------------------------------- */
+
+$('stage').addEventListener('click', (event) => {
+  if (!ultraOn() || state.dragMoved) return;
+  const tile = event.target.closest('[data-display]');
+  if (!tile) return;
+  const id = tile.dataset.display;
+  if (tile.classList.contains('railed')) { focusDisplay(id); return; }
+  const button = event.target.closest('[data-tile]');
+  if (!button) {
+    if (event.target.closest('.tile-min')) changeLayout(Tiles.setMin(state.layout, id, false));
+    return;
+  }
+  const item = state.layout.items[id];
+  if (button.dataset.tile === 'min') changeLayout(Tiles.setMin(state.layout, id, !item.min));
+  if (button.dataset.tile === 'focus') focusDisplay(state.layout.focus === id ? null : id);
+  if (button.dataset.tile === 'hide') changeLayout(Tiles.setShown(state.layout, id, false));
+  if (button.dataset.tile === 'config') {
+    if (state.configFor === id) closeConfig();
+    else openConfig(id, button);
+  }
+});
+
+$('stage').addEventListener('dblclick', (event) => {
+  const handle = ultraOn() && event.target.closest('.tile-handle');
+  if (!handle) return;
+  const id = handle.closest('[data-display]').dataset.display;
+  focusDisplay(state.layout.focus === id ? null : id);
+});
+
+/* Moved by the top edge, or by a minimized display's line; resized by the
+ * corner. Only in the grid - an expanded display and its rail are laid out
+ * for you. */
+$('stage').addEventListener('pointerdown', (event) => {
+  if (!ultraOn() || event.button !== 0 || state.layout.focus) return;
+  const tile = event.target.closest('[data-display]');
+  if (!tile) return;
+  if (event.target.closest('.tile-resize')) startResize(tile, event);
+  else if (event.target.closest('.tile-handle, .tile-min')) armDrag(tile, event);
+});
+
+/* Follow the pointer from `target` until it lets go. */
+function track(target, event, move, done) {
+  // Captured, so the pointer can leave the handle and still be followed. A
+  // pointer that has already gone cannot be captured, and need not be.
+  try { target.setPointerCapture(event.pointerId); } catch (error) { /* followed as it is */ }
+  const up = () => {
+    target.removeEventListener('pointermove', move);
+    target.removeEventListener('pointerup', up);
+    target.removeEventListener('pointercancel', up);
+    done();
+    // The click that ends a drag is not a click on anything.
+    setTimeout(() => { state.dragMoved = false; }, 0);
+  };
+  target.addEventListener('pointermove', move);
+  target.addEventListener('pointerup', up);
+  target.addEventListener('pointercancel', up);
+}
+
+function armDrag(tile, event) {
+  const start = { x: event.clientX, y: event.clientY };
+  track(event.target, event, (e) => {
+    if (!state.drag) {
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < 6) return;
+      beginDrag(tile, start);
+    }
+    dragTo(e.clientX, e.clientY);
+  }, () => { if (state.drag) endDrag(); });
+}
+
+function beginDrag(tile, start) {
+  const box = tile.getBoundingClientRect();
+  state.drag = { tile, id: tile.dataset.display, grabX: start.x - box.left,
+                 grabY: start.y - box.top, over: null };
+  state.dragMoved = true;
+  tile.classList.add('dragging');
+  document.body.classList.add('arranging');
+  closeConfig();
+  scheduleOsiris();
+}
+
+/* Where a display's own place in the grid is on the screen, whatever
+ * transform it is wearing. */
+function gridPlace(tile) {
+  const stage = $('stage').getBoundingClientRect();
+  return { x: stage.left + tile.offsetLeft, y: stage.top + tile.offsetTop };
+}
+
+/* The display follows the pointer, and the one under the pointer is marked:
+ * that is the one it trades places with when it is let go. Nothing else
+ * moves while it is carried - swapping with every display it passed over
+ * on the way would shuffle the whole screen. */
+function dragTo(x, y) {
+  const drag = state.drag;
+  const place = gridPlace(drag.tile);
+  drag.tile.style.transform = `translate(${(x - drag.grabX - place.x).toFixed(1)}px, `
+                            + `${(y - drag.grabY - place.y).toFixed(1)}px)`;
+  const under = document.elementsFromPoint(x, y)
+    .map((element) => element.closest('[data-display]'))
+    .find((tile) => tile && tile !== drag.tile && !tile.classList.contains('tile-off'));
+  if (under === drag.over) return;
+  if (drag.over) drag.over.classList.remove('drop-target');
+  drag.over = under || null;
+  if (drag.over) drag.over.classList.add('drop-target');
+}
+
+function endDrag() {
+  const drag = state.drag;
+  state.drag = null;
+  drag.tile.classList.remove('dragging');
+  document.body.classList.remove('arranging');
+  if (drag.over) drag.over.classList.remove('drop-target');
+  // Both go to their new places from where they are, the carried one from
+  // under the pointer; let go over nothing, it goes back to its own.
+  flip(() => {
+    drag.tile.style.removeProperty('transform');
+    if (drag.over) {
+      state.layout = Tiles.swap(state.layout, drag.id, drag.over.dataset.display);
+      applyLayout();
+    }
+  });
+  saveLayout();
+  scheduleOsiris(480);
+}
+
+/* The grid's cells, measured off the page: its columns and gap from the
+ * stage, its rows from the rows it has now. */
+function gridMetrics() {
+  const stage = $('stage');
+  const style = getComputedStyle(stage);
+  const gap = parseFloat(style.columnGap) || 12;
+  const width = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const height = stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  const rows = Math.max(1, style.gridTemplateRows.split(' ').filter(Boolean).length);
+  return { colW: (width - gap * (Tiles.COLUMNS - 1)) / Tiles.COLUMNS,
+           rowH: (height - gap * (rows - 1)) / rows, gap };
+}
+
+function startResize(tile, event) {
+  const id = tile.dataset.display;
+  const item = state.layout.items[id];
+  const from = { x: event.clientX, y: event.clientY, w: item.w, h: item.h, grid: gridMetrics() };
+  state.resizing = { id, tile };
+  state.dragMoved = true;
+  tile.classList.add('resizing');
+  document.body.classList.add('arranging');
+  closeConfig();
+  scheduleOsiris();
+  track(event.target, event, (e) => {
+    const spans = Tiles.spansFor({ w: from.w, h: from.h, dx: e.clientX - from.x,
+                                   dy: e.clientY - from.y, ...from.grid });
+    const now = state.layout.items[id];
+    if (spans.w === now.w && spans.h === now.h) return;
+    flip(() => {
+      state.layout = Tiles.resize(state.layout, id, spans.w, spans.h);
+      applyLayout();
+    });
+  }, () => {
+    state.resizing = null;
+    tile.classList.remove('resizing');
+    document.body.classList.remove('arranging');
+    wordmark.resize();
+    saveLayout();
+    scheduleOsiris(420);
+  });
+}
+
+/* --- a display's settings ------------------------------------------------------------ */
+
+function openConfig(id, anchor) {
+  state.configFor = id;
+  const pop = $('tile-config');
+  renderConfig();
+  pop.classList.add('on');
+  pop.setAttribute('aria-hidden', 'false');
+  // Under the button that opened it, and on the screen.
+  const box = anchor.getBoundingClientRect();
+  const width = pop.offsetWidth, height = pop.offsetHeight;
+  const x = Math.max(16, Math.min(window.innerWidth - width - 16, box.right - width));
+  let y = box.bottom + 10;
+  if (y + height > window.innerHeight - 16) y = Math.max(16, box.top - height - 10);
+  pop.style.transform = `translate(${x}px, ${y}px)`;
+  scheduleOsiris();                            // the map steps out from under it
+}
+
+function closeConfig() {
+  if (!state.configFor) return;
+  state.configFor = null;
+  $('tile-config').classList.remove('on');
+  $('tile-config').setAttribute('aria-hidden', 'true');
+  scheduleOsiris(200);
+}
+
+function renderConfig() {
+  const id = state.configFor;
+  if (!id) return;
+  const item = state.layout.items[id];
+  const button = (label, act, extra = '', on = false) =>
+    `<button type="button" class="cfg-btn${on ? ' on' : ''}" data-cfg="${act}" ${extra}>${label}</button>`;
+  const sizes = Object.entries(Tiles.SIZES).map(([name, [w, h]]) =>
+    button(name, 'size', `data-size="${name}"`, item.w === w && item.h === h)).join('');
+  let own = '';
+  if (id === 'feed') {
+    own = `<div class="cfg-row"><span>Topic</span>${TOPICS.map((topic, i) =>
+      button(esc(topic), 'topic', `data-topic="${i}"`, i === state.topic)).join('')}</div>`;
+  }
+  if (id === 'osiris') {
+    own = `<div class="cfg-row"><span>Layers</span></div><div class="cfg-layers">${Tiles.LAYERS.map((layer) =>
+      button(LAYER_NAMES[layer], 'layer', `data-layer="${layer}"`, state.layout.layers.includes(layer))).join('')}</div>
+      <p class="cfg-note">The map loads again with the layers you pick.</p>`;
+  }
+  $('tile-config').innerHTML = `
+    <header><b>${Tiles.NAMES[id]}</b><span>Settings</span>${button(ICON.hide, 'close', 'title="Close"')}</header>
+    <div class="cfg-row"><span>Size</span>${sizes}</div>
+    <div class="cfg-row"><span>Width</span>${button('−', 'w', 'data-by="-1"')}<b>${item.w} columns</b>${button('+', 'w', 'data-by="1"')}</div>
+    <div class="cfg-row"><span>Height</span>${button('−', 'h', 'data-by="-1"')}<b>${item.h} rows</b>${button('+', 'h', 'data-by="1"')}</div>
+    ${own}
+    <div class="cfg-row"><span>Show</span>${button(item.min ? 'Restore' : 'Minimize', 'min')}${
+      button(state.layout.focus === id ? 'Grid' : 'Expand', 'focus')}${button('Hide', 'hide')}</div>`;
+}
+
+$('tile-config').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-cfg]');
+  const id = state.configFor;
+  if (!button || !id) return;
+  const item = state.layout.items[id];
+  const act = button.dataset.cfg;
+  if (act === 'close') closeConfig();
+  if (act === 'size') {
+    const [w, h] = Tiles.SIZES[button.dataset.size];
+    changeLayout(Tiles.resize(state.layout, id, w, h));
+  }
+  if (act === 'w') changeLayout(Tiles.resize(state.layout, id, item.w + Number(button.dataset.by), item.h));
+  if (act === 'h') changeLayout(Tiles.resize(state.layout, id, item.w, item.h + Number(button.dataset.by)));
+  if (act === 'topic') {
+    state.topic = Number(button.dataset.topic) || 0;
+    closeStory();
+    if (state.snapshot) renderFeed(state.snapshot);
+    renderConfig();
+  }
+  if (act === 'layer') {
+    const layer = button.dataset.layer;
+    const layers = state.layout.layers.includes(layer)
+      ? state.layout.layers.filter((kept) => kept !== layer) : [...state.layout.layers, layer];
+    changeLayout(Tiles.setLayers(state.layout, layers), { animate: false });
+    const api = bridge();
+    if (api && api.osiris_layers) api.osiris_layers(state.layout.layers);
+  }
+  if (act === 'min') changeLayout(Tiles.setMin(state.layout, id, !item.min));
+  if (act === 'focus') { closeConfig(); focusDisplay(state.layout.focus === id ? null : id); }
+  if (act === 'hide') { closeConfig(); changeLayout(Tiles.setShown(state.layout, id, false)); }
+});
+
+// Anywhere else, and the settings close.
+document.addEventListener('pointerdown', (event) => {
+  if (state.configFor && !event.target.closest('#tile-config, [data-tile="config"]')) closeConfig();
+}, true);
 
 /* --- the choreography ------------------------------------------------------ */
 
@@ -1865,6 +2609,12 @@ function setPhase(phase) {
   $('thinking').classList.toggle('on', phase === 'thinking');
   if (phase === 'thinking') dots.play(THINKING);
   else dots.stop();
+
+  // In ultra mode the map steps aside while there is an answer on screen.
+  if (ultraOn()) {
+    scheduleOsiris(400);
+    renderSummaries();
+  }
 
   if (phase === 'listening') {
     $('you').textContent = '';
@@ -2000,6 +2750,16 @@ window.apollo = {
   intro() { playIntro(); },
   // OSIRIS in the display, or not - by voice, or its window closed itself.
   osiris(on) { return setOsiris(on); },
+  // Ultra mode's displays: on or off, one expanded, one shown or hidden - or
+  // the layout apollo.py kept, as the display opens.
+  display(request) {
+    const asked = request || {};
+    if (asked.action === 'layout') adoptLayout(asked.layout);
+    if (asked.action === 'ultra') setUltra(Boolean(asked.on));
+    if (asked.action === 'focus') focusDisplay(asked.id || null);
+    if (asked.action === 'show' || asked.action === 'hide') showDisplay(asked.id, asked.action === 'show');
+    return { ultra: state.layout.ultra, focus: state.layout.focus };
+  },
   // "Open story three": opens it and says what it is. 0 closes it.
   story(number) {
     number = Number(number) || 0;

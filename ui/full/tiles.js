@@ -8,7 +8,7 @@
  * in place, so a layout handed to the bridge is never altered after it. */
 
 export const COLUMNS = 12;
-export const ROWS = 6;             // the default fills exactly this many
+export const ROWS = 12;            // the default fills exactly this many
 export const MIN_W = 2;            // narrower than two columns is not a display
 
 // The order they are laid out in by default, which is also the order the
@@ -23,7 +23,7 @@ export const NAMES = {
 };
 
 // Sizes by name, smallest first: columns by rows.
-export const SIZES = { S: [2, 2], M: [3, 2], L: [4, 3], XL: [6, 4] };
+export const SIZES = { S: [2, 3], M: [3, 4], L: [4, 6], XL: [6, 8] };
 
 // OSIRIS's layers (osiris.LAYERS), each one a switch in its settings.
 export const LAYERS = ['maritime', 'cctv', 'cctv_previews', 'live_news', 'earthquakes',
@@ -31,8 +31,8 @@ export const LAYERS = ['maritime', 'cctv', 'cctv_previews', 'live_news', 'earthq
                        'sdk_naval'];
 
 const SPANS = {
-  today: [3, 2], osiris: [6, 4], feed: [3, 4], markets: [3, 4], projects: [2, 2],
-  ideas: [2, 2], core: [2, 2], system: [3, 2], talks: [3, 2],
+  today: [3, 4], osiris: [6, 8], feed: [3, 8], markets: [3, 8], projects: [2, 4],
+  ideas: [2, 4], core: [2, 4], system: [3, 4], talks: [3, 4],
 };
 
 export function defaultLayout() {
