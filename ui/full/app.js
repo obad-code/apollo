@@ -16,6 +16,7 @@ import { DotFlow, FRAMES } from './dotflow.js';
 import { LedWord } from './ledword.js';
 import { bootLines, typed } from './boot.js';
 import * as Tiles from './tiles.js';
+import * as Rings from './rings.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -157,29 +158,21 @@ const asleep = { on: false, timer: null, last: '' };
 const shader = new Shader($('shader'));
 shader.start();
 
-/* The name in lit cells, in its three places: under the ring, on the idle
- * screen, and in the intro as Apollo comes up. Upright, in Orbitron at its
+/* The name in lit cells, in its two places: on the idle screen, and in the
+ * intro as Apollo comes up. (Under the ring it is a neon sign, all markup
+ * and CSS.) Upright, in Orbitron at its
  * heaviest drawn at four fifths of its width - a little taller than it
  * comes - with room between the letters, and arriving scrambled. */
 const NAME = { font: '"Orbitron", "Segoe UI", sans-serif', weight: 900, stretch: 0.8,
                tracking: 0.3 };
-// The display's own: quieter than the intro's tube - a soft glow, the guns
-// close together, steady - and a little colour, cyan through violet to pink,
-// the way a cyberpunk sign is lit.
-const wordmark = new LedWord($('wordmark'), { ...NAME, rows: 12, glow: 0.42, fill: 0.62, bulge: 0.1,
-                                              gap: 0.26, fringe: 0.3, steady: true, glitch: true,
-                                              palette: [[92, 236, 255], [160, 146, 255], [255, 128, 214]] });
 const sleepWord = new LedWord($('sleep-word'), { ...NAME, rows: 16, fill: 0.7 });
 // In the intro the name is lit in the boot screen's own green phosphor.
 const introWord = new LedWord($('intro-word'), { ...NAME, rows: 22, glow: 1.15,
                                                  colour: [168, 255, 192] });
-wordmark.scramble(0.75);
-// The scramble-text component's own trigger: point at the name and it goes again.
-$('wordmark').addEventListener('pointerenter', () => wordmark.scramble(0.75));
 
 window.addEventListener('resize', () => {
   shader.resize();
-  for (const word of [wordmark, sleepWord, introWord]) word.resize();
+  for (const word of [sleepWord, introWord]) word.resize();
 });
 
 const INTRO_OFF_AT = 2850;       // ms: the tube switches off...
@@ -242,50 +235,179 @@ lyla.start();
 document.addEventListener('pointerdown', (event) => lyla.follow(event.clientX, event.clientY));
 document.addEventListener('pointermove', (event) => lyla.pointer(event.clientX, event.clientY));
 
+/* Apollo's shape: a circle, as the old display drew it (rings.js has the
+ * dots). In amber #FFB000: a scope's faint graticule - a bezel with its ticks
+ * and a grid across it - a dark lens in the middle, and inside the bezel five
+ * rings of lit dots joined round each ring, turning against each other and
+ * breathing with your voice. While Apollo is busy they brighten, thicken and
+ * turn faster, a scan bar runs down the glass and a wave goes out from the
+ * middle over and over; while it is listening the rings take a gradient,
+ * cyan in the middle to amber and orange at the edge; and while it speaks
+ * they go towards white and a white bloom lifts off the middle. */
 const ring = $('ring').getContext('2d');
-const RINGS = [[1.0, 22, 0.026, '255,193,94'], [0.85, 18, -0.034, '255,176,0'],
-               [0.7, 14, 0.045, '86,197,214']];
-let ringClock = 0;
+const AMBER = [255, 176, 0];
+const LISTEN = [[90, 215, 255], [127, 227, 255], [255, 227, 168], [255, 122, 46]];
+const core = { clock: 0, env: 0, talk: 0, listen: 0, spin: 1 };
 let lastFrame = performance.now();
 let ringFrame = null;
 
 function drawRing(now) {
   const dt = Math.min(0.05, (now - lastFrame) / 1000);
   lastFrame = now;
-  ringClock += dt * (state.phase === 'thinking' ? 5 : 1);
+  const phase = state.phase;
   // Eased, not followed: the raw level jumps every packet, and a ring that
   // jumps with it reads as a fault rather than as breathing.
   state.levelSmooth += (state.level - state.levelSmooth)
                      * (1 - Math.exp(-dt / (state.level > state.levelSmooth ? 0.05 : 0.28)));
-  const breath = 1 + 0.09 * state.levelSmooth;
-  const size = $('ring').width;
-  const centre = size / 2;
+  core.env = Rings.ease(core.env, phase === 'idle' ? 0 : 1, dt, 0.35);
+  core.talk = Rings.ease(core.talk, phase === 'speaking' ? 1 : 0, dt, 0.2);
+  core.listen = Rings.ease(core.listen, phase === 'listening' ? 1 : 0, dt, 0.3);
+  core.spin = Rings.ease(core.spin, phase === 'thinking' ? 3.2 : 1 + 1.2 * core.env + 3.4 * core.talk, dt, 0.4);
+  core.clock += dt * 1000 * core.spin;
+  const env = core.env, w = core.talk, t = now;
+
+  // Drawn at the canvas's own size on the screen, in the screen's pixels, so
+  // a line of one is a line of one; `px` is one CSS pixel.
+  const canvas = $('ring');
+  const px = Math.min(2, window.devicePixelRatio || 1);
+  const want = Math.max(1, Math.round(canvas.clientWidth * px));
+  if (canvas.width !== want) { canvas.width = want; canvas.height = want; }
+  const size = canvas.width;
+  const cx = size / 2, cy = size / 2;
+  const coreR = size * 0.4 * (1 + 0.06 * state.levelSmooth);
+  // Towards white while it speaks.
+  const rgb = AMBER.map((v) => Math.round(v + (255 - v) * w)).join(',');
   ring.clearRect(0, 0, size, size);
-  for (const [fraction, count, turns, colour] of RINGS) {
-    const radius = centre * 0.82 * fraction * breath;
-    const start = ringClock * turns * Math.PI * 2;
-    ring.strokeStyle = `rgba(${colour},${(0.28 + 0.22 * state.levelSmooth).toFixed(3)})`;
-    ring.lineWidth = 2;
+
+  // The dark lens the rings sit round, gone while Apollo is busy.
+  const lensA = 1 - env;
+  if (lensA > 0.004) {
+    const lens = ring.createRadialGradient(cx, cy, coreR * 0.4, cx, cy, coreR * 0.78);
+    lens.addColorStop(0, `rgba(0,0,0,${(0.78 * lensA).toFixed(3)})`);
+    lens.addColorStop(0.78, `rgba(0,0,0,${(0.78 * lensA).toFixed(3)})`);
+    lens.addColorStop(1, 'rgba(0,0,0,0)');
+    ring.fillStyle = lens;
     ring.beginPath();
-    for (let i = 0; i <= count; i++) {
-      const angle = start - Math.PI / 2 + (i * Math.PI * 2) / count;
-      const x = centre + Math.cos(angle) * radius;
-      const y = centre + Math.sin(angle) * radius;
-      i ? ring.lineTo(x, y) : ring.moveTo(x, y);
-    }
+    ring.arc(cx, cy, coreR * 0.78, 0, Math.PI * 2);
+    ring.fill();
+  }
+
+  ring.globalCompositeOperation = 'lighter';
+
+  // The white bloom while Apollo speaks - kept inside the canvas.
+  if (w > 0.004) {
+    const reach = Math.min(coreR * 1.7, size / 2);
+    const flick = 0.82 + 0.18 * Math.sin(t * 0.026);
+    const bloom = ring.createRadialGradient(cx, cy, coreR * 0.15, cx, cy, reach);
+    bloom.addColorStop(0, `rgba(255,255,255,${(0.3 * w * flick).toFixed(3)})`);
+    bloom.addColorStop(0.42, `rgba(255,248,232,${(0.13 * w * flick).toFixed(3)})`);
+    bloom.addColorStop(1, 'rgba(255,255,255,0)');
+    ring.fillStyle = bloom;
+    ring.beginPath();
+    ring.arc(cx, cy, reach, 0, Math.PI * 2);
+    ring.fill();
+    ring.lineWidth = 2 * px;
+    ring.strokeStyle = `rgba(255,255,255,${(0.5 * w).toFixed(3)})`;
+    ring.shadowBlur = 40 * w * px;
+    ring.shadowColor = `rgba(255,255,255,${(0.8 * w).toFixed(3)})`;
+    ring.beginPath();
+    ring.arc(cx, cy, coreR * 0.7, 0, Math.PI * 2);
     ring.stroke();
-    ring.shadowColor = `rgba(${colour},.9)`;
-    ring.shadowBlur = 14;
-    ring.fillStyle = `rgba(${colour},.95)`;
-    for (let i = 0; i < count; i++) {
-      const angle = start - Math.PI / 2 + (i * Math.PI * 2) / count;
-      ring.beginPath();
-      ring.arc(centre + Math.cos(angle) * radius, centre + Math.sin(angle) * radius,
-               5 + 1.8 * state.levelSmooth, 0, Math.PI * 2);
-      ring.fill();
-    }
     ring.shadowBlur = 0;
   }
+
+  // The scope's graticule: never off, a dim floor at rest.
+  const scope = Math.min(1, Math.max(env, 0.24) * 1.4);
+  ring.lineWidth = px;
+  ring.strokeStyle = `rgba(${rgb},${(0.2 * scope).toFixed(3)})`;
+  ring.beginPath();
+  ring.arc(cx, cy, coreR * 1.04, 0, Math.PI * 2);
+  ring.stroke();
+  ring.strokeStyle = `rgba(${rgb},${(0.12 * scope).toFixed(3)})`;
+  for (let g = -2; g <= 2; g++) {
+    const o = g * coreR * 0.3;
+    ring.beginPath();
+    ring.moveTo(cx - coreR * 0.86, cy + o); ring.lineTo(cx + coreR * 0.86, cy + o);
+    ring.moveTo(cx + o, cy - coreR * 0.86); ring.lineTo(cx + o, cy + coreR * 0.86);
+    ring.stroke();
+  }
+  ring.strokeStyle = `rgba(${rgb},${(0.3 * scope).toFixed(3)})`;
+  ring.beginPath();
+  for (let k = 0; k < 36; k++) {
+    const a = (k / 36) * Math.PI * 2, r0 = coreR * 1.04, r1 = r0 - coreR * (k % 3 ? 0.025 : 0.05);
+    ring.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+    ring.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+  }
+  ring.stroke();
+
+  // The rings: joined round, a lit dot at each join. Listening, they take
+  // the gradient, cross-faded in so they never drop out.
+  const pulse = 0.82 + 0.18 * Math.sin(t * 0.0016) + 0.12 * env * Math.sin(t * 0.0052)
+              + 0.25 * w + 0.2 * state.levelSmooth;
+  let tint = null;
+  if (core.listen > 0.02) {
+    tint = ring.createRadialGradient(cx, cy, coreR * 0.1, cx, cy, coreR * 1.02);
+    LISTEN.forEach((c, i) => tint.addColorStop([0, 0.38, 0.62, 1][i], `rgb(${c.join(',')})`));
+  }
+  const mix = Math.min(1, core.listen * 1.4);
+  const stroke = (style, alpha, draw) => {
+    if (alpha <= 0.004) return;
+    ring.globalAlpha = Math.min(1, alpha);
+    ring.strokeStyle = style;
+    ring.fillStyle = style;
+    draw();
+    ring.globalAlpha = 1;
+  };
+  Rings.LAYERS.forEach((layer, li) => {
+    const lay = (1 - li * 0.07) * (1 + 0.25 * env) * (1 + 1.5 * w);
+    const dots = Rings.layerDots(li, core.clock).map((d) => [cx + d.x * coreR, cy + d.y * coreR]);
+    const lineA = (0.3 + 0.38 * env + 0.3 * w) * pulse * lay;
+    ring.lineWidth = (1 + 2.4 * env + 1.8 * w) * px;
+    ring.shadowBlur = (12 + 18 * env + 30 * w) * px;
+    ring.shadowColor = `rgba(${rgb},${Math.min(1, 0.7 * lay).toFixed(3)})`;
+    const round = () => {
+      ring.beginPath();
+      dots.forEach(([x, y], k) => (k ? ring.lineTo(x, y) : ring.moveTo(x, y)));
+      ring.closePath();
+      ring.stroke();
+    };
+    stroke(`rgb(${rgb})`, lineA * (tint ? 1 - mix : 1), round);
+    if (tint) stroke(tint, lineA * mix, round);
+    ring.shadowBlur = (14 + 16 * env + 34 * w) * px;
+    dots.forEach(([x, y], k) => {
+      const flare = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.0024 * core.spin + k * 0.8 + li * 1.7));
+      const r = (1.6 + 0.9 * flare) * (1 + 1.1 * env + 0.9 * w) * px;
+      const dot = () => { ring.beginPath(); ring.arc(x, y, r, 0, Math.PI * 2); ring.fill(); };
+      const dotA = 0.92 * flare * lay;
+      stroke(`rgb(${rgb})`, dotA * (tint ? 1 - mix : 1), dot);
+      if (tint) stroke(tint, dotA * mix, dot);
+    });
+  });
+  ring.shadowBlur = 0;
+
+  // A scan bar drifting down inside the bezel.
+  const scanY = cy - coreR * 0.94 + ((t * 0.055 * px) % (coreR * 1.88));
+  const half = Math.sqrt(Math.max(0, (coreR * 0.94) ** 2 - (scanY - cy) ** 2));
+  ring.lineWidth = 2 * px;
+  ring.strokeStyle = `rgba(${rgb},${(0.14 * scope).toFixed(3)})`;
+  ring.beginPath();
+  ring.moveTo(cx - half, scanY); ring.lineTo(cx + half, scanY);
+  ring.stroke();
+
+  // While Apollo works, a wave going out from the middle, over and over.
+  if (env > 0.004) {
+    const period = env > 0.5 ? 1100 : 3400;
+    const wave = (t % period) / period;
+    ring.lineWidth = 1.4 * px;
+    ring.strokeStyle = `rgba(255,176,0,${(0.3 * env * (1 - wave) ** 2).toFixed(3)})`;
+    ring.shadowBlur = 18 * px;
+    ring.shadowColor = `rgba(${rgb},0.7)`;
+    ring.beginPath();
+    ring.arc(cx, cy, coreR * 0.3 + wave * (size / 2 - 4 * px - coreR * 0.3), 0, Math.PI * 2);
+    ring.stroke();
+    ring.shadowBlur = 0;
+  }
+  ring.globalCompositeOperation = 'source-over';
   ringFrame = requestAnimationFrame(drawRing);
 }
 
@@ -1817,7 +1939,6 @@ function setSleep(on) {
     // Under the idle screen only the dots are seen; nothing else earns frames.
     lyla.stop();
     ringStop();
-    wordmark.stop();
     sleepWord.resize();
     sleepWord.scramble(0.9, 0.5);  // as the idle screen fades in
     tickSleep();
@@ -1827,7 +1948,6 @@ function setSleep(on) {
     sleepWord.stop();
   }
   if (!on && state.mode === 'full') {
-    wordmark.scramble(0.75);
     ringStart();
     if (roomShown()) lyla.start();
   }
@@ -1888,7 +2008,6 @@ function setRoom(shown, { quiet = false } = {}) {
   clearTimeout(state.roomTimer);
   const swap = () => {
     document.body.classList.toggle('roomless', !shown);
-    wordmark.resize();                    // its cells, at its new size
     if (shown) {
       if (state.mode === 'full' && !asleep.on) lyla.start();
     } else {
@@ -1942,7 +2061,6 @@ function setOsiris(on) {
     $('osiris').setAttribute('aria-hidden', on ? 'false' : 'true');
     applySkin();
     applyRoom({ quiet: true });
-    if (!on) wordmark.resize();
   });
   // Laid over the frame once the stage has its new shape - or gone.
   scheduleOsiris(on ? 320 : 0);
@@ -2115,7 +2233,6 @@ function changeLayout(next, { animate: moving = true, save = true } = {}) {
   else run();
   if (save) saveLayout();
   if (state.configFor) renderConfig();
-  wordmark.resize();
   scheduleOsiris();
 }
 
@@ -2164,7 +2281,6 @@ function setUltra(on, { quiet = false, layout = null } = {}) {
     if (on) settleTiles();
     applyLayout();
     applyRoom({ quiet: true });
-    wordmark.resize();
     if (on) powerOn();
   };
   if (quiet) swap();
@@ -2539,7 +2655,6 @@ function startResize(tile, event) {
     state.resizing = null;
     tile.classList.remove('resizing');
     document.body.classList.remove('arranging');
-    wordmark.resize();
     saveLayout();
     scheduleOsiris(420);
   });
@@ -2817,7 +2932,7 @@ window.apollo = {
     $('dots').innerHTML = `
       <span><i class="${phase === 'Error' ? 'off' : 'ok'}">●</i>GEMINI LIVE</span>
       <span><i class="ok">●</i>CLAUDE READY</span>
-      <span><i class="${phase === 'Listening' ? 'ok' : ''}" style="color:var(--cyan)">●</i>MIC</span>`;
+      <span><i class="${phase === 'Listening' ? 'ok' : ''}" style="color:var(--accent)">●</i>MIC</span>`;
   },
   turn(who, text) {
     if (who === 'You') {
@@ -2847,14 +2962,16 @@ window.apollo = {
     state.mode = name;
     // The overlay has the screen while Apollo is at rest; a shader drawing to
     // a window nobody can see is a GPU burning for nothing.
+    // Nothing on the sign moves while nobody can see it.
+    document.body.classList.toggle('offscreen', name !== 'full');
     if (name === 'full') {
       shader.start();
-      if (!asleep.on) { if (roomShown()) lyla.start(); ringStart(); wordmark.scramble(0.75); }
+      if (!asleep.on) { if (roomShown()) lyla.start(); ringStart(); }
       else sleepWord.start();
       enter();
     } else {
       shader.stop(); lyla.stop(); ringStop();
-      wordmark.stop(); sleepWord.stop();
+      sleepWord.stop();
       unlight();
       unlightRow();
     }

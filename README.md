@@ -189,22 +189,36 @@ one is a number Apollo actually has.
 
 ### The full display
 
-**The name.** Wherever Apollo writes its name - under the ring on the full
-display, on the idle screen, and in the intro - it is an LED sign on an old
-tube: Orbitron at its heaviest, upright and drawn a little taller than it
+**Apollo's shape and its name.** On the full display Apollo is a circle,
+the way the old display drew it: five rings of lit dots nested inside one
+another, each turning against the one inside it, on a scope's faint
+graticule round a dark lens, in amber, with a warm glow behind (`ui/full/rings.js`
+has the dots). While Apollo works the rings brighten and quicken and a wave
+goes out from the middle; listening, they take a gradient, cyan in the
+middle to orange at the edge; speaking, they go white and bloom. Under it
+the name is a neon sign: Melete, 19px, spaced a fifth of a letter apart, in
+#FFF0CE, each letter pulsing on its own a little after the one before, the
+first O a tube on its way out, a warm bloom breathing behind and three dots
+running under it. It stands aside while Apollo is busy. Melete is under the
+SIL Open Font License (`ui/full/fonts/melete/OFL.txt`).
+
+On the idle screen and in the intro the name is an LED sign on an old tube
+instead: Orbitron at its heaviest, upright and drawn a little taller than it
 comes, with room between the letters, used as a stencil over a grid of small
 lit cells, with a bloom, the three colours landing a hair apart, a flicker,
 scanlines and now and then a bright band rolling down (`ui/full/ledword.js`) -
 and all of it seen through the same fisheye as the picture behind, its colours
-parting towards the edges. Under the ring it is quieter: a soft glow, the
-colours landing close together, burning steadily, and lit a little cyber -
-cyan through violet to pink across the word, drifting slowly, with once in a
-long while a slice of it jumping sideways for a moment. It arrives scrambled, like
-the scramble-text component: every letter a random symbol, settling into
-the word from the left. Point at it on the display and it scrambles again.
-Orbitron is under the SIL Open Font License
+parting towards the edges. It arrives scrambled, like the scramble-text
+component: every letter a random symbol, settling into the word from the
+left. Orbitron is under the SIL Open Font License
 (`ui/full/fonts/orbitron/OFL.txt`), so unlike Thmanyah it may be shared
 with the code.
+
+**The type and the colour.** Everything else on the display - the labels,
+the lists, the buttons, the clock - is set in IBM Plex Mono (200 to 600,
+SIL Open Font License, `ui/full/fonts/ibm-plex-mono/`), with Thmanyah behind
+it for Arabic, in amber on black: #FFB000, #FFC15E, #FFD48A and #FFF0CE,
+every word with a warm orange glow.
 
 **The intro.** As Apollo starts, the display holds the screen for about
 three and a half seconds (`INTRO_SECONDS`) and boots like an old machine
@@ -531,7 +545,9 @@ lock from read to save, so three at once all stick.
 Apollo sets both Arabic and English in **Thmanyah Sans**, carried in the
 repository rather than expected from Windows: the overlay loads the OTFs into
 a private GDI+ collection, and the display loads the WOFF2s with `@font-face`.
-One family for both scripts is the whole reason for it.
+One family for both scripts is the whole reason for it. (The full display
+sets its English in IBM Plex Mono now; its Arabic still falls through to
+Thmanyah.)
 
 **Its licence permits this and forbids publishing it.** Embedding the font in
 an application you build is expressly allowed; redistributing the files, or
@@ -762,10 +778,11 @@ The only thing left is your API key.
 | `ui/full/app.js` | Its panels, its bridge (`window.apollo.*`) and its motion. |
 | `ui/full/app.css` | Its skin: the overlay's palette, the CRT surface, the grid. |
 | `ui/full/shader.js` | The ground: an old set's slot mask lit by the CRT gradient, in plain WebGL. |
+| `ui/full/rings.js` | Apollo's shape as data: its five rings of dots, which way each turns, and the easing of their pace. No DOM, so node tests it (`tests/test_rings.py`). |
 | `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
 | `ui/fonts/thmanyah/` | Thmanyah Sans, as OTFs — what the overlay loads privately at runtime. |
-| `ui/full/fonts/` | The same weights as WOFF2, under the page because pywebview's server roots there. |
+| `ui/full/fonts/` | The same weights as WOFF2, under the page because pywebview's server roots there - and beside them IBM Plex Mono, Melete, Orbitron and VT323, each with its licence. |
 | `ui/legacy/index.html` | The old generated design, frozen. Nothing in the run reads it. |
 | `build_ui.py` | Builds `ui/legacy/index.html` from the Claude Design export. **Not part of the run.** |
 | `ADD A CITY.dc.html` | The old design source, as exported from the canvas. |

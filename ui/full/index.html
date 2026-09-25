@@ -117,9 +117,20 @@
   </section>
 
   <section id="core" data-display="core">
-    <canvas id="ring" width="520" height="520"></canvas>
-    <!-- The name in lit cells (ledword.js). -->
-    <canvas id="wordmark" role="img" aria-label="Apollo"></canvas>
+    <!-- Apollo: a circle. The rings on their canvas, and a warm glow behind
+         them lifting the colour of the ground under it. -->
+    <div id="orb">
+      <i class="glow"></i>
+      <canvas id="ring" width="520" height="520"></canvas>
+    </div>
+    <!-- The name as a neon sign, the way the old display had it: Melete,
+         each letter pulsing on its own, the first O a tube on its way out,
+         a warm bloom behind it and three dots under it. -->
+    <div id="wordmark" role="img" aria-label="Apollo">
+      <i class="bloom"></i>
+      <span class="letters" aria-hidden="true"><b>A</b><b>P</b><b class="bad">O</b><b>L</b><b>L</b><b>O</b></span>
+      <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    </div>
     <div id="hint" class="caption">Hold Ctrl+Alt to talk</div>
     <!-- Only while it is working: the dot matrix and what it is doing. -->
     <div id="thinking"></div>
