@@ -138,6 +138,8 @@
       <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
     </div>
     <div id="hint" class="caption">Hold Ctrl+Alt to talk</div>
+    <!-- Clear mode's sign, while Apollo is at rest. -->
+    <div id="clear-sign"><span>Press</span><kbd>Ctrl</kbd><b>+</b><kbd>Alt</kbd><span>to command Apollo</span></div>
     <!-- Only while it is working: the dot matrix and what it is doing. -->
     <div id="thinking"></div>
   </section>
@@ -191,10 +193,6 @@
        over the feed (lylaagent.js). A preview - nothing on it is live yet. -->
   <section id="lyla-agent" aria-label="LYLA's agent pipeline, a preview"></section>
 
-  <!-- OSIRIS's eye, under the feed. -->
-  <button id="osiris-button" class="hud-button" type="button" data-sfx="none" aria-pressed="false" title="Open OSIRIS inside Apollo">
-    <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg><span>OSIRIS</span><em>MAP</em>
-  </button>
 </main>
 
 <!-- The pictures that follow the pointer beside the feed and beside the
@@ -203,30 +201,73 @@
 <div id="peek" class="peek" aria-hidden="true"></div>
 <div id="chart-peek" class="peek" aria-hidden="true"></div>
 
-<!-- Along the bottom edge: LYLA's room in or out - without it, the panels
-     and the ring take the room back - and ultra mode. -->
-<nav id="dock">
+<!-- Along the bottom edge: every mode, the one that is on lit - the normal
+     display, clear (nothing but Apollo), expanded (ultra mode, every display
+     at once) and OSIRIS (modes.js) - and LYLA's room in or out. By voice
+     too: "clear mode", "الوضع الموسع". -->
+<nav id="dock" aria-label="Modes">
+  <div class="modes" role="group" aria-label="Modes">
+    <button class="mode" type="button" data-mode="normal" data-sfx="none" aria-pressed="true"
+            title="The display as it always is"><i class="led"></i>Normal</button>
+    <button class="mode" type="button" data-mode="clear" data-sfx="none" aria-pressed="false"
+            title="Nothing but Apollo"><i class="led"></i>Clear</button>
+    <button class="mode" type="button" data-mode="expanded" data-sfx="none" aria-pressed="false"
+            title="Every display at once, ready for work"><i class="led"></i>Expanded</button>
+    <button class="mode" type="button" data-mode="osiris" data-sfx="none" aria-pressed="false"
+            title="OSIRIS, inside Apollo"><svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg>OSIRIS</button>
+  </div>
   <button id="room-toggle" class="hud-button" type="button" data-sfx="none" aria-pressed="true" title="Show or hide LYLA's room">
     <i class="led"></i><span>LYLA</span><em>ROOM ON</em>
   </button>
-  <button id="ultra-button" class="hud-button" type="button" data-sfx="none" aria-pressed="false"
-          title="Ultra mode: every display on the screen, ready for work">
-    <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg><span>ULTRA</span><em>EXPAND</em>
-  </button>
 </nav>
 
-<!-- Ultra mode's bar along the bottom: back to the normal display, every
-     display as a switch, and the grid back when one is expanded. -->
+<!-- Ultra mode's bar along the bottom: the modes, every display as a
+     switch, and the grid back when one is expanded. -->
 <nav id="ultra-bar" aria-label="Displays">
-  <button id="ultra-exit" class="hud-button" type="button" data-sfx="none" title="Back to the normal display">
-    <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg><span>NORMAL</span>
-  </button>
+  <div class="modes" role="group" aria-label="Modes">
+    <button class="mode" type="button" data-mode="normal" data-sfx="none" aria-pressed="true"
+            title="The display as it always is"><i class="led"></i>Normal</button>
+    <button class="mode" type="button" data-mode="clear" data-sfx="none" aria-pressed="false"
+            title="Nothing but Apollo"><i class="led"></i>Clear</button>
+    <button class="mode" type="button" data-mode="expanded" data-sfx="none" aria-pressed="false"
+            title="Every display at once, ready for work"><i class="led"></i>Expanded</button>
+    <button class="mode" type="button" data-mode="osiris" data-sfx="none" aria-pressed="false"
+            title="OSIRIS, inside Apollo"><svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg>OSIRIS</button>
+  </div>
+  <i class="bar-rule" aria-hidden="true"></i>
   <div id="ultra-chips"></div>
   <button id="ultra-grid" class="hud-button" type="button" title="Every display back in the grid">
     <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg><span>GRID</span>
   </button>
   <button id="ultra-reset" class="hud-button" type="button" title="Every display back where it started"><span>RESET</span></button>
 </nav>
+
+<!-- Expanded mode's consoles, either side of its bar: switches, lights,
+     armed buttons, a dial and readouts, the way a facility's desk has them.
+     For the look of the place - they flip, light and click, and do nothing
+     else. -->
+<aside id="console-left" class="console" aria-label="Systems console (decorative)">
+  <div class="console-head"><i class="beacon"></i><b>SYS · CTRL</b><em class="console-read" data-read="clock">T+00:00:00</em></div>
+  <div class="console-row">
+    <button class="flip on" type="button" tabindex="-1" data-sfx="press"><i class="lever"></i><span>AUX</span></button>
+    <button class="flip on" type="button" tabindex="-1" data-sfx="press"><i class="lever"></i><span>COMMS</span></button>
+    <button class="flip" type="button" tabindex="-1" data-sfx="press"><i class="lever"></i><span>NAV</span></button>
+    <button class="flip on" type="button" tabindex="-1" data-sfx="press"><i class="lever"></i><span>SHIELD</span></button>
+    <button class="flip" type="button" tabindex="-1" data-sfx="press"><i class="lever"></i><span>CLOAK</span></button>
+  </div>
+  <div class="console-leds" aria-hidden="true"></div>
+</aside>
+<aside id="console-right" class="console" aria-label="Protocol console (decorative)">
+  <div class="console-head"><i class="beacon"></i><b>PROTOCOL 9</b><em class="console-read" data-read="link">LINK 99.2%</em></div>
+  <div class="console-row">
+    <button class="arm" type="button" tabindex="-1" data-sfx="ping"><i></i>SCAN</button>
+    <button class="arm" type="button" tabindex="-1" data-sfx="hud"><i></i>UPLINK</button>
+    <button class="arm" type="button" tabindex="-1" data-sfx="rev"><i></i>LOCK</button>
+    <button class="arm danger" type="button" tabindex="-1" data-sfx="down"><i></i>PURGE</button>
+    <button class="knob" type="button" tabindex="-1" data-sfx="tab" aria-label="Gain"><i></i></button>
+  </div>
+  <div class="console-foot"><em class="console-read" data-read="core">CORE 0x3FA2</em><span class="console-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><em class="console-read" data-read="temp">TEMP 41°C</em></div>
+</aside>
 
 <!-- One display's settings in ultra mode: its size, and what it shows. -->
 <div id="tile-config" role="dialog" aria-hidden="true"></div>

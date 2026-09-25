@@ -558,6 +558,36 @@ def _ultra_mode(ctx, on=True):
     return {"ok": True, "ultra": wanted}
 
 
+# The display's modes, as the bar along its bottom has them, and the other
+# things people call them.
+MODES = ("normal", "clear", "expanded", "osiris")
+_MODE_WORDS = {"ultra": "expanded", "ultra mode": "expanded", "work": "expanded",
+               "expand": "expanded", "map": "osiris", "the map": "osiris",
+               "regular": "normal", "default": "normal", "usual": "normal",
+               "clean": "clear", "focus": "clear"}
+
+
+@_tool("display_mode", "switching the display",
+       "Put Apollo's full display into one of its modes - the ones on the bar "
+       "along its bottom: normal (the usual display), clear (nothing on the "
+       "screen but Apollo and the sign saying to press Ctrl+Alt), expanded "
+       "(ultra mode: every display at once as tiles) or osiris (the OSIRIS map "
+       "laid into the display). Use this when the user asks for a mode by name "
+       "- \"clear mode\", \"الوضع الصافي\", \"رجع الوضع العادي\", \"الوضع "
+       "الموسع\", \"وضع اوزيرس\". Confirm in a few words.",
+       _obj({"mode": _str("normal, clear, expanded or osiris")}, ("mode",)))
+def _display_mode(ctx, mode="normal"):
+    said = str(mode or "").strip().lower()
+    wanted = _MODE_WORDS.get(said, said)
+    if wanted not in MODES:
+        return {"ok": False, "error": f"There is no {mode} mode - the modes are normal, "
+                                      "clear, expanded and OSIRIS."}
+    ctx.activity("switching the display")
+    if ctx.display({"action": "mode", "mode": wanted}) is False:
+        return {"ok": False, "error": "The display isn't up to switch modes right now."}
+    return {"ok": True, "mode": wanted}
+
+
 # What "put everything back" sounds like: every display back in the grid.
 _EVERYTHING = {"", "all", "everything", "every display", "all displays", "all of them",
                "grid", "the grid", "كل", "الكل", "كلها", "كل الشاشات", "الشبكة"}

@@ -233,7 +233,7 @@ class Orb:
 
         self.view = overlay_state.OverlayState()
         self._height = overlay_state.Spring(float(size), response=0.40)
-        self.paint = self.rings = None
+        self.paint = self.mark = None
 
         # What is on screen: your words, Apollo's body, and what it is doing.
         self._heard = ""
@@ -267,7 +267,7 @@ class Orb:
 
         self._D, self._WF, self._IntPtr = D, WF, IntPtr
         self.paint = overlay_paint.Backdrop(D)
-        self.rings = overlay_paint.Rings(D)
+        self.mark = overlay_paint.GlobeMark(D)
 
         def build():
             try:
@@ -1023,7 +1023,7 @@ class Orb:
         orb_x = left + self.PAD_X + self.ORB_BOX / 2
         orb_y = foot_top + self.ORB_BOX / 2
         spinning = self.view.state == overlay_state.SEARCHING
-        self.rings.draw_at(g, orb_x, orb_y, self.ORB_BOX / 2,
+        self.mark.draw_at(g, orb_x, orb_y, self.ORB_BOX / 2,
                            t * (5.0 if spinning else 1.0),
                            level=self._level, fade=open_amount)
 
@@ -1035,7 +1035,8 @@ class Orb:
         """The design's bottom row: the mark, the name, and what he is doing."""
         fonts = self._font_set()
         text_x = left + self.PAD_X + self.ORB_BOX + self.ROW_GAP
-        self._string(g, "Apollo", fonts["name"], fonts["fmt"],
+        # In capitals, as the display's sign has it.
+        self._string(g, "APOLLO", fonts["name"], fonts["fmt"],
                      text_x, top + 3, PALETTE["ink"], 255 * fade, PHOSPHOR)
         caption = self._activity or self._status_word()
         if caption:
@@ -1080,7 +1081,7 @@ class Orb:
         # Grey by default, as the design has it. Colour is kept for the two
         # states where it says something: working, and finished working.
         if self.view.state == overlay_state.SEARCHING:
-            return PALETTE["violet"]
+            return PALETTE["amber"]
         if self.view.state == overlay_state.RESULT:
             return PALETTE["up"]
         # Not the grey caption: this sits on the brightest of the glow.
@@ -1204,8 +1205,8 @@ class Orb:
     # the centre.
 
     CONSTELLATION_N = 22          # points around the circle
-    CONSTELLATION_R = 0.355       # their radius, as a fraction of the box
-    CONSTELLATION_DOT = 0.016     # point radius, as a fraction of the box
+    CONSTELLATION_R = 0.2         # their radius, as a fraction of the box
+    CONSTELLATION_DOT = 0.008     # point radius, as a fraction of the box
 
     def _draw_ring(self, g, ox, oy, w, h, t, fade):
         """At rest: a ring of evenly spaced points over nothing - no ground,

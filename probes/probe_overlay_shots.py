@@ -31,7 +31,7 @@ import overlay_paint  # noqa: E402
 import overlay_state  # noqa: E402
 
 WIDTH, HEIGHT = 620, 470
-OVERHANG = 130          # what apollo.Overlay.orb_overhang() works out to
+OVERHANG = 114          # what apollo.Overlay.orb_overhang() works out to
 
 
 def headless():
@@ -39,7 +39,7 @@ def headless():
     overlay = orb_module.Orb(size=190, position=(0, -OVERHANG), overhang=OVERHANG)
     overlay._D, overlay._WF, overlay._IntPtr = D, WF, IntPtr
     overlay.paint = overlay_paint.Backdrop(D)
-    overlay.rings = overlay_paint.Rings(D)
+    overlay.mark = overlay_paint.GlobeMark(D)
     overlay.sparkles = overlay_paint.Sparkles(D)
     return overlay
 

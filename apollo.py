@@ -247,6 +247,14 @@ PEEK_CHORD = (VK_CTRL, 0xC0)                     # VK_OEM_3, the backtick key
 QUIT_HOTKEY = "ctrl+alt+shift+q"                 # for messages and the README
 PEEK_HOTKEY = "ctrl+`"
 
+# Whether the day's recap plays by itself, the first time you are at the
+# machine each day. Off: it came every time Apollo started, you could not get
+# a word in over it, and it was more in the way than it was worth. It is still
+# there the moment you ask for it - "brief me", "catch me up" (the
+# daily_briefing tool) - as an ordinary answer, which Ctrl+Alt cuts off like
+# any other.
+DAILY_RECAP = False
+
 # How long after a turn the day's recap waits before it will start. Long
 # enough that pressing the chord, thinking, and pressing it again is one
 # conversation rather than an opening for the recap to talk over.
@@ -1401,10 +1409,12 @@ class Apollo:
     @staticmethod
     def _to_be_seen(request):
         """A request that wants the display up: ultra mode on, a display put
-        on the screen or shown. Hiding one, or leaving ultra mode, leaves the
-        screen as it is."""
+        on the screen or shown, or a mode asked for by name - every one of
+        them is something to look at. Hiding one, or leaving ultra mode,
+        leaves the screen as it is."""
         action = request.get("action")
-        return action in ("focus", "show") or (action == "ultra" and bool(request.get("on")))
+        return (action in ("focus", "show", "mode")
+                or (action == "ultra" and bool(request.get("on"))))
 
     def check_displays(self):
         """Voice requests for ultra mode, in the order they were made, on the
@@ -1678,6 +1688,8 @@ class Apollo:
         because that flag comes from Gemini's status and the status arrives
         after the press.
         """
+        if not DAILY_RECAP:
+            return
         ui = getattr(self, "ui", None)
         if (ui is None or ui.quiet or self.voice is None
                 or self.briefing_thread is not None and self.briefing_thread.is_alive()):

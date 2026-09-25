@@ -39,7 +39,7 @@ def main(count=180):
     scratch.Dispose()
 
     backdrop = paint.Backdrop(D)
-    rings = paint.Rings(D)
+    mark = paint.GlobeMark(D)
     sparkles = paint.Sparkles(D, count=260)
 
     times = []
@@ -48,7 +48,7 @@ def main(count=180):
         start = time.perf_counter()
         graphics.Clear(D.Color.FromArgb(0, 0, 0, 0))
         backdrop.panel(graphics, PANEL_X, 0, PANEL_W, PANEL_H, t=clock)
-        rings.draw_at(graphics, PANEL_X + 56, 58, 34, t=clock, level=0.8)
+        mark.draw_at(graphics, PANEL_X + 56, 58, 25, t=clock, level=0.8)
         graphics.DrawImage(content, PANEL_X, 70)
         paint.horizon(graphics, D, PANEL_X, PANEL_H, PANEL_W)
         sparkles.advance(1 / 60, level=0.8)

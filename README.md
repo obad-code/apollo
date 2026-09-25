@@ -120,7 +120,7 @@ Apollo has two windows, and it is only ever as big as what it needs to show.
 | **Overlay** | at rest, and for a whole conversation | a mesh at the top edge (~1% of the screen), growing downward only as far as the answer needs |
 | **Full** | you pressed `` Ctrl+` ``, or you have been away 10 min (the idle screen) | the whole work area |
 
-At rest it is just the mesh: a small constellation of glowing yellow points,
+At rest it is just the mesh: a small, fine ring of little yellow points,
 turning slowly, hanging off the very top edge of the screen with only its
 bottom quarter in view. It is genuinely transparent — your wallpaper and
 desktop icons show through it and through its glow, because it is drawn with
@@ -134,9 +134,9 @@ edge of the screen and retracts when it is done:
 
 | | What you see |
 |---|---|
-| **At rest** | A ring of amber points, hanging off the top edge with a quarter of it in view - only the points: no lines between them and no glow round them, each one plain round light, twinkling a little and turning together, slowly. Your wallpaper shows through everything else. |
-| **While you talk** | The panel drops down: Apollo's three-ring orb on the left, your words in cyan as they are transcribed, and a word underneath saying it is listening. Under the panel's edge, a glowing horizon and a dome of sparkles that brighten and speed up with your voice. |
-| **While it works** | The orb spins up, and the line under your words says what it is doing - *searching the web*, *fetching NVDA*, *saving the clip*. |
+| **At rest** | A small ring of little amber points, hanging off the top edge with a quarter of it in view - only the points: no lines between them and no glow round them, each one plain round light, twinkling a little and turning together, slowly. Your wallpaper shows through everything else. |
+| **While you talk** | The card drops down, in the full display's own style: black glass with the display's CRT gradient drifting along its foot - warm on the left, cool on the right - inside an amber hairline, Apollo as the display draws him (a small globe with the star at its heart) and APOLLO beside him, your words as they are transcribed, and a word saying it is listening. Under the card's edge, a glowing horizon and a dome of sparkles that brighten and speed up with your voice. |
+| **While it works** | The globe spins up, and the line under your words says what it is doing - *searching the web*, *fetching NVDA*, *saving the clip*. |
 | **When it answers** | The reply in warm white, each word rising out of a blur. An answer that rests on real numbers brings a chart with it - violet into cyan into amber, with the last reading marked - and one that is two to six figures brings borderless cards instead. |
 | **Afterwards** | It retracts into the ring, quicker than it came. |
 
@@ -266,17 +266,24 @@ flagged, each with two lines of what it says, what it is about, and its
 picture beside it - or, where it came without one, its source's initials on
 a tile tinted for its topic - under a line saying how many stories there
 are, from how many sources, and how new the newest is (`ui/full/feed.js`),
-with OSIRIS's eye under them; and
+and
 LYLA in her room along the bottom. The lists - the stocks, the indices, the
 feed and its chips, the side panel's tabs - are drawn the way a CRT tool
 would: each letter glowing, its red and blue landing a hair either side of
 it, and the whole list seen through a halftone of dots.
 
-Along the bottom edge, two buttons. **LYLA** puts her room away - she stops,
+**The modes.** Along the bottom edge, every mode, the one that is on lit
+(`ui/full/modes.js`): **Normal**, the display as it always is; **Clear**,
+nothing on the screen but Apollo, bigger, in the middle of it, and under
+him a sign - *Press Ctrl + Alt to command Apollo* - with his answer still
+shown while he gives it and the bar faint until you point at it (Escape
+leaves it); **Expanded**, every display at once (ultra mode, below); and
+**OSIRIS**, the map laid into the display (below). Click one, or ask -
+*"clear mode"*, *"الوضع الصافي"*, *"الوضع الموسع"*, *"رجع الوضع العادي"* -
+and the display comes up if it has to and switches, leaving one mode before
+arriving in the next. Beside them, **LYLA** puts her room away - she stops,
 the room fades, and the panels and the ring grow into the space - and brings
-it back; the choice is kept, and *"hide Lyla"* does the same. **ULTRA**
-brings every display up at once (below). The eye under the feed opens
-**OSIRIS** (below).
+it back; the choice is kept, and *"hide Lyla"* does the same.
 
 **Sounds.** The display makes its own, on the spot, with Web Audio - a few
 oscillators and a little noise, swept and shaped like an old synth's blips,
@@ -379,7 +386,7 @@ way, only something you do after asking wakes it.
 A conversation can happen while it is open, and it stays open for it: LYLA and
 the panels step aside while there is an answer on screen, then come back.
 
-**OSIRIS.** The button along the bottom, or *"open OSIRIS"* / *"افتح اوزيرس"*,
+**OSIRIS.** **OSIRIS** on the bar along the bottom, or *"open OSIRIS"* / *"افتح اوزيرس"*,
 lays [OSIRIS](https://osirisai.live) - the open-source intelligence map:
 flights and ships, naval and air traffic, CCTV, live news, earthquakes,
 incidents around the world, undersea cables, day and night - into the display
@@ -400,7 +407,7 @@ the machine they run on - a scan of your own PC's local ports and addresses,
 a Bluetooth scanner, live location - and each runs only when you open that
 tool; Bluetooth and location still ask first.
 
-**Ultra mode.** The **ULTRA** button along the bottom, or *"ultra mode"* /
+**Ultra mode.** **Expanded** on the bar along the bottom, or *"ultra mode"* /
 *"وضع الشغل"* / *"جهز الشاشة للشغل"*, gets Apollo ready for work: a channel
 change, a line of light down the glass, and every display powers on one
 after another as a tile on a grid of twelve columns and twelve rows - the
@@ -419,8 +426,14 @@ one line that matters - the indices and the biggest mover, the next prayer,
 CPU and tokens), **expand** (it takes the screen and the rest line up
 minimized down the side - click one to swap), **settings** (its size by
 name or a column and a row at a time, the feed's topic, the map's layers)
-and **hide**. The bar along the bottom switches each display on and off,
-puts the grid back, and resets the lot. By voice: *"put the projects on my
+and **hide**. The bar along the bottom has the modes, switches each display
+on and off, puts the grid back, and resets the lot. Either side of it sits
+a facility's desk, for the look of the place: switches that flip with their
+lights, a strip of blinking status lights, armed buttons that fire (SCAN,
+UPLINK, LOCK, PURGE), a dial that turns a quarter at a time, and readouts
+that tick - the time up, the link, the core, the temperature. They click
+and light and do nothing else; on a screen narrower than 1900 pixels they
+step away to leave the bar its room. By voice: *"put the projects on my
 screen"* / *"حط المشاريع على الشاشة"* pulls that display up, expanded, with
 the rest minimized - bringing the display up first if it has to; *"all of
 them"* puts the grid back; *"hide the ideas"* and *"show my talks"* work on
@@ -712,12 +725,13 @@ None of them needs a key or an account, and none of them can break a
 conversation: a feed that is down gives its last answer with an honest age on
 it, or nothing at all.
 
-**The daily recap.** The first time you are actually at the PC each day, Apollo
-opens the full display and reads you the day: the date (Gregorian and Hijri),
-the weather, where the market stands and what your stocks did, the two or three
-stories that matter to you, anything market-moving Trump posted, and your
-reminders. About 40 seconds. Say *"brief me"* or *"what did I miss"* for the
-same thing any time. It is spoken in whatever language you last used.
+**The daily recap.** Say *"brief me"* or *"what did I miss"* and Apollo reads
+you the day: the date (Gregorian and Hijri), the weather, where the market
+stands and what your stocks did, the two or three stories that matter to
+you, anything market-moving Trump posted, and your reminders. About 40
+seconds, in whatever language you last used, and `Ctrl+Alt` cuts it off
+like any other answer. It no longer plays by itself when Apollo starts
+(`DAILY_RECAP` in `apollo.py`).
 
 **What it remembers about you.** Apollo keeps a record of your days on this
 PC and nowhere else (`journal.py`, `%LOCALAPPDATA%\Apollo\journal`): what
@@ -816,6 +830,7 @@ The only thing left is your API key.
 | `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
 | `ui/full/lylaagent.js` | LYLA's agent card, a preview before she is an agent: the pipeline, its moving parts and what opens and shuts it - ported from a React component to plain JS and SVG, so there is still no build step (`tests/test_lyla_agent.py`). |
+| `ui/full/modes.js` | The display's modes - normal, clear, expanded, OSIRIS - and the switches to throw, in order, from one to another (`tests/test_modes.py`). |
 | `ui/full/feed.js` | The feed's rows, fuller: a source's initials for its tile, what a story is about, and the line over the list (`tests/test_feed_rows.py`). |
 | `ui/full/sfx.js` | The display's sounds, synthesized with Web Audio: the recipes, and the player that keeps a sound from doubling up (`tests/test_sfx.py`). |
 | `ui/fonts/thmanyah/` | Thmanyah Sans, as OTFs — what the overlay loads privately at runtime. |

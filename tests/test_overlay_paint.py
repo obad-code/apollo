@@ -28,23 +28,6 @@ def pixel(bitmap, x, y):
     return (colour.A, colour.R, colour.G, colour.B)
 
 
-def test_the_card_is_black_and_its_lights_span_the_colours():
-    """A black card with a gradient of colours drifting in it - rose, sky,
-    sun, iris, mint, the display's own lights - not one amber smear."""
-    import colorsys
-
-    card = overlay_paint.PALETTE["card"]
-    assert max(card) <= 16, card
-    families = set()
-    for name, _home, _drift, _period, strength in overlay_paint.BLOBS:
-        r, g, b = overlay_paint.PALETTE[name]
-        hue, _light, saturation = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
-        assert saturation > 0.6, (name, "a washed-out light reads as grey on black")
-        families.add(int(hue * 360 // 60))
-        assert strength >= 0.45, (name, "too faint to be seen")
-    assert len(families) >= 4, f"only {len(families)} colour families: {families}"
-
-
 def test_the_colour_reaches_up_the_card(draw, surface):
     """Half way up the card - where the words are - there is colour, not
     just black: the old veil held every light down in the bottom strip."""
@@ -143,25 +126,6 @@ def test_alpha_puts_the_channels_in_the_order_gdi_plus_takes():
     """Color.FromArgb reads alpha first; the colour must follow it."""
     assert overlay_paint.alpha((10, 20, 30), 0.5) == (128, 10, 20, 30)
     assert overlay_paint.alpha((10, 20, 30), 1.0) == (255, 10, 20, 30)
-
-
-def test_rings_draw_inside_their_radius(draw, surface):
-    bitmap, graphics = surface
-    overlay_paint.Rings(draw).draw_at(graphics, 100, 100, 46, t=0.0)
-    lit = [(x, y) for x in range(0, 300, 3) for y in range(0, 300, 3)
-           if pixel(bitmap, x, y)[0] > 12]
-    assert lit, "the rings drew nothing"
-    assert all((x - 100) ** 2 + (y - 100) ** 2 < 75 ** 2 for x, y in lit)
-
-
-def test_rings_turn_over_time(draw, surface):
-    bitmap, graphics = surface
-    rings = overlay_paint.Rings(draw)
-    rings.draw_at(graphics, 100, 100, 46, t=0.0)
-    early = [pixel(bitmap, x, 100) for x in range(40, 160, 6)]
-    graphics.Clear(draw.Color.FromArgb(0, 0, 0, 0))
-    rings.draw_at(graphics, 100, 100, 46, t=4.0)
-    assert [pixel(bitmap, x, 100) for x in range(40, 160, 6)] != early
 
 
 def test_sparkles_wrap_inside_their_field(draw):

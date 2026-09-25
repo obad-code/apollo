@@ -20,6 +20,7 @@ import * as Globe from './globe.js';
 import { Sfx } from './sfx.js';
 import { LylaAgent } from './lylaagent.js';
 import * as Feed from './feed.js';
+import * as Modes from './modes.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -140,6 +141,8 @@ const state = {
   liveTimer: null,        // takes LIVE off the panel when the trades stop
   panels: {},             // which panels apollo.py last said are shown
   osiris: false,          // OSIRIS laid into the normal display, and Apollo in its colours
+  clear: false,           // clear mode: nothing on the screen but Apollo and the sign
+  modeTicket: 0,          // the mode last asked for, so an older one stops half way
   osirisReturn: false,    // ...and taken into ultra mode, to go back when it ends
   osirisTicket: 0,        // the last placing of the map asked for; older ones stand down
   osirisTimer: null,      // ...places the map once the stage has its new shape
@@ -1137,6 +1140,7 @@ document.addEventListener('keydown', (event) => {
   closeStock();
   if (state.configFor) closeConfig();
   else if (ultraOn() && state.layout.focus) focusDisplay(null);
+  else if (state.clear && !ultraOn() && !state.osiris) setMode('normal');
 });
 
 /* --- the stocks, picked the way the feed is -----------------------------------
@@ -2060,7 +2064,7 @@ function setPanels(wanted) {
 /* LYLA's room is out while OSIRIS is up or ultra mode is, and back the way
  * it was after. */
 function applyRoom(options) {
-  setRoom(!state.osiris && !ultraOn() && state.panels.lyla !== false, options);
+  setRoom(!state.osiris && !ultraOn() && !state.clear && state.panels.lyla !== false, options);
 }
 
 /* LYLA's room, in or out - the button along the bottom, or "hide Lyla". Her
@@ -2123,7 +2127,7 @@ function setOsiris(on) {
   closeStock();
   unlight();
   unlightRow();
-  $('osiris-button').setAttribute('aria-pressed', on ? 'true' : 'false');
+  renderModes();
   // The switch is a channel change: Apollo goes into OSIRIS's colours, and
   // LYLA's room out, at its dark moment.
   if (!on) syncOsiris();                  // gone at once
@@ -2138,9 +2142,72 @@ function setOsiris(on) {
   return on;
 }
 
-$('osiris-button').addEventListener('click', () => setOsiris(!state.osiris));
 $('osiris-close').addEventListener('click', () => setOsiris(false));
 window.addEventListener('resize', () => scheduleOsiris(300));
+
+/* --- the modes -----------------------------------------------------------------
+ *
+ * One at a time, on the bar along the bottom (modes.js): normal, clear,
+ * expanded and OSIRIS - clicked there, or asked for by voice. Expanded is
+ * ultra mode and OSIRIS the map, switches the page already had; clear is
+ * new: nothing on the screen but Apollo and the sign to press Ctrl+Alt. A
+ * mode asked for throws the switches it needs in order, leaving before
+ * arriving, each after the last one's channel change has settled. */
+
+function modeFlags() {
+  return { ultra: ultraOn(), osiris: state.osiris, clear: state.clear };
+}
+
+function renderModes() {
+  const mode = Modes.current(modeFlags());
+  document.querySelectorAll('[data-mode]').forEach((button) =>
+    button.setAttribute('aria-pressed', button.dataset.mode === mode ? 'true' : 'false'));
+}
+
+/* Clear mode: the panels, the clock, LYLA and her room all away, and Apollo
+ * alone in the middle of the screen, bigger, with the sign under him. */
+function setClear(on) {
+  on = Boolean(on);
+  if (on === state.clear) return;
+  state.clear = on;
+  sfx.play(on ? 'hud' : 'down');
+  closeStory();
+  closeStock();
+  unlight();
+  unlightRow();
+  if (agent.open) toggleAgent();
+  renderModes();
+  channelChange(() => {
+    document.body.classList.toggle('clear', on);
+    applyRoom({ quiet: true });
+  });
+}
+
+async function setMode(mode) {
+  const ticket = ++state.modeTicket;
+  const steps = Modes.plan(modeFlags(), mode);
+  for (let i = 0; i < steps.length; i++) {
+    if (ticket !== state.modeTicket) return;      // another mode was asked for meanwhile
+    const [what, on] = steps[i];
+    if (what === 'ultra') {
+      // Straight to the mode asked for: the map ultra mode held stays there
+      // rather than coming back into the normal display on the way out.
+      if (!on) state.osirisReturn = false;
+      setUltra(on);
+    } else if (what === 'osiris') {
+      setOsiris(on);
+    } else {
+      setClear(on);
+    }
+    if (i < steps.length - 1) await new Promise((done) => setTimeout(done, 560));
+  }
+  renderModes();
+}
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-mode]');
+  if (button) setMode(button.dataset.mode);
+});
 
 $('room-toggle').addEventListener('click', () => {
   const shown = !roomShown();
@@ -2269,6 +2336,7 @@ function applyLayout() {
   }
   renderDisplayChips();
   renderSummaries();
+  renderModes();
   applySkin();
 }
 
@@ -2352,7 +2420,6 @@ function saveLayout() {
 function setUltra(on, { quiet = false, layout = null } = {}) {
   on = Boolean(on);
   const next = layout || Tiles.setUltra(state.layout, on);
-  $('ultra-button').setAttribute('aria-pressed', on ? 'true' : 'false');
   if (on === ultraOn()) { changeLayout(next); return on; }
   if (!quiet) sfx.play(on ? 'swipe' : 'down');
   closeStory();
@@ -2365,7 +2432,6 @@ function setUltra(on, { quiet = false, layout = null } = {}) {
     // and goes back into the normal display after, if it is still up.
     state.osiris = false;
     state.osirisReturn = true;
-    $('osiris-button').setAttribute('aria-pressed', 'false');
   } else if (on) {
     state.osirisReturn = false;
   }
@@ -2378,10 +2444,7 @@ function setUltra(on, { quiet = false, layout = null } = {}) {
   const api = bridge();
   if (api && api.osiris_park) api.osiris_park();
   const swap = () => {
-    if (back) {
-      state.osiris = true;
-      $('osiris-button').setAttribute('aria-pressed', 'true');
-    }
+    if (back) state.osiris = true;
     document.body.classList.toggle('osiris-map', back);
     document.body.classList.toggle('ultra', on);
     $('osiris').setAttribute('aria-hidden', on || back ? 'false' : 'true');
@@ -2597,8 +2660,45 @@ function renderSummaries() {
   }
 }
 
-$('ultra-button').addEventListener('click', () => setUltra(!ultraOn()));
-$('ultra-exit').addEventListener('click', () => setUltra(false));
+/* --- expanded mode's consoles ---------------------------------------------------
+ * Either side of its bar, the way a facility's desk has them: switches that
+ * flip, lights that blink, armed buttons that fire, a dial that turns and
+ * readouts that tick. For the look of the place; they do nothing else. */
+(function consoles() {
+  const colours = ['amber', 'green', 'amber', 'cyan', 'red', 'amber'];
+  document.querySelector('.console-leds').innerHTML = Array.from({ length: 18 }, (_, i) =>
+    `<i class="${colours[(i * 5) % colours.length]}" style="animation-delay:-${((i * 0.37) % 2.3).toFixed(2)}s;`
+    + `animation-duration:${(1.1 + ((i * 0.29) % 1.7)).toFixed(2)}s"></i>`).join('');
+  document.querySelectorAll('.console').forEach((panel) => panel.addEventListener('click', (event) => {
+    const flip = event.target.closest('.flip');
+    if (flip) flip.classList.toggle('on');
+    const arm = event.target.closest('.arm');
+    if (arm) {
+      arm.classList.remove('fired');
+      void arm.offsetWidth;                  // fired again from the start
+      arm.classList.add('fired');
+    }
+    const knob = event.target.closest('.knob');
+    if (knob) {
+      knob.dataset.turn = String((Number(knob.dataset.turn || 0) + 45) % 360);
+      knob.style.setProperty('--turn', `${knob.dataset.turn}deg`);
+    }
+  }));
+  const began = Date.now();
+  const read = (name, text) => {
+    const element = document.querySelector(`[data-read="${name}"]`);
+    if (element) element.textContent = text;
+  };
+  setInterval(() => {
+    if (!ultraOn() || state.mode !== 'full') return;
+    const up = Math.floor((Date.now() - began) / 1000);
+    read('clock', `T+${pad(Math.floor(up / 3600))}:${pad(Math.floor(up / 60) % 60)}:${pad(up % 60)}`);
+    read('link', `LINK ${(97 + Math.random() * 2.9).toFixed(1)}%`);
+    read('core', `CORE 0x${Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, '0')}`);
+    read('temp', `TEMP ${38 + Math.floor(Math.random() * 7)}°C`);
+  }, 1000);
+})();
+
 $('ultra-grid').addEventListener('click', () => focusDisplay(null));
 $('ultra-chips').addEventListener('click', (event) => {
   const chip = event.target.closest('[data-chip]');
@@ -3132,7 +3232,8 @@ window.apollo = {
     if (asked.action === 'ultra') setUltra(Boolean(asked.on));
     if (asked.action === 'focus') focusDisplay(asked.id || null);
     if (asked.action === 'show' || asked.action === 'hide') showDisplay(asked.id, asked.action === 'show');
-    return { ultra: state.layout.ultra, focus: state.layout.focus };
+    if (asked.action === 'mode') setMode(String(asked.mode || ''));
+    return { ultra: state.layout.ultra, focus: state.layout.focus, mode: Modes.current(modeFlags()) };
   },
   // "Open story three": opens it and says what it is. 0 closes it.
   story(number) {

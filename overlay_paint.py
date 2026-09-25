@@ -11,11 +11,11 @@ grid, and the four soft colours that drift underneath. What is left per frame
 is a handful of DrawImage calls and the things that genuinely move.
 
 The card hangs out of the top edge of the screen, so its top corners are
-square - that edge is above the screen. It was cream; it is black now, a
-tube's glass with five coloured lights drifting slowly through it - the full
-display's own rose, sky, sun, iris and mint - overlapping into one moving
-gradient, the printed dots kept, faint scanlines, and light ink. Apollo's own
-mark kept its colours.
+square - that edge is above the screen. It is a tube's black glass in the
+full display's own style: its CRT gradient drifting along the foot - warm on
+the left, red to amber, cool on the right, teal to blue - under an amber
+hairline, the printed dots kept, faint scanlines, light ink, and Apollo
+himself as the display draws him, a globe with a star at its heart.
 """
 
 import math
@@ -27,14 +27,12 @@ PALETTE = {
     "ink": (255, 239, 208),       # Apollo's own words, warm white
     "you": (224, 206, 170),       # yours, and the line under them
     "caption": (184, 162, 122),
-    # The five lights that drift through it: the full display's colours, so
-    # the two halves of Apollo glow the same. It was one amber, which read
-    # as a brown smear at the foot of the card.
-    "rose": (255, 70, 150),
-    "sky": (40, 186, 255),
+    # The lights that drift along its foot: the full display's CRT band, so
+    # the two halves of Apollo are one style - warm to cool, left to right.
+    "ember": (240, 70, 30),
     "sun": (255, 158, 40),
-    "iris": (138, 92, 255),
-    "mint": (40, 226, 158),
+    "gold": (255, 196, 60),
+    "sky": (40, 186, 255),
     # The ring, the charts and the cards, at the brightness a black card
     # needs - the darker set was for cream paper.
     "amber": (255, 190, 70),
@@ -47,16 +45,15 @@ PALETTE = {
 }
 
 # Each light: colour, where it rests (as a fraction of the card), how far it
-# wanders, how long one loop takes, and how strong it is. Spread across the
-# card and wandering wide, on long loops of their own lengths, so they cross
-# and mix into different gradients all the time and never in step. Two sit
-# up where the words are; none reaches the strip above the screen's edge,
-# which the veil keeps black.
-BLOBS = (("rose", (0.12, 0.95), (0.30, 0.22), 17.0, 0.58),
-         ("sky", (0.88, 0.90), (0.28, 0.24), 19.0, 0.56),
-         ("sun", (0.50, 1.10), (0.38, 0.16), 23.0, 0.50),
-         ("iris", (0.70, 0.62), (0.26, 0.20), 21.0, 0.50),
-         ("mint", (0.30, 0.66), (0.24, 0.18), 26.0, 0.46))
+# wanders, how long one loop takes, and how strong it is. In the display's
+# order, warm to cool from left to right, each swaying about its place on
+# loops of its own length so the band flows the way the display's does;
+# none reaches the strip above the screen's edge, which the veil keeps black.
+BLOBS = (("ember", (0.06, 1.02), (0.10, 0.10), 9.0, 0.60),
+         ("sun", (0.30, 1.08), (0.12, 0.10), 11.0, 0.55),
+         ("gold", (0.48, 1.00), (0.10, 0.08), 13.0, 0.36),
+         ("teal", (0.70, 0.98), (0.10, 0.10), 10.0, 0.45),
+         ("sky", (0.94, 0.90), (0.10, 0.10), 12.0, 0.55))
 
 # Where the glass stops covering the colour, as fractions of the card's
 # height: opaque down to the first - the strip that hides above the screen -
@@ -78,7 +75,7 @@ SCANLINE_ALPHA = 0.12
 
 RADIUS = 28              # the card's bottom corners; the top ones are square
                          # because that edge sits above the screen
-EDGE = (255, 214, 140, 70)   # the hairline around it, warm, over any desktop
+EDGE = (255, 176, 0, 90)     # the hairline around it, the display's amber
 # How much of the card hides above the screen's edge. The part that hides is
 # paper the content does not need, so nothing readable is ever cut off.
 HIDDEN = 0.25
@@ -233,7 +230,8 @@ def veil(draw, w, h, colour):
 
 
 class Backdrop:
-    """The card: glass, five lights drifting under it, and a printed grid.
+    """The card: glass, the display's gradient drifting under it, and a
+    printed grid.
 
     The order is the design's: blobs at the bottom, a mask that keeps them out
     of the upper half, the paper's scrim over them, then the dot grid on top.
@@ -339,29 +337,17 @@ class Backdrop:
         return attributes
 
 
-# The searching orb: three rings of points turning against each other, cyan
-# at the core. Each is (radius as a fraction, how many points, turns per
-# second, colour). Counter-rotation is what makes it read as something
-# running rather than as one object spinning.
-RING_SPEC = ((1.00, 22, 0.026, (255, 193, 94)),
-             (0.85, 18, -0.034, (255, 176, 0)),
-             (0.70, 14, 0.045, (86, 197, 214)))
-
-# The same mark at the size it sits in the card's footer. Twenty-two points
-# around a 22-pixel radius are three pixels apart and read as a smudge, so the
-# small mark keeps the three counter-turning rings and drops the point count
-# until each one is a point again. On the black card it takes the big ring's
-# own colours; the darkened set was for cream paper.
-RING_SPEC_SMALL = ((1.00, 11, 0.026, (255, 204, 96)),
-                   (0.72, 8, -0.034, (255, 176, 0)),
-                   (0.44, 5, 0.045, (86, 197, 214)))
-SMALL_BELOW = 34         # outer radius, in pixels
-
-# One point's glow: concentric discs, widest first. Eight closely spaced
-# steps rather than four wide ones - with wide steps each disc's own edge
-# shows inside the glow, which is the opposite of soft.
-BLOOM = ((4.6, 0.018), (3.9, 0.028), (3.3, 0.042), (2.75, 0.062),
-         (2.25, 0.090), (1.8, 0.130), (1.4, 0.230), (1.0, 1.000))
+# Apollo's mark on the card: the full display's globe with the star at its
+# heart (ui/full/globe.js), small. As wide as it is tall times this...
+GLOBE_ASPECT = 0.52
+# ...great circles through its poles, 30 degrees apart...
+GLOBE_CIRCLES = 6
+# ...lines across it, as the sine of their latitude...
+GLOBE_ACROSS = (-0.5, 0.0, 0.5)
+# ...turning this many radians a second, faster while it is looking something
+# up (the card passes a faster clock), in the display's warm white.
+GLOBE_TURN = 0.35
+GLOBE_LINE = (255, 244, 222)
 
 SPARKLE_COLOURS = ("white", "cyan", "violet", "amber")
 
@@ -397,183 +383,70 @@ class _Brushes:
         return found
 
 
-def bloom(g, brushes, x, y, r, colour, a, spread=1.0):
-    """One glowing point: a soft halo with a solid core inside it."""
-    for multiple, weight in BLOOM:
-        strength = a * weight
-        if strength <= 1.0:
-            continue
-        radius = r * multiple * (1.0 if multiple <= 1.0 else spread)
-        g.FillEllipse(brushes.brush(colour, strength),
-                      float(x - radius), float(y - radius),
-                      float(radius * 2), float(radius * 2))
+class GlobeMark:
+    """Apollo himself, on the card: the globe and its star, as the full
+    display draws him, at the size of the card's footer - a wide outline,
+    meridians that widen and narrow as it turns, three lines across, and a
+    four-pointed star of white in the middle, growing with your voice.
 
-
-class Glow:
-    """One pre-rendered glowing point, stamped wherever a point goes.
-
-    Measured: drawing the eight bloom discs per point cost 8.9 ms a frame for
-    the orb's fifty-four points - more than half the frame budget on its own.
-    The glow does not change shape, only place and brightness, so it is drawn
-    once per colour and blitted after that.
-    """
-
-    PAD = 1.15          # the sprite is a little wider than the widest disc
-
-    def __init__(self, draw, colour, dot, spread=1.0, bloom=True):
-        self.draw = draw
-        self.colour = colour
-        self.dot = dot
-        # Without a bloom the sprite is the point itself and nothing more.
-        self.bloom = BLOOM if bloom else ((1.0, 1.0),)
-        radius = dot * self.bloom[0][0] * spread * self.PAD
-        self.size = max(4, int(radius * 2) + 2)
-        self.centre = self.size / 2.0
-        bitmap = draw.Bitmap(self.size, self.size, draw.Imaging.PixelFormat.Format32bppPArgb)
-        graphics = draw.Graphics.FromImage(bitmap)
-        try:
-            graphics.SmoothingMode = draw.Drawing2D.SmoothingMode.AntiAlias
-            for multiple, weight in self.bloom:
-                strength = 255 * weight
-                if strength <= 1.0:
-                    continue
-                r = dot * multiple * (1.0 if multiple <= 1.0 else spread)
-                brush = draw.SolidBrush(draw.Color.FromArgb(*alpha(colour, weight)))
-                graphics.FillEllipse(brush, float(self.centre - r), float(self.centre - r),
-                                     float(r * 2), float(r * 2))
-                brush.Dispose()
-        finally:
-            graphics.Dispose()
-        self.bitmap = bitmap
-        self._fades = {}
-
-    def fade(self, a):
-        """ImageAttributes for a given brightness, cached in 16 steps."""
-        key = min(16, max(0, int(a / 255 * 16)))
-        found = self._fades.get(key)
-        if found is None:
-            draw = self.draw
-            matrix = draw.Imaging.ColorMatrix()
-            matrix.Matrix33 = key / 16.0
-            found = draw.Imaging.ImageAttributes()
-            found.SetColorMatrix(matrix)
-            self._fades[key] = found
-        return found
-
-    def stamp(self, g, x, y, a):
-        if a <= 6:
-            return
-        destination = self.draw.Rectangle(int(round(x - self.centre)),
-                                          int(round(y - self.centre)),
-                                          self.size, self.size)
-        g.DrawImage(self.bitmap, destination, 0, 0, self.size, self.size,
-                    self.draw.GraphicsUnit.Pixel, self.fade(a))
-
-
-class RingSprite:
-    """One ring of glowing points, drawn once and then rotated into place.
-
-    Stamping fifty-four glows a frame cost 4 ms; a ring does not change shape
-    as it turns, so each is rendered once and drawn with a rotation. The
-    twinkle that gives the orb its life would be lost that way, so a handful
-    of variants are rendered with the brightness pattern shifted, and the
-    frame picks one - the eye reads that as the same shimmer.
-    """
-
-    VARIANTS = 6
-
-    def __init__(self, draw, colour, count, radius, dot, spread=1.0, bloom=True):
-        self.draw = draw
-        self.count = count
-        reach = dot * BLOOM[0][0] * spread if bloom else dot
-        self.size = int((radius + reach) * 2) + 4
-        centre = self.size / 2.0
-        # On cream paper a bloom has nothing to bloom into: the halos merge
-        # and the mark reads as one fuzzy disc instead of three rings. The
-        # small mark is drawn as plain points.
-        glow = Glow(draw, colour, dot, spread, bloom=bloom)
-        self.frames = []
-        for variant in range(self.VARIANTS):
-            bitmap = draw.Bitmap(self.size, self.size, draw.Imaging.PixelFormat.Format32bppPArgb)
-            graphics = draw.Graphics.FromImage(bitmap)
-            try:
-                graphics.SmoothingMode = draw.Drawing2D.SmoothingMode.AntiAlias
-                points = [(centre + math.cos(-math.tau / 4 + i * math.tau / count) * radius,
-                           centre + math.sin(-math.tau / 4 + i * math.tau / count) * radius)
-                          for i in range(count)]
-                pen = draw.Pen(draw.Color.FromArgb(40, *colour), 1.0)
-                for i, (px, py) in enumerate(points):
-                    qx, qy = points[(i + 1) % count]
-                    graphics.DrawLine(pen, float(px), float(py), float(qx), float(qy))
-                pen.Dispose()
-                phase = variant / self.VARIANTS * math.tau
-                for i, (px, py) in enumerate(points):
-                    twinkle = 0.80 + 0.20 * math.sin(phase + i * math.tau / count)
-                    glow.stamp(graphics, px, py, 225 * twinkle)
-            finally:
-                graphics.Dispose()
-            self.frames.append(bitmap)
-        self._fades = {}
-
-    def _fade(self, scale):
-        key = min(16, max(0, int(scale * 16)))
-        found = self._fades.get(key)
-        if found is None:
-            matrix = self.draw.Imaging.ColorMatrix()
-            matrix.Matrix33 = key / 16.0
-            found = self.draw.Imaging.ImageAttributes()
-            found.SetColorMatrix(matrix)
-            self._fades[key] = found
-        return found
-
-    def draw_at(self, g, cx, cy, turn_degrees, t, fade=1.0):
-        bitmap = self.frames[int(t * 3) % self.VARIANTS]
-        state = g.Save()
-        try:
-            g.TranslateTransform(float(cx), float(cy))
-            g.RotateTransform(float(turn_degrees))
-            rectangle = self.draw.Rectangle(int(-self.size / 2), int(-self.size / 2),
-                                            self.size, self.size)
-            g.DrawImage(bitmap, rectangle, 0, 0, self.size, self.size,
-                        self.draw.GraphicsUnit.Pixel, self._fade(fade))
-        finally:
-            g.Restore(state)
-
-
-class Rings:
-    """Apollo itself: the three-ring searching orb from the mockup."""
-
-    DOT = 0.037            # point radius as a fraction of the outer radius
-    DOT_SMALL = 0.115      # ...and at the size it sits on the card
-    BREATH = 0.035         # how much the rings widen at full voice
+    Plain strokes and one filled path a frame: at fifty pixels across there
+    is nothing here worth caching into a bitmap."""
 
     def __init__(self, draw):
         self.draw = draw
-        self._sprites = {}
+        self.brushes = _Brushes(draw)
 
-    def _sprite(self, colour, count, radius, dot, spread, bloom=True):
-        # Quantised, or a new sprite would be built on every pixel of voice.
-        key = (colour, count, int(radius), round(dot, 1), round(spread, 1), bloom)
-        found = self._sprites.get(key)
-        if found is None:
-            found = RingSprite(self.draw, colour, count, radius, dot, spread,
-                               bloom=bloom)
-            self._sprites[key] = found
-        return found
+    @staticmethod
+    def geometry(radius, t, level=0.0):
+        """Half-width and half-height, each meridian's half-width, each line
+        across as (y, half-length), and the star's reach - about (0, 0)."""
+        a = radius * (1.0 + 0.04 * level)
+        b = a * GLOBE_ASPECT
+        turn = t * GLOBE_TURN
+        meridians = [abs(math.sin(turn + k * math.pi / GLOBE_CIRCLES)) * a
+                     for k in range(GLOBE_CIRCLES)]
+        across = [(s * b, math.sqrt(1.0 - s * s) * a) for s in GLOBE_ACROSS]
+        star = a * (0.24 + 0.08 * level)
+        return a, b, meridians, across, star
 
     def draw_at(self, g, cx, cy, radius, t, level=0.0, fade=1.0):
         if fade <= 0.01:
             return
-        radius = radius * (1.0 + self.BREATH * level)
-        small = radius <= SMALL_BELOW
-        spec = RING_SPEC_SMALL if small else RING_SPEC
-        dot = max(1.2, radius * (self.DOT_SMALL if small else self.DOT))
-        spread = round(1.0 + 0.5 * level, 1)
-        glow = min(1.0, fade * (1.0 + 0.6 * level))
-        for fraction, count, turns, colour in spec:
-            sprite = self._sprite(colour, count, radius * fraction, dot, spread,
-                                  bloom=not small)
-            sprite.draw_at(g, cx, cy, t * turns * 360.0, t, glow)
+        a, b, meridians, across, star = self.geometry(radius, t, level)
+        strength = 245 * min(1.0, fade)
+        faint = self.brushes.pen(GLOBE_LINE, strength * 0.45, 1.0)
+        for w in meridians:
+            if w < 0.75:
+                # Edge on: an upright line.
+                g.DrawLine(faint, float(cx), float(cy - b), float(cx), float(cy + b))
+            elif w < a - 0.5:
+                g.DrawEllipse(faint, float(cx - w), float(cy - b), float(w * 2), float(b * 2))
+        for y, half in across:
+            g.DrawLine(faint, float(cx - half), float(cy + y), float(cx + half), float(cy + y))
+        g.DrawEllipse(self.brushes.pen(GLOBE_LINE, strength, 1.3),
+                      float(cx - a), float(cy - b), float(a * 2), float(b * 2))
+
+        # The star: a little halo, then four thin points of white.
+        for reach, share in ((2.4, 0.10), (1.6, 0.18), (1.05, 0.30)):
+            r = star * reach
+            g.FillEllipse(self.brushes.brush(GLOBE_LINE, strength * share),
+                          float(cx - r), float(cy - r), float(r * 2), float(r * 2))
+        tips = [(star, 0.0), (0.0, star), (-star, 0.0), (0.0, -star)]
+        pinch = star * 0.11
+        path = self.draw.Drawing2D.GraphicsPath()
+        for i, (x0, y0) in enumerate(tips):
+            x3, y3 = tips[(i + 1) % 4]
+            # The pinch between two tips, as a quadratic's control point,
+            # raised to the cubic GDI+ draws.
+            qx = pinch if (x0 + x3) > 0 else -pinch
+            qy = pinch if (y0 + y3) > 0 else -pinch
+            c1 = (x0 + (qx - x0) * 2 / 3, y0 + (qy - y0) * 2 / 3)
+            c2 = (x3 + (qx - x3) * 2 / 3, y3 + (qy - y3) * 2 / 3)
+            path.AddBezier(float(cx + x0), float(cy + y0), float(cx + c1[0]), float(cy + c1[1]),
+                           float(cx + c2[0]), float(cy + c2[1]), float(cx + x3), float(cy + y3))
+        path.CloseFigure()
+        g.FillPath(self.brushes.brush((255, 255, 255), strength), path)
+        path.Dispose()
 
 
 class Sparkles:

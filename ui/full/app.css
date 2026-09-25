@@ -884,9 +884,30 @@ body.roomless:not(.ultra) #gauge-foot { margin-left: 0; }
                                         box-shadow: 0 0 8px rgba(255, 190, 90, .9); }
 .grid-icon { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5;
              stroke-linecap: round; stroke-linejoin: round; }
-#ultra-button[aria-pressed="true"] { border-color: rgba(255, 214, 150, .5);
-                                     box-shadow: 0 0 22px rgba(255, 190, 90, .25); }
-body.answering #dock, body.answering #osiris-button { opacity: .18; }
+body.answering #dock { opacity: .18; }
+
+/* The modes, one lit: on the dock, and at the start of ultra mode's bar. */
+.modes {
+  display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 14px;
+  background: rgba(9, 8, 7, .82); border: 1px solid rgba(255, 214, 150, .12);
+  backdrop-filter: blur(8px) saturate(1.2);
+}
+#ultra-bar .modes { padding: 0; background: none; border: 0; backdrop-filter: none; }
+.mode {
+  font: 700 11px var(--hud); letter-spacing: .16em; text-transform: uppercase; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px;
+  color: var(--caption); background: transparent; border: 1px solid transparent;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.mode:hover { color: var(--amber-bright); border-color: rgba(255, 214, 150, .2); }
+.mode .led { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 214, 150, .16);
+             transition: background .2s, box-shadow .2s; }
+.mode .eye { width: 18px; height: 11px; }
+.mode[aria-pressed="true"] { background: var(--paper); color: #121012; text-shadow: none; }
+.mode[aria-pressed="true"] .led { background: #121012; }
+.mode[data-mode="osiris"][aria-pressed="true"] { background: #00e5ff; color: #04121a; }
+.bar-rule { width: 1px; height: 22px; margin: 0 4px; background: rgba(255, 214, 150, .16); }
+body.osiris .modes, body.osiris .mode { border-radius: 4px; }
 body.asleep #dock, body.asleep #ultra-bar { opacity: 0; pointer-events: none; }
 
 /* --- OSIRIS ----------------------------------------------------------------------
@@ -898,12 +919,6 @@ body.asleep #dock, body.asleep #ultra-bar { opacity: 0; pointer-events: none; }
 .eye { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round;
        stroke-linejoin: round; }
 .eye circle { fill: currentColor; stroke: none; }
-/* Under the feed, at the bottom right. */
-#osiris-button { grid-area: eye; justify-self: end; align-self: end; }
-#osiris-button .eye { width: 22px; height: 14px; }
-#osiris-button[aria-pressed="true"] { color: #00e5ff; border-color: rgba(0, 229, 255, .5);
-                                      box-shadow: 0 0 22px rgba(0, 229, 255, .28);
-                                      text-shadow: 0 0 8px rgba(0, 229, 255, .6); }
 
 #osiris { display: none; grid-area: osiris; flex-direction: column; padding: 0; }
 #osiris header {
@@ -1029,7 +1044,7 @@ body.ultra [data-display] {
 }
 body.ultra #osiris { display: flex; }
 body.ultra .tile-off { display: none !important; }
-body.ultra #lyla-block, body.ultra #osiris-button, body.ultra #dock, body.ultra #osiris-close,
+body.ultra #lyla-block, body.ultra #dock, body.ultra #osiris-close,
 body.ultra #market-clock, body.ultra #panel-tabs .tab:not([data-tab="stocks"]) { display: none; }
 body.ultra #lyla { opacity: 0; }
 body.ultra #ultra-bar { display: flex; }
@@ -1689,4 +1704,122 @@ body.revealing #stage { animation: display-arrive .9s cubic-bezier(.2, .7, .3, 1
   body.ultra #clock { font-size: 48px; }
   .dchip { padding: 8px 9px; letter-spacing: .1em; }
   #tile-config { width: 326px; }
+}
+
+/* --- clear mode ------------------------------------------------------------------
+   Nothing on the screen but Apollo, bigger, in the middle of it, and under
+   him the sign to press Ctrl+Alt - the panels, the clock, LYLA and her room
+   all away. His answer still shows while he gives it, and the modes stay
+   along the bottom, faint until the pointer comes to them. */
+
+#clear-sign { display: none; }
+body.clear:not(.ultra):not(.osiris-map) #stage > :not(#core):not(#answer) { display: none !important; }
+body.clear:not(.ultra):not(.osiris-map) #stage {
+  grid-template-columns: 1fr; grid-template-rows: 1fr; grid-template-areas: "core";
+}
+body.clear:not(.ultra):not(.osiris-map) #lyla,
+body.clear:not(.ultra):not(.osiris-map) #lyla-agent,
+body.clear:not(.ultra):not(.osiris-map) #room-toggle { display: none; }
+body.clear:not(.ultra):not(.osiris-map) #ring { width: 640px; height: 397px; }
+body.clear:not(.ultra):not(.osiris-map) #dock { opacity: .4; }
+body.clear:not(.ultra):not(.osiris-map) #dock:hover { opacity: 1; }
+body.clear:not(.listening):not(.answering) #hint { display: none; }
+body.clear:not(.ultra):not(.osiris-map):not(.listening):not(.answering) #clear-sign {
+  display: flex; align-items: center; gap: 10px; margin-top: 26px; padding: 12px 22px;
+  border-radius: 12px; border: 1px solid rgba(255, 176, 0, .35);
+  background: rgba(9, 8, 7, .55); backdrop-filter: blur(6px);
+  font: 600 13px var(--hud); letter-spacing: .2em; text-transform: uppercase;
+  color: var(--amber-bright); text-shadow: 0 0 8px rgba(255, 150, 0, .45);
+  box-shadow: 0 0 26px rgba(255, 150, 0, .16);
+  animation: clear-sign 3.2s ease-in-out infinite;
+}
+#clear-sign b { font-weight: 600; color: var(--caption); }
+#clear-sign kbd {
+  font: 700 12px var(--hud); letter-spacing: .12em; padding: 5px 10px; border-radius: 6px;
+  color: #121012; background: var(--paper); text-shadow: none;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .45), 0 0 12px rgba(255, 190, 90, .35);
+}
+@keyframes clear-sign { 0%, 100% { opacity: .82; } 50% { opacity: 1; } }
+
+/* --- expanded mode's consoles -----------------------------------------------------
+   Either side of ultra mode's bar: a facility's desk, for the look of the
+   place - switches that flip, lights that blink, armed buttons that fire, a
+   dial that turns, and readouts that tick. */
+
+.console {
+  display: none; position: fixed; bottom: 14px; z-index: 19; width: 290px; padding: 9px 11px 10px;
+  border-radius: 12px; background: rgba(9, 8, 7, .84); border: 1px solid rgba(255, 214, 150, .12);
+  backdrop-filter: blur(8px) saturate(1.2); color: var(--caption);
+  font: 700 11px var(--hud); letter-spacing: .12em; text-transform: uppercase;
+}
+body.ultra .console { display: block; }
+body.answering .console { opacity: .18; }
+#console-left { left: 16px; }
+#console-right { right: 16px; }
+.console-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.console-head b { color: var(--amber-bright); font-weight: 800; letter-spacing: .18em; }
+.console-read { margin-left: auto; font-style: normal; font-variant-numeric: tabular-nums; color: rgba(127, 227, 255, .8); }
+.beacon { width: 7px; height: 7px; border-radius: 50%; background: #ff4d4d;
+          box-shadow: 0 0 8px rgba(255, 77, 77, .9); animation: console-blink 1.4s steps(2, jump-none) infinite; }
+.console-row { display: flex; align-items: flex-end; gap: 6px; }
+.console-row button { font: inherit; letter-spacing: .1em; cursor: pointer; }
+/* A toggle: its light, its lever, its label. */
+.flip {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 0 4px;
+  border-radius: 7px; color: var(--caption); background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(255, 214, 150, .1);
+}
+.flip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 90, 60, .5); }
+.flip.on::before { background: #5fe39a; box-shadow: 0 0 7px rgba(95, 227, 154, .9); }
+.flip .lever { position: relative; width: 12px; height: 20px; border-radius: 6px; background: rgba(0, 0, 0, .55);
+               border: 1px solid rgba(255, 214, 150, .22); }
+.flip .lever::after { content: ""; position: absolute; left: 1px; right: 1px; height: 9px; bottom: 1px;
+                      border-radius: 4px; background: #c9b48a; transition: bottom .15s ease-out; }
+.flip.on .lever::after { bottom: 9px; background: var(--amber-bright); }
+.flip span { font-size: 9.5px; }
+/* An armed button: fired, it flashes and settles. */
+.arm {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; height: 40px;
+  font-size: 10px; letter-spacing: .06em;
+  border-radius: 6px; color: var(--amber-bright); background: rgba(255, 176, 0, .08);
+  border: 1px solid rgba(255, 176, 0, .35); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .35);
+}
+.arm i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .5; }
+.arm.danger { color: #ff6b7a; background: rgba(255, 60, 80, .08); border-color: rgba(255, 90, 100, .45); }
+.arm.fired { animation: console-fire .9s ease-out; }
+.arm:active { transform: translateY(1px); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .35); }
+/* The dial: a knurled knob with its mark, a quarter turn at a time. */
+.knob {
+  --turn: 0deg; flex: none; position: relative; width: 38px; height: 38px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #4a4034, #16130f 70%);
+  border: 1px solid rgba(255, 214, 150, .3); box-shadow: 0 0 0 3px rgba(255, 214, 150, .06);
+  transform: rotate(var(--turn)); transition: transform .25s cubic-bezier(.2, .8, .2, 1);
+}
+.knob i { position: absolute; left: 50%; top: 4px; width: 2px; height: 10px; margin-left: -1px;
+          border-radius: 1px; background: var(--amber-bright); box-shadow: 0 0 6px rgba(255, 176, 0, .8); }
+.console-leds { display: flex; gap: 5px; margin-top: 9px; }
+.console-leds i { width: 10px; height: 4px; border-radius: 1px; animation: console-blink 1.6s steps(2, jump-none) infinite; }
+.console-leds i.amber { background: var(--amber-bright); }
+.console-leds i.green { background: #5fe39a; }
+.console-leds i.cyan { background: #7fe3ff; }
+.console-leds i.red { background: #ff6b7a; }
+.console-foot { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
+.console-foot .console-read { margin: 0; }
+.console-bars { display: flex; align-items: flex-end; gap: 2px; height: 14px; margin: 0 auto; }
+.console-bars i { width: 4px; background: rgba(127, 227, 255, .75); animation: console-bar 1.2s ease-in-out infinite alternate; }
+.console-bars i:nth-child(2) { animation-delay: -.3s; } .console-bars i:nth-child(3) { animation-delay: -.7s; }
+.console-bars i:nth-child(4) { animation-delay: -.1s; } .console-bars i:nth-child(5) { animation-delay: -.9s; }
+.console-bars i:nth-child(6) { animation-delay: -.5s; }
+@keyframes console-blink { 0%, 100% { opacity: 1; } 50% { opacity: .18; } }
+@keyframes console-bar { from { height: 3px; } to { height: 14px; } }
+@keyframes console-fire {
+  0% { background: currentColor; color: #121012; box-shadow: 0 0 24px currentColor; }
+  100% { box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .35); }
+}
+/* The tiles make room for the desk over the bar - and where the bar needs
+   the width, the desk steps away. */
+@media (min-width: 1900px) { body.ultra #stage { padding-bottom: 142px; } }
+@media (max-width: 1899px) { body.ultra .console { display: none; } }
+@media (max-width: 1920px) {
+  body.clear:not(.ultra):not(.osiris-map) #ring { width: 560px; height: 348px; }
 }

@@ -8,7 +8,6 @@ import math
 import pytest
 
 import orb
-import overlay_paint
 
 
 class Colour:
@@ -45,7 +44,6 @@ class Graphics:
 
 
 def resting(monkeypatch, t=0.0, level=0.0):
-    monkeypatch.setattr(overlay_paint, "bloom", lambda *a, **k: pytest.fail("no bloom at rest"))
     o = orb.Orb.__new__(orb.Orb)
     o._D = Drawing()
     o._brushes, o._pens = {}, {}
@@ -68,10 +66,17 @@ def test_the_points_sit_evenly_round_one_circle(monkeypatch):
     assert radii[0] == pytest.approx(190 * orb.Orb.CONSTELLATION_R)
 
 
-def test_each_point_is_a_plain_light_big_enough_to_see(monkeypatch):
+def test_mini_apollo_is_small(monkeypatch):
+    # Much smaller than the 67-pixel ring it was.
+    g = resting(monkeypatch)
+    assert math.hypot(g.dots[0][0] - 95, g.dots[0][1] - 95) <= 40
+
+
+def test_each_point_is_a_small_plain_light(monkeypatch):
+    # Much smaller than it was: a fine ring of small points.
     g = resting(monkeypatch)
     sizes = {round(r, 6) for _, _, r, _ in g.dots}
-    assert len(sizes) == 1 and 2.0 <= sizes.pop() <= 4.5
+    assert len(sizes) == 1 and 1.0 <= sizes.pop() <= 2.0
     assert all(0 < a <= 255 for _, _, _, a in g.dots)
 
 
