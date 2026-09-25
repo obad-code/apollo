@@ -241,9 +241,11 @@ a green and a blue slot, six screen pixels across, laid on lightly - lit by
 a CRT gradient: one wide band of light leaning across the tube from the top
 left to the bottom right, warm below it (red, orange, yellow), pale along its
 ridge and cool above it (teal, blue, night), with soft scanlines and faint
-wavy ripples crawling up the glass - bulged by a fisheye, swaying and
-wandering slowly, and breathing rather than flickering: it is meant to be
-restful to look at for hours. Over it: the clock with the date in both
+wavy ripples crawling up the glass - bulged by a fisheye, and breathing
+rather than flickering. The gradient flows, and fast: its ridge sways and
+slides across the screen and a wave runs along it, quick enough to watch,
+quicker still while Apollo works (the idle screen's dusk keeps its slow
+pace). Over it: the clock with the date in both
 calendars, Riyadh's weather, the next prayer and who on your list reports
 this week; your watchlist, and under it the status line - the links to
 Gemini, Claude and the mic, the market's hours, the machine as rows of lit

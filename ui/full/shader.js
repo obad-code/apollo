@@ -1,14 +1,15 @@
 // The display's ground: an old set's own pixels, each lit by a broad band
-// of colour drifting underneath it, seen through the bulge of the tube.
+// of colour flowing underneath it, seen through the bulge of the tube.
 //
 // Plain WebGL - three.js would be 600 KB to draw two triangles. All in one
 // pass:
 //   - the colour: one wide band of light leaning across the tube from the
 //     top left to the bottom right - warm below it, going red to orange to
 //     yellow, pale along its ridge, and cool above it, going teal to blue
-//     to night - the CRT gradient of the reference picture. It sways a few
-//     degrees and wanders, slowly: it is meant to be restful to look at for
-//     hours. Asleep, it settles into a dusk horizon instead - navy
+//     to night - the CRT gradient of the reference picture. It flows, and
+//     fast: its ridge sways and slides across the screen and a wave runs
+//     along it, quick enough to watch. Asleep, it settles into a dusk horizon
+//     instead, as slow as ever - navy
 //     overhead, the last orange low down - which is the idle screen's sky.
 //   - the pixels: a slot mask, as fine as a set's - cells of a red, a green
 //     and a blue slot, six screen pixels across, alternate columns half a
@@ -26,6 +27,15 @@
 // screen's own rate, so that what little moves moves smoothly. Dimmed
 // throughout: the panels sit on it and have to stay readable.
 
+// The band of colour runs on its own clock, this many times the ground's:
+// fast enough to watch it flow - its ridge sliding across the screen and a
+// wave running along it - where it used to sway on loops of a minute and
+// more. The idle sky keeps the ground's slow clock.
+export const FLOW = 12;
+// How far the band's middle wanders either way, across the screen (which is
+// about 3.6 of these wide).
+export const WANDER = 0.55;
+
 const VERTEX = `
 attribute vec2 position;
 void main() { gl_Position = vec4(position, 0.0, 1.0); }
@@ -33,6 +43,8 @@ void main() { gl_Position = vec4(position, 0.0, 1.0); }
 
 const FRAGMENT = `
 precision highp float;
+const float FLOW = ${FLOW.toFixed(1)};
+const float WANDER = ${WANDER.toFixed(2)};
 uniform vec2 resolution;
 uniform float time;
 uniform float sleep;      // 0 awake, 1 asleep - eased, so the sky changes slowly
@@ -84,20 +96,21 @@ vec3 ramp(float u) {
 
 // The band, awake, at s. q is centred and aspect-correct: x runs about
 // -1.8..1.8 on a 16:9 screen, y -1..1, upwards. The ridge leans from the top
-// left down to the bottom right and sways a few degrees either way while its
-// middle wanders; it is not quite straight, but carries a long, slow wave.
+// left down to the bottom right and sways either way while its middle slides
+// across the screen; it is not quite straight, but carries a wave that runs
+// along it.
 // Brightest in the middle of the screen, so both far corners - the warm
 // one low on the left and the cool one high on the right - go dark, as in
 // the picture. (No backticks in here: this is a template string, and one
 // would end it.)
 vec3 band(vec2 q, float s) {
-  float lean = -0.85 + 0.10 * sin(s * 0.070) + 0.05 * sin(s * 0.043 + 1.7);
+  float lean = -0.85 + 0.12 * sin(s * 0.070) + 0.05 * sin(s * 0.043 + 1.7);
   vec2 along = vec2(cos(lean), sin(lean));
   vec2 across = vec2(-along.y, along.x);
-  vec2 middle = vec2(-0.20 + 0.30 * sin(s * 0.037), 0.06 * cos(s * 0.029));
+  vec2 middle = vec2(-0.20 + WANDER * sin(s * 0.037), 0.10 * cos(s * 0.029));
   vec2 d = q - middle;
   float v = dot(d, along);
-  float u = dot(d, across) + 0.10 * sin(v * 1.2 + s * 0.090) + 0.05 * sin(v * 2.7 - s * 0.061);
+  float u = dot(d, across) + 0.14 * sin(v * 1.2 + s * 0.090) + 0.06 * sin(v * 2.7 - s * 0.061);
   return ramp(u) * mix(0.55, 1.0, exp(-v * v / 9.0));
 }
 
@@ -130,7 +143,7 @@ vec3 dusk(vec2 q, float t, float aspect) {
 }
 
 vec3 colourAt(vec2 q, float t, float aspect) {
-  vec3 awake = band(q, t);
+  vec3 awake = band(q, t * FLOW);
   if (sleep <= 0.001) return awake;
   // The idle sky keeps the slow pace it always had: it is meant to be restful.
   return mix(awake, dusk(q, t * 0.38, aspect), sleep);
@@ -201,17 +214,22 @@ void main() {
 }
 `;
 
-// How fast the band drifts: units of its own time a second.
+// The ground's clock: units of its own time a second.
 const DRIFT = 1.0;
 // A breath, never a flicker: the deepest the tube's brightness goes.
 const FLICKER_FLOOR = 0.96;
 // The fewest frames a second the ground is drawn at, screen allowing.
 const SMOOTH = 55;
 
-/* How far the band moves a second of the clock: slowly, and half that for
- * anyone who asked for less motion. */
+/* The ground's clock, a second: and half that for anyone who asked for
+ * less motion. */
 export function driftPerSecond(still) {
   return DRIFT * (still ? 0.5 : 1);
+}
+
+/* ...and the band's, on top of it: fast. */
+export function bandPerSecond(still) {
+  return driftPerSecond(still) * FLOW;
 }
 
 /* How bright the tube is this frame, as a share of itself: a shimmer every

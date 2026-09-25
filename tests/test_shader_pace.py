@@ -1,7 +1,7 @@
 """The ground's pace and its flicker (ui/full/shader.js), run under node: drawn
 often enough to move smoothly on any screen without a full-resolution pass
-per refresh of a fast one, drifting slowly, and alive the way a lit tube is
-without ever visibly flickering - it is meant to be restful to look at."""
+per refresh of a fast one, its band of colour flowing fast, and alive the
+way a lit tube is without ever visibly flickering."""
 import json
 import pathlib
 import shutil
@@ -58,9 +58,31 @@ def test_asleep_or_asked_for_less_motion_it_is_calmer(tmp_path):
     assert 1 - calm < (1 - awake) / 2
 
 
-def test_the_light_drifts_slowly(tmp_path):
-    # The band of colour takes its time: about a unit of its own time a
-    # second, and half that for anyone who asked for less motion.
+def test_the_ground_s_clock(tmp_path):
+    # A unit of its own time a second, and half that for anyone who asked
+    # for less motion.
     awake, still = run(tmp_path, "[S.driftPerSecond(false), S.driftPerSecond(true)]")
     assert 0 < awake <= 1.2
     assert still == pytest.approx(awake / 2)
+
+
+def test_the_gradient_flows_fast(tmp_path):
+    # It used to sway on loops of a minute and more, too slow to see move.
+    # Now the band runs on its own faster clock: its ridge slides across the
+    # screen and a wave runs along it, quick enough to watch.
+    flow = run(tmp_path, "S.FLOW")
+    assert flow >= 6
+    assert run(tmp_path, "S.bandPerSecond(false)") == pytest.approx(flow)
+    assert run(tmp_path, "S.bandPerSecond(true)") == pytest.approx(flow / 2)
+
+
+def test_it_slides_far_enough_to_see(tmp_path):
+    # Its middle wanders across a good part of the screen, not a sliver of it.
+    assert run(tmp_path, "S.WANDER") >= 0.45
+
+
+def test_the_idle_sky_keeps_its_slow_pace():
+    # Asleep, the dusk is meant to be restful: it is not on the fast clock.
+    text = SHADER.read_text(encoding="utf-8")
+    assert "band(q, t * FLOW)" in text
+    assert "dusk(q, t * 0.38, aspect)" in text
