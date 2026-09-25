@@ -708,6 +708,93 @@ html, body {
 body.answering #dock { opacity: .18; }
 body.asleep #dock { opacity: 0; pointer-events: none; }
 
+/* --- OSIRIS ----------------------------------------------------------------------
+   The button along the bottom, or "open OSIRIS": the map laid into the
+   display where the ring and the feed were, and the whole of Apollo dressed
+   the way OSIRIS is - its void, its gold and cyan, sharp corners, and a
+   monospace for everything. Its own tokens, read off its stylesheet. */
+
+.eye { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round;
+       stroke-linejoin: round; }
+.eye circle { fill: currentColor; stroke: none; }
+#osiris-button .eye { width: 22px; height: 14px; }
+#osiris-button[aria-pressed="true"] { color: #00e5ff; border-color: rgba(0, 229, 255, .5);
+                                      box-shadow: 0 0 22px rgba(0, 229, 255, .28);
+                                      text-shadow: 0 0 8px rgba(0, 229, 255, .6); }
+
+#osiris { display: none; grid-area: osiris; flex-direction: column; padding: 0; }
+#osiris header {
+  display: flex; align-items: center; gap: 12px; padding: 11px 16px;
+  border-bottom: 1px solid rgba(212, 175, 55, .15);
+  font: 700 12px var(--hud); letter-spacing: .32em; color: #d4af37;
+}
+#osiris header .eye { width: 26px; height: 16px; color: #d4af37; }
+#osiris header span { font-weight: 400; font-size: 9px; letter-spacing: .26em;
+                      text-transform: uppercase; color: #9b978e; }
+#osiris-close {
+  margin-left: auto; font: 700 10px var(--hud); letter-spacing: .22em; text-transform: uppercase;
+  color: #d4af37; background: rgba(212, 175, 55, .08); border: 1px solid rgba(212, 175, 55, .3);
+  border-radius: 3px; padding: 6px 12px; cursor: pointer; transition: background .2s, color .2s;
+}
+#osiris-close:hover { background: #d4af37; color: #04040a; }
+/* Under the map's window, and seen only until it arrives - or if it cannot. */
+#osiris-view {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 18px; background: #04040a;
+  font: 400 11px var(--hud); letter-spacing: .34em; text-transform: uppercase; color: #5c5a54;
+}
+#osiris-view .eye { width: 96px; height: 60px; color: rgba(212, 175, 55, .5); }
+#osiris-view .cursor { font-style: normal; animation: cursor-blink 1.06s steps(1) infinite; }
+
+body.osiris #stage {
+  grid-template-columns: 30% 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "clock   status"
+    "markets osiris";
+  padding-bottom: var(--dock-room);
+}
+body.osiris #osiris { display: flex; }
+body.osiris #core, body.osiris #headlines, body.osiris #lyla-block,
+body.osiris #answer { display: none; }
+body.osiris #lyla { opacity: 0; }
+body.osiris #room-toggle { opacity: .35; pointer-events: none; }
+
+body.osiris {
+  --amber: #d4af37; --amber-bright: #f0d060; --you: #e8e6e0; --caption: #9b978e;
+  --cyan: #00e5ff; --violet: #448aff; --up: #00e676; --down: #ff3d3d;
+  --panel: rgba(8, 10, 20, .88); --paper: #d4af37; --radius: 4px;
+  --mono: var(--hud); --display: var(--hud);
+  text-shadow: 0 0 6px rgba(0, 229, 255, .12);
+}
+body.osiris .panel { border-color: rgba(212, 175, 55, .15); }
+body.osiris .panel h2, body.osiris #panel-tabs .tab { font-size: 10px; letter-spacing: .3em; }
+body.osiris #panel-tabs .tab.on { color: #d4af37; border-bottom-color: #d4af37; }
+body.osiris #clock { font-weight: 700; letter-spacing: .02em; color: #f5f0e0; }
+body.osiris #seconds { color: #00e5ff; }
+body.osiris .tag { color: #00e5ff; }
+body.osiris .chip.on { background: rgba(212, 175, 55, .14); color: #f0d060; }
+body.osiris .gauge .bar s.on { background: #00e5ff; box-shadow: 0 0 6px rgba(0, 229, 255, .7); }
+body.osiris .gauge .bar s.on.warm { background: #d4af37; box-shadow: 0 0 6px rgba(212, 175, 55, .7); }
+body.osiris #dock button { border-radius: 4px; background: rgba(8, 10, 20, .9);
+                           border-color: rgba(212, 175, 55, .22); color: #d4af37; }
+body.osiris #watch-bar { background: #d4af37; }
+body.osiris .stock-row .sym b, body.osiris .stock-row .price { color: #e8e6e0; }
+body.osiris .stock-row.lit .sym b, body.osiris .stock-row.lit .price { color: #04040a; }
+body.osiris .peek, body.osiris #stock, body.osiris #story { border-radius: 4px; }
+body.osiris .quote-shot, body.osiris #stock, body.osiris #story { background: #080a14; }
+
+/* The switch itself is a channel change on an old set: a flash, a jolt, and
+   the new picture. */
+@keyframes channel {
+  0% { filter: none; transform: none; }
+  18% { filter: brightness(2.4) contrast(1.5) saturate(1.6); transform: scaleY(.985); }
+  40% { filter: brightness(.55); transform: translateX(8px) skewX(-1.5deg); }
+  62% { filter: brightness(1.3); transform: translateX(-4px); }
+  100% { filter: none; transform: none; }
+}
+body.switching #stage { animation: channel .5s steps(6, end); }
+
 /* --- without LYLA's room ------------------------------------------------------
    The button, or "hide Lyla": her room fades, and the panels and the ring
    grow into the space she leaves. */
@@ -960,6 +1047,7 @@ body.asleep .peek { opacity: 0 !important; pointer-events: none; transition: opa
   .tick-up, .tick-down, #stock.live .big .pulse, #stock .live-badge,
   #markets.streaming #markets-head::after { animation: none; }
   #sleep-wake { animation: none; }
+  body.switching #stage, #osiris-view .cursor { animation: none; }
 }
 
 /* #lyla is deliberately absent here: her canvas is the window at every size,

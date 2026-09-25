@@ -110,6 +110,21 @@
     <div id="visual"></div>
   </section>
 
+  <!-- OSIRIS, laid into the display: its frame, its name along the top and
+       the way out. The map is a window of its own laid over the frame
+       (osiris.py) - the site will not be drawn inside another page. -->
+  <section id="osiris" class="panel" aria-hidden="true">
+    <header>
+      <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg>
+      <b>OSIRIS</b><span>Open source intelligence · inside Apollo</span>
+      <button id="osiris-close" type="button">Close ✕</button>
+    </header>
+    <div id="osiris-view">
+      <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg>
+      <p>Linking OSIRIS<i class="cursor">_</i></p>
+    </div>
+  </section>
+
   <section id="lyla-block" class="rise">
     <canvas id="lyla-icon" width="48" height="72"></canvas>
     <div id="lyla-label" class="caption">LYLA // BOOTING</div>
@@ -124,11 +139,14 @@
 <div id="peek" class="peek" aria-hidden="true"></div>
 <div id="chart-peek" class="peek" aria-hidden="true"></div>
 
-<!-- Along the bottom edge: LYLA's room in or out. Without it, the panels and
-     the ring take the room back. -->
+<!-- Along the bottom edge: LYLA's room in or out - without it, the panels
+     and the ring take the room back - and OSIRIS. -->
 <nav id="dock">
   <button id="room-toggle" type="button" aria-pressed="true" title="Show or hide LYLA's room">
     <i class="led"></i><span>LYLA</span><em>ROOM ON</em>
+  </button>
+  <button id="osiris-button" type="button" aria-pressed="false" title="Open OSIRIS inside Apollo">
+    <svg class="eye" viewBox="0 0 26 16" aria-hidden="true"><path d="M1.5 8C5.5 2.2 20.5 2.2 24.5 8 20.5 13.8 5.5 13.8 1.5 8Z"/><circle cx="13" cy="8" r="3.3"/><path d="M10.6 12.8 9.2 15.2M15.3 13.1c1.3 1.5 3.4 2 5.5 1.3"/></svg><span>OSIRIS</span><em>MAP</em>
   </button>
 </nav>
 

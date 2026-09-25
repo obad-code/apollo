@@ -128,6 +128,8 @@ const state = {
   projects: null,         // the projects last drawn, for their clicks
   liveTimer: null,        // takes LIVE off the panel when the trades stop
   panels: {},             // which panels apollo.py last said are shown
+  osiris: false,          // OSIRIS laid into the display, and Apollo in its colours
+  osirisTimer: null,      // ...places the map once the stage has its new shape
   roomTimer: null,        // stops LYLA once her room has faded
 };
 
@@ -1668,8 +1670,11 @@ function setPanels(wanted) {
       else setTimeout(hide, 260);
     }
   }
-  setRoom(wanted.lyla !== false);
+  applyRoom();
 }
+
+/* LYLA's room is out while OSIRIS is up, and back the way it was after. */
+function applyRoom() { setRoom(!state.osiris && state.panels.lyla !== false); }
 
 /* LYLA's room, in or out - the button along the bottom, or "hide Lyla". Her
  * room is a full-window canvas, not a grid cell: it fades, she stops, and
@@ -1691,6 +1696,61 @@ function setRoom(shown) {
   // The name redraws its cells at its new size once the stage has settled.
   setTimeout(() => wordmark.resize(), 600);
 }
+
+/* --- OSIRIS --------------------------------------------------------------------
+ *
+ * The open-source intelligence map, laid into the display where the ring
+ * and the feed were, with all of Apollo in OSIRIS's colours while it is up.
+ * The map is a window of its own (osiris.py): this page lays out the frame
+ * and says where it is, and apollo.py puts the window exactly over it. */
+
+function placeOsiris() {
+  if (!state.osiris) return;
+  const box = $('osiris-view').getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  const api = bridge();
+  if (api && api.osiris_open) {
+    api.osiris_open({ x: Math.round(box.left * ratio), y: Math.round(box.top * ratio),
+                      w: Math.round(box.width * ratio), h: Math.round(box.height * ratio) });
+  }
+}
+
+function setOsiris(on) {
+  on = Boolean(on);
+  if (on === state.osiris) return on;
+  state.osiris = on;
+  closeStory();
+  closeStock();
+  unlight();
+  unlightRow();
+  // The switch is a channel change on an old set.
+  document.body.classList.remove('switching');
+  void document.body.offsetWidth;
+  document.body.classList.add('switching');
+  setTimeout(() => document.body.classList.remove('switching'), 520);
+  document.body.classList.toggle('osiris', on);
+  $('osiris').setAttribute('aria-hidden', on ? 'false' : 'true');
+  $('osiris-button').setAttribute('aria-pressed', on ? 'true' : 'false');
+  shader.theme(on);
+  applyRoom();
+  clearTimeout(state.osirisTimer);
+  if (on) {
+    // Laid over the frame once the stage has settled into its new shape.
+    state.osirisTimer = setTimeout(placeOsiris, 620);
+  } else {
+    const api = bridge();
+    if (api && api.osiris_close) api.osiris_close();
+    setTimeout(() => wordmark.resize(), 600);
+  }
+  return on;
+}
+
+$('osiris-button').addEventListener('click', () => setOsiris(!state.osiris));
+$('osiris-close').addEventListener('click', () => setOsiris(false));
+window.addEventListener('resize', () => {
+  clearTimeout(state.osirisTimer);
+  state.osirisTimer = setTimeout(placeOsiris, 300);
+});
 
 $('room-toggle').addEventListener('click', () => {
   const shown = !roomShown();
@@ -1922,6 +1982,8 @@ window.apollo = {
   sleep(on) { setSleep(on); },
   // As Apollo comes up: the name, once, and the tube switching off.
   intro() { playIntro(); },
+  // OSIRIS in the display, or not - by voice, or its window closed itself.
+  osiris(on) { return setOsiris(on); },
   // "Open story three": opens it and says what it is. 0 closes it.
   story(number) {
     number = Number(number) || 0;

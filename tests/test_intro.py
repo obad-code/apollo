@@ -85,6 +85,7 @@ def test_the_watcher_is_what_runs_it(monkeypatch):
         def quit(self): calls.append("quit")
         def toggle_peek(self): calls.append("peek")
         def check_intro(self): calls.append("intro")
+        def check_osiris(self): calls.append("osiris")
         def check_presence(self, idle): calls.append("presence")
         def check_overlay_alive(self): calls.append("alive")
 

@@ -192,10 +192,11 @@ one is a number Apollo actually has.
 **The name.** Wherever Apollo writes its name - under the ring on the full
 display, on the idle screen, and in the intro - it is an LED sign on an old
 tube: Orbitron at its heaviest, upright and drawn a little taller than it
-comes, used as a stencil over a grid of small lit cells, with a bloom, the
-three colours landing a hair apart, a flicker, scanlines and now and then a
-bright band rolling down (`ui/full/ledword.js`) - and all of it seen through the
-same fisheye as the dots behind, its colours parting towards the edges. It arrives scrambled, like
+comes, with room between the letters, used as a stencil over a grid of small
+lit cells, with a bloom, the three colours landing a hair apart, a flicker,
+scanlines and now and then a bright band rolling down (`ui/full/ledword.js`) -
+and all of it seen through the same fisheye as the picture behind, its colours
+parting towards the edges. It arrives scrambled, like
 the scramble-text component: every letter a random symbol, settling into
 the word from the left. Point at it on the display and it scrambles again.
 Orbitron is under the SIL Open Font License
@@ -212,13 +213,22 @@ tube switches off - the picture collapsing to a bright line and the line
 to nothing - before Apollo settles into the overlay. It is skipped when a
 full-screen program was already up, so a game or a film is left alone.
 
-The full display is the whole screen: a field of dots behind everything - a
-halftone of five coloured lights drifting on their own slow loops and
-blooming where they cross, bulged by a fisheye - the clock with the date in
-both calendars, Riyadh's weather, your watchlist with sparklines, headlines
-on what you follow, Trump's posts with the market-moving ones flagged, what
-Apollo has cost today, what the machine is doing — and LYLA still in her room
-along the bottom.
+The full display is the whole screen. Behind everything, an old set's own
+pixels (`ui/full/shader.js`): a slot mask as fine as a TV's - cells of a red,
+a green and a blue slot, six screen pixels across - lit by five coloured
+lights drifting on their own slow loops, bulged by a fisheye, and blooming
+hard where the lights cross. Over it: the clock with the date in both
+calendars and Riyadh's weather; in the top right corner, the machine as rows
+of lit segments - CPU, GPU and RAM, sixteen segments each, the last ones
+warm and then red - with the day's tokens and cost, the clips saved and how
+fresh it all is under them; your watchlist; headlines on what you follow and
+Trump's posts with the market-moving ones flagged; and LYLA in her room along
+the bottom.
+
+Along the bottom edge, two buttons. **LYLA** puts her room away - she stops,
+the room fades, and the panels and the ring grow into the space - and brings
+it back; the choice is kept, and *"hide Lyla"* does the same. **OSIRIS** opens
+the map (below).
 
 The panel on the left has four tabs. **Markets** is the stocks. **Talks**
 is what you said to Apollo and what came back, newest first, from the record.
@@ -240,25 +250,30 @@ your browser. Or say it: *"open story three"* opens it (bringing the display
 up if it was not) and Apollo tells you what it is. The chips along the top
 filter by topic.
 
-The stocks work the same way. Point at a card and a frame slides to it;
-click it and the stock opens out of its card: its chart over a day, five
+The stocks work the same way - a list after the same component: each row
+is the mark and ticker, the name, the day's curve drawn small, the price and
+the move, in a small spaced-out monospace. Point at one and the bar slides to
+it and the stock's chart opens beside the panel, following the pointer - the
+price large, the day's curve, the target, the P/E and anything it earned this
+week; click it and the stock opens out of its row: its chart over a day, five
 days, a month, six months or a year (run the pointer along it for the close
 at any point), the day's range, the analysts' target and the P/E, and
 **Remove from watchlist** - which asks for a second click before it does.
 When a stock next reports its earnings is in the opened view ("Next
 earnings: Tue 17 Nov, in 53 days", marked *est.* while the company has not
-fixed the day), on its card once it is within a week, in the morning recap
+fixed the day), on its chart and a lit point by its ticker once it is within
+a week, in the morning recap
 that week, and by voice (*"when are Nvidia's earnings?"*) - from the same
 Yahoo lookup as the target price.
 What the people running each company did with its shares is in the
 opened view too: open-market buys and sells by directors and officers over
 the last 90 days, from their SEC Form 4 filings as Finnhub carries them
 (the same key as live prices; tax withholding, option exercises, gifts and
-grants are routine and left out). A card says *Insider buying* when one of
+grants are routine and left out). A stock says *Insider buying* when one of
 them bought in the last month, the morning recap mentions any trade over
 $1M filed in the last two days, and *"are Nvidia's insiders selling?"*
 asks by voice. US stocks only.
-The slot after the last card, **Add a stock**, opens a list of suggestions
+The row after the last, **Add a stock**, opens a list of suggestions
 to put on with a click. By voice: *"open Nvidia"*, *"add Palantir and AMD"*,
 *"take off Apple and Tesla"* - in English or Arabic.
 
@@ -294,6 +309,27 @@ way, only something you do after asking wakes it.
 
 A conversation can happen while it is open, and it stays open for it: LYLA and
 the panels step aside while there is an answer on screen, then come back.
+
+**OSIRIS.** The button along the bottom, or *"open OSIRIS"* / *"افتح اوزيرس"*,
+lays [OSIRIS](https://osirisai.live) - the open-source intelligence map:
+flights and ships, naval and air traffic, CCTV, live news, earthquakes,
+incidents around the world, undersea cables, day and night - into the display
+where the ring and the feed were, and dresses the whole of Apollo the way
+OSIRIS is while it is up: its void, its gold and cyan, sharp corners, a
+monospace for everything, the pixels behind in its colours, switched over
+like a channel changing. **Close** (or *"close OSIRIS"*) puts Apollo back.
+
+The map is a window of its own laid exactly over the frame (`osiris.py`),
+because the site will not be drawn inside another page (`X-Frame-Options:
+SAMEORIGIN`) and that is its choice to make. The window has no bridge into
+Apollo - nothing on the page can ask Apollo for anything - it browses
+privately like every Apollo window, and it goes whenever the display goes.
+Before it went in, the site was read through: everything comes from
+osirisai.live itself behind Cloudflare, with no ads, no third-party trackers,
+no miner and nothing that touches a wallet. It does carry tools that look at
+the machine they run on - a scan of your own PC's local ports and addresses,
+a Bluetooth scanner, live location - and each runs only when you open that
+tool; Bluetooth and location still ask first.
 
 ### Hotkeys
 
@@ -661,6 +697,7 @@ The only thing left is your API key.
 | `reminders.py` | Reminder storage and the watcher that fires them. |
 | `probes/` | Live checks against the real APIs and PC: which Gemini model to use, transcript timing, and an end-to-end tool run. |
 | `apollo.py` | The overlay host. Owns the window shapes, the tray icon, the presence watcher and the single-instance lock, and drives the page from `assistant`. |
+| `osiris.py` | OSIRIS inside the display: the map's own window, laid over the frame the page leaves for it, owned by the display and gone whenever it goes. |
 | `orb.py` | The overlay itself: the window, the states, and the composition - ring, panel, your words, the answer, cards and chart. |
 | `overlay_paint.py` | Its paint box: the drifting CRT panel, the three-ring orb, the sparkle field and the horizon, each pre-rendered where a per-frame redraw would cost too much. |
 | `overlay_state.py` | The springs and the state machine, with no window in sight. |

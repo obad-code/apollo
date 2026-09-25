@@ -63,13 +63,14 @@ class Context:
     with none named) and push them to the display - without waiting for it,
     `panels(state)` tells the display which of its panels to show, `story(n)`
     opens the feed's nth story on it and says what that story is, `stock(sym)`
-    does the same for a stock on the watchlist, and `turn`
+    does the same for a stock on the watchlist, `osiris(on)` opens or closes
+    OSIRIS inside the display, and `turn`
     is the user's turn number at the moment the call arrived.
     """
 
     def __init__(self, show=None, activity=None, turn=None, refresh=None,
                  panels_hook=None, story_hook=None, stock_hook=None, idle_hook=None,
-                 tab_hook=None, away_hook=None):
+                 tab_hook=None, away_hook=None, osiris_hook=None):
         self.show = show or (lambda visual: None)
         self.activity = activity or (lambda text: None)
         # False by default, so a tool that changes the display can tell the
@@ -81,6 +82,7 @@ class Context:
         self.idle = idle_hook or (lambda: False)
         self.tab = tab_hook or (lambda name: None)
         self.away = away_hook or (lambda: False)
+        self.osiris = osiris_hook or (lambda on: False)
         self.turn = current_turn() if turn is None else turn
 
 
@@ -676,6 +678,25 @@ def _going_out(ctx):
     if ctx.away() is False:
         return {"ok": False, "error": "Away mode isn't available right now."}
     return {"ok": True, "away": True}
+
+
+@_tool("osiris", "opening OSIRIS",
+       "Open or close OSIRIS inside Apollo - the open-source intelligence map "
+       "at osirisai.live: live flights and ships, naval and air traffic, CCTV "
+       "cameras, live news, earthquakes, incidents around the world, undersea "
+       "cables, day and night. Opening it brings up Apollo's display with the "
+       "map laid into it and Apollo dressed in OSIRIS's gold and cyan; closing "
+       "it puts Apollo back. Use this when the user asks for OSIRIS, the world "
+       "map or the intelligence map - \"افتح اوزيرس\", \"سكر اوزيرس\". Say in "
+       "a few words that it is up, or closed.",
+       _obj({"open": {"type": "boolean",
+                      "description": "True to open OSIRIS, false to close it"}}, ("open",)))
+def _osiris(ctx, open=True):  # noqa: A002 - the model's word for it
+    wanted = bool(open)
+    ctx.activity("opening OSIRIS" if wanted else "closing OSIRIS")
+    if ctx.osiris(wanted) is False:
+        return {"ok": False, "error": "The display isn't up to hold OSIRIS right now."}
+    return {"ok": True, "open": wanted}
 
 
 @_tool("idle_mode", "going idle",

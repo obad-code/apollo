@@ -39,6 +39,7 @@ uniform float roll;       // the rolling band's height, 0..1 up the screen (off 
 uniform float tear;       // how far a torn band of lines is pushed sideways
 uniform float tearAt;     // ...and where that band is, 0..1 up the screen
 uniform float grain;      // a fresh seed every frame, for the static
+uniform float osiris;     // 0 Apollo's colours, 1 OSIRIS's - gold and cyan in the void - eased
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
@@ -66,11 +67,13 @@ float lamp(vec2 q, vec2 at, float size) {
 // pair of periods (40 to 90 seconds), so they never line up the same way
 // twice and something on the screen is always visibly on the move.
 vec3 lights(vec2 q, float s) {
-  vec3 rose   = vec3(1.00, 0.26, 0.58);
-  vec3 cyan   = vec3(0.16, 0.78, 1.00);
-  vec3 amber  = vec3(1.00, 0.58, 0.12);
-  vec3 violet = vec3(0.50, 0.32, 1.00);
-  vec3 green  = vec3(0.20, 1.00, 0.62);
+  // With OSIRIS up, the same five lights in its colours: gold, its cyan, a
+  // pale gold, its blue, and a teal kept low.
+  vec3 rose   = mix(vec3(1.00, 0.26, 0.58), vec3(0.83, 0.69, 0.22), osiris);
+  vec3 cyan   = mix(vec3(0.16, 0.78, 1.00), vec3(0.00, 0.90, 1.00), osiris);
+  vec3 amber  = mix(vec3(1.00, 0.58, 0.12), vec3(0.94, 0.82, 0.38), osiris);
+  vec3 violet = mix(vec3(0.50, 0.32, 1.00), vec3(0.27, 0.54, 1.00), osiris);
+  vec3 green  = mix(vec3(0.20, 1.00, 0.62), vec3(0.00, 0.42, 0.48), osiris);
   vec3 sum = vec3(0.0);
   sum += rose   * lamp(q, vec2(-0.95 + 0.75 * sin(s * 0.110), 0.30 + 0.40 * cos(s * 0.083)), 0.78);
   sum += cyan   * lamp(q, vec2( 0.95 + 0.65 * cos(s * 0.093), -0.15 + 0.45 * sin(s * 0.140)), 0.74);
@@ -193,9 +196,11 @@ void main() {
              * smoothstep(1.55, 0.95, length(corner));
   colour *= mix(0.25, 1.0, tube);
 
-  // Dim enough to read over, and a floor that is not quite black.
-  float dim = mix(0.50, 0.62, sleep);
-  gl_FragColor = vec4(colour * dim + vec3(0.014, 0.012, 0.018), 1.0);
+  // Dim enough to read over, and a floor that is not quite black - darker
+  // still with OSIRIS up, whose ground is a void with a little blue in it.
+  float dim = mix(0.50, 0.62, sleep) * mix(1.0, 0.62, osiris);
+  vec3 ground = mix(vec3(0.014, 0.012, 0.018), vec3(0.016, 0.016, 0.040), osiris);
+  gl_FragColor = vec4(colour * dim + ground, 1.0);
 }
 `;
 
@@ -217,6 +222,8 @@ export class Shader {
     this.rollWait = 3.0;
     this.tear = 0.0;
     this.tearAt = 0.5;
+    this.osirisValue = 0.0;
+    this.osirisTarget = 0.0;
     if (this.gl) this._build();
   }
 
@@ -253,6 +260,7 @@ export class Shader {
     this.tearUniform = gl.getUniformLocation(program, 'tear');
     this.tearAtUniform = gl.getUniformLocation(program, 'tearAt');
     this.grainUniform = gl.getUniformLocation(program, 'grain');
+    this.osirisUniform = gl.getUniformLocation(program, 'osiris');
     this.resize();
   }
 
@@ -277,6 +285,9 @@ export class Shader {
   // Asleep, the phosphors settle into the dusk sky; awake, back. Eased over
   // a few seconds, the way light changes.
   sleep(on) { this.sleepTarget = on ? 1 : 0; }
+
+  // OSIRIS up: the lights go over to its colours, in about a second.
+  theme(osiris) { this.osirisTarget = osiris ? 1 : 0; }
 
   /* One frame of an old set: a flicker that is never quite still and now
    * and then dips, a brighter band rolling up the picture every few seconds,
@@ -313,6 +324,7 @@ export class Shader {
     gl.uniform1f(this.tearUniform, this.tear);
     gl.uniform1f(this.tearAtUniform, this.tearAt);
     gl.uniform1f(this.grainUniform, Math.random() * 97.0);
+    gl.uniform1f(this.osirisUniform, this.osirisValue);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
@@ -329,6 +341,7 @@ export class Shader {
         this.last = now;
         this.time += dt * 1.5 * this.rate;
         this.sleepValue += (this.sleepTarget - this.sleepValue) * Math.min(1, dt * 1.05);
+        this.osirisValue += (this.osirisTarget - this.osirisValue) * Math.min(1, dt * 3.2);
         this._set(dt);
         this.draw();
       }

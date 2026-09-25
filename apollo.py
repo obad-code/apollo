@@ -119,6 +119,7 @@ import live  # noqa: E402
 import private_eye  # noqa: E402
 import projects  # noqa: E402
 import orb as orb_module  # noqa: E402
+import osiris as osiris_module  # noqa: E402
 import overlay_content  # noqa: E402
 import overlay_state  # noqa: E402
 import panels  # noqa: E402
@@ -621,6 +622,7 @@ class Watcher(threading.Thread):
                 held[name] = False
 
         self.app.check_intro()
+        self.app.check_osiris()
         self.app.check_presence(idle_seconds())
         self.app.check_overlay_alive()
 
@@ -906,6 +908,21 @@ class WebReporter:
         self._call("tab", str(name))
         return True
 
+    def osiris(self, on):
+        """OSIRIS mode on the page, or off: Apollo in its colours, with the
+        frame the map's window is laid into (or without it)."""
+        self._call("osiris", bool(on))
+
+    def ask_osiris(self, on):
+        """OSIRIS asked for by voice. The watcher brings the display up if it
+        has to and tells the page (Apollo.check_osiris)."""
+        app = self._app
+        if app is None:
+            return False
+        log.info("OSIRIS %s, you said", "open" if on else "closed")
+        app.request_osiris(bool(on))
+        return True
+
     def going_out(self):
         """You said you are going out."""
         app = self._app
@@ -960,11 +977,12 @@ class Api:
     what keeps it out.
     """
 
-    def __init__(self, quit, open_link=None, desk=None, poke=None):
+    def __init__(self, quit, open_link=None, desk=None, poke=None, osiris=None):
         self._quit = quit
         self._open_link = open_link
         self._desk = desk or stockdesk.StockDesk()
         self._poke = poke or (lambda *keys: None)
+        self._osiris = osiris
 
     def quit(self):
         self._quit()
@@ -1012,6 +1030,21 @@ class Api:
         journal.opened(str(what or ""), str(title or ""), str(source or ""))
         return True
 
+    def osiris_open(self, rect):
+        """The display has gone into OSIRIS mode and laid out the frame for the
+        map, at `rect` ({x, y, w, h}, device pixels): the map's window goes
+        there. Called again when the frame moves."""
+        if self._osiris is None:
+            return False
+        return self._osiris.open(rect)
+
+    def osiris_close(self):
+        """The display has left OSIRIS mode: the map's window goes."""
+        if self._osiris is None:
+            return False
+        self._osiris.close()
+        return True
+
     def set_panel(self, name, shown):
         """A panel shown or hidden from the display itself - LYLA's room, by
         the button along the bottom - and kept that way, as if it had been
@@ -1051,6 +1084,11 @@ class Apollo:
         self.asleep_shown = False           # what the page was last told
         self.last_status = None    # the phase the overlay last acted on
         self.view = turnview.TurnView()   # what this turn adds up to on screen
+        # OSIRIS, laid into the display in a window of its own (osiris.py).
+        self.osiris = osiris_module.Osiris(origin=self._display_origin,
+                                           owner=lambda: self.overlay.hwnd,
+                                           on_gone=self.osiris_gone)
+        self.osiris_requested = None
         self.window = webview.create_window(
             "Apollo",
             INDEX,
@@ -1066,7 +1104,7 @@ class Apollo:
             background_color="#000000",
             js_api=Api(self.quit, open_link=self.open_link,
                        desk=stockdesk.StockDesk(poke=self.poke_data),
-                       poke=self.poke_data),
+                       poke=self.poke_data, osiris=self.osiris),
         )
         self.window.events.shown += self.on_shown
         self.window.events.loaded += self.on_loaded
@@ -1258,6 +1296,53 @@ class Apollo:
             self.apply_mode()
 
     def apply_mode(self):
+        """Swap between the overlay and the full display, and take OSIRIS's
+        window along: it is only ever on screen with the display, awake."""
+        self._apply_mode()
+        self.osiris_follow()
+
+    def osiris_follow(self):
+        osiris = getattr(self, "osiris", None)
+        if osiris is not None:
+            osiris.follow(self.overlay.mode == Overlay.FULL and not self.presence.asleep)
+
+    @staticmethod
+    def _display_origin():
+        left, top, _right, _bottom = Overlay.work_area()
+        return (left, top)
+
+    def osiris_gone(self):
+        """The map's window was closed from its own side: the display takes
+        off OSIRIS's colours."""
+        ui = getattr(self, "ui", None)
+        if ui is not None and ui.alive:
+            ui.osiris(False)
+
+    def request_osiris(self, on):
+        """OSIRIS open or closed, by voice. The watcher does it (check_osiris)."""
+        self.osiris_requested = bool(on)
+
+    def check_osiris(self):
+        """A voice request for OSIRIS, on the watcher's thread like every other
+        change of mode: the display comes up first if it has to, then the page
+        goes into OSIRIS mode and says where the map goes (Api.osiris_open)."""
+        wanted = getattr(self, "osiris_requested", None)
+        if wanted is None:
+            return
+        self.osiris_requested = None
+        ui = getattr(self, "ui", None)
+        if ui is None or not ui.alive:
+            return
+        if wanted and not self.presence.full:
+            self.presence.toggle_peek()
+            self.apply_mode()
+        ui.osiris(wanted)
+        if not wanted:
+            osiris = getattr(self, "osiris", None)
+            if osiris is not None:
+                osiris.close()
+
+    def _apply_mode(self):
         """Swap between the overlay and the full display.
 
         A cut, not an animation: the full display is a different thing
