@@ -41,12 +41,15 @@ class Native:
     def destroy(self, window):
         self.calls.append(("destroy",))
 
+    def navigate(self, window, url):
+        self.calls.append(("navigate", url))
 
-def controller(origin=(0, 0), on_gone=None):
+
+def controller(origin=(0, 0), on_gone=None, layers=None):
     native = Native()
     return osiris.Osiris(create=native.create, place=native.place, show=native.show,
-                         hide=native.hide, destroy=native.destroy,
-                         origin=lambda: origin, on_gone=on_gone), native
+                         hide=native.hide, destroy=native.destroy, navigate=native.navigate,
+                         origin=lambda: origin, on_gone=on_gone, layers=layers), native
 
 
 FRAME = {"x": 700, "y": 180, "w": 1700, "h": 1000}
@@ -194,3 +197,82 @@ def test_the_window_follows_the_display(monkeypatch):
     app.presence.toggle_peek()
     app.apply_mode()
     assert followed[-1] is False
+
+
+# --- ultra mode: the map as one display among several -------------------------
+
+
+def test_parked_it_goes_from_the_screen_but_stays_loaded():
+    o, native = controller()
+    o.open(FRAME)
+    native.ready()
+    o.park()                                       # minimized, or something laid over it
+    assert native.calls[-1] == ("hide",)
+    assert ("destroy",) not in native.calls
+    o.open({"x": 10, "y": 20, "w": 900, "h": 600})  # back, somewhere else
+    assert [c for c in native.calls if c[0] == "create"] == [("create", (700, 180, 1700, 1000))]
+    assert native.calls[-2:] == [("place", (10, 20, 900, 600)), ("show",)]
+
+
+def test_parked_it_stays_off_when_the_display_comes_back():
+    o, native = controller()
+    o.open(FRAME)
+    native.ready()
+    o.park()
+    o.follow(False)
+    o.follow(True)
+    assert ("show",) not in native.calls
+
+
+def test_parked_before_it_was_up_it_comes_up_hidden():
+    o, native = controller()
+    o.open(FRAME)
+    o.park()
+    native.ready()
+    assert native.calls[-1] == ("hide",)
+
+
+def test_only_the_map_s_own_layers():
+    o, native = controller()
+    kept = o.set_layers(["cctv", "javascript:alert(1)", "cables", "cctv", 7])
+    assert kept == ["cctv", "cables"]
+    assert o.url == "https://osirisai.live/?layers=cctv,cables"
+    assert osiris.url_for([]) == "https://osirisai.live/"
+    assert osiris.url_for(["https://evil.example"]) == "https://osirisai.live/"
+
+
+def test_opened_with_the_layers_you_chose():
+    o, native = controller(layers=["earthquakes", "day_night"])
+    assert o.url == "https://osirisai.live/?layers=earthquakes,day_night"
+    assert controller()[0].url == osiris.URL
+
+
+def test_new_layers_load_into_the_open_map():
+    o, native = controller()
+    o.open(FRAME)
+    native.ready()
+    o.set_layers(["maritime"])
+    assert native.calls[-1] == ("navigate", "https://osirisai.live/?layers=maritime")
+
+
+def test_new_layers_with_no_map_open_wait_for_it():
+    o, native = controller()
+    o.set_layers(["maritime"])
+    assert native.calls == []
+
+
+def test_the_display_parks_it_and_sets_its_layers():
+    parked, layered = [], []
+
+    class Fake:
+        def park(self):
+            parked.append(True)
+
+        def set_layers(self, layers):
+            layered.append(layers)
+            return ["cctv"]
+
+    api = apollo.Api(lambda: None, osiris=Fake())
+    assert api.osiris_park() is True and parked == [True]
+    assert api.osiris_layers(["cctv", "nope"]) == ["cctv"] and layered == [["cctv", "nope"]]
+    assert apollo.Api(lambda: None).osiris_park() is False

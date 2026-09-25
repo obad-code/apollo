@@ -32,6 +32,9 @@ class App:
     def check_osiris(self):
         pass
 
+    def check_displays(self):
+        pass
+
     def check_presence(self, idle):
         self.ticks += 1
         if self.ticks >= self.ticks_until_stop:

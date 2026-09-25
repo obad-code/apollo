@@ -33,9 +33,32 @@ log = logging.getLogger("apollo.osiris")
 
 LAYERS = ("maritime", "cctv", "cctv_previews", "live_news", "earthquakes",
           "global_incidents", "day_night", "cables", "sdk_sea", "sdk_air", "sdk_naval")
-URL = "https://osirisai.live/?layers=" + ",".join(LAYERS)
+SITE = "https://osirisai.live/"
 TITLE = "Apollo · OSIRIS"
 SMALLEST = 200            # a frame narrower or shorter than this is not a frame
+
+
+def layers_of(wanted):
+    """The map's own layers out of `wanted`, once each, in the order given.
+    Anything else - anything that is not one of its layers' names - is left
+    out: the page chooses layers, never an address."""
+    if not isinstance(wanted, (list, tuple)):
+        return list(LAYERS)
+    kept = []
+    for layer in wanted:
+        if isinstance(layer, str) and layer in LAYERS and layer not in kept:
+            kept.append(layer)
+    return kept
+
+
+def url_for(layers):
+    """The map with these layers on. Always osirisai.live: only a layer's
+    name gets into the address, and with none on it is the site's own view."""
+    kept = layers_of(layers)
+    return SITE + "?layers=" + ",".join(kept) if kept else SITE
+
+
+URL = url_for(LAYERS)
 
 
 def _frame(rect):
@@ -58,14 +81,21 @@ class Osiris:
     without a window: `create(rect, on_ready, on_closed)` makes the window,
     calls `on_ready` once it can be moved and `on_closed` if it is closed
     from its own side; `place(window, rect)` puts it on a screen rectangle;
-    `show`, `hide` and `destroy` do what they say. `origin()` is where the
+    `show`, `hide` and `destroy` do what they say, and `navigate(window,
+    url)` loads the map again with other layers. `origin()` is where the
     display's top left corner is on the screen, and `on_gone()` is told
     when the window closed without Apollo closing it (Alt+F4 on the map),
     so the display can take off OSIRIS's colours.
+
+    In ultra mode the map is one display among several, and it is parked -
+    off the screen but still loaded - while it is minimized, while another
+    display is expanded, while one is being dragged or set up over it, and
+    while Apollo answers: a window can only be laid over the page, never
+    under it, so whatever the page drew where the map is would be hidden.
     """
 
     def __init__(self, create=None, place=None, show=None, hide=None, destroy=None,
-                 origin=None, owner=None, on_gone=None):
+                 navigate=None, origin=None, owner=None, on_gone=None, layers=None):
         self._owner = owner or (lambda: None)
         self._on_gone = on_gone or (lambda: None)
         self._create = create or self._create_window
@@ -73,12 +103,15 @@ class Osiris:
         self._show = show or _show_window
         self._hide = hide or _hide_window
         self._destroy = destroy or _destroy_window
+        self._navigate = navigate or _navigate_window
         self._origin = origin or (lambda: (0, 0))
         self._lock = threading.RLock()
         self.window = None
         self.frame = None         # where it goes on the display, device pixels
         self.ready = False        # the window exists and can be moved
         self.shown = True         # the display is up and awake
+        self.wanted = True        # ...and the page wants the map seen, not parked
+        self.url = url_for(LAYERS if layers is None else layers)
 
     def _on_screen(self):
         left, top = self._origin()
@@ -93,6 +126,7 @@ class Osiris:
             return False
         with self._lock:
             self.frame = frame
+            self.wanted = True
             if self.window is None:
                 log.info("OSIRIS opening")
                 self.ready = False
@@ -102,13 +136,35 @@ class Osiris:
                 self._show(self.window)
         return True
 
+    def park(self):
+        """Off the screen, still loaded: back where it was, or wherever the
+        next `open` says, without loading the whole map again."""
+        with self._lock:
+            was = self.wanted
+            self.wanted = False
+            if self.window is not None and self.ready and self.shown and was:
+                self._hide(self.window)
+
+    def set_layers(self, layers):
+        """The map with these of its layers on; an open map loads them now.
+        Returns the layers kept."""
+        kept = layers_of(layers)
+        with self._lock:
+            url = url_for(kept)
+            changed = url != self.url
+            self.url = url
+            if changed and self.window is not None and self.ready:
+                log.info("OSIRIS layers: %s", ",".join(kept) or "the site's own")
+                self._navigate(self.window, url)
+        return kept
+
     def _on_ready(self, *_):
         with self._lock:
             if self.window is None:
                 return
             self.ready = True
             self._place(self.window, self._on_screen())
-            if not self.shown:
+            if not (self.shown and self.wanted):
                 self._hide(self.window)
 
     def _on_closed(self, *_):
@@ -125,7 +181,7 @@ class Osiris:
             shown = bool(shown)
             changed = shown != self.shown
             self.shown = shown
-            if self.window is None or not self.ready or not changed:
+            if self.window is None or not self.ready or not changed or not self.wanted:
                 return
             if shown:
                 self._place(self.window, self._on_screen())
@@ -147,7 +203,7 @@ class Osiris:
         x, y, w, h = rect
         # No js_api: the page gets no way into Apollo.
         window = webview.create_window(
-            TITLE, URL, x=x, y=y, width=w, height=h,
+            TITLE, self.url, x=x, y=y, width=w, height=h,
             frameless=True, easy_drag=False, on_top=True, resizable=False,
             background_color="#04040a", text_select=True)
         window.events.shown += on_ready
@@ -209,6 +265,20 @@ def _hide_window(window):
     hwnd = _hwnd()
     if hwnd:
         _user32.ShowWindow(hwnd, SW_HIDE)
+
+
+def _navigate_window(window, url):
+    try:
+        window.load_url(url)
+    except Exception as e:  # noqa: BLE001 - it may be closing
+        log.info("OSIRIS would not load its new layers: %s", e)
+
+
+def _navigate_window(window, url):
+    try:
+        window.load_url(url)
+    except Exception as e:  # noqa: BLE001 - it may be closing
+        log.info("OSIRIS would not load its new layers: %s", e)
 
 
 def _destroy_window(window):

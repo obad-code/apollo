@@ -64,13 +64,14 @@ class Context:
     `panels(state)` tells the display which of its panels to show, `story(n)`
     opens the feed's nth story on it and says what that story is, `stock(sym)`
     does the same for a stock on the watchlist, `osiris(on)` opens or closes
-    OSIRIS inside the display, and `turn`
+    OSIRIS inside the display, `display(request)` asks ultra mode's displays
+    for something - on or off, one expanded, one shown or hidden - and `turn`
     is the user's turn number at the moment the call arrived.
     """
 
     def __init__(self, show=None, activity=None, turn=None, refresh=None,
                  panels_hook=None, story_hook=None, stock_hook=None, idle_hook=None,
-                 tab_hook=None, away_hook=None, osiris_hook=None):
+                 tab_hook=None, away_hook=None, osiris_hook=None, display_hook=None):
         self.show = show or (lambda visual: None)
         self.activity = activity or (lambda text: None)
         # False by default, so a tool that changes the display can tell the
@@ -83,6 +84,7 @@ class Context:
         self.tab = tab_hook or (lambda name: None)
         self.away = away_hook or (lambda: False)
         self.osiris = osiris_hook or (lambda on: False)
+        self.display = display_hook or (lambda request: False)
         self.turn = current_turn() if turn is None else turn
 
 
@@ -250,6 +252,7 @@ import insiders  # noqa: E402
 import journal  # noqa: E402
 import private_eye  # noqa: E402
 import clips  # noqa: E402
+import displays  # noqa: E402
 import feeds  # noqa: E402
 import live  # noqa: E402
 import market  # noqa: E402
@@ -484,17 +487,34 @@ def _save_clip(ctx, seconds=60):
     return result
 
 
+def _in_ultra_mode(ctx, said, shown):
+    """In ultra mode, hiding or showing is done to its displays - all but
+    Lyla, who is the normal display's alone. None when it is not for them."""
+    if not displays.ultra():
+        return None
+    display = displays.resolve(said)
+    if display is None:
+        return None
+    if ctx.display({"action": "show" if shown else "hide", "id": display}) is False:
+        return {"ok": False, "error": "The display isn't up to do that right now."}
+    return {"ok": True, "display": display, "name": displays.name(display), "shown": shown}
+
+
 @_tool("hide_panel", "clearing it off the display",
        "Take a panel off the full display - the stocks, the news feed, the "
        "clock, the status dots, the system gauges, Lyla's room, or Apollo's own "
-       "ring. Hiding Lyla gives her room back to the stocks and the ring. "
-       "Use this when the user asks to hide, remove or close part of the "
-       "display. Pass what they called it.",
+       "ring. Hiding Lyla gives her room back to the stocks and the ring. In "
+       "ultra mode it takes one of its displays off instead - projects, ideas, "
+       "talks, OSIRIS and the rest. Use this when the user asks to hide, "
+       "remove or close part of the display. Pass what they called it.",
        _obj({"panel": {"type": "string",
                        "description": "What the user called the panel"}},
             ("panel",)))
 def _hide_panel(ctx, panel=""):
     ctx.activity("clearing it off the display")
+    done = _in_ultra_mode(ctx, panel, False)
+    if done is not None:
+        return done
     result = panels.hide(panel)
     if result.get("ok"):
         ctx.panels(result["panels"])
@@ -502,17 +522,69 @@ def _hide_panel(ctx, panel=""):
 
 
 @_tool("show_panel", "putting it back on the display",
-       "Put a panel back on the full display after it was hidden. Use this "
-       "when the user asks to show, bring back or restore part of it.",
+       "Put a panel back on the full display after it was hidden - in ultra "
+       "mode, one of its displays. Use this when the user asks to show, bring "
+       "back or restore part of it.",
        _obj({"panel": {"type": "string",
                        "description": "What the user called the panel"}},
             ("panel",)))
 def _show_panel(ctx, panel=""):
     ctx.activity("putting it back on the display")
+    done = _in_ultra_mode(ctx, panel, True)
+    if done is not None:
+        return done
     result = panels.show(panel)
     if result.get("ok"):
         ctx.panels(result["panels"])
     return result
+
+
+@_tool("ultra_mode", "getting the displays ready",
+       "Switch Apollo's full display into ultra mode, the work mode: every "
+       "display on the screen at once as tiles - the stocks, the feed, the "
+       "OSIRIS map, projects, ideas, the system and today - which the user "
+       "can move, resize, hide and expand. Use this when the user asks for "
+       "ultra mode, work mode or the expanded display, or to get the screen "
+       "ready for work - \"الوضع الموسع\", \"وضع الشغل\", \"جهز الشاشة "
+       "للشغل\". on=false puts the normal display back. Confirm in a few words.",
+       _obj({"on": {"type": "boolean",
+                    "description": "True for ultra mode, false for the normal display"}},
+            ("on",)))
+def _ultra_mode(ctx, on=True):
+    wanted = bool(on)
+    ctx.activity("getting the displays ready" if wanted else "putting the display back")
+    if ctx.display({"action": "ultra", "on": wanted}) is False:
+        return {"ok": False, "error": "The display isn't up to go into ultra mode right now."}
+    return {"ok": True, "ultra": wanted}
+
+
+# What "put everything back" sounds like: every display back in the grid.
+_EVERYTHING = {"", "all", "everything", "every display", "all displays", "all of them",
+               "grid", "the grid", "كل", "الكل", "كلها", "كل الشاشات", "الشبكة"}
+
+
+@_tool("focus_display", "putting it on your screen",
+       "Put one display on the user's screen: the full display comes up in "
+       "ultra mode with that display expanded large and every other display "
+       "minimized beside it. Use this when the user asks to put, pull up, "
+       "bring up, expand or focus something on their screen - \"حط المشاريع "
+       "على الشاشة\", \"كبر الأخبار\", \"put OSIRIS on my screen\". Pass what "
+       "they called it: the stocks, the news, OSIRIS or the map, projects, "
+       "ideas, talks, the system, today, or Apollo. \"all\" puts every "
+       "display back in the grid.",
+       _obj({"display": _str("What the user called the display, or all")}, ("display",)))
+def _focus_display(ctx, display=""):
+    said = str(display or "").strip()
+    everything = said.lower() in _EVERYTHING
+    wanted = None if everything else displays.resolve(said)
+    if not everything and wanted is None:
+        return displays.unknown(said)
+    ctx.activity("putting it on your screen")
+    if ctx.display({"action": "focus", "id": wanted}) is False:
+        return {"ok": False, "error": "The display isn't up to do that right now."}
+    if wanted is None:
+        return {"ok": True, "all": True}
+    return {"ok": True, "display": wanted, "name": displays.name(wanted)}
 
 
 @_tool("open_story", "opening it on the display",

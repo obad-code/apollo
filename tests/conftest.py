@@ -48,6 +48,17 @@ def private_finds(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def private_layout(tmp_path, monkeypatch):
+    """...and ultra mode's layout its own: no test lays out the real screen."""
+    try:
+        import displays
+    except ImportError:
+        return
+    monkeypatch.setattr(displays, "PATH", str(tmp_path / "layout.json"))
+    monkeypatch.setattr(displays, "_memo", None)
+
+
+@pytest.fixture(autouse=True)
 def private_ideas(tmp_path, monkeypatch):
     """...its own ideas, and no git or GitHub reached for the Projects tab."""
     try:

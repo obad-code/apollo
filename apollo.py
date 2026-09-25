@@ -79,6 +79,7 @@ The WorkerW handle also dies whenever Explorer restarts, and WebView2
 composites unreliably outside the normal window hierarchy.
 """
 
+import collections
 import ctypes
 from ctypes import wintypes
 import json
@@ -112,6 +113,7 @@ import away as away_mode  # noqa: E402
 import briefing  # noqa: E402
 import clips  # noqa: E402
 import dataservice  # noqa: E402
+import displays  # noqa: E402
 import ideas  # noqa: E402
 import interests  # noqa: E402
 import journal  # noqa: E402
@@ -623,6 +625,7 @@ class Watcher(threading.Thread):
 
         self.app.check_intro()
         self.app.check_osiris()
+        self.app.check_displays()
         self.app.check_presence(idle_seconds())
         self.app.check_overlay_alive()
 
@@ -923,6 +926,22 @@ class WebReporter:
         app.request_osiris(bool(on))
         return True
 
+    def display(self, request):
+        """Ultra mode's displays: on or off, one expanded, one shown or
+        hidden - or the layout kept from last time, as the display opens."""
+        self._call("display", request)
+
+    def ask_display(self, request):
+        """Something asked of ultra mode by voice. Like OSIRIS, the watcher
+        does it - bringing the display up first if it has to be seen - so
+        a mode never changes on the voice's own thread (check_displays)."""
+        app = self._app
+        if app is None:
+            return False
+        log.info("displays: %s, you said", request)
+        app.request_display(request)
+        return True
+
     def going_out(self):
         """You said you are going out."""
         app = self._app
@@ -1051,6 +1070,29 @@ class Api:
         asked for out loud."""
         return (panels.show if shown else panels.hide)(str(name or ""))
 
+    def save_layout(self, layout):
+        """Ultra mode's layout as the page has it now, after a drag, a resize,
+        a display hidden or expanded: kept, so the screen you set up is the
+        one you get tomorrow. Cleaned first - it came over the bridge."""
+        displays.save(layout)
+        return True
+
+    def osiris_park(self):
+        """Ultra mode wants the map off the screen for now - minimized, under
+        a display being dragged or set up, or while Apollo answers - but kept
+        loaded for when it is back."""
+        if self._osiris is None:
+            return False
+        self._osiris.park()
+        return True
+
+    def osiris_layers(self, layers):
+        """The map's layers, switched in its settings. Only its own layers'
+        names are taken; the map's address is never the page's to give."""
+        if self._osiris is None:
+            return []
+        return self._osiris.set_layers(layers)
+
 
 class Apollo:
     def __init__(self):
@@ -1087,8 +1129,10 @@ class Apollo:
         # OSIRIS, laid into the display in a window of its own (osiris.py).
         self.osiris = osiris_module.Osiris(origin=self._display_origin,
                                            owner=lambda: self.overlay.hwnd,
-                                           on_gone=self.osiris_gone)
+                                           on_gone=self.osiris_gone,
+                                           layers=displays.state()["layers"])
         self.osiris_requested = None
+        self.display_requests = collections.deque()   # ultra mode, asked by voice
         self.window = webview.create_window(
             "Apollo",
             INDEX,
@@ -1342,6 +1386,41 @@ class Apollo:
             if osiris is not None:
                 osiris.close()
 
+    def request_display(self, request):
+        """Ultra mode asked for by voice. The watcher does it (check_displays)."""
+        queue = getattr(self, "display_requests", None)
+        if queue is None:
+            queue = self.display_requests = collections.deque()
+        queue.append(dict(request))
+
+    @staticmethod
+    def _to_be_seen(request):
+        """A request that wants the display up: ultra mode on, a display put
+        on the screen or shown. Hiding one, or leaving ultra mode, leaves the
+        screen as it is."""
+        action = request.get("action")
+        return action in ("focus", "show") or (action == "ultra" and bool(request.get("on")))
+
+    def check_displays(self):
+        """Voice requests for ultra mode, in the order they were made, on the
+        watcher's thread like every other change of mode: the display comes
+        up first if the request wants to be seen, then the page does it."""
+        queue = getattr(self, "display_requests", None)
+        if not queue:
+            return
+        ui = getattr(self, "ui", None)
+        if ui is None or not ui.alive:
+            queue.clear()
+            return
+        while queue:
+            request = queue.popleft()
+            if self._to_be_seen(request) and not self.presence.full:
+                self.presence.toggle_peek()
+                self.apply_mode()
+            show = getattr(ui, "display", None)
+            if show is not None:
+                show(request)
+
     def _apply_mode(self):
         """Swap between the overlay and the full display.
 
@@ -1372,6 +1451,10 @@ class Apollo:
                 shown = getattr(ui, "panels", None)
                 if shown is not None:
                     shown(panels.state())
+                # ...and ultra mode's displays the way you laid them out.
+                laid_out = getattr(ui, "display", None)
+                if laid_out is not None:
+                    laid_out({"action": "layout", "layout": displays.state()})
 
         if orb is None:                   # no native layer yet: just cut
             self.overlay.show_page(mode)
