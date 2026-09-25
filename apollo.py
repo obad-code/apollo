@@ -116,7 +116,6 @@ import ideas  # noqa: E402
 import interests  # noqa: E402
 import journal  # noqa: E402
 import live  # noqa: E402
-import phone  # noqa: E402
 import private_eye  # noqa: E402
 import projects  # noqa: E402
 import orb as orb_module  # noqa: E402
@@ -1030,7 +1029,6 @@ class Apollo:
         self.eye = None            # Private Eye, the scout
         self.away = away_mode.Away()        # out of the house? (away.py)
         self.keeper = away_mode.Keeper()    # ...then the PC stays up with Claude open
-        self.phone_watch = None             # your phone on the Wi-Fi, if APOLLO_PHONE is set
         self.away_requested = False
         self.intro_wanted = False  # the word, once; see `check_intro`
         self.intro_until = 0.0     # ...playing until then (monotonic)
@@ -1189,8 +1187,6 @@ class Apollo:
             self.learner.stop()
         if self.eye is not None:
             self.eye.stop()
-        if self.phone_watch is not None:
-            self.phone_watch.stop()
         if self.orb:
             self.orb.close()
         if self.tray:
@@ -1548,8 +1544,8 @@ class Apollo:
             self.request_idle()
         self._was_locked = locked
         # Away mode (away.py): out by what you say - once the answer is over,
-        # or Apollo's own voice would count as you being here - or by your
-        # phone leaving the Wi-Fi; back by a touch, or the phone coming home.
+        # or Apollo's own voice would count as you being here - and back at a
+        # touch or a word.
         # Here, on the watcher's thread, because keeping the PC up holds only
         # as long as the thread that asked for it.
         if getattr(self, "away", None) is not None:
@@ -1559,8 +1555,7 @@ class Apollo:
                     self.keeper.apply(True)
             touched = self.presence._touched
             here = idle if touched is None else min(idle, max(0.0, now - touched))
-            watch = getattr(self, "phone_watch", None)
-            if self.away.update(now, here, watch.state() if watch is not None else None):
+            if self.away.update(now, here):
                 self.keeper.apply(self.away.away)
         # Asked for by voice: once Apollo has finished saying it will, or his
         # own voice would be the thing that wakes him.
@@ -1691,14 +1686,6 @@ class Apollo:
         # care about; the best few finds go on the display and into the recap.
         self.eye = private_eye.PrivateEye().start(on_found=lambda: self.poke_data("finds"))
         log.info("Private Eye on watch")
-
-        # Away mode by your phone, if Apollo knows which one it is.
-        ident = phone.saved_ident()
-        if ident:
-            self.phone_watch = phone.Watch(phone.Phone(ident)).start()
-            log.info("watching for your phone on the Wi-Fi")
-        else:
-            log.info("no APOLLO_PHONE; away mode goes by what you say")
 
         # CTRL+1. A thread of its own so it answers during a turn as well as
         # between them; `run_loop` reads its flag and does the actual

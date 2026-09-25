@@ -279,22 +279,11 @@ already holds - the level only, nothing is recorded or sent - and a sentence
 wakes it where a click or a cough does not. It will not fall asleep over a
 full-screen program, so a film or a game is left alone.
 
-**Away mode.** When you leave the house the PC stays up with the Claude app
-open, so you can reach it from your phone; when you are home it may rest as
-the power plan says. You have left when you say so (*"أنا طالع"*, *"I'm
-heading out"*), or when your phone has been off the home Wi-Fi for 15
-minutes and nobody has touched the PC for 10. You are back when you touch
-the PC, or when the phone comes home after it was gone. The phone is named
-by its Wi-Fi address, its IP, or both, saved once:
-
-```powershell
-setx APOLLO_PHONE "3a-4b-5c-6d-7e-8f 192.168.1.23"
-```
-
-On an iPhone both are under Settings > Wi-Fi > (i) next to your network; set
-*Private Wi-Fi Address* to **Fixed** there, or the address changes. Without
-`APOLLO_PHONE` away mode goes by what you say. Only sleep is held off - the
-screen can still turn off.
+**Away mode.** Tell Apollo you are going out (*"أنا طالع"*, *"I'm heading
+out"*) and the PC stays up with the Claude app open, so you can reach it
+from your phone; touch the PC or talk to Apollo when you are back and it
+may rest again as the power plan says. Only sleep is held off - the screen
+can still turn off.
 
 It also goes idle when you ask - *"ادخل وضع الخمول"*, *"idle mode"* - once
 it has finished saying it will, and when you lock the PC (Win+L). Either

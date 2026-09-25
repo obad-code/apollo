@@ -1,11 +1,11 @@
 """Away mode: while you are out of the house the PC stays up with Claude
 open, so you can reach it from your phone; while you are home it may rest.
 
-You have left when you say so ("أنا طالع", the going_out tool), or when your
-phone has been off the home Wi-Fi for a while (phone.py) and nobody is at
-the keyboard - a phone dropping off the Wi-Fi while you type is not you
-leaving. You are back when you touch the PC, or when the phone comes home
-after it was gone.
+You have left when you say so ("أنا طالع", the going_out tool), and you
+are back when you touch the PC or talk to Apollo. Nothing watches the
+network for your phone: it was built and taken out again, because a phone
+asleep in a pocket misses pings and a private Wi-Fi address changes, and
+saying it is simpler and never wrong.
 
 `Keeper` does the two things away mode is for. It asks Windows not to sleep
 (SetThreadExecutionState, which holds only while the thread that asked is
@@ -33,43 +33,24 @@ class Away:
     # of the chord you held to say it.
     GRACE = 1.0
 
-    def __init__(self, gone_after=15 * 60, quiet_after=10 * 60):
-        self.gone_after = gone_after
-        self.quiet_after = quiet_after
+    def __init__(self):
         self.away = False
         self.since = None           # when you went
-        self._phone_last = None     # when the phone was last on the Wi-Fi
-        self._phone_gone = False    # ...and whether it has since been off it a while
 
     def leaving(self, now):
         """You said you are going out. True if that changed anything."""
         changed = not self.away
         self.away = True
         self.since = now
-        self._phone_gone = False    # only an absence from now on counts
         return changed
 
-    def update(self, now, idle, phone=None):
-        """`idle` is seconds since you last touched the PC; `phone` is whether
-        it is on the Wi-Fi now, or None when there is no phone to go by.
-        True if you left or came back."""
-        before = self.away
-        returned = gone = False
-        if phone is True:
-            returned = self.away and self._phone_gone
-            self._phone_last = now
-            self._phone_gone = False
-        elif phone is False:
-            if self._phone_last is None:
-                self._phone_last = now
-            if now - self._phone_last >= self.gone_after:
-                self._phone_gone = gone = True
-        if self.away and (returned or now - idle > self.since + self.GRACE):
+    def update(self, now, idle):
+        """`idle` is seconds since you last touched the PC or talked to Apollo.
+        True if that brought you back."""
+        if self.away and now - idle > self.since + self.GRACE:
             self.away = False
-        elif not self.away and gone and idle >= self.quiet_after:
-            self.away = True
-            self.since = now
-        return self.away != before
+            return True
+        return False
 
 
 def _set_state(flags):
