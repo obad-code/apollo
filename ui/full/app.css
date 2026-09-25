@@ -65,6 +65,9 @@
      another 168px above that. */
   --room: 272px;
   --mono: "Thmanyah", "Segoe UI", system-ui, sans-serif;
+  /* The stock list's face, after the interactive-list component: a small
+     monospace, spaced out and upper-case. */
+  --hud: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
   --display: "Thmanyah Display", "Thmanyah", Georgia, serif;
 }
 
@@ -185,54 +188,61 @@ html, body {
   font-variant-numeric: tabular-nums;   /* a proportional face wanders */
 }
 
-/* --- one stock, one card ---------------------------------------------------
-   White paper on the dark display, the same card the overlay draws: the mark,
-   the price, the curve, and the valuation along the foot. */
+/* --- the stocks, as a list -------------------------------------------------------
+   The interactive-list component's rows, the way the feed has them: edge to
+   edge of the panel, in a small monospace, spaced out and upper-case, with a
+   paper bar that slides to the row under the pointer and turns its text dark.
+   A row is the mark and ticker, the name, the day's curve drawn small, the
+   price and the move; the chart itself opens beside the panel (#chart-peek). */
 
-/* Two columns: seven cards in one column do not fit the height the panel
-   has, and shrinking them until they did left a chart eight pixels tall. */
-#watchlist { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
+#watchlist { position: relative; }        /* over the bar, which is under it */
 
-#watchlist .card {
-  position: relative; overflow: hidden;
-  background: #121316; border-radius: 16px; padding: 12px 14px 10px;
-  border: 1px solid rgba(255, 255, 255, .07);
-  box-shadow: 0 10px 24px -16px rgba(0, 0, 0, .9);
-  color: #f2f3f5; text-shadow: none;    /* the phosphor bleed is for the amber */
+.stock-row {
+  position: relative; display: grid; align-items: center; width: 100%;
+  grid-template-columns: minmax(104px, 23%) minmax(0, 1fr) 84px 88px 78px;
+  gap: 0 14px; padding: 13px 24px; margin: 0; cursor: pointer;
+  font: 500 12px/1.2 var(--hud); letter-spacing: .14em; text-transform: uppercase;
+  text-align: left; color: #ece4d2; background: transparent;
+  border: 0; border-bottom: 1px solid rgba(255, 240, 210, .055);
+  transition: color .35s cubic-bezier(.215, .61, .355, 1);
 }
-
-/* The printed grid from the reference card, under everything on it. */
-#watchlist .card::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background-image: radial-gradient(rgba(255, 255, 255, .13) 1px, transparent 1.2px);
-  background-size: 11px 11px;
+.stock-row .sym { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.stock-row .sym b { font-weight: 800; color: #fff3dc; transition: color .35s; }
+.stock-row .mark { width: 18px; height: 18px; object-fit: contain; flex: none; }
+.stock-row .mark.none {
+  display: grid; place-items: center; border-radius: 5px; font-size: 11px; font-weight: 900;
+  background: rgba(255, 255, 255, .09); color: #9aa1ab;
 }
-#watchlist .card > * { position: relative; }
+/* Earnings this week, or an insider buying: a lit point beside the ticker,
+   and the words on the chart. */
+.stock-row .flag { width: 5px; height: 5px; border-radius: 50%; flex: none;
+                   background: var(--amber-bright); box-shadow: 0 0 6px rgba(255, 190, 90, .8); }
+.stock-row .name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+                   font-size: 11px; color: rgba(216, 210, 196, .55); transition: color .35s; }
+.stock-row .mini { display: block; width: 84px; height: 22px; overflow: visible; }
+.stock-row .mini.empty { height: 22px; }
+.stock-row .price { text-align: right; font-weight: 700; color: #fff3dc; transition: color .35s; }
+.stock-row .move { text-align: right; font-size: 11px; font-weight: 700; }
+/* Under the bar: dark on paper, the ink greens and reds, no phosphor bleed. */
+.stock-row.lit, .stock-row.lit .sym b, .stock-row.lit .price { color: #121012; text-shadow: none; }
+.stock-row.lit .name { color: rgba(18, 16, 18, .6); }
+.stock-row.lit .up { color: var(--up-ink); }
+.stock-row.lit .down { color: var(--down-ink); }
+.stock-row.lit .mini .line { stroke: #121012; }
+.stock-row.lit .mark.none { background: rgba(18, 16, 18, .1); color: #121012; }
 
-.card-top { display: flex; align-items: center; gap: 10px; font-size: 15px; }
-.card-top .mark { width: 26px; height: 26px; object-fit: contain; flex: none; }
-.card-top .mark.none {
-  display: grid; place-items: center; border-radius: 7px; font-size: 13px;
-  background: rgba(255, 255, 255, .09); color: #9aa1ab; font-weight: 900;
-}
-.card-top .ticker { font-weight: 900; letter-spacing: 0; }
-.card-top .price { margin-left: auto; font-weight: 900;
-                   font-variant-numeric: tabular-nums; }
-.card-top .move { margin-left: 8px; text-align: right; font-size: 12px; font-weight: 700;
-                  font-variant-numeric: tabular-nums; }
+.stock-row.add .sym b { color: var(--amber-bright); }
+.stock-row.add .mark.none { background: transparent; border: 1px dashed rgba(255, 214, 150, .4);
+                            color: var(--amber-bright); }
+.stock-row.add .name { text-transform: none; letter-spacing: .04em; font-family: var(--mono);
+                       font-size: 12px; color: var(--caption); }
+.stock-row.add.lit .sym b { color: #121012; }
+.stock-row.add.lit .mark.none { border-color: rgba(18, 16, 18, .4); color: #121012; }
+.stock-row.add.lit .name { color: rgba(18, 16, 18, .6); }
 
-#watchlist .chart { display: block; width: 100%; height: 54px; margin: 4px 0 2px; }
-#watchlist .chart.empty { height: 54px; }
-
-.card-foot { font-size: 12px; font-weight: 500; color: #8b929c;
-             font-variant-numeric: tabular-nums; }
-.card-foot b { color: #e8eaed; font-weight: 900; }
-.card-foot i { font-style: normal; }
-.card-foot i.up { color: var(--up-ink); }
-.card-foot i.down { color: var(--down-ink); }
-.card-foot .dot { opacity: .4; margin: 0 6px; }
-.card-foot .soon { color: var(--amber-bright); }
-.card-foot .buying { color: var(--up); }
+@keyframes fetching { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+.stock-row.pending { cursor: default; }
+.stock-row.pending .name { animation: fetching 1.4s ease-in-out infinite; }
 
 .insiders { margin-top: 10px; }
 .insiders h4 { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
@@ -244,21 +254,23 @@ html, body {
 .insiders .trade.sell span { color: var(--down); font-weight: 800; }
 .insiders .trade i { font-style: normal; color: var(--caption); }
 
-/* The curve draws itself in on the first paint only. */
+/* The small curves draw themselves in on the first paint only; the chart
+   beside the panel draws in every time it opens. */
 @keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes wash { from { opacity: 0; } to { opacity: 1; } }
-#watchlist.drawing .chart .line {
+#watchlist.drawing .mini .line {
   stroke-dasharray: 1; animation: draw .8s cubic-bezier(.32, .72, 0, 1) both;
 }
-#watchlist.drawing .chart .wash { animation: wash .6s ease-out .35s both; }
+.peek > .shot.open .quote-shot .chart .line {
+  stroke-dasharray: 1; animation: draw .9s cubic-bezier(.32, .72, 0, 1) .12s both;
+}
+.peek > .shot.open .quote-shot .chart .wash { animation: wash .6s ease-out .45s both; }
 
 .up { color: var(--up); }
 .down { color: var(--down); }
-#watchlist .card .up { color: var(--up); }
-#watchlist .card .down { color: var(--down); }
 
-@keyframes flash-up { from { background: rgba(95, 227, 154, .16); } to { background: #121316; } }
-@keyframes flash-down { from { background: rgba(255, 107, 122, .16); } to { background: #121316; } }
+@keyframes flash-up { from { background: rgba(95, 227, 154, .16); } to { background: rgba(95, 227, 154, 0); } }
+@keyframes flash-down { from { background: rgba(255, 107, 122, .16); } to { background: rgba(255, 107, 122, 0); } }
 .flash-up { animation: flash-up .6s ease-out; }
 .flash-down { animation: flash-down .6s ease-out; }
 
@@ -312,45 +324,25 @@ html, body {
 .idea button.sure { background: var(--down); color: #1a0c0e; }
 
 /* --- picking a stock --------------------------------------------------------
-   The feed's list, on the cards: a frame slides to the card under the
-   pointer, and a click opens the stock out of its card across the panel. */
+   The feed's list, on the stocks: a paper bar slides to the row under the
+   pointer, and a click opens the stock out of its row across the panel. */
 
 #markets { position: relative; }
 #watch-area {
-  position: relative; flex: 1; min-height: 0; margin: -6px; padding: 6px;
+  position: relative; flex: 1; min-height: 0; margin: 0 -24px;
   overflow-x: hidden; overflow-y: auto; scrollbar-width: none;
 }
 #watch-area::-webkit-scrollbar { display: none; }
-/* Equal rows, so the add slot is a card's height wherever it lands. */
-#watchlist { grid-auto-rows: 1fr; }
-#watchlist .card { cursor: pointer; transition: background .3s ease-out; }
-#watchlist .card.lit { background: #1b1b1f; }
-
-#watch-frame {
-  position: absolute; left: 0; top: 0; z-index: 2; opacity: 0; pointer-events: none;
-  border-radius: 16px; border: 1.5px solid rgba(255, 226, 172, .85);
-  box-shadow: 0 0 0 4px rgba(255, 176, 60, .10), 0 0 30px rgba(255, 160, 40, .32);
-  transition: transform .35s cubic-bezier(.215, .61, .355, 1), opacity .3s ease-out;
+/* A fixed 100px bar, moved and stretched to the row by transform alone. */
+#watch-bar {
+  position: absolute; left: 0; right: 0; top: 0; height: 100px; opacity: 0;
+  background: var(--paper); pointer-events: none; transform-origin: 0 0;
+  transform: scaleY(0);
+  transition: transform .35s cubic-bezier(.215, .61, .355, 1), opacity .35s ease-out;
   will-change: transform;
 }
 
-#watchlist .card.add {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; font: inherit; color: rgba(240, 217, 160, .82);
-  background: rgba(255, 255, 255, .02); border: 1.5px dashed rgba(255, 214, 150, .22);
-  box-shadow: none; min-height: 112px;
-}
-#watchlist .card.add::before { display: none; }
-#watchlist .card.add.lit { background: rgba(240, 217, 160, .06); }
-.card.add .plus { font-size: 30px; line-height: .9; font-weight: 300; color: var(--amber-bright); }
-.card.add b { font-size: 14px; font-weight: 900; }
-.card.add small { font-size: 11px; font-weight: 500; color: var(--caption); }
-
-@keyframes fetching { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
-#watchlist .card.pending { cursor: default; }
-.card.pending .card-foot { animation: fetching 1.4s ease-in-out infinite; }
-
-/* --- one stock, opened out of its card -------------------------------------- */
+/* --- one stock, opened out of its row --------------------------------------- */
 
 #stock {
   position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column;
@@ -542,30 +534,68 @@ html, body {
 .story.moving { box-shadow: inset 2px 0 0 rgba(255, 107, 122, .6); }
 .story.empty { cursor: default; }
 
-/* --- the picture beside the feed ------------------------------------------
-   The component's preview: every story's picture is stacked here, and the
-   one under the pointer opens out of its own centre (clip-path) on top of
-   the last. It follows the pointer a little behind it. */
+/* --- the pictures beside the lists ------------------------------------------
+   The component's preview: every row's picture is stacked here, and the one
+   under the pointer opens out of its own centre (clip-path) on top of the
+   last. It follows the pointer a little behind it. Beside the feed, the
+   story's picture; beside the stocks, the stock's chart. */
 
-#peek {
-  position: fixed; left: 0; top: 0; width: 360px; height: 228px; z-index: 30;
+.peek {
+  position: fixed; left: 0; top: 0; z-index: 30;
   pointer-events: none; border-radius: 14px; overflow: hidden;
   box-shadow: 0 30px 60px -24px rgba(0, 0, 0, .9);
   opacity: 0; transition: opacity .3s ease-out; will-change: transform;
 }
-#peek.on { opacity: 1; }
-#peek > .shot {
+#peek { width: 360px; height: 228px; }
+#chart-peek { width: 410px; height: 268px; border: 1px solid rgba(255, 214, 150, .1); }
+.peek.on { opacity: 1; }
+.peek > .shot {
   position: absolute; inset: 0; visibility: hidden;
   clip-path: inset(50%);
   transition: clip-path .6s cubic-bezier(.65, 0, .35, 1), opacity .6s ease-out;
 }
-#peek > .shot.open { visibility: visible; clip-path: inset(0%); opacity: 1; }
-#peek > .shot.gone { visibility: visible; clip-path: inset(50%); opacity: 0; }
+.peek > .shot.open { visibility: visible; clip-path: inset(0%); opacity: 1; }
+.peek > .shot.gone { visibility: visible; clip-path: inset(50%); opacity: 0; }
 #peek img, #story .media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* A stock's chart, beside the list: the price large, the day's curve, and
+   what the analysts make of it, on the same dark paper as an opened stock. */
+.quote-shot {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  padding: 18px 20px 16px; background: #0e0c0b; color: #f2ead9; text-shadow: none;
+}
+.quote-shot::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, .09) 1px, transparent 1.2px);
+  background-size: 11px 11px;
+}
+.quote-shot > * { position: relative; }
+.qs-head { display: flex; align-items: center; gap: 12px; }
+.qs-head .mark { width: 34px; height: 34px; object-fit: contain; flex: none; }
+.qs-head .mark.none {
+  display: grid; place-items: center; border-radius: 9px; font-size: 17px; font-weight: 900;
+  background: rgba(255, 255, 255, .08); color: var(--amber-bright);
+}
+.qs-head .who { display: flex; flex-direction: column; min-width: 0; }
+.qs-head .who b { font: 800 17px/1.1 var(--hud); letter-spacing: .12em; color: #fff3dc; }
+.qs-head .who span { font-size: 12px; color: var(--caption); white-space: nowrap;
+                     overflow: hidden; text-overflow: ellipsis; }
+.qs-head .now { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; }
+.qs-head .price { font: 700 24px/1.05 var(--hud); color: #fff3dc; }
+.qs-head .move { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.quote-shot .chart { display: block; flex: 1; width: 100%; min-height: 0; margin: 12px 0 10px; }
+.qs-foot { font: 500 10.5px/1.55 var(--hud); letter-spacing: .1em; text-transform: uppercase;
+           color: #8b929c; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+           overflow: hidden; }
+.qs-foot b { color: #e8eaed; font-weight: 800; }
+.qs-foot i { font-style: normal; }
+.qs-foot .dot { opacity: .4; margin: 0 7px; }
+.qs-foot .soon { color: var(--amber-bright); }
+.qs-foot .buying { color: var(--up); }
 /* The same scanlines over the pictures as over everything else, a little
    stronger: a photograph is the thing on this screen that looks least like
    it came out of a tube. */
-#peek > .shot::after, #story .media::after {
+.peek > .shot::after, #story .media::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .16) 0 1px, transparent 1px 3px),
               radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, .35) 100%);
@@ -826,7 +856,7 @@ body.asleep #sleep { opacity: 1; visibility: visible;
                      transition: opacity 1.4s ease-in-out .35s, visibility 0s; }
 body.asleep #stage,
 body.asleep #lyla,
-body.asleep #peek { opacity: 0 !important; pointer-events: none; transition: opacity .8s ease-in-out; }
+body.asleep .peek { opacity: 0 !important; pointer-events: none; transition: opacity .8s ease-in-out; }
 
 #sleep-copy { position: absolute; left: 72px; bottom: 80px; max-width: 640px; }
 #sleep-name { display: flex; align-items: baseline; gap: 22px; }
@@ -924,8 +954,9 @@ body.asleep #peek { opacity: 0 !important; pointer-events: none; transition: opa
 @media (prefers-reduced-motion: reduce) {
   #intro.on #intro-screen, #intro.off #intro-screen, #intro .cursor,
   #intro-screen .lit, #intro-screen::before { animation: none; }
-  #feed-bar, .story, #peek > .shot, #story, #stock, #watch-frame { transition-duration: .01s; }
-  .big svg, .card.pending .card-foot { animation: none; }
+  #feed-bar, .story, .peek > .shot, #story, #stock, #watch-bar, .stock-row { transition-duration: .01s; }
+  .big svg, .stock-row.pending .name, .peek .chart .line, .peek .chart .wash,
+  #watchlist .mini .line { animation: none; }
   .tick-up, .tick-down, #stock.live .big .pulse, #stock .live-badge,
   #markets.streaming #markets-head::after { animation: none; }
   #sleep-wake { animation: none; }
@@ -939,6 +970,10 @@ body.asleep #peek { opacity: 0 !important; pointer-events: none; transition: opa
   #wordmark { width: 370px; height: 82px; }
   #ring { width: 200px; height: 200px; }
   #peek { width: 300px; height: 190px; }
+  #chart-peek { width: 350px; height: 232px; }
+  .stock-row { grid-template-columns: minmax(96px, 24%) minmax(0, 1fr) 70px 80px 70px;
+               gap: 0 10px; padding: 11px 24px; font-size: 11px; }
+  .stock-row .mini { width: 70px; }
   .story { padding: 9px 24px; }
   .story .what { font-size: 14px; }
   #story h3 { font-size: 19px; }

@@ -67,10 +67,11 @@
     </h2>
     <div class="pane" id="pane-stocks">
       <div id="indices"></div>
-      <!-- The frame slides to the card under the pointer, as the feed's bar
-           slides to its row. -->
+      <!-- The interactive-list component, as the feed has it: a bar that
+           slides to the row under the pointer and turns its text dark, and
+           the stock's chart opening beside the panel. -->
       <div id="watch-area">
-        <div id="watch-frame"></div>
+        <div id="watch-bar"></div>
         <div id="watchlist"></div>
       </div>
     </div>
@@ -117,9 +118,11 @@
   </section>
 </main>
 
-<!-- The picture that follows the pointer beside the feed. Outside the panels,
-     so the panel's rounded clip does not cut it off. -->
-<div id="peek" aria-hidden="true"></div>
+<!-- The pictures that follow the pointer beside the feed and beside the
+     stocks. Outside the panels, so a panel's rounded clip does not cut them
+     off. -->
+<div id="peek" class="peek" aria-hidden="true"></div>
+<div id="chart-peek" class="peek" aria-hidden="true"></div>
 
 <!-- Along the bottom edge: LYLA's room in or out. Without it, the panels and
      the ring take the room back. -->

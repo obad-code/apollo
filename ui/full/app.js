@@ -60,25 +60,25 @@ const SAMPLE = {
       { symbol: '^IXIC', name: 'Nasdaq', price: 26522.54, change_pct: 0.39, spark: [] },
     ],
     watchlist: [
-      { symbol: 'AAPL', price: 336.13, change_pct: -0.26, logo: 'logos/AAPL.png',
+      { symbol: 'AAPL', name: 'Apple Inc.', price: 336.13, change_pct: -0.26, logo: 'logos/AAPL.png',
         target: 328.22, upside: -2.35, pe: 38.59,
         spark: [330, 332, 331, 335, 338, 336, 334, 337, 336, 334, 336] },
-      { symbol: 'MSFT', price: 493.78, change_pct: -0.8, logo: 'logos/MSFT.png',
+      { symbol: 'MSFT', name: 'Microsoft Corporation', price: 493.78, change_pct: -0.8, logo: 'logos/MSFT.png',
         target: 560.4, upside: 13.5, pe: 31.2,
         spark: [498, 496, 495, 492, 490, 494, 493, 491, 494, 492, 494] },
-      { symbol: 'NVDA', price: 222.27, change_pct: 1.34, logo: 'logos/NVDA.png',
-        target: 327.7, upside: 47.43, pe: 28.1,
+      { symbol: 'NVDA', name: 'NVIDIA Corporation', price: 222.27, change_pct: 1.34, logo: 'logos/NVDA.png',
+        target: 327.7, upside: 47.43, pe: 28.1, earnings: '2026-09-28',
         spark: [206, 210, 214, 212, 218, 224, 229, 232, 226, 220, 222] },
-      { symbol: 'TSLA', price: 364.27, change_pct: -0.53, logo: 'logos/TSLA.png',
+      { symbol: 'TSLA', name: 'Tesla, Inc.', price: 364.27, change_pct: -0.53, logo: 'logos/TSLA.png',
         target: 396.94, upside: 8.97, pe: 334.19,
         spark: [372, 368, 366, 370, 367, 364, 361, 365, 363, 366, 364] },
-      { symbol: 'AMZN', price: 253.71, change_pct: 1.0, logo: 'logos/AMZN.png',
+      { symbol: 'AMZN', name: 'Amazon.com, Inc.', price: 253.71, change_pct: 1.0, logo: 'logos/AMZN.png',
         target: 288.1, upside: 13.6, pe: 34.8,
         spark: [246, 249, 248, 251, 250, 252, 255, 253, 252, 254, 254] },
-      { symbol: 'GOOGL', price: 201.35, change_pct: -0.3, logo: 'logos/GOOGL.png',
+      { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 201.35, change_pct: -0.3, logo: 'logos/GOOGL.png',
         target: 224.6, upside: 11.5, pe: 26.4,
         spark: [205, 203, 204, 202, 203, 201, 200, 202, 201, 202, 201] },
-      { symbol: 'META', price: 665.75, change_pct: -2.43, logo: 'logos/META.png',
+      { symbol: 'META', name: 'Meta Platforms, Inc.', price: 665.75, change_pct: -2.43, logo: 'logos/META.png',
         target: 790.2, upside: 18.7, pe: 24.9,
         spark: [692, 686, 682, 679, 674, 670, 673, 668, 666, 669, 666] },
     ],
@@ -120,7 +120,7 @@ const state = {
   feedKey: '',            // ...and what they were, so an unchanged feed is left alone
   lit: -1,                // the row under the pointer
   open: null,             // the story opened out of its row: { index, item }
-  cardLit: null,          // the stock card under the pointer
+  rowLit: null,           // the stock row under the pointer
   stock: null,            // the stock opened out of its card, or the add picker
   pending: new Map(),     // stocks asked for whose cards have not come yet
   marketKey: '',          // what the cards were last drawn from
@@ -386,38 +386,77 @@ function earningsIn(quote) {
 const earningsWords = (days) =>
   (days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`);
 
-/* One stock, as a card: its mark, what it costs, what it did, and what the
- * analysts make of it. The same shape as the card the overlay draws - white
- * paper, the price large, the curve under it, the valuation along the foot -
- * so the two halves of Apollo say the same thing the same way. */
-function stockCard(quote) {
-  const mark = quote.logo
+/* One stock, as a row of the list: its mark and ticker, its name, the day's
+ * curve drawn small, what it costs and what it did - the interactive-list
+ * component's row, the way the feed has it. Its chart opens beside the panel
+ * while the pointer is on it (quoteShot), and a click opens the stock. */
+const MINI_W = 84, MINI_H = 22;
+
+function mini(points, rising) {
+  if (!points || points.length < 2) return '<i class="mini empty"></i>';
+  const low = Math.min(...points), high = Math.max(...points);
+  const span = high - low || 1;
+  const laid = points.map((value, i) => [
+    (i / (points.length - 1)) * MINI_W,
+    2 + (1 - (value - low) / span) * (MINI_H - 4),
+  ]);
+  return `<svg class="mini" viewBox="0 0 ${MINI_W} ${MINI_H}" width="${MINI_W}" height="${MINI_H}">
+    <path class="line" d="${smooth(laid)}" fill="none" pathLength="1"
+          stroke="${rising ? 'var(--up)' : 'var(--down)'}" stroke-width="1.6"
+          stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+/* The words a stock has earned this week: earnings within seven days, and
+ * someone who runs the company buying in the last month - rare, and worth it. */
+function stockNotes(quote) {
+  const notes = [];
+  const days = earningsIn(quote);
+  if (days !== null && days >= 0 && days <= 7) notes.push(`<b class="soon">Earnings ${earningsWords(days)}</b>`);
+  const inside = ((state.snapshot || {}).insiders || {})[quote.symbol];
+  if (inside && inside.recent_buy) notes.push('<b class="buying">Insider buying</b>');
+  return notes;
+}
+
+function markOf(quote) {
+  return quote.logo
     ? `<img class="mark" src="${esc(quote.logo)}" alt="">`
     : `<span class="mark none">${esc((quote.symbol || '?')[0])}</span>`;
-  const target = quote.target
-    ? `<b>${money(quote.target)}</b> target${quote.upside != null
-        ? ` <i class="${moveClass(quote.upside)}">${quote.upside >= 0 ? '+' : ''}${quote.upside.toFixed(1)}%</i>`
-        : ''}`
-    : '<b>—</b> target';
-  const pe = quote.pe ? `<b>${quote.pe.toFixed(1)}</b> P/E` : '<b>—</b> P/E';
-  // Earnings within the week earn a word on the card itself.
-  const days = earningsIn(quote);
-  const soon = days !== null && days >= 0 && days <= 7
-    ? `<i class="dot">·</i><b class="soon">Earnings ${earningsWords(days)}</b>` : '';
-  // Someone who runs the company bought in the last month: rare, and worth a word.
-  const inside = ((state.snapshot || {}).insiders || {})[quote.symbol];
-  const buying = inside && inside.recent_buy
-    ? '<i class="dot">·</i><b class="buying">Insider buying</b>' : '';
+}
+
+function stockRow(quote) {
+  const flag = stockNotes(quote).length ? '<i class="flag"></i>' : '';
   return `
-    <div class="card" data-symbol="${esc(quote.symbol)}">
-      <div class="card-top">
-        ${mark}
-        <span class="ticker">${esc(quote.symbol)}</span>
-        <span class="price">${money(quote.price)}</span>
-        <span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span>
+    <div class="stock-row" data-symbol="${esc(quote.symbol)}">
+      <span class="sym">${markOf(quote)}<b>${esc(quote.symbol)}</b>${flag}</span>
+      <span class="name">${esc(quote.name || '')}</span>
+      ${mini(quote.spark, quote.change_pct >= 0)}
+      <span class="price">${money(quote.price)}</span>
+      <span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span>
+    </div>`;
+}
+
+/* The picture a row opens beside the panel - the component's image, as the
+ * stock's own card: the price large, the day's curve, and what the analysts
+ * make of it. The same card the overlay draws, so the two halves of Apollo
+ * say the same thing the same way. */
+function quoteShot(quote) {
+  const upside = quote.target && quote.upside != null
+    ? ` <i class="${moveClass(quote.upside)}">${quote.upside >= 0 ? '+' : ''}${quote.upside.toFixed(1)}%</i>` : '';
+  const facts = [
+    `Target <b>${quote.target ? money(quote.target) : '—'}</b>${upside}`,
+    `P/E <b>${quote.pe ? quote.pe.toFixed(1) : '—'}</b>`,
+    ...stockNotes(quote),
+  ];
+  return `
+    <div class="quote-shot">
+      <div class="qs-head">${markOf(quote)}
+        <div class="who"><b>${esc(quote.symbol)}</b><span>${esc(quote.name || '')}</span></div>
+        <div class="now"><span class="price">${money(quote.price)}</span>
+          <span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)} today</span></div>
       </div>
       ${sparkline(quote.spark, quote.change_pct >= 0)}
-      <div class="card-foot">${target}<i class="dot">·</i>${pe}${soon}${buying}</div>
+      <div class="qs-foot">${facts.join('<i class="dot">·</i>')}</div>
     </div>`;
 }
 
@@ -448,48 +487,51 @@ function renderMarkets(market) {
       state.pending.delete(symbol);
     }
   }
-  const before = [...list.children].map((card) => card.dataset.symbol).filter(Boolean);
+  const before = [...list.children].map((row) => row.dataset.symbol).filter(Boolean);
   const after = watched.map((quote) => quote.symbol).concat([...state.pending.keys()]);
   const leaving = before.filter((symbol) => !after.includes(symbol));
 
   if (state.entered && leaving.length) {
     // Let them go first, then draw the rest - otherwise the row under a
-    // removed card jumps up while the card is still fading.
+    // removed one jumps up while it is still fading.
     for (const symbol of leaving) {
-      const card = [...list.children].find((c) => c.dataset.symbol === symbol);
-      if (card) animate(card, { opacity: [1, 0], transform: ['scale(1)', 'scale(.94)'] },
-                        { duration: 0.26, ease: 'easeOut' });
+      const row = [...list.children].find((r) => r.dataset.symbol === symbol);
+      if (row) animate(row, { opacity: [1, 0], transform: ['translateX(0px)', 'translateX(-14px)'] },
+                       { duration: 0.26, ease: 'easeOut' });
     }
     clearTimeout(state.cardsTimer);
     state.cardsTimer = setTimeout(() => {
-      for (const card of [...list.children]) {
-        if (leaving.includes(card.dataset.symbol)) card.remove();
+      for (const row of [...list.children]) {
+        if (leaving.includes(row.dataset.symbol)) row.remove();
       }
       renderMarkets(market);
     }, 280);
     return;
   }
 
-  // A snapshot comes every few seconds for the machine's numbers; the cards
-  // are rebuilt only when something on them changed, or the frame under the
-  // pointer would drop off its card every five seconds.
+  // A snapshot comes every few seconds for the machine's numbers; the rows
+  // are rebuilt only when something on them changed, or the bar under the
+  // pointer would drop off its row every five seconds.
   const key = JSON.stringify([after, watched.map((quote) =>
-    [quote.price, quote.change_pct, quote.target, quote.pe, quote.logo, quote.spark]), state.entered]);
+    [quote.price, quote.change_pct, quote.target, quote.pe, quote.logo, quote.spark, quote.name]),
+    state.entered]);
   if (key === state.marketKey) return;
   state.marketKey = key;
-  const lit = state.cardLit ? (state.cardLit.dataset.symbol || 'add') : null;
-  unlightCard();
-  list.innerHTML = watched.map((quote) => stockCard(quote)).join('')
-    + [...state.pending].map(([symbol, asked]) => pendingCard(symbol, asked.name)).join('')
-    + (watched.length + state.pending.size < WATCH_MAX ? ADD_SLOT : '');
-  if (lit) lightCard(lit === 'add' ? list.querySelector('.add') : cardFor(lit));
+  const lit = state.rowLit ? (state.rowLit.dataset.symbol || 'add') : null;
+  unlightRow();
+  list.innerHTML = watched.map((quote) => stockRow(quote)).join('')
+    + [...state.pending].map(([symbol, asked]) => pendingRow(symbol, asked.name)).join('')
+    + (watched.length + state.pending.size < WATCH_MAX ? ADD_ROW : '');
+  // Each stock's chart, stacked beside the panel in the same order as the rows.
+  $('chart-peek').innerHTML = watched.map((quote) => `<div class="shot">${quoteShot(quote)}</div>`).join('');
+  if (lit) lightRow(lit === 'add' ? list.querySelector('.add') : rowFor(lit));
 
   if (state.entered) {
     const arriving = after.filter((symbol) => !before.includes(symbol));
     for (const symbol of arriving) {
-      const card = [...list.children].find((c) => c.dataset.symbol === symbol);
-      if (card) animate(card, {
-        opacity: [0, 1], transform: ['translateY(10px) scale(.96)', 'translateY(0) scale(1)'],
+      const row = [...list.children].find((r) => r.dataset.symbol === symbol);
+      if (row) animate(row, {
+        opacity: [0, 1], transform: ['translateX(-14px)', 'translateX(0px)'],
       }, { ...SPRING, delay: 0.04 });
     }
   }
@@ -603,8 +645,69 @@ function shot(item) {
 
 const PEEK_LERP = 0.18;          // the component's `lerp`
 const PEEK_WANDER = 20;          // ...and its IMAGE_OFFSET_MULTIPLIER
-const peekAt = { x: 0, y: 0, tx: 0, ty: 0, frame: null, placed: false };
-let peekTop = 10;
+
+/* The picture beside a list: every row's picture stacked in `el`, and the one
+ * under the pointer opening out of its own centre on top of the last,
+ * following the pointer a little behind it - on the side of `panel` that has
+ * the room, level with the pointer, drifting with it by up to PEEK_WANDER. */
+function makePeek(el, panel, side) {
+  const at = { x: 0, y: 0, tx: 0, ty: 0, frame: null, placed: false, lit: -1, top: 10 };
+  const target = () => {
+    const box = panel.getBoundingClientRect();
+    const width = el.offsetWidth, height = el.offsetHeight;
+    const across = (at.tx - box.left) / Math.max(1, box.width) - 0.5;
+    const x = (side === 'left' ? box.left - width - 30 : box.right + 30) + across * PEEK_WANDER * 2;
+    const y = Math.max(24, Math.min(window.innerHeight - height - 24, at.ty - height / 2));
+    return [x, y];
+  };
+  const follow = () => {
+    if (at.frame !== null) return;
+    const step = () => {
+      const [x, y] = target();
+      if (!at.placed) { at.x = x; at.y = y; at.placed = true; }
+      at.x += (x - at.x) * PEEK_LERP;
+      at.y += (y - at.y) * PEEK_LERP;
+      el.style.transform = `translate3d(${at.x.toFixed(1)}px, ${at.y.toFixed(1)}px, 0)`;
+      const settled = Math.abs(x - at.x) < 0.3 && Math.abs(y - at.y) < 0.3;
+      // Frames only while there is somewhere to go.
+      at.frame = at.lit >= 0 || !settled ? requestAnimationFrame(step) : null;
+    };
+    at.frame = requestAnimationFrame(step);
+  };
+  const close = (index) => {
+    const frame = el.children[index];
+    if (!frame || !frame.classList.contains('open')) return;
+    frame.classList.remove('open');
+    frame.classList.add('gone');
+    frame._closing = setTimeout(() => frame.classList.remove('gone'), 640);
+  };
+  return {
+    open(index) {
+      if (at.lit >= 0 && at.lit !== index) close(at.lit);
+      at.lit = index;
+      const frame = el.children[index];
+      if (!frame) { el.classList.remove('on'); return; }
+      clearTimeout(frame._closing);
+      frame.classList.remove('gone', 'open');
+      at.top += 1;
+      frame.style.zIndex = String(at.top);
+      void frame.offsetWidth;                  // from closed, every time
+      frame.classList.add('open');
+      el.classList.add('on');
+      follow();
+    },
+    hide() {
+      if (at.lit >= 0) close(at.lit);
+      at.lit = -1;
+      el.classList.remove('on');
+    },
+    point(x, y) { at.tx = x; at.ty = y; },
+    leave() { this.hide(); at.placed = false; },
+  };
+}
+
+const feedPeek = makePeek($('peek'), $('headlines'), 'left');
+const chartPeek = makePeek($('chart-peek'), $('markets'), 'right');
 
 const rowAt = (index) => $('stories').children[index] || null;
 
@@ -615,86 +718,33 @@ function light(index) {
   if (state.lit >= 0) {
     const before = rowAt(state.lit);
     if (before) before.classList.remove('lit');
-    closeShot(state.lit);
   }
   state.lit = index;
   row.classList.add('lit');
   const bar = $('feed-bar');
   bar.style.transform = `translateY(${row.offsetTop}px) scaleY(${row.offsetHeight / 100})`;
   bar.style.opacity = '1';
-  openShot(index);
+  feedPeek.open(index);
 }
 
 function unlight() {
   if (state.lit >= 0) {
     const row = rowAt(state.lit);
     if (row) row.classList.remove('lit');
-    closeShot(state.lit);
   }
   state.lit = -1;
   $('feed-bar').style.opacity = '0';
-  $('peek').classList.remove('on');
-}
-
-function openShot(index) {
-  const frame = $('peek').children[index];
-  if (!frame) return;
-  clearTimeout(frame._closing);
-  frame.classList.remove('gone', 'open');
-  peekTop += 1;
-  frame.style.zIndex = String(peekTop);
-  void frame.offsetWidth;                  // from closed, every time
-  frame.classList.add('open');
-  $('peek').classList.add('on');
-  follow();
-}
-
-function closeShot(index) {
-  const frame = $('peek').children[index];
-  if (!frame || !frame.classList.contains('open')) return;
-  frame.classList.remove('open');
-  frame.classList.add('gone');
-  frame._closing = setTimeout(() => frame.classList.remove('gone'), 640);
-}
-
-/* Beside the feed, on the side the screen has room: level with the pointer,
- * and drifting with it by up to PEEK_WANDER either way. */
-function peekTarget() {
-  const panel = $('headlines').getBoundingClientRect();
-  const peek = $('peek');
-  const width = peek.offsetWidth, height = peek.offsetHeight;
-  const across = (peekAt.tx - panel.left) / Math.max(1, panel.width) - 0.5;
-  const x = panel.left - width - 30 + across * PEEK_WANDER * 2;
-  const y = Math.max(24, Math.min(window.innerHeight - height - 24, peekAt.ty - height / 2));
-  return [x, y];
-}
-
-function follow() {
-  if (peekAt.frame !== null) return;
-  const step = () => {
-    const [x, y] = peekTarget();
-    if (!peekAt.placed) { peekAt.x = x; peekAt.y = y; peekAt.placed = true; }
-    peekAt.x += (x - peekAt.x) * PEEK_LERP;
-    peekAt.y += (y - peekAt.y) * PEEK_LERP;
-    $('peek').style.transform = `translate3d(${peekAt.x.toFixed(1)}px, ${peekAt.y.toFixed(1)}px, 0)`;
-    const settled = Math.abs(x - peekAt.x) < 0.3 && Math.abs(y - peekAt.y) < 0.3;
-    // Frames only while there is somewhere to go.
-    peekAt.frame = state.lit >= 0 || !settled ? requestAnimationFrame(step) : null;
-  };
-  peekAt.frame = requestAnimationFrame(step);
+  feedPeek.hide();
 }
 
 $('stories').addEventListener('pointerover', (event) => {
   const row = event.target.closest('.story');
   if (row && row.dataset.i !== undefined) light(Number(row.dataset.i));
 });
-$('feed').addEventListener('pointermove', (event) => {
-  peekAt.tx = event.clientX;
-  peekAt.ty = event.clientY;
-});
+$('feed').addEventListener('pointermove', (event) => feedPeek.point(event.clientX, event.clientY));
 $('feed').addEventListener('pointerleave', () => {
   unlight();
-  peekAt.placed = false;
+  feedPeek.leave();
 });
 $('stories').addEventListener('click', (event) => {
   const row = event.target.closest('.story');
@@ -813,12 +863,13 @@ document.addEventListener('keydown', (event) => {
 
 /* --- the stocks, picked the way the feed is -----------------------------------
  *
- * A frame slides to the card under the pointer, and a click opens the stock
- * out of its card across the whole panel: its chart over a day, a week, a
- * month, six months or a year, with a line you can run along it; what it
- * did; what the analysts think it is worth; and a button that takes it off
- * the list. The slot after the last card puts one on. Voice does the same
- * through apollo.py: "open Nvidia", "add Palantir", "take off Tesla". */
+ * The paper bar slides to the row under the pointer and the stock's chart
+ * opens beside the panel; a click opens the stock out of its row across the
+ * whole panel: its chart over a day, a week, a month, six months or a year,
+ * with a line you can run along it; what it did; what the analysts think it
+ * is worth; and a button that takes it off the list. The row after the last
+ * puts one on. Voice does the same through apollo.py: "open Nvidia", "add
+ * Palantir", "take off Tesla". */
 
 const SPANS = [['1d', '1D'], ['5d', '5D'], ['1mo', '1M'], ['6mo', '6M'], ['1y', '1Y']];
 const WATCH_MAX = 12;             // watchlist.MAX
@@ -826,42 +877,42 @@ const PENDING_FOR = 45000;        // a card asked for and never delivered goes
 const BIG_W = 600, BIG_H = 200, BIG_PAD = 14;
 
 const bridge = () => (window.pywebview && window.pywebview.api) || null;
-const cardFor = (symbol) =>
-  [...$('watchlist').children].find((card) => card.dataset.symbol === symbol) || null;
+const rowFor = (symbol) =>
+  [...$('watchlist').children].find((row) => row.dataset.symbol === symbol) || null;
 
-function pendingCard(symbol, name) {
+function pendingRow(symbol, name) {
   return `
-    <div class="card pending" data-symbol="${esc(symbol)}">
-      <div class="card-top"><span class="mark none">${esc(String(symbol)[0])}</span>
-        <span class="ticker">${esc(symbol)}</span><span class="price">…</span></div>
-      <div class="chart empty"></div>
-      <div class="card-foot">Fetching ${esc(name)}</div>
+    <div class="stock-row pending" data-symbol="${esc(symbol)}">
+      <span class="sym"><span class="mark none">${esc(String(symbol)[0])}</span><b>${esc(symbol)}</b></span>
+      <span class="name">Fetching ${esc(name)}…</span>
+      <i class="mini empty"></i><span class="price">…</span><span class="move"></span>
     </div>`;
 }
 
-const ADD_SLOT = `
-    <button class="card add" type="button">
-      <span class="plus">+</span><b>Add a stock</b><small>or say “add Palantir”</small>
+const ADD_ROW = `
+    <button class="stock-row add" type="button">
+      <span class="sym"><span class="mark none">+</span><b>Add a stock</b></span>
+      <span class="name">or say “add Palantir”</span>
     </button>`;
 
-function lightCard(card) {
-  if (state.stock || !card || card === state.cardLit || card.classList.contains('pending')) return;
-  if (state.cardLit) state.cardLit.classList.remove('lit');
-  state.cardLit = card;
-  card.classList.add('lit');
-  const frame = $('watch-frame');
-  // Sized to the card, moved by transform: the cards are one size, so the
-  // size is set once and it is only the move that animates.
-  frame.style.width = `${card.offsetWidth}px`;
-  frame.style.height = `${card.offsetHeight}px`;
-  frame.style.transform = `translate(${card.offsetLeft}px, ${card.offsetTop}px)`;
-  frame.style.opacity = '1';
+function lightRow(row) {
+  if (state.stock || !row || row === state.rowLit || row.classList.contains('pending')) return;
+  if (state.rowLit) state.rowLit.classList.remove('lit');
+  state.rowLit = row;
+  row.classList.add('lit');
+  // A fixed 100px bar, moved and stretched to the row by transform alone.
+  const bar = $('watch-bar');
+  bar.style.transform = `translateY(${row.offsetTop}px) scaleY(${row.offsetHeight / 100})`;
+  bar.style.opacity = '1';
+  // The add row has no chart to show.
+  chartPeek.open(row.classList.contains('add') ? -1 : [...$('watchlist').children].indexOf(row));
 }
 
-function unlightCard() {
-  if (state.cardLit) state.cardLit.classList.remove('lit');
-  state.cardLit = null;
-  $('watch-frame').style.opacity = '0';
+function unlightRow() {
+  if (state.rowLit) state.rowLit.classList.remove('lit');
+  state.rowLit = null;
+  $('watch-bar').style.opacity = '0';
+  chartPeek.hide();
 }
 
 /* What Apollo is told about a stock it opened, so it can talk about it. */
@@ -1037,11 +1088,11 @@ function openStock(symbol) {
   const quote = (market.watchlist || []).find((q) => q.symbol === symbol);
   if (!quote) return null;
   noted('stock', quote.symbol, quote.name);
-  unlightCard();
+  unlightRow();
   const view = $('stock');
   state.stock = { symbol, quote, span: '1d', points: quote.spark || [], times: [] };
   view.innerHTML = stockMarkup(quote);
-  openOver(view, $('markets'), cardFor(symbol));
+  openOver(view, $('markets'), rowFor(symbol));
   drawBig(state.stock.points, quote.change_pct >= 0);
   spanMove(quote.change_pct, '1d');
   loadSpan('1d');
@@ -1065,7 +1116,7 @@ function closeStock() {
   state.stock = null;
   const view = $('stock');
   view.setAttribute('aria-hidden', 'true');
-  view.style.clipPath = clipTo(open.picker ? $('watchlist').querySelector('.add') : cardFor(open.symbol),
+  view.style.clipPath = clipTo(open.picker ? $('watchlist').querySelector('.add') : rowFor(open.symbol),
                                $('markets'));
   setTimeout(() => {
     if (state.stock) return;               // another was opened meanwhile
@@ -1102,7 +1153,7 @@ function dropStock(button) {
 }
 
 async function openPicker() {
-  unlightCard();
+  unlightRow();
   const view = $('stock');
   const open = { picker: true };
   state.stock = open;
@@ -1147,14 +1198,18 @@ async function addPick(button) {
 }
 
 $('watch-area').addEventListener('pointerover', (event) => {
-  lightCard(event.target.closest('.card'));
+  lightRow(event.target.closest('.stock-row'));
 });
-$('watch-area').addEventListener('pointerleave', () => unlightCard());
+$('watch-area').addEventListener('pointermove', (event) => chartPeek.point(event.clientX, event.clientY));
+$('watch-area').addEventListener('pointerleave', () => {
+  unlightRow();
+  chartPeek.leave();
+});
 $('watchlist').addEventListener('click', (event) => {
-  const card = event.target.closest('.card');
-  if (!card) return;
-  if (card.classList.contains('add')) openPicker();
-  else if (card.dataset.symbol && !card.classList.contains('pending')) openStock(card.dataset.symbol);
+  const row = event.target.closest('.stock-row');
+  if (!row) return;
+  if (row.classList.contains('add')) openPicker();
+  else if (row.dataset.symbol && !row.classList.contains('pending')) openStock(row.dataset.symbol);
 });
 $('stock').addEventListener('click', (event) => {
   const span = event.target.closest('[data-span]');
@@ -1216,23 +1271,26 @@ function flicker(element, up) {
   element.classList.add(up ? 'tick-up' : 'tick-down');
 }
 
-function tickCard(quote, before) {
+function tickRow(quote, before) {
   // The next full redraw compares against this, so it has nothing to flash.
   state.prices.set(quote.symbol, quote.price);
-  const card = cardFor(quote.symbol);
-  if (!card || card.classList.contains('pending')) return;
-  const price = card.querySelector('.card-top .price');
-  const move = card.querySelector('.card-top .move');
+  const row = rowFor(quote.symbol);
+  if (!row || row.classList.contains('pending')) return;
+  const price = row.querySelector('.price');
+  const move = row.querySelector('.move');
   if (price) price.textContent = money(quote.price);
   if (move) {
     move.className = `move ${moveClass(quote.change_pct)}`;
     move.textContent = moveText(quote.change_pct);
   }
   if (quote.price !== before) flicker(price, quote.price > before);
-  const chart = card.querySelector('.chart');
+  const chart = row.querySelector('.mini');
   if (chart && quote.spark && quote.spark.length > 1) {
-    chart.outerHTML = sparkline(quote.spark, quote.change_pct >= 0);
+    chart.outerHTML = mini(quote.spark, quote.change_pct >= 0);
   }
+  // ...and its chart beside the panel, which may be the one showing.
+  const shot = $('chart-peek').children[[...$('watchlist').children].indexOf(row)];
+  if (shot) shot.innerHTML = quoteShot(quote);
 }
 
 function tickStock(quote, tick, before) {
@@ -1274,7 +1332,7 @@ function applyLive(batch) {
     quote.price = price;
     if (quote.previous) quote.change_pct = ((price - quote.previous) / quote.previous) * 100;
     if (quote.spark && quote.spark.length) quote.spark[quote.spark.length - 1] = price;
-    tickCard(quote, before);
+    tickRow(quote, before);
     const open = state.stock;
     if (open && !open.picker && open.symbol === quote.symbol) tickStock(quote, tick, before);
   }
@@ -1855,7 +1913,7 @@ window.apollo = {
       shader.stop(); lyla.stop(); ringStop();
       wordmark.stop(); sleepWord.stop();
       unlight();
-      unlightCard();
+      unlightRow();
     }
   },
   level(value) { setLevel(value); },
