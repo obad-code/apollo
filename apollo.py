@@ -214,15 +214,15 @@ ORB_PX = 190                 # the mesh's own box, drawn by orb.py. The resting
                              # downward from this one's top edge and the mesh
                              # stays in a box of exactly this size at the top.
 # The resting orb does not sit on the screen - it hangs off the top edge, and
-# only this fraction of the disc stays in view: the lower part of it coming
-# down out of the edge, which is the whole point of the resting state -
-# present, not in the way. Measured against the disc rather than the window
-# because the two are not the same size: the disc only reaches
+# only this fraction of the CONSTELLATION stays in view: the bottom arc of it
+# coming down out of the edge, which is the whole point of the resting state -
+# present, not in the way. Measured against the pattern rather than the window
+# because the two are not the same size: the ring of points only reaches
 # `Orb.CONSTELLATION_R` of the box, so revealing a quarter of the window would
-# reveal barely a sixth of it. The window really is positioned at a
+# reveal barely a sixth of the figure. The window really is positioned at a
 # negative Y; UpdateLayeredWindow composites the off-screen part away without
 # complaint, so no clipping region is needed.
-ORB_REVEAL = 0.4          # two fifths: the CD's hub and all three of its tapes
+ORB_REVEAL = 0.25
 
 # Per-shape window translucency, 0-255. This is the one transparency mechanism
 # that actually works on a WebView2 window (see the module docstring). Only
@@ -437,13 +437,13 @@ class Overlay:
     def orb_overhang():
         """How far above the top edge the resting orb's window starts.
 
-        Worked back from the disc so `ORB_REVEAL` means what it says. The disc
-        has radius `r` about the box's centre; leaving `ORB_REVEAL` of its
-        height showing puts that centre at `r * (2f - 1)` relative to the
-        edge, and the window's own top is half a box above that. At two
-        fifths the centre lands a fifth of a radius above the edge, so the
-        lower part of the CD - the edge of its hub and its three tapes - is
-        what hangs into view.
+        Worked back from the constellation so `ORB_REVEAL` means what it says.
+        The pattern is a ring of radius `r` about the box's centre; leaving
+        `ORB_REVEAL` of its height showing puts that centre at `r * (2f - 1)`
+        relative to the edge, and the window's own top is half a box above
+        that. At the default quarter the centre lands half a radius above the
+        edge, so the bottom arc - two or three points and the chords between
+        them - is what hangs into view.
         """
         r = ORB_PX * orb_module.Orb.CONSTELLATION_R
         centre = r * (2.0 * ORB_REVEAL - 1.0)

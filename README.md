@@ -134,7 +134,7 @@ edge of the screen and retracts when it is done:
 
 | | What you see |
 |---|---|
-| **At rest** | A CD, hanging off the top edge with two fifths of it in view: black, a clear hub, a thin blue rim, and four bands of tape on it - blue, green, yellow and red at the rim - each laid in tiny triangles pointing the way it turns, so you can see it turn. It turns slowly, faster while you speak, and a rainbow stays on it where the light falls. Your wallpaper shows through its hub and round its glow. |
+| **At rest** | A ring of amber points, hanging off the top edge with a quarter of it in view - only the points: no lines between them and no glow round them, each one plain round light, twinkling a little and turning together, slowly. Your wallpaper shows through everything else. |
 | **While you talk** | The panel drops down: Apollo's three-ring orb on the left, your words in cyan as they are transcribed, and a word underneath saying it is listening. Under the panel's edge, a glowing horizon and a dome of sparkles that brighten and speed up with your voice. |
 | **While it works** | The orb spins up, and the line under your words says what it is doing - *searching the web*, *fetching NVDA*, *saving the clip*. |
 | **When it answers** | The reply in warm white, each word rising out of a blur. An answer that rests on real numbers brings a chart with it - violet into cyan into amber, with the last reading marked - and one that is two to six figures brings borderless cards instead. |
@@ -147,7 +147,7 @@ on loops of nine to thirteen seconds, over printed dots and scanlines, so it
 never sits still and never repeats.
 
 ```
-      \__/                   resting - the CD alone
+      .  .                   resting - the ring of points alone
        |   Ctrl+Alt (hold)
        v
     +--------------+         listening - your words in cyan, the orb turning,
@@ -778,7 +778,7 @@ The only thing left is your API key.
 | `displays.py` | Ultra mode's layout, kept: which displays are shown, where and how big, which one is expanded, the map's layers - and the words, in English and Arabic, that find each display by voice. |
 | `osiris.py` | OSIRIS inside the display: the map's own window, laid over the frame the page leaves for it, owned by the display and gone whenever it goes. |
 | `orb.py` | The overlay itself: the window, the states, and the composition - ring, panel, your words, the answer, cards and chart. |
-| `overlay_paint.py` | Its paint box: the drifting CRT panel, the three-ring orb, the resting CD (its pixels worked out in numpy, so `tests/test_cd.py` runs anywhere), the sparkle field and the horizon, each pre-rendered where a per-frame redraw would cost too much. |
+| `overlay_paint.py` | Its paint box: the drifting CRT panel, the three-ring orb, the sparkle field and the horizon, each pre-rendered where a per-frame redraw would cost too much. |
 | `overlay_state.py` | The springs and the state machine, with no window in sight. |
 | `overlay_content.py` | What an answer actually contains and how tall that makes the overlay — reply parsing and layout, with no drawing code in it. |
 | `ui/full/index.html` | The full display. Written by hand — edit it directly. |
