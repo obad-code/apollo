@@ -2597,7 +2597,7 @@ function setPhase(phase) {
   $('answer').classList.toggle('show', answering);
   // The room steps back as far as the state warrants: a little while it is
   // listening to you, all the way once it is answering.
-  shader.speed(phase === 'thinking' ? 4 : attending ? 2 : 1);
+  shader.speed(phase === 'thinking' ? 2.2 : attending ? 1.5 : 1);
 
   const hint = $('hint');
   // The matrix carries the word while it is working, so the hint stands down

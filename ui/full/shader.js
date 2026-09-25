@@ -21,13 +21,19 @@
 //   - the glass: a fisheye that swells the middle of the picture and pinches
 //     its corners, which go dark the way a tube's did. Over the pixels, the
 //     bloom: the same lights, unbroken, as a haze - the glow a bright tube
-//     threw past its own phosphors - and each cell's colour bleeding round
-//     it.
-//   - the set it is on: the picture flickers, a brighter band rolls up it,
-//     static crawls over it, and now and then a few lines tear sideways for
-//     a frame. The flicker, the band and the tear are decided in JavaScript
-//     once a frame and handed in; the static is hashed here per pixel.
-// Dimmed throughout: the panels sit on it and have to stay readable.
+//     threw past its own phosphors - and again much wider, the way it
+//     spread across the glass round the brightest light, and each cell's
+//     colour bleeding round it.
+//   - the set it is on: the picture flickers - a shimmer every frame, a hum
+//     of a few cycles a second, now and then a dip - its lines shimmer
+//     against each other, a dark hum bar rolls slowly up it, a brighter band
+//     rolls up it every few seconds, static crawls over it, and now and then
+//     a few lines tear sideways for a frame. All but the static are decided
+//     in JavaScript once a frame and handed in; the static is hashed here
+//     per pixel.
+// Drawn at 55 frames a second or more, on evenly spaced frames of the
+// screen's own rate, so that the light moves smoothly. Dimmed throughout:
+// the panels sit on it and have to stay readable.
 
 const VERTEX = `
 attribute vec2 position;
@@ -40,7 +46,9 @@ uniform vec2 resolution;
 uniform float time;
 uniform float sleep;      // 0 awake, 1 asleep - eased, so the sky changes slowly
 uniform float pitch;      // one cell of the mask - red, green and blue slot - in device pixels
-uniform float flicker;    // the tube's brightness this frame: ~0.96-1, now and then a dip
+uniform float flicker;    // the tube's brightness this frame: ~0.9-1, now and then a dip
+uniform float hum;        // the dark hum bar's height, 0..1 up the screen, rolling
+uniform float shimmer;    // how much the lines shimmer against each other this frame
 uniform float roll;       // the rolling band's height, 0..1 up the screen (off it when there is none)
 uniform float tear;       // how far a torn band of lines is pushed sideways
 uniform float tearAt;     // ...and where that band is, 0..1 up the screen
@@ -78,11 +86,14 @@ float silk(vec2 q, float s, float y, float lift, float along, float turn, float 
   return exp(-d * d);
 }
 
-// The lights, awake, at s seconds. q is centred and aspect-correct: x runs
-// about -1.8..1.8 on a 16:9 screen, y -1..1. Each light loops on its own
-// pair of periods (40 to 90 seconds), so they never line up the same way
-// twice and something on the screen is always visibly on the move.
-vec3 lights(vec2 q, float s) {
+// The lights, awake, at s. q is centred and aspect-correct: x runs about
+// -1.8..1.8 on a 16:9 screen, y -1..1. Each light loops on its own pair of
+// periods, so they never line up the same way twice and something on the
+// screen is always on the move. The spread widens every light and fold
+// alike - a gaussian blurred is a wider gaussian - which is how the bloom's
+// wide glow is the same light, spread. (No backticks in here: this is a
+// template string, and one would end it.)
+vec3 lights(vec2 q, float s, float spread) {
   // With OSIRIS up, the same five lights in its colours: gold, its cyan, a
   // pale gold, its blue, and a teal kept low.
   vec3 rose   = mix(vec3(1.00, 0.26, 0.58), vec3(0.83, 0.69, 0.22), osiris);
@@ -91,11 +102,11 @@ vec3 lights(vec2 q, float s) {
   vec3 violet = mix(vec3(0.50, 0.32, 1.00), vec3(0.27, 0.54, 1.00), osiris);
   vec3 green  = mix(vec3(0.20, 1.00, 0.62), vec3(0.00, 0.42, 0.48), osiris);
   vec3 sum = vec3(0.0);
-  sum += rose   * lamp(q, vec2(-0.95 + 0.75 * sin(s * 0.110), 0.30 + 0.40 * cos(s * 0.083)), 0.78) * 0.8;
-  sum += cyan   * lamp(q, vec2( 0.95 + 0.65 * cos(s * 0.093), -0.15 + 0.45 * sin(s * 0.140)), 0.74) * 0.8;
-  sum += amber  * lamp(q, vec2( 0.10 + 0.95 * sin(s * 0.071 + 1.3), -0.62 + 0.30 * cos(s * 0.120)), 0.70) * 0.8;
-  sum += violet * lamp(q, vec2( 0.35 + 0.85 * cos(s * 0.104 + 2.1), 0.62 + 0.30 * sin(s * 0.077)), 0.72) * 0.8;
-  sum += green  * lamp(q, vec2(-0.45 + 0.70 * sin(s * 0.066 + 4.0), -0.30 + 0.50 * cos(s * 0.098)), 0.60) * 0.55;
+  sum += rose   * lamp(q, vec2(-0.95 + 0.75 * sin(s * 0.110), 0.30 + 0.40 * cos(s * 0.083)), 0.78 * spread) * 0.72;
+  sum += cyan   * lamp(q, vec2( 0.95 + 0.65 * cos(s * 0.093), -0.15 + 0.45 * sin(s * 0.140)), 0.74 * spread) * 0.72;
+  sum += amber  * lamp(q, vec2( 0.10 + 0.95 * sin(s * 0.071 + 1.3), -0.62 + 0.30 * cos(s * 0.120)), 0.70 * spread) * 0.72;
+  sum += violet * lamp(q, vec2( 0.35 + 0.85 * cos(s * 0.104 + 2.1), 0.62 + 0.30 * sin(s * 0.077)), 0.72 * spread) * 0.72;
+  sum += green  * lamp(q, vec2(-0.45 + 0.70 * sin(s * 0.066 + 4.0), -0.30 + 0.50 * cos(s * 0.098)), 0.60 * spread) * 0.55;
   // The two folds of silk: the warm one low across the tube, red on the
   // left going amber and then gold to the right, with a bright edge along
   // its crest; the cool one high on the left, fading out across the middle.
@@ -103,19 +114,20 @@ vec3 lights(vec2 q, float s) {
   vec3 gold  = mix(vec3(1.00, 0.66, 0.12), vec3(0.94, 0.82, 0.38), osiris);
   vec3 deep  = mix(vec3(0.08, 0.42, 1.00), vec3(0.00, 0.90, 1.00), osiris);
   vec3 warm  = mix(ember, gold, smoothstep(-1.5, 1.3, q.x));
-  sum += warm * silk(q, s, -0.46, 0.26, 1.10, 0.0, 0.24) * 0.95;
-  sum += vec3(1.00, 0.86, 0.50) * silk(q, s, -0.33, 0.26, 1.10, 0.32, 0.06) * 0.45;
-  sum += deep * silk(q, s, 0.58, 0.18, 0.85, 2.4, 0.32) * smoothstep(0.9, -1.3, q.x) * 0.9;
+  sum += warm * silk(q, s, -0.46, 0.26, 1.10, 0.0, 0.24 * spread) * 0.95;
+  sum += vec3(1.00, 0.86, 0.50) * silk(q, s, -0.33, 0.26, 1.10, 0.32, 0.06 * spread) * 0.45;
+  sum += deep * silk(q, s, 0.58, 0.18, 0.85, 2.4, 0.32 * spread) * smoothstep(0.9, -1.3, q.x) * 0.9;
   // Light adds up towards white rather than past it: where two cross, the
   // colour blooms instead of clipping to a flat patch.
   return 1.0 - exp(-sum * 1.35);
 }
 
-// The dots' colour: the lights, their edges folded by slow noise so they
-// read as glow and not as circles.
+// The dots' colour: the lights, their edges folded by slow, broad noise -
+// enough that they read as glow and not as circles, little enough that the
+// gradient stays smooth.
 vec3 phosphor(vec2 q, float s) {
-  vec2 fold = vec2(fbm(q * 0.9 + s * 0.050), fbm(q * 0.9 - s * 0.040 + 5.2)) - 0.5;
-  return lights(q + fold * 0.55, s);
+  vec2 fold = vec2(fbm(q * 0.75 + s * 0.050), fbm(q * 0.75 - s * 0.040 + 5.2)) - 0.5;
+  return lights(q + fold * 0.34, s, 1.0);
 }
 
 // The same dots at dusk: the idle screen's sky, from its reference photo.
@@ -147,9 +159,10 @@ vec3 dusk(vec2 q, float t, float aspect) {
 }
 
 vec3 colourAt(vec2 q, float t, float aspect) {
-  vec3 awake = phosphor(q, t / 1.5);           // time runs 1.5 a second
+  vec3 awake = phosphor(q, t / 1.5);
   if (sleep <= 0.001) return awake;
-  return mix(awake, dusk(q, t, aspect), sleep);
+  // The idle sky keeps the slow pace it always had: it is meant to be restful.
+  return mix(awake, dusk(q, t * 0.38, aspect), sleep);
 }
 
 // Where the picture is for a point on the glass: the fisheye samples nearer
@@ -181,9 +194,14 @@ void main() {
   float row = floor(px.y / pitch + shift);
   vec2 inCell = vec2(fract(px.x / pitch), fract(px.y / pitch + shift));
 
-  // Each cell shows one flat colour: the picture where its centre falls.
+  // Each cell shows one flat colour: the picture where its centre falls -
+  // given a set's contrast and colour: its darks deeper, its mids fuller,
+  // and its colours pushed away from grey, so the light reads as coloured
+  // light on a dark tube rather than a wash over all of it.
   vec2 centre = vec2(column + 0.5, row + 0.5 - shift) * pitch;
   vec3 lit = colourAt(bend(centre / resolution) * vec2(aspect, 1.0), t, aspect);
+  lit = lit * lit * (3.0 - 2.0 * lit);
+  lit = max(mix(vec3(dot(lit, vec3(0.30, 0.55, 0.15))), lit, 1.3), 0.0);
 
   // Which slot this pixel is on, and how far into it: lit along its middle,
   // soft at its sides, with a dark seam between one cell and the next.
@@ -204,23 +222,36 @@ void main() {
   vec2 ringsAt = resolution * vec2(0.20 + 0.10 * sin(t * 0.013), 0.24 + 0.08 * cos(t * 0.011));
   float beat = cos(6.2832 * length(centre - ringsAt) / (pitch * 0.94));
   float bright = smoothstep(0.30, 0.85, dot(lit, vec3(0.30, 0.55, 0.15))) * (1.0 - sleep);
-  phosphors *= 1.0 + 0.24 * beat * bright;
+  phosphors *= 1.0 + 0.16 * beat * bright;
 
   // The bloom, turned up: the lights again, unbroken and unfolded, as a haze
   // over the whole field - the glow a bright tube threw past its own
-  // phosphors, and far more of it where the lights are brightest and cross.
-  // Taken at this pixel, not at the cell's centre, or it would come out in
-  // cells. Asleep, the dusk has none.
-  vec3 haze = lights(plane, t / 1.5) * (1.0 - sleep);
-  vec3 bloom = haze * 0.10 + haze * haze * 0.90;
+  // phosphors, and far more of it where the lights are brightest and cross -
+  // and the same light spread nearly twice as wide, the glow round the
+  // brightest of it reaching well out across the glass. Taken at this
+  // pixel, not at the cell's centre, or it would come out in cells.
+  // Asleep, the dusk has none.
+  float s = t / 1.5;
+  vec3 haze = lights(plane, s, 1.0) * (1.0 - sleep);
+  vec3 wide = lights(plane, s, 1.85) * (1.0 - sleep);
+  // The wide glow cubed: it gathers round the brightest light and falls
+  // away into the dark, rather than laying a veil over everything.
+  vec3 bloom = haze * 0.10 + haze * haze * 0.95 + wide * wide * wide * 0.62;
   // ...and each cell's own colour bleeding round it, so the mask glows
   // rather than sitting on black.
-  vec3 halation = lit * 0.12;
+  vec3 halation = lit * 0.18;
 
   vec3 colour = phosphors * 0.85 + halation + bloom;
 
   // The rolling band, a little brighter where it passes.
-  colour *= 1.0 + 0.24 * exp(-pow((uv.y - roll) * 7.0, 2.0));
+  colour *= 1.0 + 0.26 * exp(-pow((uv.y - roll) * 7.0, 2.0));
+  // The hum bar: a broad, soft dark band rolling slowly up the picture and
+  // round again, the way mains hum crawled up an old set.
+  float humAt = fract(uv.y - hum + 0.5) - 0.5;
+  colour *= 1.0 - 0.10 * exp(-humAt * humAt * 26.0);
+  // The lines shimmering against each other, a pair of screen rows at a
+  // time, fresh every frame.
+  colour *= 1.0 + (hash(vec2(floor(gl_FragCoord.y * 0.5), grain * 0.37)) - 0.5) * 0.09 * shimmer;
   // Static, finer than the dots, new every frame.
   colour += (hash(gl_FragCoord.xy * 0.73 + grain) - 0.5) * 0.05;
   colour *= flicker;
@@ -231,6 +262,11 @@ void main() {
              * smoothstep(1.55, 0.95, length(corner));
   colour *= mix(0.25, 1.0, tube);
 
+  // The brightest of the bloom rolled off rather than clipped: the glow
+  // keeps its spread, and the words on the panels over its hottest part
+  // stay as readable as they were before there was this much of it.
+  colour = colour / (1.0 + colour * 0.24);
+
   // Dim enough to read over, and a floor that is not quite black - darker
   // still with OSIRIS up, whose ground is a void with a little blue in it.
   float dim = mix(0.50, 0.62, sleep) * mix(1.0, 0.62, osiris);
@@ -238,6 +274,32 @@ void main() {
   gl_FragColor = vec4(colour * dim + ground, 1.0);
 }
 `;
+
+// How fast the light drifts: units of the lights' own time a second.
+const DRIFT = 3.9;
+// A flicker, never a flash: the deepest the tube's brightness goes.
+const FLICKER_FLOOR = 0.74;
+// The fewest frames a second the ground is drawn at, screen allowing.
+const SMOOTH = 55;
+
+/* How bright the tube is this frame, as a share of itself: a shimmer every
+ * frame (shimmer, 0..1), a hum of a few cycles a second under it (hum, 0..1)
+ * and now and then a dip (dip, 0..1, falling away over a few frames) - all
+ * of it scaled by `calm`, and never below FLICKER_FLOOR. */
+export function flickerLevel({ shimmer = 0, hum = 0, dip = 0, calm = 1 }) {
+  const fall = (shimmer * 0.07 + hum * 0.03 + dip * 0.16) * calm;
+  return Math.max(FLICKER_FLOOR, 1 - fall);
+}
+
+/* On how many of the screen's frames to draw one, for a screen whose frames
+ * come `interval` ms apart: as few as keep the ground at SMOOTH a second or
+ * more, evenly spaced - every frame at 60Hz, every other at 144, every
+ * third at 165 - so the light moves smoothly without a full-resolution pass
+ * on every refresh of a fast screen. */
+export function framesPerDraw(interval) {
+  if (!(interval > 0)) return 1;
+  return Math.max(1, Math.floor(1000 / interval / SMOOTH));
+}
 
 export class Shader {
   constructor(canvas, { scale = 1, pitch = 6 } = {}) {
@@ -257,8 +319,14 @@ export class Shader {
     this.rollWait = 3.0;
     this.tear = 0.0;
     this.tearAt = 0.5;
+    this.dip = 0.0;
+    this.hum = 0.0;
+    this.shimmer = 1.0;
     this.osirisValue = 0.0;
     this.osirisTarget = 0.0;
+    // Asked for less motion, the set is steadier and the light slower.
+    this.still = typeof matchMedia === 'function'
+      && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (this.gl) this._build();
   }
 
@@ -296,6 +364,8 @@ export class Shader {
     this.tearAtUniform = gl.getUniformLocation(program, 'tearAt');
     this.grainUniform = gl.getUniformLocation(program, 'grain');
     this.osirisUniform = gl.getUniformLocation(program, 'osiris');
+    this.humUniform = gl.getUniformLocation(program, 'hum');
+    this.shimmerUniform = gl.getUniformLocation(program, 'shimmer');
     this.resize();
   }
 
@@ -324,26 +394,38 @@ export class Shader {
   // OSIRIS up: the lights go over to its colours, in about a second.
   theme(osiris) { this.osirisTarget = osiris ? 1 : 0; }
 
-  /* One frame of an old set: a flicker that is never quite still and now
-   * and then dips, a brighter band rolling up the picture every few seconds,
-   * and once in a while a few lines torn sideways. `dt` in seconds. Quieter
-   * asleep - the idle screen is meant to be restful. */
-  _set(dt) {
-    const calm = 1 - this.sleepValue * 0.7;
-    this.flicker = 1 - (Math.random() * 0.04
-                        + (Math.random() < 0.01 ? 0.12 : 0)) * calm;
+  /* One frame of an old set: a flicker that is never quite still - a
+   * shimmer, a hum under it, and a dip now and then that falls away over a
+   * few frames - lines shimmering against each other, a dark hum bar
+   * crawling up, a brighter band rolling up every few seconds, and once in a
+   * while a few lines torn sideways. `dt` in seconds, `now` in ms. Chances
+   * are per second, not per frame, so the set behaves the same at any frame
+   * rate. Quieter asleep - the idle screen is meant to be restful - and
+   * quieter still for anyone who asked for less motion. */
+  _set(dt, now) {
+    const calm = (1 - this.sleepValue * 0.7) * (this.still ? 0.3 : 1);
+    this.dip *= Math.pow(0.02, dt);                  // gone in about a quarter second
+    if (Math.random() < dt * 0.7) this.dip = 0.6 + Math.random() * 0.4;
+    this.flicker = flickerLevel({
+      shimmer: Math.random(),
+      hum: 0.5 + 0.5 * Math.sin((now / 1000) * Math.PI * 2 * 5.3),
+      dip: this.dip,
+      calm,
+    });
+    this.shimmer = calm;
+    this.hum = (this.hum + dt * 0.055) % 1;
     if (this.roll > -0.5) {
-      this.roll += dt * 0.32;
-      if (this.roll > 1.25) { this.roll = -1; this.rollWait = 3 + Math.random() * 6; }
+      this.roll += dt * 0.42;
+      if (this.roll > 1.25) { this.roll = -1; this.rollWait = 2 + Math.random() * 4; }
     } else if ((this.rollWait -= dt) <= 0) {
       this.roll = -0.25;
     }
     if (this.tear > 0.0004) {
-      this.tear *= 0.55;
+      this.tear *= Math.pow(0.55, dt * 30);
     } else {
       this.tear = 0;
-      if (Math.random() < 0.006 * calm) {
-        this.tear = 0.004 + Math.random() * 0.006;
+      if (Math.random() < dt * 0.22 * calm) {
+        this.tear = 0.004 + Math.random() * 0.007;
         this.tearAt = Math.random();
       }
     }
@@ -360,24 +442,32 @@ export class Shader {
     gl.uniform1f(this.tearAtUniform, this.tearAt);
     gl.uniform1f(this.grainUniform, Math.random() * 97.0);
     gl.uniform1f(this.osirisUniform, this.osirisValue);
+    gl.uniform1f(this.humUniform, this.hum);
+    gl.uniform1f(this.shimmerUniform, this.shimmer);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
   start() {
     if (!this.gl || this.frame !== null) return;
     this.last = performance.now();
+    let previous = this.last;
+    let interval = 1000 / 60;         // the screen's own frame time, learned as it goes
+    let waited = 0;                   // the screen's frames since the last one drawn
     const tick = (now) => {
-      // Thirty frames a second, whatever the screen's own rate: everything
-      // here drifts over tens of seconds, and a full-resolution pass every
-      // refresh of a 144Hz screen would be GPU spent on nothing. Time is
-      // taken from the clock, so the drift is the same speed on any screen.
-      if (now - this.last >= 1000 / 30 - 1) {
+      // Drawn on evenly spaced frames of the screen's own rate, at 55 a
+      // second or more (framesPerDraw). Time is taken from the clock, so
+      // the drift is the same speed on any screen.
+      const gap = now - previous;
+      previous = now;
+      if (gap > 0 && gap < 100) interval += (gap - interval) * 0.05;
+      if (++waited >= framesPerDraw(interval)) {
+        waited = 0;
         const dt = Math.min(0.1, (now - this.last) / 1000);
         this.last = now;
-        this.time += dt * 1.5 * this.rate;
+        this.time += dt * DRIFT * this.rate * (this.still ? 0.5 : 1);
         this.sleepValue += (this.sleepTarget - this.sleepValue) * Math.min(1, dt * 1.05);
         this.osirisValue += (this.osirisTarget - this.osirisValue) * Math.min(1, dt * 3.2);
-        this._set(dt);
+        this._set(dt, now);
         this.draw();
       }
       this.frame = requestAnimationFrame(tick);
