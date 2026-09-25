@@ -111,12 +111,12 @@ html, body {
   grid-template-columns: 30% 1fr 30%;
   grid-template-rows: auto 1fr auto;
   gap: 24px 32px;
-  /* The feed runs the full height on the right; under the stocks, the
-     status line, and under the feed OSIRIS's eye. */
+  /* The feed runs the full height on the right, with LYLA's health over it;
+     under the stocks, the status line, and under the feed OSIRIS's eye. */
   grid-template-areas:
     "clock   core     headlines"
     "markets core     headlines"
-    "status  lyla     eye";
+    "status  .        eye";
 }
 
 /* --- the panels ---------------------------------------------------------- */
@@ -161,7 +161,9 @@ html, body {
          letter-spacing: -0.03em; color: var(--amber-bright); }
 #seconds { font-size: 26px; color: rgba(232, 185, 88, 0.55); margin-left: 4px; }
 #date { margin-top: 10px; }
-#date-extra, #weather { margin-top: 6px; }
+#date-extra, #weather, #today-line { margin-top: 6px; }
+#today-line:empty { display: none; }
+#today-line b { color: var(--amber-bright); font-weight: 700; }
 
 /* --- status ------------------------------------------------------------------
    Under the stocks: the links to Gemini, Claude and the mic, the market's
@@ -193,7 +195,7 @@ html, body {
 
 #markets { grid-area: markets; display: flex; flex-direction: column; }
 #markets #watchlist { flex: 1; min-height: 0; }
-#indices { display: flex; gap: 28px; margin-bottom: 16px; }
+#indices { display: flex; flex-wrap: wrap; gap: 4px 24px; margin-bottom: 14px; }
 .index .name { font-size: 12px; font-weight: 700; color: rgba(216, 210, 196, 0.62);
                 letter-spacing: 0.1em; text-transform: uppercase; }
 .index .value { font-size: 27px; font-weight: 900; color: var(--amber-bright); }
@@ -214,14 +216,17 @@ html, body {
 
 .stock-row {
   position: relative; display: grid; align-items: center; width: 100%;
-  grid-template-columns: minmax(104px, 23%) minmax(0, 1fr) 84px 88px 78px;
-  gap: 0 14px; padding: 13px 24px; margin: 0; cursor: pointer;
+  grid-template-columns: minmax(0, 1fr) 76px 84px 84px;
+  gap: 0 14px; padding: 9px 24px; margin: 0; cursor: pointer;
   font: 500 12px/1.2 var(--hud); letter-spacing: .14em; text-transform: uppercase;
   text-align: left; color: #ece4d2; background: transparent;
   border: 0; border-bottom: 1px solid rgba(255, 240, 210, .055);
   transition: color .35s cubic-bezier(.215, .61, .355, 1);
 }
 .stock-row .sym { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* The ticker with its name under it. */
+.stock-row .id { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; min-width: 0; }
+.stock-row .id .name { flex-basis: 100%; display: block; }
 .stock-row .sym b { font-weight: 800; color: #fff3dc; transition: color .35s; }
 .stock-row .mark { width: 18px; height: 18px; object-fit: contain; flex: none; }
 .stock-row .mark.none {
@@ -234,10 +239,44 @@ html, body {
                    background: var(--amber-bright); box-shadow: 0 0 6px rgba(255, 190, 90, .8); }
 .stock-row .name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
                    font-size: 11px; color: rgba(216, 210, 196, .55); transition: color .35s; }
-.stock-row .mini { display: block; width: 84px; height: 22px; overflow: visible; }
+.stock-row .mini { display: block; width: 100%; height: 22px; overflow: visible; }
 .stock-row .mini.empty { height: 22px; }
 .stock-row .price { text-align: right; font-weight: 700; color: #fff3dc; transition: color .35s; }
 .stock-row .move { text-align: right; font-size: 11px; font-weight: 700; }
+/* The price with the day's move under it. */
+.stock-row .now { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+/* The day's curve, with where the price sits in the day's range under it -
+   low on the left, high on the right. */
+.stock-row .day { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.stock-row .day .mini { height: 18px; }
+/* What it earns, and what the analysts think it is worth. */
+.stock-row .facts { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.stock-row .facts small { font-size: 11px; letter-spacing: .06em; white-space: nowrap;
+                          color: #e6ddcb; transition: color .35s; }
+.stock-row .facts i { font-style: normal; color: rgba(216, 210, 196, .5); margin-right: 3px; }
+.stock-row .facts em { font-style: normal; }
+.stock-row.lit .facts small { color: #121012; }
+.stock-row.lit .facts i { color: rgba(18, 16, 18, .55); }
+.range { position: relative; display: block; height: 3px; border-radius: 2px;
+         background: rgba(255, 240, 210, .14); }
+.range s { position: absolute; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px;
+           border-radius: 50%; background: var(--amber-bright); box-shadow: 0 0 6px rgba(255, 190, 90, .8); }
+.range.empty { opacity: .45; }
+.stock-row.lit .range { background: rgba(18, 16, 18, .16); }
+.stock-row.lit .range s { background: #121012; box-shadow: none; }
+
+/* Folded: a few rows, small - the ticker, the curve, the move - and under
+   them how many are folded away. The panel keeps only the room they need. */
+#markets.folded { align-self: start; }
+#markets.folded #indices { margin-bottom: 8px; }
+#markets.folded .index .value { font-size: 21px; }
+#markets.folded #watch-area { flex: none; }
+.stock-row.compact { grid-template-columns: minmax(0, 1fr) 70px 78px; padding: 8px 24px; }
+.stock-row.rest { grid-template-columns: 1fr; padding: 8px 24px; border-bottom: 0; }
+.stock-row.rest .sym b { color: var(--caption); font-weight: 700; }
+.stock-row.rest .mark.none { width: auto; padding: 0 5px; background: transparent;
+                             border: 1px dashed rgba(255, 214, 150, .35); color: var(--amber-bright); }
+.stock-row.rest.lit .sym b, .stock-row.rest.lit .mark.none { color: #121012; border-color: rgba(18, 16, 18, .4); }
 /* Under the bar: dark on paper, the ink greens and reds, no phosphor bleed. */
 .stock-row.lit, .stock-row.lit .sym b, .stock-row.lit .price { color: #121012; text-shadow: none; }
 .stock-row.lit .name { color: rgba(18, 16, 18, .6); }
@@ -296,6 +335,21 @@ html, body {
                    border-bottom: 2px solid transparent; }
 #panel-tabs .tab:hover { color: var(--amber-bright); }
 #panel-tabs .tab.on { color: var(--amber-bright); border-bottom-color: rgba(240, 217, 160, .55); }
+/* Folds the stocks away to a few, and back - only while they are showing. */
+#panel-tabs .fold {
+  margin-left: auto; align-self: center; display: flex; align-items: center; gap: 6px;
+  font: 800 11px var(--hud); letter-spacing: .18em; cursor: pointer; text-shadow: none;
+  padding: 5px 11px 5px 8px; border-radius: 999px; color: var(--caption);
+  background: var(--panel-soft); border: 1px solid rgba(255, 214, 150, .12);
+  transition: color .2s, border-color .2s;
+}
+#panel-tabs .fold:hover { color: var(--amber-bright); border-color: rgba(255, 214, 150, .4); }
+#panel-tabs .fold .grid-icon { width: 12px; height: 12px; transition: transform .25s ease-out; }
+#markets.folded #panel-tabs .fold { color: var(--amber-bright); }
+#markets.folded #panel-tabs .fold .grid-icon { transform: rotate(180deg); }
+#markets:has(#panel-tabs .tab.on:not([data-tab="stocks"])) #panel-tabs .fold,
+body.ultra #panel-tabs .fold { display: none; }
+body.ultra #markets.folded #panel-tabs .fold { display: flex; }
 .pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 #pane-talks, #pane-projects, #pane-ideas { overflow-y: auto; scrollbar-width: none; display: block; }
 .pane[hidden] { display: none !important; }
@@ -532,6 +586,11 @@ html, body {
               transition: color .35s; }
 .story .what { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2;
                -webkit-box-orient: vertical; font-size: 15px; font-weight: 700; }
+/* What the story says, in one line, where it says more than its title. */
+.story .gist { grid-column: 2; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 1;
+               -webkit-box-orient: vertical; margin-top: 3px; font-size: 12px; font-weight: 500;
+               line-height: 1.4; color: rgba(236, 228, 210, .6); transition: color .35s; }
+.story.lit .gist { color: rgba(18, 16, 18, .66); }
 .story .who { grid-column: 2; display: block; margin-top: 4px; font-size: 11px;
               font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
               color: rgba(127, 224, 238, 0.55); transition: color .35s; }
@@ -548,6 +607,24 @@ html, body {
 /* A post that moves the market is the one thing here worth a mark. */
 .story.moving { box-shadow: inset 2px 0 0 rgba(255, 107, 122, .6); }
 .story.empty { cursor: default; }
+
+/* --- the lists through a CRT -------------------------------------------------
+   The stocks, the indices, the feed, its chips and the side panel's lists,
+   the way the CRT tool pictures have them: each letter glowing, its red and
+   blue landing a hair either side of it, and the whole list seen through a
+   halftone of dots - a mask, so the dots are in the lettering and its glow
+   and not laid over the panel. The paper bar under the pointer is not in the
+   list, so it stays solid, and the dark letters on it are dotted like the
+   rest. */
+#indices, #watchlist, #stories, #topics, #pane-talks, #pane-projects, #pane-ideas {
+  text-shadow: -0.7px 0 rgba(255, 70, 110, .5), 0.7px 0 rgba(70, 200, 255, .5),
+               0 0 2px rgba(255, 232, 200, .3), 0 0 10px rgba(255, 190, 120, .42);
+  -webkit-mask-image: radial-gradient(circle, #000 0 1.05px, rgba(0, 0, 0, .62) 1.5px);
+  mask-image: radial-gradient(circle, #000 0 1.05px, rgba(0, 0, 0, .62) 1.5px);
+  -webkit-mask-size: 3px 3px;
+  mask-size: 3px 3px;
+}
+.stock-row.lit, .story.lit { text-shadow: -0.5px 0 rgba(200, 20, 60, .35), 0.5px 0 rgba(0, 120, 200, .35); }
 
 /* --- the pictures beside the lists ------------------------------------------
    The component's preview: every row's picture is stacked here, and the one
@@ -706,6 +783,10 @@ body.roomless:not(.ultra) .gauge .bar s { width: 9px; height: 7px; border-radius
 body.roomless:not(.ultra) .gauge b { margin-left: auto; text-align: right; }
 body.roomless:not(.ultra) #gauge-foot { margin-left: 0; }
 #gauge-foot .fresh { color: var(--up); }
+/* Under the meters: the card, and each model's share of the day. */
+#system-line { flex-basis: 100%; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#system-line:empty, body.ultra #system-line, body.ultra #today-line { display: none; }
 #gauge-foot .fresh.old { color: var(--down); }
 
 /* --- the dock -------------------------------------------------------------------
@@ -1172,19 +1253,38 @@ body.answering #core { transition: transform .6s cubic-bezier(.32,.72,0,1); }
   pointer-events: none; image-rendering: pixelated;
 }
 
-/* The line that says what she is doing, with her portrait and her battery. */
+/* Her health over the feed, the way a game shows it: her portrait, her name
+   and HP, her bar in segments, and what she is doing under it. It shares
+   the feed's place on the grid; the feed starts under it while it is up. */
+:root { --hp-h: 66px; }
 #lyla-block {
-  grid-area: lyla; align-self: end; justify-self: center;
-  display: flex; align-items: center; gap: 12px;
+  grid-area: headlines; align-self: start; position: relative; z-index: 2;
+  display: flex; align-items: center; gap: 14px; height: var(--hp-h); min-width: 0;
+  padding: 10px 18px 10px 14px; border-radius: 16px; background: var(--panel);
+  border: 1px solid rgba(255, 214, 150, .07); backdrop-filter: blur(7px) saturate(1.2);
 }
-#lyla-icon { width: 24px; height: 36px; image-rendering: pixelated; }
-#lyla-label { letter-spacing: 0.1em; color: rgba(232, 185, 88, 0.9); white-space: nowrap; }
+body:not(.ultra) #stage:has(#lyla-block:not(.away)) #headlines { margin-top: calc(var(--hp-h) + 14px); }
+#lyla-icon { width: 28px; height: 42px; flex: none; image-rendering: pixelated; }
+#lyla-hp { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.hp-head { display: flex; align-items: center; gap: 8px; font: 800 12px var(--hud); letter-spacing: .22em; }
+.hp-head b { color: var(--amber-bright); font-weight: 900; }
+.hp-tag { font-size: 11px; font-weight: 900; letter-spacing: .08em; line-height: 1.3; padding: 0 5px;
+          border-radius: 3px; color: #0c0b0a; background: var(--up); text-shadow: none; }
+#lyla-pct { margin-left: auto; font: 800 12px var(--hud); letter-spacing: .06em; }
 #lyla-battery {
-  position: relative; width: 74px; height: 5px; border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08); overflow: hidden;
+  position: relative; height: 10px; border-radius: 2px; overflow: hidden;
+  background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 214, 150, .2);
 }
-#lyla-bar { position: absolute; inset: 0 auto 0 0; width: 88%; background: var(--amber); }
-#lyla-pct { min-width: 46px; }
+/* The segments: dark seams laid over the bar, so it empties a block at a time
+   to the eye while lyla.js still sets its width smoothly. */
+#lyla-battery::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 9px, rgba(8, 7, 6, .9) 9px 11px);
+}
+#lyla-bar { position: absolute; inset: 0 auto 0 0; width: 88%; background: var(--amber);
+            transition: width .6s ease-out; }
+#lyla-label { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap;
+              overflow: hidden; text-overflow: ellipsis; color: var(--caption); }
 
 /* --- the reply, a word at a time ------------------------------------------- */
 
@@ -1196,7 +1296,8 @@ body.answering #core { transition: transform .6s cubic-bezier(.32,.72,0,1); }
    Three states that have to look like three states. Holding the chord used to
    change nothing here, so the display just went quiet. */
 
-#hint { transition: opacity .3s, color .3s; }
+#hint { transition: opacity .3s, color .3s; color: rgba(236, 228, 214, .8);
+        text-shadow: 0 0 3px rgba(0, 0, 0, .9), 0 0 12px rgba(0, 0, 0, .7); }
 #hint.busy { color: var(--cyan); letter-spacing: .18em; text-transform: uppercase;
              font-size: 12px; opacity: 1; }
 
@@ -1358,9 +1459,10 @@ body.asleep .peek { opacity: 0 !important; pointer-events: none; transition: opa
   #ring { width: 200px; height: 200px; }
   #peek { width: 300px; height: 190px; }
   #chart-peek { width: 350px; height: 232px; }
-  .stock-row { grid-template-columns: minmax(96px, 24%) minmax(0, 1fr) 70px 80px 70px;
-               gap: 0 10px; padding: 11px 24px; font-size: 11px; }
-  .stock-row .mini { width: 70px; }
+  .stock-row { grid-template-columns: minmax(0, 1fr) 64px 80px 78px;
+               gap: 0 10px; padding: 8px 24px; font-size: 11px; }
+  :root { --hp-h: 60px; }
+  .stock-row .mini { width: 100%; }
   .story { padding: 9px 24px; }
   .story .what { font-size: 14px; }
   #story h3 { font-size: 19px; }

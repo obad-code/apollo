@@ -196,7 +196,10 @@ comes, with room between the letters, used as a stencil over a grid of small
 lit cells, with a bloom, the three colours landing a hair apart, a flicker,
 scanlines and now and then a bright band rolling down (`ui/full/ledword.js`) -
 and all of it seen through the same fisheye as the picture behind, its colours
-parting towards the edges. It arrives scrambled, like
+parting towards the edges. Under the ring it is quieter: a soft glow, the
+colours landing close together, burning steadily, and lit a little cyber -
+cyan through violet to pink across the word, drifting slowly, with once in a
+long while a slice of it jumping sideways for a moment. It arrives scrambled, like
 the scramble-text component: every letter a random symbol, settling into
 the word from the left. Point at it on the display and it scrambles again.
 Orbitron is under the SIL Open Font License
@@ -215,20 +218,27 @@ full-screen program was already up, so a game or a film is left alone.
 
 The full display is the whole screen. Behind everything, an old set's own
 pixels (`ui/full/shader.js`): a slot mask as fine as a TV's - cells of a red,
-a green and a blue slot, six screen pixels across - lit by a CRT gradient:
-five coloured lights drifting on their own slow loops, and over them two
-folds of light like silk catching it, a warm one low across the tube going
-red to amber to gold and a cool blue one high on the left, with faint moire
-rings where the picture is brightest - bulged by a fisheye, and blooming
-hard where the light crosses. Over it: the clock with the date in both
-calendars and Riyadh's weather; your watchlist, and under it the status line -
-the links to Gemini, Claude and the mic, the market's hours, the machine as
-rows of lit segments (CPU, GPU and RAM, sixteen segments each, the last ones
-warm and then red) and the day's tokens, cost and clips - two slim lines while
-LYLA's room is up, the full meters when it is away; headlines on what you
-follow and Trump's posts with the market-moving ones flagged, the full height
-of the right side, with OSIRIS's eye under them; and LYLA in her room along
-the bottom.
+a green and a blue slot, six screen pixels across, laid on lightly - lit by
+a CRT gradient: one wide band of light leaning across the tube from the top
+left to the bottom right, warm below it (red, orange, yellow), pale along its
+ridge and cool above it (teal, blue, night), with soft scanlines and faint
+wavy ripples crawling up the glass - bulged by a fisheye, swaying and
+wandering slowly, and breathing rather than flickering: it is meant to be
+restful to look at for hours. Over it: the clock with the date in both
+calendars, Riyadh's weather, the next prayer and who on your list reports
+this week; your watchlist, and under it the status line - the links to
+Gemini, Claude and the mic, the market's hours, the machine as rows of lit
+segments (CPU, GPU and RAM, sixteen segments each, the last ones warm and
+then red), the day's tokens, cost and clips, and the card with each model's
+share of the day - two slim lines while LYLA's room is up, the full meters
+when it is away; LYLA's health bar at the top right, the way a game shows it
+- her portrait, her HP in segments and what she is doing; under it
+headlines on what you follow and Trump's posts with the market-moving ones
+flagged, each with a line of what it says, with OSIRIS's eye under them; and
+LYLA in her room along the bottom. The lists - the stocks, the indices, the
+feed and its chips, the side panel's tabs - are drawn the way a CRT tool
+would: each letter glowing, its red and blue landing a hair either side of
+it, and the whole list seen through a halftone of dots.
 
 Along the bottom edge, two buttons. **LYLA** puts her room away - she stops,
 the room fades, and the panels and the ring grow into the space - and brings
@@ -257,8 +267,13 @@ up if it was not) and Apollo tells you what it is. The chips along the top
 filter by topic.
 
 The stocks work the same way - a list after the same component: each row
-is the mark and ticker, the name, the day's curve drawn small, the price and
-the move, in a small spaced-out monospace. Point at one and the bar slides to
+is the mark and ticker with the name under it, the day's curve drawn small
+with where the price sits in the day's range under it, the P/E and the
+analysts' target, and the price with the move, in a small spaced-out
+monospace. **FOLD**, at the end of the tabs, folds the list away to the first
+four stocks, small - the ticker, the curve and the move - with how many are
+folded under them; **ALL**, or clicking that row, brings every one back. The
+choice is kept with the layout, so it is the same tomorrow. Point at one and the bar slides to
 it and the stock's chart opens beside the panel, following the pointer - the
 price large, the day's curve, the target, the P/E and anything it earned this
 week; click it and the stock opens out of its row: its chart over a day, five

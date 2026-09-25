@@ -73,6 +73,15 @@ def test_kept_across_a_restart():
     assert kept["order"][0] == "talks"
 
 
+def test_the_stocks_stay_folded_across_a_restart():
+    layout = displays.default()
+    assert layout["folded"] is False
+    layout["folded"] = True
+    displays.save(layout)
+    displays._memo = None                          # as if Apollo restarted
+    assert displays.state()["folded"] is True
+
+
 def test_a_file_that_is_not_a_layout_is_the_default(tmp_path):
     pathlib.Path(displays.PATH).write_text("{not json", encoding="utf-8")
     assert displays.state() == displays.default()
@@ -124,6 +133,7 @@ RAW = [
      "layers": ["cables", "cables", "nope", "cctv"]},
     {"ultra": 1, "focus": "talks", "items": {"talks": {"shown": True, "w": -8, "h": 70}}},
     {"focus": ["feed"], "order": "feed", "layers": "cctv"},
+    {"folded": True}, {"folded": "yes"}, {"folded": 1},
 ]
 
 

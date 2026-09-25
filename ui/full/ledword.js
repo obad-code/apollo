@@ -17,6 +17,13 @@
 // as the dots behind it, with its colours parting towards the edges (see
 // `glass` below).
 //
+// The display's own wordmark is quieter than the intro's old tube: its guns
+// land closer together, its glow is softer, it burns steadily - no dips, no
+// band rolling down it - and it takes a few colours from left to right
+// across its width (`palette`, see `tint`), drifting slowly, with once in a
+// long while a slice of it jumping sideways for a moment, the way a
+// terminal's picture glitches in a film.
+//
 // Frames only while it runs, at most `fps` of them.
 
 const DEFAULT_FONT = '"Thmanyah", "Segoe UI", system-ui, sans-serif';
@@ -32,6 +39,26 @@ const randomChar = () => CHARS[Math.floor(Math.random() * CHARS.length)] || '?';
 export function spaced(prefixes, widths, full, gap) {
   const slots = prefixes.map((x, i) => ({ x: x + i * gap, w: widths[i] }));
   return { slots, width: full + Math.max(0, prefixes.length - 1) * gap };
+}
+
+/* The colour at `t` across the word, 0 at its left edge and 1 at its right:
+ * the `stops` spread evenly over it, each blending into the next, and the
+ * end ones held beyond the word's edges. */
+export function tint(stops, t) {
+  if (!stops || !stops.length) return [255, 255, 255];
+  if (stops.length === 1) return [...stops[0]];
+  const at = Math.min(1, Math.max(0, t)) * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(at));
+  const f = at - i;
+  return stops[i].map((value, k) => Math.round(value + (stops[i + 1][k] - value) * f));
+}
+
+/* How brightly the word burns this frame, from two draws `a` and `b` in
+ * 0..1: steadily, a breath under full, for the display's wordmark; the old
+ * tube's restless flicker for the rest, with a dip one frame in fifty. */
+export function flickerOf(a, b, steady) {
+  if (steady) return 0.95 + b * 0.05;
+  return a < 0.02 ? 0.55 : 0.87 + b * 0.13;
 }
 
 /* The word with its first `progress` of letters settled and the rest noise. */
@@ -56,6 +83,7 @@ varying vec2 uv;
 uniform sampler2D frame;
 uniform float aspect;      // width over height
 uniform float bulge;       // how far the middle swells, 0 for flat glass
+uniform float part;        // how far the three guns part towards the edges
 void main() {
   vec2 p = uv * 2.0 - 1.0;
   // 0 at the centre to 1 in a corner, measured on the real shape.
@@ -66,7 +94,7 @@ void main() {
     gl_FragColor = vec4(0.0);
     return;
   }
-  vec2 miss = q * r2 * 0.012;
+  vec2 miss = q * r2 * part;
   vec4 red = texture2D(frame, at + miss);
   vec4 mid = texture2D(frame, at);
   vec4 blue = texture2D(frame, at - miss);
@@ -112,7 +140,8 @@ function glass(canvas) {
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   return { gl, aspect: gl.getUniformLocation(program, 'aspect'),
-           bulge: gl.getUniformLocation(program, 'bulge') };
+           bulge: gl.getUniformLocation(program, 'bulge'),
+           part: gl.getUniformLocation(program, 'part') };
 }
 
 // Motion's "easeOut".
@@ -124,6 +153,10 @@ export class LedWord {
     glow = 1, stretch = 1, lean = 0, fps = 30, fill = 0.9,
     font = DEFAULT_FONT, weight = 900, bulge = 0.22,
     tracking = 0,          // extra room between the letters, in cap heights
+    palette = null,        // colours from left to right across the word, or none
+    fringe = 1,            // how far apart the three guns land, as a share of the old tube's
+    steady = false,        // burn steadily: no dips, no rolling band
+    glitch = false,        // now and then a slice of the word jumps sideways
   } = {}) {
     this.canvas = canvas;
     // The word is drawn in 2D onto `surface`; the glass bends that onto the
@@ -132,7 +165,10 @@ export class LedWord {
     this.surface = this.glass ? document.createElement('canvas') : canvas;
     this.ctx = this.surface.getContext('2d');
     Object.assign(this, { text, rows, aspect, gap, colour, glow, stretch, lean, fps, fill,
-                          font, weight, bulge, tracking });
+                          font, weight, bulge, tracking, palette, fringe, steady, glitch });
+    this.glitchAt = 0;         // when the next slice jumps, in ms
+    this.glitchUntil = 0;      // ...and until when it is out of place
+    this.glitchBand = null;
     this.shown = text;         // what the stencil says right now
     this.cells = [];
     this.frame = null;
@@ -303,7 +339,7 @@ export class LedWord {
     if (next !== null && next !== this.shown) this._stencil(next);
 
     const [r, g, b] = this.colour;
-    const shift = Math.max(0.6, this.cellH * 0.045);   // how far apart the guns land
+    const shift = Math.max(0.6, this.cellH * 0.045) * this.fringe;   // how far apart the guns land
 
     // The cells, once per gun, added together: white where they meet, a
     // fringe of colour where they do not. Each has its own slow shimmer.
@@ -313,8 +349,10 @@ export class LedWord {
     l.clearRect(0, 0, width, height);
     l.globalCompositeOperation = 'lighter';
     const seconds = now / 1000;
+    // A steady word's cells shimmer less than half as much.
+    const depth = this.steady ? 0.07 : 0.16;
     const levels = this.cells.map((cell) =>
-      cell.tired * (0.84 + 0.16 * Math.sin(seconds * (1.3 + cell.seed * 2.4) + cell.seed * 40)));
+      cell.tired * (1 - depth + depth * Math.sin(seconds * (1.3 + cell.seed * 2.4) + cell.seed * 40)));
     for (const [colour, dx] of [[`rgb(${r},0,0)`, -shift], [`rgb(0,${g},0)`, 0], [`rgb(0,0,${b})`, shift]]) {
       l.fillStyle = colour;
       this.cells.forEach((cell, i) => {
@@ -328,9 +366,30 @@ export class LedWord {
     l.drawImage(this.mask, 0, 0);
     l.globalCompositeOperation = 'source-over';
 
+    // Its colours, laid over the lit cells only, left to right across the
+    // word and sliding a little either way over half a minute - most of the
+    // way to the colour, so the cells keep a little of their white heat.
+    if (this.palette && this.palette.length) {
+      const wide = this.wordWidth * this.stretch;
+      const drift = Math.sin(seconds * 0.21) * 0.12 * wide;
+      const from = width / 2 - wide / 2 + drift;
+      const wash = l.createLinearGradient(from, 0, from + wide, 0);
+      const last = Math.max(1, this.palette.length - 1);
+      this.palette.forEach(([cr, cg, cb], i) => wash.addColorStop(i / last, `rgb(${cr},${cg},${cb})`));
+      l.globalCompositeOperation = 'source-atop';
+      l.globalAlpha = 0.72;
+      l.fillStyle = wash;
+      l.fillRect(0, 0, width, height);
+      l.globalAlpha = 1;
+      l.globalCompositeOperation = 'source-over';
+    }
+
+    // Once in a long while, a slice of it jumps sideways for a moment.
+    if (this.glitch) this._glitch(l, now, width, height);
+
     // The tube: bloom under, the cells, a flicker through all of it - a
     // restless one, and now and then a dip.
-    const flicker = Math.random() < 0.02 ? 0.55 : 0.87 + Math.random() * 0.13;
+    const flicker = flickerOf(Math.random(), Math.random(), this.steady);
     ctx.clearRect(0, 0, width, height);
     ctx.globalCompositeOperation = 'lighter';
     ctx.filter = `blur(${(this.cellH * 2.6).toFixed(1)}px)`;
@@ -343,8 +402,8 @@ export class LedWord {
     ctx.globalAlpha = flicker;
     ctx.drawImage(this.layer, 0, 0);
 
-    // Now and then a brighter band rolls down the glass.
-    if (this.roll < 0 && Math.random() < 0.004) this.roll = 0;
+    // Now and then a brighter band rolls down the glass - on the old tube.
+    if (!this.steady && this.roll < 0 && Math.random() < 0.004) this.roll = 0;
     if (this.roll >= 0) {
       const band = height * 0.16;
       const y = this.roll * (height + band) - band;
@@ -372,10 +431,32 @@ export class LedWord {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
       gl.uniform1f(this.glass.aspect, width / height);
       gl.uniform1f(this.glass.bulge, this.bulge);
+      gl.uniform1f(this.glass.part, 0.012 * this.fringe);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
+  }
+
+  /* A slice of the word, a sixth of its height somewhere down it, pushed a
+   * cell or so sideways for about a tenth of a second, every eight to
+   * fourteen seconds - taken out of the finished cells and put back
+   * shifted, so the bloom follows it. */
+  _glitch(l, now, width, height) {
+    if (!this.glitchAt) this.glitchAt = now + 8000 + Math.random() * 6000;
+    if (now >= this.glitchAt) {
+      const h = Math.max(2, Math.round(height * (0.08 + Math.random() * 0.1)));
+      const y = Math.round(height * 0.2 + Math.random() * (height * 0.6 - h));
+      const dx = Math.round((Math.random() < 0.5 ? -1 : 1) * this.grid.cellW * (0.4 + Math.random() * 0.6));
+      this.glitchBand = { y, h, dx };
+      this.glitchUntil = now + 90 + Math.random() * 60;
+      this.glitchAt = now + 8000 + Math.random() * 6000;
+    }
+    if (!this.glitchBand || now > this.glitchUntil) return;
+    const { y, h, dx } = this.glitchBand;
+    const slice = l.getImageData(0, y, width, h);
+    l.clearRect(0, y, width, h);
+    l.putImageData(slice, dx, y);
   }
 
   /* Arrive scrambled and settle into the word over `seconds`, `delay`

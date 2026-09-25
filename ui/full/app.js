@@ -106,6 +106,12 @@ const SAMPLE = {
             weather: Date.now() / 1000, system: Date.now() / 1000 },
 };
 
+// The day's range, as dataservice works it out from the day's curve.
+for (const quote of SAMPLE.market.watchlist) {
+  quote.high = Math.max(...quote.spark);
+  quote.low = Math.min(...quote.spark);
+}
+
 const state = {
   snapshot: null,
   prices: new Map(),
@@ -157,7 +163,12 @@ shader.start();
  * comes - with room between the letters, and arriving scrambled. */
 const NAME = { font: '"Orbitron", "Segoe UI", sans-serif', weight: 900, stretch: 0.8,
                tracking: 0.3 };
-const wordmark = new LedWord($('wordmark'), { ...NAME, rows: 12, glow: 0.8, fill: 0.62, bulge: 0.18 });
+// The display's own: quieter than the intro's tube - a soft glow, the guns
+// close together, steady - and a little colour, cyan through violet to pink,
+// the way a cyberpunk sign is lit.
+const wordmark = new LedWord($('wordmark'), { ...NAME, rows: 12, glow: 0.42, fill: 0.62, bulge: 0.1,
+                                              gap: 0.26, fringe: 0.3, steady: true, glitch: true,
+                                              palette: [[92, 236, 255], [160, 146, 255], [255, 128, 214]] });
 const sleepWord = new LedWord($('sleep-word'), { ...NAME, rows: 16, fill: 0.7 });
 // In the intro the name is lit in the boot screen's own green phosphor.
 const introWord = new LedWord($('intro-word'), { ...NAME, rows: 22, glow: 1.15,
@@ -214,8 +225,15 @@ function playIntro() {
   }, INTRO_GONE_AT);
 }
 
+/* What she is doing, under her bar. Her name is over the bar already, so the
+ * "LYLA // " lyla.js starts every line with is taken off on the way in. */
+const lylaDoing = {
+  get textContent() { return $('lyla-label').textContent; },
+  set textContent(text) { $('lyla-label').textContent = String(text).replace(/^LYLA\s*\/\/\s*/, ''); },
+};
+
 const lyla = new Lyla($('lyla'), {
-  label: $('lyla-label'), icon: $('lyla-icon'),
+  label: lylaDoing, icon: $('lyla-icon'),
   bar: $('lyla-bar'), pct: $('lyla-pct'), ring: $('ring'),
 });
 lyla.start();
@@ -436,17 +454,55 @@ function markOf(quote) {
     : `<span class="mark none">${esc((quote.symbol || '?')[0])}</span>`;
 }
 
+/* Where the price sits in the day's range, as a lit point on a short line -
+ * low on the left, high on the right - or an empty line when the day has
+ * no range yet. */
+function rangeMark(quote) {
+  const low = Number(quote.low), high = Number(quote.high), price = Number(quote.price);
+  if (!Number.isFinite(low) || !Number.isFinite(high) || !(high > low)) return '<i class="range empty"></i>';
+  const at = Math.max(0, Math.min(1, (price - low) / (high - low)));
+  return `<i class="range"><s style="left:${(at * 100).toFixed(1)}%"></s></i>`;
+}
+
+/* What it earns and what the analysts think it is worth: a line each. */
+function stockFacts(quote) {
+  const pe = Number(quote.pe) > 0 ? Number(quote.pe).toFixed(1) : '—';
+  const upside = Number(quote.upside);
+  const target = quote.target && Number.isFinite(upside)
+    ? `<em class="${moveClass(upside)}">${upside >= 0 ? '+' : ''}${upside.toFixed(1)}%</em>` : '—';
+  return `<small><i>P/E</i> ${pe}</small><small><i>TGT</i> ${target}</small>`;
+}
+
+const flagOf = (quote) => (stockNotes(quote).length ? '<i class="flag"></i>' : '');
+
+/* A row in full: the mark, the ticker with the name under it, the day's
+ * curve with where the price sits in the day's range under it, what it
+ * earns and what it is thought worth, and the price with the day's move. */
 function stockRow(quote) {
-  const flag = stockNotes(quote).length ? '<i class="flag"></i>' : '';
   return `
     <div class="stock-row" data-symbol="${esc(quote.symbol)}">
-      <span class="sym">${markOf(quote)}<b>${esc(quote.symbol)}</b>${flag}</span>
-      <span class="name">${esc(quote.name || '')}</span>
+      <span class="sym">${markOf(quote)}<span class="id"><b>${esc(quote.symbol)}</b>${flagOf(quote)}<small class="name">${esc(quote.name || '')}</small></span></span>
+      <span class="day">${mini(quote.spark, quote.change_pct >= 0)}${rangeMark(quote)}</span>
+      <span class="facts">${stockFacts(quote)}</span>
+      <span class="now"><span class="price">${money(quote.price)}</span><span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span></span>
+    </div>`;
+}
+
+/* ...and folded: the ticker, the curve and the move - nothing more. */
+function compactRow(quote) {
+  return `
+    <div class="stock-row compact" data-symbol="${esc(quote.symbol)}">
+      <span class="sym">${markOf(quote)}<b>${esc(quote.symbol)}</b>${flagOf(quote)}</span>
       ${mini(quote.spark, quote.change_pct >= 0)}
-      <span class="price">${money(quote.price)}</span>
       <span class="move ${moveClass(quote.change_pct)}">${moveText(quote.change_pct)}</span>
     </div>`;
 }
+
+/* The row under a folded list: how many are folded away, and the way back. */
+const moreRow = (hidden) => `
+    <button class="stock-row rest" type="button">
+      <span class="sym"><span class="mark none">+${Number(hidden) || 0}</span><b>Show all</b></span>
+    </button>`;
 
 /* The picture a row opens beside the panel - the component's image, as the
  * stock's own card: the price large, the day's curve, and what the analysts
@@ -492,15 +548,17 @@ function renderMarkets(market) {
   list.classList.toggle('drawing', !state.entered);
   // Which stocks were here a moment ago, so a card that has just been asked
   // for can arrive rather than appear, and one that has been dropped can
-  // leave rather than vanish.
+  // leave rather than vanish. Folded, only the first few are here at all.
   const watched = market.watchlist || [];
+  const folded = Boolean(state.layout.folded);
+  const shown = Tiles.foldedStocks(watched, folded);
   for (const [symbol, asked] of [...state.pending]) {
     if (watched.some((quote) => quote.symbol === symbol) || Date.now() - asked.since > PENDING_FOR) {
       state.pending.delete(symbol);
     }
   }
   const before = [...list.children].map((row) => row.dataset.symbol).filter(Boolean);
-  const after = watched.map((quote) => quote.symbol).concat([...state.pending.keys()]);
+  const after = shown.map((quote) => quote.symbol).concat(folded ? [] : [...state.pending.keys()]);
   const leaving = before.filter((symbol) => !after.includes(symbol));
 
   if (state.entered && leaving.length) {
@@ -524,18 +582,21 @@ function renderMarkets(market) {
   // A snapshot comes every few seconds for the machine's numbers; the rows
   // are rebuilt only when something on them changed, or the bar under the
   // pointer would drop off its row every five seconds.
-  const key = JSON.stringify([after, watched.map((quote) =>
-    [quote.price, quote.change_pct, quote.target, quote.pe, quote.logo, quote.spark, quote.name]),
-    state.entered]);
+  const key = JSON.stringify([after, shown.map((quote) =>
+    [quote.price, quote.change_pct, quote.target, quote.pe, quote.logo, quote.spark, quote.name,
+     quote.high, quote.low]), state.entered, folded, watched.length]);
   if (key === state.marketKey) return;
   state.marketKey = key;
   const lit = state.rowLit ? (state.rowLit.dataset.symbol || 'add') : null;
   unlightRow();
-  list.innerHTML = watched.map((quote) => stockRow(quote)).join('')
-    + [...state.pending].map(([symbol, asked]) => pendingRow(symbol, asked.name)).join('')
-    + (watched.length + state.pending.size < WATCH_MAX ? ADD_ROW : '');
+  list.innerHTML = folded
+    ? shown.map((quote) => compactRow(quote)).join('')
+      + (watched.length > shown.length ? moreRow(watched.length - shown.length) : '')
+    : shown.map((quote) => stockRow(quote)).join('')
+      + [...state.pending].map(([symbol, asked]) => pendingRow(symbol, asked.name)).join('')
+      + (watched.length + state.pending.size < WATCH_MAX ? ADD_ROW : '');
   // Each stock's chart, stacked beside the panel in the same order as the rows.
-  $('chart-peek').innerHTML = watched.map((quote) => `<div class="shot">${quoteShot(quote)}</div>`).join('');
+  $('chart-peek').innerHTML = shown.map((quote) => `<div class="shot">${quoteShot(quote)}</div>`).join('');
   if (lit) lightRow(lit === 'add' ? list.querySelector('.add') : rowFor(lit));
 
   if (state.entered) {
@@ -552,7 +613,7 @@ function renderMarkets(market) {
   // not stays still, or the whole column would blink every minute. Rows are
   // found by position rather than by a selector built from a ticker, which
   // would be one more piece of feed data steering the page.
-  (market.watchlist || []).forEach((quote, i) => {
+  shown.forEach((quote, i) => {
     const previous = state.prices.get(quote.symbol);
     const row = list.children[i];
     if (previous !== undefined && previous !== quote.price && row) {
@@ -624,10 +685,14 @@ function renderFeed(snapshot) {
   state.feedKey = key;
   state.feed = items;
   unlight();
+  // What a story says, where it says more than its title - a post's text is
+  // its title already.
+  const gistOf = (item) => (item.summary && item.summary !== item.title ? String(item.summary) : '');
   $('stories').innerHTML = items.map((item, i) => `
     <div class="story${item.moving ? ' moving' : ''}" data-i="${i}">
       <span class="num">${numbered(i)}</span>
       <span class="what">${esc(String(item.title).slice(0, 150))}</span>
+      ${gistOf(item) ? `<span class="gist">${esc(gistOf(item).slice(0, 180))}</span>` : ''}
       <span class="who"><b>${esc(item.source)}</b> · ${esc(item.age)}${
         item.moving ? ' · <i>market-moving</i>' : ''}${
         item.eye ? ' · <i class="eye">Private Eye</i>' : ''}</span>
@@ -908,16 +973,14 @@ const rowFor = (symbol) =>
 function pendingRow(symbol, name) {
   return `
     <div class="stock-row pending" data-symbol="${esc(symbol)}">
-      <span class="sym"><span class="mark none">${esc(String(symbol)[0])}</span><b>${esc(symbol)}</b></span>
-      <span class="name">Fetching ${esc(name)}…</span>
-      <i class="mini empty"></i><span class="price">…</span><span class="move"></span>
+      <span class="sym"><span class="mark none">${esc(String(symbol)[0])}</span><span class="id"><b>${esc(symbol)}</b><small class="name">Fetching ${esc(name)}…</small></span></span>
+      <span class="day"><i class="mini empty"></i></span><span class="facts"></span><span class="now"><span class="price">…</span></span>
     </div>`;
 }
 
 const ADD_ROW = `
     <button class="stock-row add" type="button">
-      <span class="sym"><span class="mark none">+</span><b>Add a stock</b></span>
-      <span class="name">or say “add Palantir”</span>
+      <span class="sym"><span class="mark none">+</span><span class="id"><b>Add a stock</b><small class="name">or say “add Palantir”</small></span></span>
     </button>`;
 
 function lightRow(row) {
@@ -929,8 +992,9 @@ function lightRow(row) {
   const bar = $('watch-bar');
   bar.style.transform = `translateY(${row.offsetTop}px) scaleY(${row.offsetHeight / 100})`;
   bar.style.opacity = '1';
-  // The add row has no chart to show.
-  chartPeek.open(row.classList.contains('add') ? -1 : [...$('watchlist').children].indexOf(row));
+  // The add row, and the one under a folded list, have no chart to show.
+  const chartless = row.classList.contains('add') || row.classList.contains('rest');
+  chartPeek.open(chartless ? -1 : [...$('watchlist').children].indexOf(row));
 }
 
 function unlightRow() {
@@ -1234,6 +1298,7 @@ $('watchlist').addEventListener('click', (event) => {
   const row = event.target.closest('.stock-row');
   if (!row) return;
   if (row.classList.contains('add')) openPicker();
+  else if (row.classList.contains('rest')) setFolded(false);
   else if (row.dataset.symbol && !row.classList.contains('pending')) openStock(row.dataset.symbol);
 });
 $('stock').addEventListener('click', (event) => {
@@ -1308,7 +1373,9 @@ function tickRow(quote, before) {
     move.className = `move ${moveClass(quote.change_pct)}`;
     move.textContent = moveText(quote.change_pct);
   }
-  if (quote.price !== before) flicker(price, quote.price > before);
+  if (price && quote.price !== before) flicker(price, quote.price > before);
+  const day = row.querySelector('.range');
+  if (day) day.outerHTML = rangeMark(quote);
   const chart = row.querySelector('.mini');
   if (chart && quote.spark && quote.spark.length > 1) {
     chart.outerHTML = mini(quote.spark, quote.change_pct >= 0);
@@ -1518,6 +1585,21 @@ function renderGauges(snapshot) {
   const fresh = age === null ? '' : age < 60 ? 'live' : `${Math.floor(age / 60)}m ago`;
   $('gauge-foot').innerHTML = said.join(' · ')
     + (fresh ? ` · <span class="fresh${age >= 180 ? ' old' : ''}">● ${fresh}</span>` : '');
+
+  // Under the meters: the card, what it holds, and each model's share of the
+  // day's talking.
+  const line = [];
+  if (system.gpu_name) line.push(esc(String(system.gpu_name).replace(/^NVIDIA\s+(GeForce\s+)?/i, '')));
+  if (system.vram !== null && system.vram !== undefined && Number.isFinite(Number(system.vram))) {
+    line.push(`VRAM ${Number(system.vram).toFixed(1)} GB`);
+  }
+  const turns = Number(usage.turns) || 0;
+  line.push(`${turns} turn${turns === 1 ? '' : 's'}`);
+  for (const [name, key] of [['Gemini', 'gemini'], ['Claude', 'claude']]) {
+    const used = usage[key] || {};
+    if (used.prompt || used.response) line.push(`${name} ${shortCount(used.prompt)}/${shortCount(used.response)}`);
+  }
+  $('system-line').innerHTML = line.join(' · ');
 }
 
 function renderWeather(weather) {
@@ -1528,8 +1610,13 @@ function renderWeather(weather) {
   const hijri = new Intl.DateTimeFormat('en-TN-u-ca-islamic-umalqura',
     { day: 'numeric', month: 'long', year: 'numeric' }).format(now);
   $('date-extra').textContent = `Day ${day} · Week ${week} · ${hijri}`;
+  // The day's range only when the reader had one: a missing high is not
+  // "undefined°".
+  const ranged = weather && Number.isFinite(Number(weather.high)) && weather.high !== null
+    && Number.isFinite(Number(weather.low)) && weather.low !== null;
+  const range = ranged ? ` · high ${Number(weather.high)}° low ${Number(weather.low)}°` : '';
   $('weather').innerHTML = weather && weather.temp !== undefined
-    ? `Riyadh ${weather.temp}° · ${esc(weather.text)} · high ${weather.high}° low ${weather.low}°${stale('weather')}`
+    ? `Riyadh ${weather.temp}° · ${esc(weather.text)}${range}${stale('weather')}`
     : 'Riyadh · weather unavailable';
 }
 
@@ -1557,6 +1644,18 @@ function renderToday(snapshot) {
     .join('');
   const due = ((snapshot.ideas || {}).reminders || []).map((reminder) =>
     `<div class="row"><span>Due</span><b>${esc(reminder.text)}</b><i>${esc(reminder.due)}</i></div>`).join('');
+  // On the normal display, the same in one line under the weather.
+  const line = [];
+  if (next.name && next.at * 1000 > Date.now()) {
+    const minutes = Math.round((next.at * 1000 - Date.now()) / 60000);
+    const wait = minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`;
+    line.push(`<b>${esc(next.name)}</b> at ${clock(new Date(next.at * 1000))} · in ${wait}`);
+  }
+  const soonest = watched.map((quote) => [quote, earningsIn(quote)])
+    .filter(([, days]) => days !== null && days >= 0 && days <= 7)
+    .sort((a, b) => a[1] - b[1])[0];
+  if (soonest) line.push(`<b>${esc(soonest[0].symbol)}</b> reports ${esc(earningsWords(soonest[1]))}`);
+  $('today-line').innerHTML = line.join(' · ');
   $('today-more').innerHTML = rows.join('')
     + `<h4>This week on your list</h4>${reporting + buying || '<p class="quiet">Nobody on your list reports this week.</p>'}`
     + `<h4>Reminders</h4>${due || '<p class="quiet">Nothing due.</p>'}`;
@@ -1962,6 +2061,14 @@ function applyLayout() {
       tile.style.gridRow = `span ${item.min ? 1 : item.h}`;
     }
   }
+  const folded = Boolean(layout.folded);
+  $('markets').classList.toggle('folded', folded);
+  const fold = $('stocks-fold');
+  fold.setAttribute('aria-pressed', folded ? 'true' : 'false');
+  fold.title = folded ? 'All the stocks back' : 'Fold the stocks away to a few';
+  fold.querySelector('span').textContent = folded ? 'ALL' : 'FOLD';
+  // Redrawn only if the fold changed: the list knows what it last drew.
+  if (state.snapshot) renderMarkets(state.snapshot.market || {});
   renderDisplayChips();
   renderSummaries();
   applySkin();
@@ -2011,6 +2118,16 @@ function changeLayout(next, { animate: moving = true, save = true } = {}) {
   wordmark.resize();
   scheduleOsiris();
 }
+
+/* The stocks folded away to a few, small, or all of them back - kept with
+ * the layout, so it is the same tomorrow. */
+function setFolded(on) {
+  if (Boolean(on) === Boolean(state.layout.folded)) return;
+  closeStock();
+  unlightRow();
+  changeLayout(Tiles.setFolded(state.layout, on), { animate: false });
+}
+$('stocks-fold').addEventListener('click', () => setFolded(!state.layout.folded));
 
 /* Into apollo.py's keeping once the changes stop. */
 function saveLayout() {

@@ -43,6 +43,8 @@
     <div id="date" class="line">&nbsp;</div>
     <div id="date-extra" class="caption">&nbsp;</div>
     <div id="weather" class="caption">&nbsp;</div>
+    <!-- The next prayer, and who on your list reports this week. -->
+    <div id="today-line" class="caption"></div>
     <!-- Ultra mode only: the rest of the day - the next prayer, the
          market's hours, who reports this week, what is due. -->
     <div id="today-more" class="more"></div>
@@ -62,6 +64,8 @@
       <div class="gauge" data-gauge="ram"><span class="tag">RAM</span><i class="bar"></i><b>—</b></div>
       <div id="gauge-foot" class="caption">&nbsp;</div>
     </div>
+    <!-- The card, and each model's share of the day's talking. -->
+    <div id="system-line" class="caption"></div>
     <!-- Ultra mode only: each model's share of the day, the machine's card,
          and how fresh every reading is. -->
     <div id="system-more" class="more"></div>
@@ -76,6 +80,11 @@
       <span class="tab" data-tab="talks">Talks</span>
       <span class="tab" data-tab="projects">Projects</span>
       <span class="tab" data-tab="ideas">Ideas</span>
+      <!-- The stocks folded away to a few, small, or all of them back. -->
+      <button id="stocks-fold" class="fold" type="button" aria-pressed="false"
+              title="Fold the stocks away to a few">
+        <svg class="grid-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span>FOLD</span>
+      </button>
     </h2>
     <div class="pane" id="pane-stocks">
       <div id="indices"></div>
@@ -145,11 +154,15 @@
   <section id="d-ideas" class="panel tile-only" data-display="ideas"><h2>Ideas</h2></section>
   <section id="d-talks" class="panel tile-only" data-display="talks"><h2>Talks</h2></section>
 
+  <!-- LYLA's health, over the feed, the way a game shows it: her portrait,
+       her name, her bar in segments, and what she is doing. -->
   <section id="lyla-block" class="rise">
     <canvas id="lyla-icon" width="48" height="72"></canvas>
-    <div id="lyla-label" class="caption">LYLA // BOOTING</div>
-    <div id="lyla-battery"><div id="lyla-bar"></div></div>
-    <div id="lyla-pct" class="caption">88%</div>
+    <div id="lyla-hp">
+      <div class="hp-head"><b>LYLA</b><span class="hp-tag">HP</span><span id="lyla-pct">88%</span></div>
+      <div id="lyla-battery"><div id="lyla-bar"></div></div>
+      <div id="lyla-label" class="caption">BOOTING</div>
+    </div>
   </section>
 
   <!-- OSIRIS's eye, under the feed. -->

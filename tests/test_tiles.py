@@ -184,3 +184,40 @@ def test_minimized_with_nothing_known_it_says_so_rather_than_nothing(tmp_path):
     said = run(tmp_path, """Object.fromEntries(T.DISPLAYS.map((d) => [d, T.summary(d, {}, {})]))""")
     for display, line in said.items():
         assert line and "undefined" not in line and "NaN" not in line, (display, line)
+
+
+# --- the stocks folded ------------------------------------------------------------
+# The button on the markets panel folds the stocks away to a few, small - the
+# ticker and the move - and back. The choice is kept with the rest of the
+# layout, so it survives a restart.
+
+def test_the_stocks_start_unfolded(tmp_path):
+    assert run(tmp_path, "T.defaultLayout().folded") is False
+
+
+def test_folding_is_kept_only_when_it_is_really_asked_for(tmp_path):
+    kept = run(tmp_path, """[true, 'yes', 1, null].map((folded) =>
+        T.sanitize({ ...T.defaultLayout(), folded }).folded)""")
+    assert kept == [True, False, False, False]
+
+
+def test_folding_changes_nothing_else(tmp_path):
+    before, after = run(tmp_path, """(() => { const a = T.defaultLayout();
+        const b = T.setFolded(a, true); return [a, b]; })()""")
+    assert after["folded"] is True and before["folded"] is False
+    assert {k: v for k, v in after.items() if k != "folded"} == \
+           {k: v for k, v in before.items() if k != "folded"}
+
+
+def test_folded_it_keeps_the_first_few_stocks_in_their_order(tmp_path):
+    shown = run(tmp_path, """T.foldedStocks(['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN', 'META']
+        .map((symbol) => ({ symbol })), true).map((q) => q.symbol)""")
+    assert shown == ["AAPL", "MSFT", "NVDA", "TSLA"]
+    assert run(tmp_path, "T.FOLDED") == len(shown)
+
+
+def test_unfolded_or_short_it_keeps_them_all(tmp_path):
+    every, few = run(tmp_path, """[T.foldedStocks([1, 2, 3, 4, 5, 6], false).length,
+        T.foldedStocks([1, 2], true).length]""")
+    assert every == 6 and few == 2
+    assert run(tmp_path, "T.foldedStocks(null, true)") == []

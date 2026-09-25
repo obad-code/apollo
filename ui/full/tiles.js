@@ -1,6 +1,8 @@
 /* Ultra mode's displays, as data: which ones there are, where each sits on
  * the grid, how big it is, whether it is shown, minimized or the one
  * expanded - and the one line each says about itself when it is minimized.
+ * And one thing that is the normal display's as much as ultra mode's:
+ * whether the stocks are folded away to a few.
  *
  * No DOM here, so node can run it (tests/test_tiles.py). app.js lays the
  * page out from a layout, and apollo.py keeps it (displays.py), so it is
@@ -43,7 +45,8 @@ export function defaultLayout() {
     // morning's work than the rest, and the screen is full without it.
     items[id] = { shown: id !== 'talks', w, h, min: false };
   }
-  return { ultra: false, focus: null, order: [...DISPLAYS], items, layers: [...LAYERS] };
+  return { ultra: false, focus: null, order: [...DISPLAYS], items, layers: [...LAYERS],
+           folded: false };
 }
 
 // A number of cells, or the fallback for anything that is not a number -
@@ -88,7 +91,7 @@ export function sanitize(raw) {
   }
   const focus = DISPLAYS.includes(raw.focus) && items[raw.focus].shown && !items[raw.focus].min
     ? raw.focus : null;
-  return { ultra: raw.ultra === true, focus, order, items, layers };
+  return { ultra: raw.ultra === true, focus, order, items, layers, folded: raw.folded === true };
 }
 
 const copy = (layout) => sanitize(JSON.parse(JSON.stringify(layout)));
@@ -148,6 +151,24 @@ export function setUltra(layout, on) {
   next.ultra = Boolean(on);
   if (!on) next.focus = null;
   return next;
+}
+
+/* The stocks folded away to a few, or all of them back. */
+export function setFolded(layout, on) {
+  const next = copy(layout);
+  next.folded = Boolean(on);
+  return next;
+}
+
+// How many stocks a folded list keeps.
+export const FOLDED = 4;
+
+/* The stocks a list shows: folded, the first FOLDED of them in the order you
+ * keep them - the ones you put first are the ones you care about first -
+ * and otherwise every one. */
+export function foldedStocks(watchlist, folded) {
+  const all = Array.isArray(watchlist) ? watchlist : [];
+  return folded ? all.slice(0, FOLDED) : all;
 }
 
 export function setLayers(layout, layers) {
