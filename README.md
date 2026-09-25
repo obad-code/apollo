@@ -1,4 +1,7 @@
-# Voice Assistant
+# apollo
+
+ai assistant - a voice assistant for your Windows PC.
+
 
 Hold `Ctrl+Alt` and speak — or press `Ctrl+1` once and just talk. Your voice
 streams to Gemini Live and Apollo answers out loud in Puck's voice.
