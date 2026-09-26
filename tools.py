@@ -605,13 +605,17 @@ def _display_mode(ctx, mode="normal"):
        "with its reasons. Use this when the user asks what traders are buying, "
        "what the next pick is, what insiders or Congress are buying, or for "
        "sensitive stock news - \"وش يشترون التريدرز\", \"وش السهم الجاي\". "
-       "Give the picks and their reasons in a few sentences, and say it is a "
-       "read of the crowd and the filings, not advice.",
+       "Lead with the final stocks (`final`) and their reasons in a few "
+       "sentences - or, when `final.none` says nothing is worth it this period, "
+       "say so - and say it is a read of the crowd and the filings, not advice.",
        _obj({}))
 def _trading_read(ctx):
     ctx.activity("reading the trading desk")
     board = trading.board()
     return {"ok": True, "verdict": board["verdict"],
+            # What it comes to - the final stocks, or that nothing is worth it
+            # this period - lead with this.
+            "final": board.get("final"),
             "picks": [{"ticker": p["ticker"], "name": p["name"], "reasons": p["reasons"],
                        "bullish": None if p["bull"] is None else round(p["bull"] * 100)}
                       for p in board["picks"]],

@@ -2128,6 +2128,10 @@ const pct = (share) => `${Math.round((Number(share) || 0) * 100)}%`;
 const bullBar = (share) => (share === null || share === undefined ? '<span class="bull none">no votes</span>'
   : `<span class="bull"><i style="width:${Math.round(Number(share) * 100)}%"></i></span><span class="bull-n">${pct(share)}</span>`);
 
+// The signals, as the final stocks name them.
+const SIGNAL_AR = { crowd: 'المتداولين', reddit: 'Reddit', insiders: 'كبار موظفي الشركة',
+                    congress: 'الكونجرس', x: 'X' };
+
 function renderTrading(board) {
   if (!board || !board.updated) return;
   const key = String(board.updated);
@@ -2137,6 +2141,19 @@ function renderTrading(board) {
   $('desk-age').textContent = `updated ${words(Date.now() / 1000 - board.updated)} ago`;
   const body = (id) => $(id).querySelector('.desk-body');
   const empty = (text) => `<p class="desk-empty">${esc(text)}</p>`;
+
+  // What it comes to, in the middle: the final stocks and why, or that
+  // nothing is worth it this period (trading.final).
+  const final = board.final || { picks: [], none: '' };
+  body('desk-final').innerHTML = (final.picks || []).length ? final.picks.map((pick, i) => `
+    <div class="final-pick">
+      <span class="final-n">${i + 1}</span>
+      <div class="final-id"><b>${esc(pick.ticker)}</b><span class="final-name">${esc(pick.name)}</span></div>
+      ${pick.bull === null || pick.bull === undefined ? '' : `<span class="final-bull">${pct(pick.bull)} متفائلين</span>`}
+      <p class="final-why"><em>السبب:</em> ${esc(pick.why)}</p>
+      <div class="final-sig">${(pick.signals || []).map((signal) => `<i>${esc(SIGNAL_AR[signal] || signal)}</i>`).join('')}</div>
+    </div>`).join('') : `
+    <div class="final-none"><b>ما في شي يستاهل هالفترة</b><p>${esc(final.none)}</p></div>`;
 
   const picks = board.picks || [];
   const top = Math.max(1, ...picks.map((pick) => Number(pick.score) || 0));

@@ -1933,8 +1933,18 @@ body.trading:not(.ultra):not(.osiris-map) #trading {
                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #desk-age { font: 400 11px var(--desk-figures); font-style: normal; letter-spacing: .08em; text-transform: uppercase;
             color: var(--desk-caption); white-space: nowrap; }
+/* The final stocks in the middle, the full height; the six panels they
+   come from either side of them. */
 .desk-grid { flex: 1; min-height: 0; display: grid; gap: 14px;
-             grid-template-columns: 1.15fr 1fr 1.1fr; grid-template-rows: minmax(0, 1.1fr) minmax(0, 1fr); }
+             grid-template-columns: 1fr 1.3fr 1fr; grid-template-rows: repeat(3, minmax(0, 1fr));
+             grid-template-areas: "read final sensitive" "traders final insiders" "congress final x"; }
+#desk-final { grid-area: final; }
+#desk-read { grid-area: read; }
+#desk-traders { grid-area: traders; }
+#desk-sensitive { grid-area: sensitive; }
+#desk-insiders { grid-area: insiders; }
+#desk-congress { grid-area: congress; }
+#desk-x { grid-area: x; }
 .desk-panel {
   position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 16px 18px 12px;
   border-radius: 6px; background: var(--panel); border: 1px solid var(--desk-line);
@@ -1944,6 +1954,35 @@ body.trading:not(.ultra):not(.osiris-map) #trading {
 .desk-panel::before { content: ""; position: absolute; left: 18px; right: 18px; top: -1px; height: 2px; border-radius: 1px;
                       background: linear-gradient(90deg, var(--desk-teal), transparent); opacity: .8; }
 #desk-read::before { background: linear-gradient(90deg, var(--desk-green), transparent); }
+/* The final stocks: the one panel that says what to make of the rest. Arabic,
+   right to left, and never letter-spaced - spacing pulls Arabic's joined
+   letters apart. */
+#desk-final { border-color: rgba(25, 230, 140, .32); padding: 22px 26px 16px;
+              box-shadow: inset 0 0 60px rgba(25, 230, 140, .06), 0 0 30px rgba(25, 230, 140, .08); }
+#desk-final::before { background: linear-gradient(270deg, var(--desk-green), transparent); opacity: 1; }
+#desk-final h3 { flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 14px;
+                 font: 700 24px var(--desk-words); letter-spacing: 0; text-transform: none; color: var(--desk-bright); }
+#desk-final h3 em { font-size: 13px; letter-spacing: 0; }
+.final-pick { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px 14px;
+              padding: 16px 2px; border-bottom: 1px solid rgba(120, 240, 190, .08); }
+.final-n { width: 30px; height: 30px; border-radius: 5px; display: grid; place-items: center;
+           font: 700 14px var(--desk-figures); color: #03140F; background: var(--desk-green);
+           text-shadow: none; box-shadow: 0 0 14px rgba(25, 230, 140, .5); }
+.final-id { display: flex; align-items: baseline; gap: 12px; min-width: 0; direction: ltr; justify-content: flex-end; }
+.final-id b { font: 700 30px var(--desk-figures); color: var(--desk-green); letter-spacing: .01em; }
+.final-name { min-width: 0; font-size: 13px; color: var(--desk-caption); white-space: nowrap;
+              overflow: hidden; text-overflow: ellipsis; }
+.final-bull { font: 500 13px var(--desk-words); color: var(--desk-green); white-space: nowrap; }
+.final-why { grid-column: 1 / -1; font: 400 17px/1.75 var(--desk-words); color: var(--desk-bright); }
+.final-why em { font-style: normal; font-weight: 700; color: var(--desk-teal); }
+.final-sig { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.final-sig i { font: 500 12px var(--desk-words); font-style: normal; padding: 2px 9px; border-radius: 3px;
+               color: var(--desk-teal); border: 1px solid rgba(54, 214, 231, .3); }
+.final-none { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;
+              gap: 12px; text-align: center; padding: 0 12px; }
+.final-none b { font: 700 28px var(--desk-words); color: var(--desk-gold); }
+.final-none p { max-width: 36ch; font: 400 17px/1.8 var(--desk-words); color: var(--desk-text); }
+.final-note { padding-top: 10px; font-size: 12px; color: var(--desk-caption); }
 #desk-sensitive::before { background: linear-gradient(90deg, var(--desk-gold), transparent); }
 .desk-panel h3 { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px;
                  font: 700 11px var(--desk-figures); letter-spacing: .2em; text-transform: uppercase; color: var(--desk-teal); }

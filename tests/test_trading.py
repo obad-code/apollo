@@ -335,3 +335,52 @@ def test_the_page_asks_for_it_through_the_bridge():
     app = App()
     assert apollo.Api(lambda: None, app=app).trading() is True and app.wanted == 1
     assert apollo.Api(lambda: None).trading() is False
+
+
+# --- the final stocks: what the desk comes to, in plain Arabic --------------------------------
+
+def signalled_picks():
+    trending = trading.parse_trending(TRENDING)
+    trending[0]["bull"], trending[1]["bull"] = 0.8, 0.9
+    return trading.conclude(trending, trading.parse_apewisdom(APEWISDOM),
+                            trading.parse_openinsider(OPENINSIDER_CLUSTERS),
+                            trading.parse_openinsider(OPENINSIDER_BUYS),
+                            trading.parse_congress(CONGRESS))
+
+
+def test_every_pick_says_why_in_arabic_too():
+    lead = signalled_picks()[0]
+    assert lead["why"] and len(lead["why"]) == len(lead["reasons"])
+    assert any("كبار موظفي الشركة" in w for w in lead["why"])
+    assert any("الكونجرس" in w for w in lead["why"])
+
+
+def test_the_final_stocks_are_only_where_several_signals_agree():
+    out = trading.final(signalled_picks())
+    assert out["none"] is None
+    tickers = [p["ticker"] for p in out["picks"]]
+    assert tickers[0] == "SKIL"
+    assert len(tickers) <= trading.FINAL
+    for pick in out["picks"]:
+        assert len(pick["signals"]) >= 2
+        assert pick["why"]
+
+
+def test_one_signal_alone_is_not_a_final_stock():
+    lone = trading.conclude(congress=[{"member": "C D", "chamber": "Senate", "side": "buy",
+                                       "amount": "$500,001 - $1,000,000", "ticker": "LMT",
+                                       "asset": "Lockheed", "disclosed": "2026-09-20"}])
+    out = trading.final(lone)
+    assert out["picks"] == []
+    assert "ما في" in out["none"] and "تشتري" in out["none"]
+
+
+def test_a_bearish_crowd_keeps_a_name_off_the_final_list():
+    picks = [{"ticker": "AAA", "name": "A", "score": 9, "bull": 0.3, "signals": ["crowd", "insiders"],
+              "reasons": ["x"], "why": ["س"]}]
+    assert trading.final(picks)["picks"] == []
+
+
+def test_nothing_at_all_says_so():
+    out = trading.final([])
+    assert out["picks"] == [] and out["none"]

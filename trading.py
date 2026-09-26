@@ -527,12 +527,13 @@ def x_traders():
 
 def conclude(trending=(), reddit=(), clusters=(), buys=(), congress=(), x=None, limit=PICKS):
     """The next picks: tickers scored by how many of the signals agree, each
-    with why. [{ticker, name, score, bull, reasons, summary}], best first."""
+    with why - in English (`reasons`) and, line for line, in plain Arabic
+    (`why`). [{ticker, name, score, bull, reasons, why, summary}], best first."""
     board = {}
 
     def pick(ticker, name="", signal=""):
         entry = board.setdefault(ticker, {"ticker": ticker, "name": name, "score": 0.0,
-                                          "bull": None, "reasons": [], "summary": "",
+                                          "bull": None, "reasons": [], "why": [], "summary": "",
                                           "signals": set()})
         if name and not entry["name"]:
             entry["name"] = name
@@ -545,12 +546,15 @@ def conclude(trending=(), reddit=(), clusters=(), buys=(), congress=(), x=None, 
         p["score"] += 3.0 * (1 - i / count)
         p["summary"] = t.get("summary", "")
         reason = f"#{i + 1} trending on StockTwits"
+        why = f"من الأكثر تداولًا على StockTwits (المركز {i + 1})"
         bull = t.get("bull")
         if bull is not None:
             p["bull"] = bull
             p["score"] += 4.0 * (bull - 0.5)
             reason += f", {round(bull * 100)}% bullish"
+            why += f"، و{round(bull * 100)}% من الرسائل متفائلة"
         p["reasons"].append(reason)
+        p["why"].append(why)
     for r in reddit:
         if r["mentions"] < 10:
             continue
@@ -559,10 +563,13 @@ def conclude(trending=(), reddit=(), clusters=(), buys=(), congress=(), x=None, 
         p["score"] += 0.6 + min(2.0, max(0.0, math.log2(max(rise, 1e-9)))) if rise > 1 else 0.6
         p["reasons"].append(f"{r['mentions']} Reddit mentions"
                             + (f", {rise:.1f}x yesterday's" if rise >= 1.5 and r["before"] else ""))
+        p["why"].append(f"انذكر {r['mentions']} مرة في Reddit"
+                        + (f"، {rise:.1f} ضعف أمس" if rise >= 1.5 and r["before"] else ""))
     for c in clusters:
         p = pick(c["ticker"], c.get("company", ""), "insiders")
         p["score"] += 2.0 + min(1.5, c["value"] / 2_000_000)
         p["reasons"].append(f"{c['insiders']} insiders bought ${c['value'] / 1e6:.1f}M")
+        p["why"].append(f"{c['insiders']} من كبار موظفي الشركة اشتروا بـ {c['value'] / 1e6:.1f} مليون دولار")
     for b in buys:
         if b["value"] < 100_000:
             continue
@@ -571,6 +578,9 @@ def conclude(trending=(), reddit=(), clusters=(), buys=(), congress=(), x=None, 
         p["reasons"].append(f"{b['title'] or 'Insider'} {b['insider']} bought ${b['value'] / 1e6:.2f}M"
                             if b["value"] >= 1e6 else
                             f"{b['title'] or 'Insider'} {b['insider']} bought ${b['value'] / 1e3:.0f}k")
+        amount = (f"{b['value'] / 1e6:.2f} مليون دولار" if b["value"] >= 1e6
+                  else f"{b['value'] / 1e3:.0f} ألف دولار")
+        p["why"].append(f"{b['title'] or 'مسؤول'} في الشركة اشترى من أسهمها بـ {amount}")
     # Congress: one line per member and stock however many filings it took,
     # weighted by the size of the range they disclosed.
     bought = {}
@@ -583,20 +593,50 @@ def conclude(trending=(), reddit=(), clusters=(), buys=(), congress=(), x=None, 
         p["score"] += 0.5 + min(1.5, math.log10(max(floor, 1000) / 1000) / 2)
         times = f" ({len(trades)} filings)" if len(trades) > 1 else ""
         p["reasons"].append(f"{member} ({trades[0]['chamber']}) bought {trades[0]['amount']}{times}")
+        p["why"].append(f"عضو الكونجرس {member} اشترى بين {trades[0]['amount']}")
     if x:
         total = sum(x.get("tickers", {}).values()) or 1
         for ticker, n in x.get("tickers", {}).items():
             p = pick(ticker, "", "x")
             p["score"] += 1.0 + 2.0 * n / total
             p["reasons"].append(f"named in {n} posts by the traders you follow on X")
+            p["why"].append(f"انذكر في {n} منشور من المتداولين اللي تتابعهم على X")
     picks = [p for p in board.values() if p["reasons"] and p["score"] > 0]
     # Agreement first - two kinds of signal beat one strong one - then weight.
     picks.sort(key=lambda p: (min(len(p["signals"]), 3), p["score"]), reverse=True)
     for p in picks:
         p["score"] = round(p["score"], 2)
         p["reasons"] = p["reasons"][:4]
+        p["why"] = p["why"][:4]
         p["signals"] = sorted(p["signals"])
     return picks[:limit]
+
+
+# The final stocks: at most this many, and only where the signals agree -
+# two kinds of them at least (traders, Reddit, insiders, Congress, X), the
+# crowd not bearish on it, and weight enough behind it. What is left is a
+# read of the signals, not advice, and the display says so.
+FINAL = 3
+FINAL_BULL = 0.55
+FINAL_SCORE = 4.0
+NONE_WORTH = ("ما في سهم يستاهل هالفترة. الإشارات ما تتفق على شي، "
+              "والأفضل ما تشتري الحين - انتظر لين تتفق.")
+
+
+def final(picks, limit=FINAL):
+    """What the desk comes to: {picks: [{ticker, name, why, signals, bull}],
+    none}. `why` is the pick's two strongest reasons in plain Arabic; `none`
+    says so, in Arabic, when nothing is worth it."""
+    worth = [p for p in picks
+             if len(p.get("signals") or ()) >= 2
+             and (p.get("bull") is None or p["bull"] >= FINAL_BULL)
+             and float(p.get("score") or 0) >= FINAL_SCORE][:limit]
+    if not worth:
+        return {"picks": [], "none": NONE_WORTH}
+    return {"none": None, "picks": [
+        {"ticker": p["ticker"], "name": p.get("name", ""), "bull": p.get("bull"),
+         "signals": list(p.get("signals") or ()), "why": "، و".join((p.get("why") or [])[:2])}
+        for p in worth]}
 
 
 def verdict(picks):
@@ -631,7 +671,8 @@ def board():
     news = attempt("news", moving_news, [])
     x = attempt("x", x_traders, None)
     picks = conclude(crowd["trending"], crowd["reddit"], clusters, buys, congress, x)
-    return {"picks": picks, "verdict": verdict(picks), "trending": crowd["trending"][:12],
+    return {"picks": picks, "verdict": verdict(picks), "final": final(picks),
+            "trending": crowd["trending"][:12],
             "reddit": crowd["reddit"][:10], "buys": buys, "clusters": clusters,
             "congress": congress, "filings": filings, "news": news, "x": x,
             "sources": sources, "sec_contact": bool(sec_contact()), "updated": time.time()}
