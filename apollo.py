@@ -114,9 +114,11 @@ import away as away_mode  # noqa: E402
 import briefing  # noqa: E402
 import clips  # noqa: E402
 import dataservice  # noqa: E402
+import diagnostics  # noqa: E402
 import displays  # noqa: E402
 import ideas  # noqa: E402
 import interests  # noqa: E402
+import issues  # noqa: E402
 import journal  # noqa: E402
 import live  # noqa: E402
 import lyla  # noqa: E402
@@ -302,6 +304,15 @@ AFK_SECONDS = 10 * 60
 # The word, once, as Apollo comes up (see `Apollo.play_intro`): long enough
 # for the page's sweep, hold and switch-off, and not a moment longer.
 INTRO_SECONDS = 3.6
+# ...and it is a real loading screen: it stays while the checks and the start
+# run (diagnostics.py), and goes INTRO_TAIL after they are done - time to read
+# the last line - but never holds the screen longer than INTRO_MOST.
+INTRO_TAIL = 1.8
+INTRO_MOST = 12.0
+# The boot screen's lines: every check, and the six parts of Apollo that
+# say they are up (the Claude API, the voice, the replay buffer, the data
+# service, live prices, Private Eye) - for its progress line.
+BOOT_TOTAL = len(diagnostics.CHECKS) + 6
 
 # SHQueryUserNotificationState's answers that mean someone is using the
 # machine without touching it: a full-screen program (a film in a browser, a
@@ -933,6 +944,22 @@ class WebReporter:
         """Play the word, as Apollo comes up."""
         self._call("intro")
 
+    def boot(self, step):
+        """A line of the boot screen: one check, or one part of Apollo up."""
+        self._call("boot", dict(step))
+
+    def boot_done(self, summary):
+        """The checks and the start are done: {issues, fails}."""
+        self._call("bootDone", dict(summary))
+
+    def issues(self, items):
+        """What is wrong, for the System panel (issues.py)."""
+        self._call("issues", list(items))
+
+    def checked(self, summary):
+        """The checks, run again from the System panel, are done."""
+        self._call("checked", dict(summary))
+
     def story(self, number):
         """Open story `number` on the display's feed (0 closes it).
 
@@ -1180,6 +1207,18 @@ class Api:
         self._osiris.park()
         return True
 
+    def dismiss_issue(self, key):
+        """An issue on the System panel dismissed: fixed, or not worth it."""
+        return issues.resolve(str(key or ""))
+
+    def run_checks(self):
+        """The checks run again from the System panel; the page hears each
+        one and then `checked`."""
+        if self._app is None:
+            return False
+        threading.Thread(target=self._app.run_checks, daemon=True, name="checks").start()
+        return True
+
     def osiris_layers(self, layers):
         """The map's layers, switched in its settings. Only its own layers'
         names are taken; the map's address is never the page's to give."""
@@ -1208,6 +1247,10 @@ class Apollo:
         self.away_requested = False
         self.intro_wanted = False  # the word, once; see `check_intro`
         self.intro_until = 0.0     # ...playing until then (monotonic)
+        self.boot_done_at = None   # when the checks and the start were both done
+        self._boot_parts = set()
+        self._boot_results = []
+        self._boot_lock = threading.Lock()
         self.schedule = briefing.Schedule()   # has today's recap happened?
         self.briefing_thread = None
         self.prayer_thread = None
@@ -1346,6 +1389,7 @@ class Apollo:
                               on_visual=self.on_visual,
                               on_activity=self.on_activity,
                               app=self)
+        issues.set_listener(self.tell_issues)
         self.want_intro()
         threading.Thread(target=self.worker, daemon=True).start()
 
@@ -1402,6 +1446,73 @@ class Apollo:
             return Overlay.FULL
         return Overlay.FULL if self.presence.full else Overlay.ORB
 
+    def _boot_ready(self, now):
+        """The loading screen has shown its last line long enough."""
+        done = getattr(self, "boot_done_at", None)
+        if done is None:
+            return False
+        started = getattr(self, "intro_started", now)
+        return now >= max(started + INTRO_SECONDS, done + INTRO_TAIL)
+
+    # -- the boot: the checks, the start, and the issues they find ---------
+
+    def boot_step(self, step, keep=True):
+        """A line of the boot screen - and, kept, an issue for the System
+        panel when it is wrong, or one resolved when it is right again."""
+        step = {"id": str(step.get("id", "")), "label": str(step.get("label", "")),
+                "status": step.get("status", "ok"), "detail": str(step.get("detail", "")),
+                "total": BOOT_TOTAL}
+        if keep:
+            key = "check:" + step["id"]
+            if step["status"] in ("warn", "fail"):
+                issues.record(key, step["label"], step["detail"], step["status"])
+            else:
+                issues.resolve(key)
+        with self._boot_lock:
+            self._boot_results.append(step)
+        ui = getattr(self, "ui", None)
+        tell = getattr(ui, "boot", None) if ui is not None and ui.alive else None
+        if tell is not None:
+            tell(step)
+
+    @staticmethod
+    def _summary(steps):
+        return {"issues": sum(1 for s in steps if s["status"] != "ok"),
+                "fails": sum(1 for s in steps if s["status"] == "fail")}
+
+    def run_checks(self, boot=False):
+        """Every check (diagnostics.py), each a line as it lands. At the boot
+        it is half of what the loading screen waits for; from the System
+        panel, the page is told when they are all in."""
+        results = diagnostics.run(report=self.boot_step)
+        if boot:
+            self.boot_part_done("checks")
+        else:
+            ui = getattr(self, "ui", None)
+            if ui is not None and ui.alive:
+                ui.checked(self._summary(results))
+        return results
+
+    def boot_part_done(self, part):
+        """"checks" or "startup" finished; both, and the boot is done."""
+        with self._boot_lock:
+            self._boot_parts.add(part)
+            if not {"checks", "startup"} <= self._boot_parts or self.boot_done_at is not None:
+                return
+            self.boot_done_at = time.monotonic()
+            summary = self._summary(self._boot_results)
+        log.info("boot done: %d issue(s), %d failing", summary["issues"], summary["fails"])
+        ui = getattr(self, "ui", None)
+        if ui is not None and ui.alive:
+            ui.boot_done(summary)
+
+    def tell_issues(self, items):
+        """The System panel's list, whenever it changes (issues.py)."""
+        ui = getattr(self, "ui", None)
+        tell = getattr(ui, "issues", None) if ui is not None and ui.alive else None
+        if tell is not None:
+            tell(items)
+
     def want_intro(self):
         """Ask for the intro. The watcher plays it on its next tick."""
         self.intro_wanted = True
@@ -1429,13 +1540,14 @@ class Apollo:
                 log.info("intro skipped: a full-screen program has the screen")
                 return
             log.info("intro")
-            self.intro_until = now + INTRO_SECONDS
+            self.intro_started = now
+            self.intro_until = now + INTRO_MOST
             # Told first, while the page is still hidden, so the display is
             # never seen for a frame on its way to the intro.
             self.ui.intro()
             self.apply_mode()
             return
-        if self.intro_until and now >= self.intro_until:
+        if self.intro_until and (now >= self.intro_until or self._boot_ready(now)):
             self.intro_until = 0.0
             # The intro blurs away into the display, so the display is what
             # is left: open it, unless Ctrl+` already did.
@@ -1563,6 +1675,8 @@ class Apollo:
                     laid_out({"action": "layout", "layout": displays.state()})
                 # ...and which of Apollo's own modes are on, for the bar.
                 self._tell_states()
+                # ...and what is wrong, for the System panel.
+                self.tell_issues(issues.current())
 
         if orb is None:                   # no native layer yet: just cut
             self.overlay.show_page(mode)
@@ -1934,6 +2048,9 @@ class Apollo:
             if last is not None:
                 self._clips_retry = min(retry * 2, CLIPS_RETRY_MOST)
             log.info("the replay buffer had stopped; recording again")
+            issues.record("clips", "REPLAY BUFFER",
+                          f"stopped and restarted: {getattr(recorder, 'error', None) or 'no reason given'}",
+                          "warn")
         self._clips_started = now
         recorder.start()
 
@@ -1980,6 +2097,9 @@ class Apollo:
 
         ui = self.ui
         ui.status(STARTING)
+        # The checks run beside the start, each a line on the loading screen.
+        threading.Thread(target=self.run_checks, kwargs={"boot": True}, daemon=True,
+                         name="checks").start()
 
         # Patient about the network: at sign-in it is usually a few seconds
         # away, and giving up here used to leave Apollo running but empty for
@@ -1989,9 +2109,12 @@ class Apollo:
                 return                        # quitting while it waited
         except RuntimeError as e:
             log.error("startup check failed: %s", e)
+            self.boot_step({"id": "claude", "label": "CLAUDE API", "status": "fail", "detail": str(e)})
+            self.boot_part_done("startup")
             ui.fatal(str(e))
             return
         log.info("API reachable")
+        self.boot_step({"id": "claude", "label": "CLAUDE API", "status": "ok", "detail": "reachable"})
 
         # The backup transcriber loads behind everything else - Gemini's own
         # transcript is the one in use - so it no longer holds up waking.
@@ -2016,6 +2139,10 @@ class Apollo:
             run_tool=assistant.tool_runner(ui))
         self.voice.open(auto_vad=False)
         log.info("voice session opened")
+        # The voice's own issue is kept by Voice.open, for every reconnect too.
+        self.boot_step({"id": "voice", "label": "VOICE LINK",
+                        "status": "ok" if self.voice.ready else "fail",
+                        "detail": gemini_live_model(self.voice) or "would not open"}, keep=False)
 
         # The replay buffer: the last minute of the screen, in memory only, so
         # "clip that" has something to save. Nothing reaches the disk until
@@ -2023,12 +2150,16 @@ class Apollo:
         # carries on without clips.
         self.clips = clips.ReplayBuffer().start()
         tools.set_clip_buffer(self.clips)
+        self.boot_step({"id": "clips", "label": "REPLAY BUFFER", "status": "ok",
+                        "detail": "recording"}, keep=False)
 
         # Everything the display and the briefing read - prices, headlines,
         # posts, weather, the machine - refreshed on a timer rather than
         # inside a turn, where it would be latency you could hear.
         self.data = dataservice.DataService(on_snapshot=self.on_data).start()
         log.info("data service started")
+        self.boot_step({"id": "data", "label": "DATA SERVICE", "status": "ok",
+                        "detail": "running"}, keep=False)
 
         # Prices as they trade, over the minute-by-minute reading, for the
         # stocks the stream carries. No key, no stream: the minute will do.
@@ -2038,8 +2169,12 @@ class Apollo:
                                         on_tick=self.on_ticks).start()
             live.set_feed(self.ticker)
             log.info("live prices on")
+            self.boot_step({"id": "prices", "label": "LIVE PRICES", "status": "ok",
+                            "detail": "streaming"}, keep=False)
         else:
             log.info("no %s; prices refresh once a minute", live.KEY_NAME)
+            self.boot_step({"id": "prices", "label": "LIVE PRICES", "status": "warn",
+                            "detail": "once a minute - no key"}, keep=False)
 
         # What you care about, learned from each finished day of the record
         # (journal.py) by one question to Claude, and read by Gemini at the
@@ -2051,6 +2186,9 @@ class Apollo:
         # care about; the best few finds go on the display and into the recap.
         self.eye = private_eye.PrivateEye().start(on_found=lambda: self.poke_data("finds"))
         log.info("Private Eye on watch")
+        self.boot_step({"id": "eye", "label": "PRIVATE EYE", "status": "ok",
+                        "detail": "on watch"}, keep=False)
+        self.boot_part_done("startup")
 
         # CTRL+1. A thread of its own so it answers during a turn as well as
         # between them; `run_loop` reads its flag and does the actual
@@ -2120,6 +2258,11 @@ class Apollo:
         voice = getattr(self, "voice", None)
         if voice is not None:
             voice.close()
+
+
+def gemini_live_model(voice):
+    live = getattr(voice, "live", None)
+    return getattr(live, "model", None) if live is not None else None
 
 
 def die(message):

@@ -41,6 +41,8 @@ UNTRUSTED = re.compile(
     r"|idea\.(?:text|age|id)"
     r"|reminder\.(?:text|due)"
     r"|trade\.(?:name|date)"
+    # What Apollo found wrong with itself: exception text, paths, file names.
+    r"|issue\.(?:title|detail|key)"
     r"|market\.status"
     r"|weather\.text"
     r"|system\.gpu_name"

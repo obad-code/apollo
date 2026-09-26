@@ -14,7 +14,7 @@ import { Shader } from './shader.js';
 import { Lyla } from './lyla.js';
 import { DotFlow, FRAMES } from './dotflow.js';
 import { LedWord } from './ledword.js';
-import { bootLines, typed } from './boot.js';
+import { HEADER, checkLine, detailLine, lastLines, readyLine, schedule, typed, typedAt } from './boot.js';
 import * as Tiles from './tiles.js';
 import * as Globe from './globe.js';
 import { Sfx } from './sfx.js';
@@ -188,12 +188,25 @@ window.addEventListener('resize', () => {
   for (const word of [sleepWord, introWord]) word.resize();
 });
 
-const INTRO_OFF_AT = 2700;       // ms: the boot screen blurs away into the display...
-const INTRO_GONE_AT = 3500;      // ...and is gone, just before apollo.py lets go
+/* The boot screen is a real loading screen: apollo.py's checks and the
+ * parts of Apollo coming up (window.apollo.boot) are its lines, each typed
+ * as it lands with a sound for how it went, and it goes once they are all
+ * in (window.apollo.bootDone) - a moment to read the last line, and off. */
+const READY_AT = 1.7;            // s: never before the name has settled
+const READY_RATE = 60;           // letters a second, the last line
+const READY_HOLD = 800;          // ms it is read before the tube goes off
+const OFF_FOR = 800;             // ms the tube takes to go off
 const REVEAL_FOR = 1100;         // ms the display takes to come into focus
-const BOOT = bootLines();
-const READY = '> SYSTEM ONLINE';
-const READY_AT = 1.7;            // s: once the name has settled
+const INTRO_MOST = 11500;        // ms: done or not, the display comes then
+const LOG_ROWS = 12;             // lines the glass holds before it scrolls
+const LINE_GAP = 0.09;           // s between two lines that came at once
+const LINE_RATE = 300;           // letters a second, a check
+const boot = { steps: [], arrivals: [], done: null, total: 16 };
+
+// How many of the steps so far went wrong - the summary when apollo.py never
+// says it is done and the screen has to go anyway.
+const bootSoFar = () => ({ issues: boot.steps.filter((s) => s.status !== 'ok').length,
+                           fails: boot.steps.filter((s) => s.status === 'fail').length });
 
 const pad = (n) => String(n).padStart(2, '0');
 const stamp = (d) => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}  `
@@ -204,6 +217,7 @@ function playIntro() {
   clearTimeout(box._off);
   clearTimeout(box._gone);
   clearTimeout(box._revealed);
+  clearTimeout(box._cap);
   document.body.classList.remove('revealing');
   cancelAnimationFrame(box._typing);
   box.classList.remove('off');
@@ -212,33 +226,111 @@ function playIntro() {
   introWord.scramble(1.0, 0.5);
   sfx.play('boot');
 
-  // The boot lines type themselves out, then the prompt under the name.
-  const log = $('intro-log'), ready = $('intro-ready');
+  // The checks type themselves out as they land, each with a sound for how
+  // it went, the log scrolling when the glass is full; then the prompt
+  // under the name.
+  const log = $('intro-log'), ready = $('intro-ready'), bar = $('intro-bar');
   $('intro-foot').textContent = `APOLLO/OS   ${stamp(new Date())}`;
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const began = performance.now();
+  let sounded = 0;
+  let readyAt = null;
+
+  const finish = (summary) => {
+    sfx.play(summary.fails ? 'alert' : 'ready');
+    const line = readyLine(summary);
+    const read = (line.length / READY_RATE) * 1000 + READY_HOLD;
+    box._off = setTimeout(() => {
+      box.classList.add('off');
+      document.body.classList.add('revealing');
+    }, read);
+    box._gone = setTimeout(() => {
+      box.classList.remove('on', 'off');
+      introWord.stop();
+      scheduleOsiris(200);           // a map kept back while the tube warmed up
+    }, read + OFF_FOR);
+    box._revealed = setTimeout(() => document.body.classList.remove('revealing'),
+                               read + REVEAL_FOR);
+  };
+
   const type = (now) => {
-    const t = still ? 60 : (now - began) / 1000;
-    log.querySelector('.text').textContent = typed(BOOT, t);
-    log.querySelector('.cursor').classList.toggle('gone', t >= READY_AT);
-    ready.querySelector('.text').textContent = typed([READY], t, { start: READY_AT, rate: 34 });
-    ready.classList.toggle('shown', t >= READY_AT);
+    const t = still ? 600 : (now - began) / 1000;
+    const entries = HEADER.map((text) => ({ text, arrived: 0, sound: null }));
+    boot.steps.forEach((step, i) => {
+      const arrived = Math.max(0, (boot.arrivals[i] - began) / 1000);
+      entries.push({ text: checkLine(step), arrived, sound: step.status === 'ok' ? 'check' : 'fault' });
+      if (step.status !== 'ok' && step.detail) entries.push({ text: detailLine(step), arrived, sound: null });
+    });
+    const lines = schedule(entries, LINE_GAP);
+    log.querySelector('.text').textContent = lastLines(typedAt(lines, t, LINE_RATE), LOG_ROWS);
+    while (sounded < lines.length && lines[sounded].at <= t) {
+      if (lines[sounded].sound && !still) sfx.play(lines[sounded].sound);
+      sounded += 1;
+    }
+    const last = lines[lines.length - 1];
+    const typedOut = t >= last.at + last.text.length / LINE_RATE;
+    bar.style.transform = `scaleX(${boot.done ? 1 : Math.min(0.96, boot.steps.length / boot.total)})`;
+    if (readyAt === null && boot.done && typedOut && t >= READY_AT) {
+      readyAt = t;
+      finish(boot.done);
+    }
+    ready.querySelector('.text').textContent =
+      readyAt === null ? '' : typed([readyLine(boot.done)], t, { start: readyAt, rate: READY_RATE });
+    ready.classList.toggle('shown', readyAt !== null);
+    log.querySelector('.cursor').classList.toggle('gone', readyAt !== null);
     if (box.classList.contains('on')) box._typing = requestAnimationFrame(type);
   };
   box._typing = requestAnimationFrame(type);
-
-  box._off = setTimeout(() => {
-    box.classList.add('off');
-    document.body.classList.add('revealing');
-  }, INTRO_OFF_AT);
-  box._gone = setTimeout(() => {
-    box.classList.remove('on', 'off');
-    introWord.stop();
-    scheduleOsiris(200);           // a map kept back while the tube warmed up
-  }, INTRO_GONE_AT);
-  box._revealed = setTimeout(() => document.body.classList.remove('revealing'),
-                             INTRO_OFF_AT + REVEAL_FOR);
+  // A start that never says it is done does not keep the display from you.
+  box._cap = setTimeout(() => { if (!boot.done) boot.done = bootSoFar(); }, INTRO_MOST);
 }
+
+/* --- the issues: what Apollo found wrong with itself ---------------------------
+ *
+ * Its checks at startup, and what went wrong while it ran (issues.py), on the
+ * System panel until fixed or dismissed: a few in the status block, all of
+ * them in ultra mode's System display. Check again runs every check now. */
+
+function renderIssues(items) {
+  if (Array.isArray(items)) state.issues = items;
+  const all = state.issues || [];
+  const most = ultraOn() ? 8 : 3;
+  const fails = all.filter((issue) => issue.level === 'fail').length;
+  const rows = all.slice(0, most).map((issue) => `
+    <li class="issue ${issue.level === 'fail' ? 'fail' : 'warn'}">
+      <i class="led"></i><b>${esc(issue.title)}</b><span>${esc(issue.detail)}</span>
+      <button type="button" class="issue-x" data-dismiss="${esc(issue.key)}" data-sfx="none"
+              title="Dismiss: fixed, or not worth fixing">✕</button>
+    </li>`).join('');
+  const head = all.length ? `${all.length} to fix` : 'All clear';
+  $('issues').innerHTML = `
+    <div class="issues-head"><b>${head}</b>
+      <button type="button" id="recheck" data-sfx="none" ${state.rechecking ? 'disabled' : ''}
+              title="Run Apollo's checks again">${state.rechecking ? 'Checking…' : 'Check again'}</button></div>
+    ${all.length ? `<ul>${rows}</ul>` : ''}
+    ${all.length > most ? `<p class="issues-more">${all.length - most} more in Expanded</p>` : ''}`;
+  $('issues').classList.toggle('bad', fails > 0);
+  $('issues').classList.toggle('clear', !all.length);
+}
+
+$('issues').addEventListener('click', (event) => {
+  const dismiss = event.target.closest('[data-dismiss]');
+  const api = bridge();
+  if (dismiss) {
+    sfx.play('hide');
+    if (api && api.dismiss_issue) api.dismiss_issue(dismiss.dataset.dismiss);
+    return;
+  }
+  if (event.target.closest('#recheck') && !state.rechecking) {
+    sfx.play('scan');
+    state.rechecking = true;
+    renderIssues();
+    if (api && api.run_checks) api.run_checks();
+    // Done or not, the button comes back.
+    setTimeout(() => { if (state.rechecking) { state.rechecking = false; renderIssues(); } }, 15000);
+  }
+});
+renderIssues([]);
 
 /* What she is doing, under her bar. Her name is over the bar already, so the
  * "LYLA // " lyla.js starts every line with is taken off on the way in. */
@@ -3551,6 +3643,21 @@ window.apollo = {
   },
   // As Apollo comes up: the name, once, blurring away into the display.
   intro() { playIntro(); },
+  // A line of the boot screen, and the boot done (apollo.py).
+  boot(step) {
+    if (!step) return;
+    boot.steps.push(step);
+    boot.arrivals.push(performance.now());
+    if (Number.isFinite(step.total)) boot.total = step.total;
+  },
+  bootDone(summary) { if (!boot.done) boot.done = summary || bootSoFar(); },
+  // What is wrong, for the System panel; and the checks run again, done.
+  issues(items) { renderIssues(items); },
+  checked(summary) {
+    state.rechecking = false;
+    sfx.play(summary && summary.issues ? 'alert' : 'clean');
+    renderIssues();
+  },
   // OSIRIS in the display, or not - by voice, or its window closed itself.
   osiris(on) { return setOsiris(on); },
   // Ultra mode's displays: on or off, one expanded, one shown or hidden - or

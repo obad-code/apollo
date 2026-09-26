@@ -69,6 +69,8 @@
     <!-- Ultra mode only: each model's share of the day, the machine's card,
          and how fresh every reading is. -->
     <div id="system-more" class="more"></div>
+    <!-- What Apollo found wrong with itself, to fix later (issues.py). -->
+    <div id="issues" class="issues clear" aria-live="polite"></div>
     <div id="note" class="note"></div>
   </aside>
 
@@ -366,6 +368,8 @@
     <div id="intro-stage"><canvas id="intro-word" role="img" aria-label="Apollo"></canvas></div>
     <div id="intro-ready" class="lit"><span class="text"></span><span class="cursor">_</span></div>
     <div id="intro-foot" class="lit"></div>
+    <!-- How far the checks and the start have got. -->
+    <div id="intro-progress" aria-hidden="true"><i id="intro-bar"></i></div>
   </div>
 </section>
 

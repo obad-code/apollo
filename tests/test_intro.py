@@ -34,6 +34,7 @@ def _app():
     app.ui = _UI(app.log)
     app.intro_wanted = False
     app.intro_until = 0.0
+    app.boot_done_at = None
     app.apply_mode = lambda: app.log.append(app.desired_mode())
     return app
 
@@ -52,6 +53,7 @@ def test_the_watcher_plays_it_then_opens_the_display(monkeypatch):
     # The page is told first, while it is still hidden, so the display is
     # never seen for a frame on its way to the intro.
     assert app.log == ["intro", apollo.Overlay.FULL]
+    app.boot_done_at = 100.5                              # the checks came in quickly
     app.check_intro(now=100.0 + apollo.INTRO_SECONDS - 0.1)
     assert len(app.log) == 2                               # still playing
     monkeypatch.setattr(apollo.time, "monotonic", lambda: 100.0 + apollo.INTRO_SECONDS + 0.1)
@@ -60,6 +62,34 @@ def test_the_watcher_plays_it_then_opens_the_display(monkeypatch):
     # if Ctrl+` had been pressed, and closed the same way.
     assert app.log[-1] == apollo.Overlay.FULL
     assert app.presence.full is True
+    assert app.intro_until == 0.0
+
+
+def test_it_holds_the_screen_until_the_boot_is_done(monkeypatch):
+    """The loading screen is a real one: it stays while the checks and the
+    start run, and goes a moment after they are done - long enough to read
+    the last line."""
+    monkeypatch.setattr(apollo, "screen_busy", lambda: False)
+    app = _app()
+    app.want_intro()
+    app.check_intro(now=100.0)
+    app.check_intro(now=100.0 + apollo.INTRO_SECONDS + 2)
+    assert len(app.log) == 2, "gone before the checks were done"
+    app.boot_done_at = 106.0
+    app.check_intro(now=106.0 + apollo.INTRO_TAIL - 0.1)
+    assert len(app.log) == 2
+    monkeypatch.setattr(apollo.time, "monotonic", lambda: 106.0 + apollo.INTRO_TAIL + 0.1)
+    app.check_intro(now=106.0 + apollo.INTRO_TAIL + 0.1)
+    assert app.intro_until == 0.0 and app.presence.full is True
+
+
+def test_a_boot_that_never_finishes_does_not_hold_it_for_ever(monkeypatch):
+    monkeypatch.setattr(apollo, "screen_busy", lambda: False)
+    app = _app()
+    app.want_intro()
+    app.check_intro(now=100.0)
+    monkeypatch.setattr(apollo.time, "monotonic", lambda: 100.0 + apollo.INTRO_MOST + 0.1)
+    app.check_intro(now=100.0 + apollo.INTRO_MOST + 0.1)
     assert app.intro_until == 0.0
 
 

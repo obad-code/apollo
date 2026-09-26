@@ -250,6 +250,7 @@ import briefing  # noqa: E402
 import ideas  # noqa: E402
 import insiders  # noqa: E402
 import journal  # noqa: E402
+import issues  # noqa: E402
 import private_eye  # noqa: E402
 import clips  # noqa: E402
 import displays  # noqa: E402
@@ -933,6 +934,22 @@ def _next_earnings(ctx, company=""):
     return {"ok": True, "symbol": symbol, "date": day.isoformat(),
             "weekday": day.strftime("%A"), "days_away": (day - _dt.date.today()).days,
             "estimate": bool(found.get("earnings_estimate"))}
+
+
+@_tool("system_issues", "checking the system",
+       "What is wrong with Apollo itself, as its own checks found at startup and "
+       "while it ran - no microphone, a key missing, the disk nearly full, a crash "
+       "last time, a voice session that would not open - kept on the System panel "
+       "until fixed. Use this when the user asks if anything is wrong, why "
+       "something is not working, or what the System panel says. Say the "
+       "failures first, each in a few words, and what would fix it if it is plain.",
+       _obj({}))
+def _system_issues(ctx):
+    ctx.activity("checking the system")
+    return {"ok": True, "issues": [
+        {"what": i.get("title", ""), "detail": i.get("detail", ""), "level": i.get("level", ""),
+         "times": i.get("count", 1)}
+        for i in issues.current()]}
 
 
 @_tool("private_eye_finds", "checking Private Eye",

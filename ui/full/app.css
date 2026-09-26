@@ -860,6 +860,30 @@ body.roomless:not(.ultra) #gauge-foot { margin-left: 0; }
 #system-line { flex-basis: 100%; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #system-line:empty, body.ultra #system-line, body.ultra #today-line { display: none; }
+
+/* What Apollo found wrong with itself: a head line with Check again, and a
+   few issues under it - failures red, the rest amber - each dismissable. */
+.issues { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.issues-head { display: flex; align-items: center; gap: 10px; }
+.issues-head b { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+                 color: var(--caption); }
+.issues.bad .issues-head b { color: var(--down); }
+.issues-head button { margin-left: auto; font: inherit; font-size: 11px; letter-spacing: .06em;
+                      color: var(--amber); background: none; border: 1px solid rgba(255, 176, 0, .25);
+                      border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+.issues-head button:hover { background: rgba(255, 176, 0, .12); }
+.issues-head button:disabled { opacity: .55; cursor: default; }
+.issues ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.issue { display: grid; grid-template-columns: auto auto 1fr auto; align-items: baseline; gap: 8px; }
+.issue .led { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); align-self: center; }
+.issue.fail .led { background: var(--down); box-shadow: 0 0 6px var(--down); }
+.issue b { font-size: 11px; font-weight: 700; letter-spacing: .08em; white-space: nowrap; }
+.issue span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--caption); }
+.issue-x { font: inherit; font-size: 12px; color: var(--caption); background: none; border: 0;
+           padding: 0 4px; cursor: pointer; }
+.issue-x:hover { color: var(--amber-bright); }
+.issues-more { font-size: 11px; color: var(--caption); }
+body.ultra .issue span { white-space: normal; }
 #gauge-foot .fresh.old { color: var(--down); }
 
 /* --- the dock -------------------------------------------------------------------
@@ -1632,6 +1656,12 @@ body.asleep .peek { opacity: 0 !important; pointer-events: none; transition: opa
   position: absolute; right: 4.4vw; bottom: 5vh; white-space: pre;
   font-size: clamp(15px, 1.15vw, 26px); letter-spacing: .08em; opacity: .5;
 }
+/* How far the boot has got: one lit line along the bottom of the glass. */
+#intro-progress { position: absolute; left: 4.4vw; right: 4.4vw; bottom: calc(5vh + 44px); height: 3px;
+                  background: rgba(60, 255, 120, .12); overflow: hidden; }
+#intro-bar { position: absolute; inset: 0; transform-origin: left center; transform: scaleX(0);
+             background: #b6ffc9; box-shadow: 0 0 10px rgba(60, 255, 120, .7);
+             transition: transform .35s ease-out; }
 #intro .cursor { animation: cursor-blink 1.06s steps(1) infinite; }
 #intro .cursor.gone { visibility: hidden; }
 @keyframes cursor-blink { 50% { opacity: 0; } }

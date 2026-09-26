@@ -69,3 +69,14 @@ def private_ideas(tmp_path, monkeypatch):
     monkeypatch.setattr(ideas, "PATH", str(tmp_path / "ideas.json"))
     monkeypatch.setattr(projects, "snapshot",
                         lambda: {"sessions": [], "folders": [], "repos": []})
+
+
+@pytest.fixture(autouse=True)
+def private_issues(tmp_path, monkeypatch):
+    """...and its own list of issues and record of crashes seen: the System
+    panel's list is yours, and no test adds to it."""
+    import diagnostics
+    import issues
+    monkeypatch.setattr(issues, "PATH", str(tmp_path / "issues.json"))
+    monkeypatch.setattr(issues, "_listener", None)
+    monkeypatch.setattr(diagnostics, "SEEN_PATH", str(tmp_path / "diagnostics.json"))

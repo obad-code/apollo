@@ -39,6 +39,7 @@ import sounddevice as sd
 import agents
 import briefing
 import gemini_live
+import issues
 import journal
 import overlay_content
 import router
@@ -1633,11 +1634,13 @@ class Voice:
                 live.start()
             except RuntimeError as e:
                 log.warning("voice session did not open: %s", e)
+                issues.record("voice", "VOICE LINK", f"would not open: {e}", "fail")
                 self.ui.note(f"Gemini Live unavailable.\n  {e}")
                 live.close()
                 return False
 
             self.live, self.capture = live, capture
+            issues.resolve("voice")
             return True
 
     def _activity(self, kind, detail):
