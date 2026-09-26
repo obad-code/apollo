@@ -141,9 +141,16 @@ def test_the_page_edits_saves_and_lays_it_out():
     assert 'id="hud-edit"' in html and 'data-console="hud"' in html and 'data-console="scan"' in html
 
 
-def test_the_consoles_are_in_the_normal_display_too():
+def test_the_consoles_are_in_the_normal_display_under_the_feed():
     css = (FULL / "app.css").read_text(encoding="utf-8")
     assert "body:not(.viewing):not(.ultra):not(.osiris-map) .console { display: block;" in css
+    assert "#headlines { anchor-name: --feed; }" in css
+    assert "position-anchor: --feed; top: calc(anchor(bottom) + 12px);" in css
+
+
+def test_the_consoles_fade_on_the_idle_screen():
+    css = (FULL / "app.css").read_text(encoding="utf-8")
+    assert "body.asleep .console { opacity: 0 !important; pointer-events: none;" in css
 
 
 def test_the_display_opens_with_the_hud_you_left():

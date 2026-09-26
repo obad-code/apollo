@@ -1978,12 +1978,29 @@ body.answering .console { opacity: .18; }
    the width, the desk steps away (app.js measures: .squeezed). */
 @media (min-width: 1900px) { body.ultra #stage { padding-bottom: 142px; } }
 @media (max-width: 1899px) { body.ultra .console { display: none; } }
-/* In the normal display too: under Apollo, either side of the middle, on the
-   line the side panels end on. Arranged by hand like any panel (the HUD). */
+/* In the normal display too: under the feed, side by side and each half its
+   width, the feed giving up a little of its height so they fit above the
+   scanner - tied to the feed (anchor positioning), so they go wherever it
+   does. Out of the way while the scanner's report is open, and gone with
+   everything else on the idle screen. Arranged by hand like any panel (the
+   HUD). Without anchor positioning they sit under Apollo instead. */
 body:not(.viewing):not(.ultra):not(.osiris-map) .console { display: block; bottom: var(--room); }
 body.roomless:not(.viewing):not(.ultra):not(.osiris-map) .console { bottom: var(--dock-room); }
 body:not(.viewing):not(.ultra):not(.osiris-map) #console-left { left: calc(50% - 258px); }
 body:not(.viewing):not(.ultra):not(.osiris-map) #console-right { left: calc(50% + 12px); right: auto; }
+@supports (anchor-name: --feed) {
+  #headlines { anchor-name: --feed; }
+  body:not(.viewing):not(.ultra):not(.osiris-map):not(.hud-free) #stage > #headlines { margin-bottom: 32px; }
+  body:not(.viewing):not(.ultra):not(.osiris-map) :is(#console-left, #console-right) {
+    position-anchor: --feed; top: calc(anchor(bottom) + 12px); bottom: auto;
+    width: calc((anchor-size(width) - 12px) / 2);
+  }
+  body:not(.viewing):not(.ultra):not(.osiris-map) #console-left { left: anchor(left); }
+  body:not(.viewing):not(.ultra):not(.osiris-map) #console-right { left: auto; right: anchor(right); }
+}
+.console { transition: opacity .6s ease-in-out; }
+body.scan-open:not(.hud-free):not(.viewing):not(.ultra):not(.osiris-map) .console { opacity: 0; pointer-events: none; }
+body.asleep .console { opacity: 0 !important; pointer-events: none; transition: opacity .8s ease-in-out; }
 /* Its two buttons that do something: SCAN chooses a file, HUD arranges. */
 .arm.live i { background: #7fe3ff; box-shadow: 0 0 6px rgba(127, 227, 255, .8); }
 

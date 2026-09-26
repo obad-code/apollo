@@ -550,8 +550,10 @@ HUD, LOCK, PURGE), a dial that turns a quarter at a time, and readouts
 that tick - the time up, the link, the core, the temperature. Two of the
 buttons do something: SCAN opens File Explorer to choose a file for the
 scanner, HUD opens the HUD editor (below); the rest click and light. On a
-screen narrower than 1900 pixels they step away to leave the bar its room,
-and in the normal display they sit under Apollo. By voice: *"put the projects on my
+screen narrower than 1900 pixels they step away to leave the bar its room.
+In the normal display they sit under the feed, side by side above the
+scanner, step aside while a scan report is open, and fade away with
+everything else on the idle screen. By voice: *"put the projects on my
 screen"* / *"حط المشاريع على الشاشة"* pulls that display up, expanded, with
 the rest minimized - bringing the display up first if it has to; *"all of
 them"* puts the grid back; *"hide the ideas"* and *"show my talks"* work on
