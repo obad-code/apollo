@@ -22,6 +22,7 @@ import { LylaAgent, LOOKS, emblem } from './lylaagent.js';
 import * as Feed from './feed.js';
 import * as Modes from './modes.js';
 import * as Hud from './hud.js';
+import * as Lights from './consolelights.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -144,6 +145,7 @@ const state = {
   osiris: false,          // OSIRIS laid into the normal display, and Apollo in its colours
   view: 'normal',         // which view of the display: normal, clear, trading or agents
   lylaReports: [],        // what LYLA found, newest first (apollo.py keeps them)
+  feedSeen: null,         // the stories the feed last drew, so a new one can arrive
   reportOpen: -1,         // the report of hers opened out, if any
   agentOpen: null,        // the agent whose process agents mode is showing, if any
   hud: Hud.emptyHud(),    // the normal display as arranged by hand (hud.js), kept by apollo.py
@@ -995,9 +997,24 @@ function feedItems(snapshot) {
 const safeImage = (url) => (/^https:\/\//.test(String(url || '')) ? String(url) : '');
 const numbered = (index) => String(index + 1).padStart(2, '0');
 
+/* Each topic's class - its colour, down the row's edge, on its tag and its
+ * chip (app.css) - and its mark, drawn on a story's tile where it came
+ * without a picture: a pad, a star, a strip of film, a rising line, a
+ * speaker, an eye. */
+const topicClass = (kind) => `t-${esc(String(kind || 'news').toLowerCase().replace(/[^a-z0-9]+/g, '-'))}`;
+const GLYPHS = {
+  gaming: '<path d="M7 9h10a4 4 0 0 1 3.9 4.8l-.7 3.2a2 2 0 0 1-3.4.9L14.5 16h-5l-2.3 1.9a2 2 0 0 1-3.4-.9l-.7-3.2A4 4 0 0 1 7 9z"/><path d="M8 12v2M7 13h2M15.5 12.5h.01M17 14h.01"/>',
+  marvel: '<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z"/>',
+  movies: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4"/>',
+  markets: '<path d="M3 17l5-5 4 3 7-8"/><path d="M15 7h4v4"/>',
+  posts: '<path d="M4 10v4h3l6 4V6L7 10z"/><path d="M16.5 9a4 4 0 0 1 0 6"/>',
+  'private eye': '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+};
+const glyph = (kind) => `<svg class="glyph" viewBox="0 0 24 24" aria-hidden="true">${GLYPHS[kind] || GLYPHS.markets}</svg>`;
+
 function renderChips() {
-  $('topics').innerHTML = TOPICS.map((topic, i) =>
-    `<span class="chip ${i === state.topic ? 'on' : ''}" data-topic="${i}" data-sfx="tab">${esc(topic)}</span>`).join('');
+  $('topics').innerHTML = TOPICS.map((name, i) =>
+    `<span class="chip ${topicClass(name)} ${i === state.topic ? 'on' : ''}" data-topic="${i}" data-sfx="tab">${esc(name)}</span>`).join('');
 }
 
 function renderFeed(snapshot) {
@@ -1022,34 +1039,67 @@ function renderFeed(snapshot) {
   // What a story says, where it says more than its title - a post's text is
   // its title already.
   const gistOf = (item) => (item.summary && item.summary !== item.title ? String(item.summary) : '');
-  // Beside each, its picture - or its source's initials on a tile tinted for
-  // what it is about, which is also what shows if the picture will not load.
-  const thumb = (item) => `<span class="thumb t-${esc(String(item.topic).replace(/\s+/g, '-'))}">`
-    + `<b>${esc(Feed.initials(item.source) || '•')}</b>${safeImage(item.image)
-      ? `<img src="${esc(safeImage(item.image))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+  // Beside each, its picture - or its topic's mark on a tile in its colour,
+  // which is also what shows if the picture will not load.
+  const thumb = (item) => `<span class="thumb ${topicClass(item.topic)}">${glyph(item.topic)}${safeImage(item.image)
+      ? `<img src="${esc(safeImage(item.image))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
       : ''}</span>`;
   const chosen = TOPICS[state.topic];
+  // The newest story leads, large, with its picture across the panel; the
+  // rest are a line each, like the stocks. Folded, every one is a line.
+  const lead = !folded && drawn.length > 1;
+  // What came in since the feed was last drawn slides in; anything under
+  // half an hour old says NEW.
+  const seen = state.feedSeen || new Set();
+  const first = seen.size === 0;
+  const now = Date.now() / 1000;
   $('stories').innerHTML = drawn.map((item, i) => {
     const tag = Feed.topicTag(item.topic, chosen);
+    const arriving = !first && !seen.has(item.title);
+    const young = item.when && now - item.when < 1800;
+    const hero = lead && i === 0;
     return `
-    <div class="story${item.moving ? ' moving' : ''}" data-i="${i}">
+    <div class="story ${topicClass(item.topic)}${hero ? ' hero' : ''}${item.moving ? ' moving' : ''}${arriving ? ' arriving' : ''}" data-i="${i}">
       <span class="num">${numbered(i)}</span>
       <span class="what">${esc(String(item.title).slice(0, 150))}</span>
-      ${gistOf(item) ? `<span class="gist">${esc(gistOf(item).slice(0, 260))}</span>` : ''}
+      ${hero && gistOf(item) ? `<span class="gist">${esc(gistOf(item).slice(0, 260))}</span>` : ''}
       <span class="who"><b>${esc(item.source)}</b> · ${esc(item.age)}${tag ? ` · <em>${esc(tag)}</em>` : ''}${
-        item.moving ? ' · <i>market-moving</i>' : ''}${
+        young ? ' · <i class="new">new</i>' : ''}${
+        item.moving ? ' · <i class="moving">market-moving</i>' : ''}${
         item.eye ? ' · <i class="eye">Private Eye</i>' : ''}</span>
       ${thumb(item)}
     </div>`;
   }).join('')
     || '<div class="story empty"><span class="num">—</span><span class="what">Nothing has come in yet</span>'
      + '<span class="who">the feeds are quiet</span></div>';
+  state.feedSeen = new Set(items.map((item) => item.title));
   if (items.length > drawn.length) {
     $('stories').insertAdjacentHTML('beforeend',
       `<div class="story rest"><b><i>+${items.length - drawn.length}</i>Show all</b></div>`);
   }
+  markReading();
   $('peek').innerHTML = drawn.map((item) => `<div class="shot">${shot(item)}</div>`).join('');
 }
+
+/* The reading head: every few seconds the next story is the one Apollo is
+ * on - brighter, with a line in its colour running along under it for as
+ * long as it stays - down the list and round again. It waits while the
+ * pointer is over the feed, and there is nothing to do while the display
+ * is away or asleep. */
+const READ_EVERY = 7000;
+state.reading = 0;
+function markReading() {
+  const rows = [...document.querySelectorAll('#stories .story[data-i]')];
+  if (!rows.length) return;
+  state.reading %= rows.length;
+  rows.forEach((row, i) => row.classList.toggle('reading', i === state.reading));
+}
+setInterval(() => {
+  const body = document.body.classList;
+  if (body.contains('offscreen') || body.contains('asleep') || $('feed').matches(':hover')) return;
+  state.reading += 1;
+  markReading();
+}, READ_EVERY);
 
 /* A story's picture, or its source set large where it has none. */
 function shot(item) {
@@ -3252,10 +3302,8 @@ function renderSummaries() {
  * flip, lights that blink, armed buttons that fire, a dial that turns and
  * readouts that tick. For the look of the place; they do nothing else. */
 (function consoles() {
-  const colours = ['amber', 'green', 'amber', 'cyan', 'red', 'amber'];
-  document.querySelector('.console-leds').innerHTML = Array.from({ length: 18 }, (_, i) =>
-    `<i class="${colours[(i * 5) % colours.length]}" style="animation-delay:-${((i * 0.37) % 2.3).toFixed(2)}s;`
-    + `animation-duration:${(1.1 + ((i * 0.29) % 1.7)).toFixed(2)}s"></i>`).join('');
+  // Eighteen lights, each something true (consolelights.js) - lit below.
+  document.querySelector('.console-leds').innerHTML = Array.from({ length: 18 }, () => '<i></i>').join('');
   document.querySelectorAll('.console').forEach((panel) => panel.addEventListener('click', (event) => {
     const flip = event.target.closest('.flip');
     if (flip) flip.classList.toggle('on');
@@ -3283,18 +3331,44 @@ function renderSummaries() {
   };
   window.addEventListener('resize', fit);
   state.fitConsoles = fit;
+  // The readouts and the lights, once a second while a console is on the
+  // screen: how long Apollo has been up (the display opens as he starts),
+  // how quickly the internet answers, the load, the card's heat.
   const began = Date.now();
+  const history = [];
+  let heard = 0;
   const read = (name, text) => {
     const element = document.querySelector(`[data-read="${name}"]`);
     if (element) element.textContent = text;
   };
   setInterval(() => {
-    if (!ultraOn() || state.mode !== 'full') return;
-    const up = Math.floor((Date.now() - began) / 1000);
-    read('clock', `T+${pad(Math.floor(up / 3600))}:${pad(Math.floor(up / 60) % 60)}:${pad(up % 60)}`);
-    read('link', `LINK ${(97 + Math.random() * 2.9).toFixed(1)}%`);
-    read('core', `CORE 0x${Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, '0')}`);
-    read('temp', `TEMP ${38 + Math.floor(Math.random() * 7)}°C`);
+    const body = document.body.classList;
+    if (state.mode !== 'full' || body.contains('asleep') || (!ultraOn() && state.view !== 'normal')) return;
+    const snapshot = state.snapshot || {};
+    const system = snapshot.system || {};
+    const stamps = snapshot.stamps || {};
+    // A new reading of the machine is one more bar.
+    if (stamps.system && stamps.system !== heard) {
+      heard = stamps.system;
+      history.push(Number(system.cpu));
+      if (history.length > 12) history.shift();
+    }
+    read('clock', Lights.uptime((Date.now() - began) / 1000));
+    read('link', Lights.linkText(system.link_ms === null ? NaN : Number(system.link_ms)));
+    read('core', Lights.cpuText(Number(system.cpu)));
+    read('temp', Lights.tempText(system.gpu_temp === null ? NaN : Number(system.gpu_temp)));
+    document.querySelectorAll('[data-read="link"]').forEach((el) =>
+      el.classList.toggle('down', !Number.isFinite(Number(system.link_ms)) || system.link_ms === null));
+    const heights = Lights.bars(history);
+    document.querySelectorAll('.console-bars i').forEach((bar, i) => { bar.style.height = `${heights[i]}px`; });
+    const lit = Lights.lights({ stamps, now: Date.now() / 1000, phase: state.phase, listening: state.listening,
+                                away: state.away, lyla: Boolean(lylaDoing.job), cpu: Number(system.cpu) });
+    document.querySelectorAll('.console-leds i').forEach((led, i) => {
+      const it = lit[i];
+      if (!it) return;
+      led.className = `${it.colour}${it.on ? ' on' : ''}${it.blink ? ' blink' : ''}`;
+      led.title = it.title;
+    });
   }, 1000);
 })();
 

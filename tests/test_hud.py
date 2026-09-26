@@ -145,7 +145,7 @@ def test_the_consoles_are_in_the_normal_display_under_the_feed():
     css = (FULL / "app.css").read_text(encoding="utf-8")
     assert "body:not(.viewing):not(.ultra):not(.osiris-map) .console { display: block;" in css
     assert "#headlines { anchor-name: --feed; }" in css
-    assert "position-anchor: --feed; top: calc(anchor(bottom) + 12px);" in css
+    assert "position-anchor: --feed; width: calc((anchor-size(width) - 12px) / 2);" in css
 
 
 def test_the_consoles_fade_on_the_idle_screen():

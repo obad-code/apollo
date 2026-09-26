@@ -1,4 +1,5 @@
-"""What the machine is doing: CPU, memory, and the NVIDIA card if there is one.
+"""What the machine is doing: CPU, memory, the NVIDIA card if there is one
+and how hot it is, and how quickly the internet answers.
 
 NVML is read through ctypes rather than by running nvidia-smi: measured at
 1.7 ms against about 80 ms for spawning the tool, and the display asks every
@@ -7,6 +8,9 @@ few seconds.
 
 import ctypes
 import logging
+import socket
+import threading
+import time
 
 import psutil
 
@@ -57,10 +61,48 @@ def gpu():
         library.nvmlDeviceGetMemoryInfo(_handle, ctypes.byref(memory))
         name = ctypes.create_string_buffer(96)
         library.nvmlDeviceGetName(_handle, name, 96)
+        # The core's temperature (NVML_TEMPERATURE_GPU), in degrees.
+        heat = ctypes.c_uint()
+        temp = int(heat.value) if library.nvmlDeviceGetTemperature(_handle, 0, ctypes.byref(heat)) == 0 else None
         return {"load": int(used.gpu), "name": name.value.decode(errors="replace"),
-                "vram": round(memory[2] / 1e9, 1), "vram_total": round(memory[0] / 1e9, 1)}
+                "vram": round(memory[2] / 1e9, 1), "vram_total": round(memory[0] / 1e9, 1),
+                "temp": temp}
     except Exception:  # noqa: BLE001 - telemetry is never worth an exception
         return None
+
+
+# Where "is the internet there, and how quickly" is asked: a connection to
+# Cloudflare's resolver, opened and closed - nothing is sent. Asked at most
+# every LINK_EVERY seconds, whatever the display's pace.
+LINK_HOST = ("1.1.1.1", 443)
+LINK_TIMEOUT = 1.5
+LINK_EVERY = 15
+_link = {"at": -LINK_EVERY, "ms": None}
+_link_lock = threading.Lock()
+
+
+def _connect_ms(host=LINK_HOST, timeout=LINK_TIMEOUT):
+    """Milliseconds to open a connection to `host`, or None. Tests replace this."""
+    started = time.perf_counter()
+    try:
+        with socket.create_connection(host, timeout=timeout):
+            pass
+    except OSError:
+        return None
+    return round((time.perf_counter() - started) * 1000)
+
+
+def link_ms(now=None):
+    """How long the internet takes to answer, in ms - None when it does not."""
+    now = time.monotonic() if now is None else now
+    with _link_lock:
+        if now - _link["at"] < LINK_EVERY:
+            return _link["ms"]
+        _link["at"] = now
+    ms = _connect_ms()
+    with _link_lock:
+        _link["ms"] = ms
+    return ms
 
 
 def snapshot():
@@ -70,4 +112,6 @@ def snapshot():
             "ram": round(psutil.virtual_memory().percent),
             "gpu": card["load"] if card else None,
             "gpu_name": card["name"] if card else "",
-            "vram": card["vram"] if card else None}
+            "vram": card["vram"] if card else None,
+            "gpu_temp": card.get("temp") if card else None,
+            "link_ms": link_ms()}

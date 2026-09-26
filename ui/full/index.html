@@ -359,7 +359,7 @@
      armed buttons, a dial and readouts, the way a facility's desk has them.
      For the look of the place - they flip, light and click, and do nothing
      else. -->
-<aside id="console-left" class="console" aria-label="Systems console (decorative)">
+<aside id="console-left" class="console" aria-label="Systems console: uptime, and lights for the sources, Apollo and the load">
   <div class="console-head"><i class="beacon"></i><b>SYS · CTRL</b><em class="console-read" data-read="clock">T+00:00:00</em></div>
   <div class="console-row">
     <button class="flip on" type="button" tabindex="-1" data-sfx="press"><i class="lever"></i><span>AUX</span></button>
@@ -370,8 +370,8 @@
   </div>
   <div class="console-leds" aria-hidden="true"></div>
 </aside>
-<aside id="console-right" class="console" aria-label="Protocol console (decorative)">
-  <div class="console-head"><i class="beacon"></i><b>PROTOCOL 9</b><em class="console-read" data-read="link">LINK 99.2%</em></div>
+<aside id="console-right" class="console" aria-label="Protocol console: scan, arrange, the link, the load and the heat">
+  <div class="console-head"><i class="beacon"></i><b>PROTOCOL 9</b><em class="console-read" data-read="link">LINK —</em></div>
   <div class="console-row">
     <button class="arm live" type="button" tabindex="-1" data-sfx="ping" data-console="scan" title="Choose a file to scan"><i></i>SCAN</button>
     <button class="arm live" type="button" tabindex="-1" data-sfx="hud" data-console="hud" title="Arrange the display (F2)"><i></i>HUD</button>
@@ -379,7 +379,7 @@
     <button class="arm danger" type="button" tabindex="-1" data-sfx="down"><i></i>PURGE</button>
     <button class="knob" type="button" tabindex="-1" data-sfx="tab" aria-label="Gain"><i></i></button>
   </div>
-  <div class="console-foot"><em class="console-read" data-read="core">CORE 0x3FA2</em><span class="console-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><em class="console-read" data-read="temp">TEMP 41°C</em></div>
+  <div class="console-foot"><em class="console-read" data-read="core">CPU —</em><span class="console-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><em class="console-read" data-read="temp">GPU —</em></div>
 </aside>
 
 <!-- The HUD editor (F2, HUD on the console, or "customize the HUD"): every

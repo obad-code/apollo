@@ -282,6 +282,79 @@ def _read(url, parse):
         return []
 
 
+# -- a picture for a story that came without one ------------------------------------
+
+PICTURE_TTL = 24 * 3600      # a page's picture does not change
+NO_PICTURE_TTL = 6 * 3600    # ...and one that had none, or would not answer, is asked again later
+PAGE_MOST = 400_000          # the page's head is at the top; its body is not needed
+_pictures = {}
+_META = re.compile(r"<meta\b[^>]*>", re.I)
+_ATTR = re.compile(r'([\w:-]+)\s*=\s*("([^"]*)"|\'([^\']*)\')')
+
+
+def _page_head(url):
+    """The first PAGE_MOST bytes of an article, as text. Tests replace this."""
+    request = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+        return response.read(PAGE_MOST).decode("utf-8", "replace")
+
+
+def page_picture(page):
+    """The picture a page names for itself when it is shared - og:image, or
+    twitter:image - over https, or ""."""
+    wanted = {}
+    for tag in _META.findall(page or ""):
+        attrs = {m.group(1).lower(): html.unescape(m.group(3) if m.group(3) is not None else m.group(4))
+                 for m in _ATTR.finditer(tag)}
+        name = (attrs.get("property") or attrs.get("name") or "").lower()
+        if name in ("og:image", "og:image:secure_url", "twitter:image", "twitter:image:src"):
+            wanted.setdefault(name, attrs.get("content", "").strip())
+    for name in ("og:image:secure_url", "og:image", "twitter:image", "twitter:image:src"):
+        url = wanted.get(name, "")
+        if url.startswith("//"):
+            url = "https:" + url
+        if url.startswith("http://"):
+            url = "https://" + url[len("http://"):]
+        if url.startswith("https://"):
+            return url
+    return ""
+
+
+def picture_for(link):
+    """A story's own picture, read off its page and kept - "" if it has none."""
+    if not link.startswith(("https://", "http://")):
+        return ""
+    now = time.monotonic()
+    with _lock:
+        hit = _pictures.get(link)
+    if hit and hit[0] > now:
+        return hit[1]
+    try:
+        found = page_picture(_page_head(link))
+    except Exception as e:  # noqa: BLE001 - a page that will not answer has no picture
+        log.debug("no picture from %s: %s", link, e)
+        found = ""
+    with _lock:
+        _pictures[link] = (now + (PICTURE_TTL if found else NO_PICTURE_TTL), found)
+    return found
+
+
+def fill_pictures(stories):
+    """Every story without a picture given its page's own, the pages read at
+    once. The feed shows a picture beside each story; about half come from
+    Bing without one."""
+    wanting = [story for story in stories if not story.get("image") and story.get("link")]
+    if not wanting:
+        return stories
+    threads = [threading.Thread(target=lambda s=story: s.__setitem__("image", picture_for(s["link"])),
+                                daemon=True) for story in wanting]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(TIMEOUT + 2)
+    return stories
+
+
 def headlines(topic, limit=5):
     """The newest `limit` headlines for a topic (or any phrase).
 
@@ -294,7 +367,7 @@ def headlines(topic, limit=5):
     if not found:
         found = [dict(story, summary="", image="")
                  for story in _read(_url_for(topic), parse_news)]
-    return found[:limit]
+    return fill_pictures([dict(story) for story in found[:limit]])
 
 
 def search(query, limit=10):

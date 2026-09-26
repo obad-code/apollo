@@ -263,11 +263,17 @@ wires, a line of what she is doing that changes every few seconds and the
 workflows ticking up (`ui/full/lylaagent.js`; nothing on it is live yet,
 and it says PREVIEW; a click or Escape shuts it); under it
 headlines on what you follow and Trump's posts with the market-moving ones
-flagged, each with two lines of what it says, what it is about, and its
-picture beside it - or, where it came without one, its source's initials on
-a tile tinted for its topic - under a line saying how many stories there
-are, from how many sources, and how new the newest is (`ui/full/feed.js`),
-and
+flagged - each topic in its own colour down the story's edge, on its tag
+and on its chip (gaming purple, movies red, markets green, Marvel orange,
+posts blue, Private Eye cyan). The newest leads, its picture across the
+panel drifting slowly, with two lines of what it says; the rest are a line
+each like the stocks, with their picture - Bing's, or the one the article's
+own page names (`feeds.fill_pictures`), or else the topic's mark. A reading
+head moves down them every seven seconds with a line in the story's colour
+running under it; a story that has just come in slides into place, and one
+under half an hour old says NEW. Over them, a line saying how many stories
+there are, from how many sources, and how new the newest is
+(`ui/full/feed.js`), and
 LYLA in her room along the bottom. The lists - the stocks, the indices, the
 feed and its chips, the side panel's tabs - are drawn the way a CRT tool
 would: each letter glowing, its red and blue landing a hair either side of
@@ -416,7 +422,8 @@ the machine they run on - a scan of your own PC's local ports and addresses,
 a Bluetooth scanner, live location - and each runs only when you open that
 tool; Bluetooth and location still ask first.
 
-**The scanner.** Under the feed. **Choose file** opens File Explorer over
+**The scanner.** At the foot of the feed's column, folded away until a file
+is being scanned - the console's SCAN is how to start one. **Choose file** opens File Explorer over
 the display - which fills the screen, so there is nothing behind it to
 drag from - and what you pick is read and judged, never run or opened:
 clean, careful or dangerous, with why (`scanner.py`). A file dropped on the
@@ -545,15 +552,20 @@ name or a column and a row at a time, the feed's topic, the map's layers)
 and **hide**. The bar along the bottom has the modes, switches each display
 on and off, puts the grid back, and resets the lot. Either side of it sits
 a facility's desk, for the look of the place: switches that flip with their
-lights, a strip of blinking status lights, armed buttons that fire (SCAN,
-HUD, LOCK, PURGE), a dial that turns a quarter at a time, and readouts
-that tick - the time up, the link, the core, the temperature. Two of the
-buttons do something: SCAN opens File Explorer to choose a file for the
-scanner, HUD opens the HUD editor (below); the rest click and light. On a
-screen narrower than 1900 pixels they step away to leave the bar its room.
-In the normal display they sit under the feed, side by side above the
-scanner, step aside while a scan report is open, and fade away with
-everything else on the idle screen. By voice: *"put the projects on my
+lights, a strip of status lights, armed buttons that fire (SCAN, HUD, LOCK,
+PURGE), a dial that turns a quarter at a time, and readouts. The readouts
+and the lights are real (`ui/full/consolelights.js`): how long Apollo has
+been up, how quickly the internet answers (`LINK`, from `sysinfo.link_ms`,
+red when it does not), the CPU with its last six readings as bars, the
+card's heat; and eighteen lights - the six sources green while fresh and
+amber once old, then listening, thinking, speaking, hands-free, away and
+LYLA on a job, then the CPU as a meter - each saying what it is under the
+pointer. Two of the buttons do something: SCAN opens File Explorer to
+choose a file for the scanner, HUD opens the HUD editor (below); the rest
+click and light. On a screen narrower than 1900 pixels they step away to
+leave the bar its room. In the normal display they sit at the foot of the
+feed's column, side by side, step aside while a scan report is open, and
+fade away with everything else on the idle screen. By voice: *"put the projects on my
 screen"* / *"حط المشاريع على الشاشة"* pulls that display up, expanded, with
 the rest minimized - bringing the display up first if it has to; *"all of
 them"* puts the grid back; *"hide the ideas"* and *"show my talks"* work on
@@ -955,6 +967,7 @@ The only thing left is your API key.
 | `lyla.py` | LYLA's desk: the research Apollo hands her, on her own thread - what she reads, what she thinks with (Hermes or Gemini), her reports kept, and Apollo told when she is done (`tests/test_lyla_desk.py`). |
 | `trading.py` | Trading mode's desk: insiders (OpenInsider), Congress, the SEC's 8-K filings, market-moving news, StockTwits and Reddit, X when it is set up, and the read of the next picks (`tests/test_trading.py`). |
 | `ui/full/modes.js` | The display's modes - normal, clear, expanded, OSIRIS - and the switches to throw, in order, from one to another (`tests/test_modes.py`). |
+| `ui/full/consolelights.js` | The consoles' readouts and eighteen lights, each something true: the sources, what Apollo is doing, the load, the uptime, the link and the heat (`tests/test_console_lights.py`). |
 | `ui/full/feed.js` | The feed's rows, fuller: a source's initials for its tile, what a story is about, and the line over the list (`tests/test_feed_rows.py`). |
 | `ui/full/sfx.js` | The display's sounds, synthesized with Web Audio: the recipes, and the player that keeps a sound from doubling up (`tests/test_sfx.py`). |
 | `ui/fonts/thmanyah/` | Thmanyah Sans, as OTFs — what the overlay loads privately at runtime. |
