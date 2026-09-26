@@ -405,6 +405,54 @@ def traders():
     return {"trending": trending, "reddit": parse_apewisdom(_get("reddit", APEWISDOM))}
 
 
+def parse_messages(body, limit=6):
+    """One symbol's recent StockTwits messages -> the latest few, each with
+    what it says and whether it calls itself bullish or bearish."""
+    out = []
+    for m in (_json(body) or {}).get("messages") or []:
+        text = " ".join(str(m.get("body") or "").split())
+        if not text:
+            continue
+        mood = ((m.get("entities") or {}).get("sentiment") or {}).get("basic") or ""
+        out.append({"text": text[:280], "mood": mood.lower(),
+                    "who": str((m.get("user") or {}).get("username") or "")})
+    return out[:limit]
+
+
+def chatter(symbol):
+    """What traders are saying about one ticker on StockTwits right now:
+    bullish and bearish counts, the share bullish, and the latest messages."""
+    body = _get("stream", STOCKTWITS_STREAM.format(urllib.parse.quote(symbol.upper())))
+    mood = parse_stream(body)
+    said = mood["bull"] + mood["bear"]
+    return {"bull": mood["bull"], "bear": mood["bear"],
+            "bullish": round(mood["bull"] / said, 2) if said >= 5 else None,
+            "messages": parse_messages(body)}
+
+
+def on_the_desk(symbol, board):
+    """Everywhere one ticker turns up on a board: as a pick and why,
+    trending, on Reddit, bought by insiders, traded by Congress, in a
+    filing or a headline. Empty lists where it does not."""
+    ticker = symbol.upper()
+    word = re.compile(rf"\b{re.escape(ticker)}\b")
+    return {
+        "pick": next(({"rank": i + 1, "reasons": p["reasons"], "why": p.get("summary", "")}
+                      for i, p in enumerate(board.get("picks") or []) if p["ticker"] == ticker), None),
+        "trending": next(({"rank": i + 1, "bullish": t.get("bull"), "why": t.get("summary", "")}
+                          for i, t in enumerate(board.get("trending") or []) if t["symbol"] == ticker), None),
+        "reddit": next(({"mentions": r["mentions"], "yesterday": r["before"]}
+                        for r in board.get("reddit") or [] if r["ticker"] == ticker), None),
+        "insider_clusters": [c for c in board.get("clusters") or [] if c["ticker"] == ticker],
+        "insider_buys": [b for b in board.get("buys") or [] if b["ticker"] == ticker],
+        "congress": [t for t in board.get("congress") or [] if t["ticker"] == ticker],
+        "filings": [{"company": f["company"], "filed": f["filed"],
+                     "what": [i["label"] for i in f["items"]]}
+                    for f in board.get("filings") or [] if f["ticker"] == ticker],
+        "headlines": [n["title"] for n in board.get("news") or [] if word.search(n.get("title", ""))],
+    }
+
+
 # -- X, when there is a token and the reads to spend --------------------------------------
 
 X_STATE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "Apollo", "x_reads.json")

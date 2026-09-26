@@ -29,6 +29,8 @@ UNTRUSTED = re.compile(
     r"|buy\.(?:ticker|company|industry|insider|title|traded)"
     r"|deal\.(?:ticker|member|chamber|amount|disclosed|link)|post\.(?:who|text)|reason"
     r"|quote\.(?:symbol|name|logo)"
+    # LYLA's reports: her words, and the web's under them.
+    r"|report\.(?:task|symbol|summary|report|brain)"
     # "Add a stock" lists what apollo.py suggests; a pick is data like a quote.
     r"|pick\.(?:symbol|name)"
     # The side panel's tabs: your record, your folders and repos, your ideas.

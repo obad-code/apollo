@@ -118,6 +118,7 @@ import ideas  # noqa: E402
 import interests  # noqa: E402
 import journal  # noqa: E402
 import live  # noqa: E402
+import lyla  # noqa: E402
 import private_eye  # noqa: E402
 import projects  # noqa: E402
 import orb as orb_module  # noqa: E402
@@ -1121,6 +1122,13 @@ class Api:
         self._app.want_trading()
         return True
 
+    def lyla_reports(self):
+        """LYLA's latest reports and what she is on now, for agents mode to
+        list when the page comes up (it hears of each new one as it lands)."""
+        working = lyla.DESK.current
+        return {"reports": lyla.DESK.reports[:8],
+                "working": {"task": working["task"], "symbol": working["symbol"]} if working else None}
+
     def set_panel(self, name, shown):
         """A panel shown or hidden from the display itself - LYLA's room, by
         the button along the bottom - and kept that way, as if it had been
@@ -1984,6 +1992,14 @@ class Apollo:
         reminders.start_watcher(
             lambda reminder, late: assistant.fire_reminder(ui, self.voice, reminder, late),
             assistant.TURN_GATE, self.stopping.is_set)
+
+        # LYLA's desk: the research Apollo hands her runs on her own thread,
+        # her card shows each step, and when she is done Apollo says what she
+        # found - after any turn in progress, like a reminder (lyla.py).
+        lyla.DESK.configure(
+            tell=ui.agent,
+            report=lambda job: assistant.report_lyla(ui, self.voice, job),
+            gate=assistant.TURN_GATE)
 
         # Say hello, so you know the mic is live before you ever press a key.
         assistant.greet(ui)

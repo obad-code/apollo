@@ -264,6 +264,39 @@ def test_one_source_down_does_not_take_the_board_down(monkeypatch):
     assert b["picks"] and b["verdict"]
 
 
+# --- one ticker, for LYLA -------------------------------------------------------------------
+
+def test_what_traders_say_about_one_ticker(monkeypatch):
+    body = json.dumps({"messages": [
+        {"body": "UPST   to the moon", "entities": {"sentiment": {"basic": "Bullish"}},
+         "user": {"username": "trader1"}},
+        {"body": "", "entities": {}},
+        {"body": "fading this", "entities": {"sentiment": {"basic": "Bearish"}}}]
+        + [{"body": "long", "entities": {"sentiment": {"basic": "Bullish"}}}] * 4})
+    trading._cache.clear()
+    monkeypatch.setattr(trading, "_download", lambda url, headers=None: body.encode())
+    said = trading.chatter("upst")
+    assert said["bull"] == 5 and said["bear"] == 1 and said["bullish"] == 0.83
+    assert said["messages"][0] == {"text": "UPST to the moon", "mood": "bullish", "who": "trader1"}
+
+
+def test_everywhere_one_ticker_turns_up_on_the_board():
+    board = {"picks": [{"ticker": "UPST", "reasons": ["#1 trending"], "summary": "beat"}],
+             "trending": [{"symbol": "SKIL"}, {"symbol": "UPST", "bull": 0.8, "summary": "beat"}],
+             "reddit": [{"ticker": "UPST", "mentions": 90, "before": 20}],
+             "clusters": [{"ticker": "SKIL"}], "buys": [{"ticker": "UPST", "value": 1}],
+             "congress": [{"ticker": "UPST", "member": "A"}],
+             "filings": [{"ticker": "UPST", "company": "Upstart", "filed": "2026-09-25",
+                          "items": [{"label": "Results"}]}],
+             "news": [{"title": "Upstart (UPST) jumps"}, {"title": "UPSTATE bank falls"}]}
+    found = trading.on_the_desk("upst", board)
+    assert found["pick"]["rank"] == 1 and found["trending"]["rank"] == 2
+    assert found["reddit"] == {"mentions": 90, "yesterday": 20}
+    assert found["insider_clusters"] == [] and len(found["insider_buys"]) == 1
+    assert found["filings"][0]["what"] == ["Results"]
+    assert found["headlines"] == ["Upstart (UPST) jumps"]
+
+
 # --- by voice, and on the display's clock ----------------------------------------------------
 
 def test_the_trading_read_by_voice(monkeypatch):

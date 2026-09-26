@@ -1716,6 +1716,30 @@ def fire_prayer(ui, voice, name, when, lead_minutes):
              f"{name} at {when.strftime('%H:%M')}")
 
 
+def report_lyla(ui, voice, job):
+    """LYLA is done with a job Apollo handed her: Apollo says what she found,
+    in his voice and your language, and her card has the rest. Runs holding
+    TURN_GATE (lyla.Desk), so it waits for any turn in progress to end."""
+    task = job.get("task", "")
+    if job.get("ok"):
+        journal.answered(job["summary"] + "\n\n" + job["report"], who=agents.LYLA)
+        instruction = (
+            f"LYLA, your research agent, has finished the job you handed her: "
+            f"\"{task}\". Her summary: {job['summary']} Tell the user in two or "
+            f"three short sentences, starting with that LYLA is done, in the "
+            f"language they last spoke - their dialect if it was Arabic. If it is "
+            f"about a stock, say it is a read, not advice. Her full report is "
+            f"there if they ask for more (lyla_findings).")
+        fallback = f"LYLA is done: {job['summary']}"
+    else:
+        instruction = (
+            f"LYLA, your research agent, could not finish the job you handed her: "
+            f"\"{task}\" ({job.get('error', 'no reason given')}). Tell the user in "
+            f"one short sentence, in the language they last spoke.")
+        fallback = f"LYLA couldn't finish that: {job.get('error', '')}"
+    announce(ui, voice, instruction, fallback)
+
+
 def answer_with_agent(name, said, ui):
     """Hand one turn to a summoned agent, and speak what comes back.
 
@@ -1754,15 +1778,13 @@ def answer_with_agent(name, said, ui):
 
 
 def _agent_card(name, ui):
-    """LYLA's pipeline card, told each step of her run as it happens - the
-    display brought up in agents mode for it first. Her card is the only
-    one there is; for the other agents this does nothing."""
+    """LYLA's pipeline card, told each step of her run as it happens. Her
+    card is the only one there is; for the other agents this does nothing.
+    It never changes what the display shows: LYLA works for Apollo, and the
+    screen is his and yours - agents mode is where you go to watch her."""
     show = getattr(ui, "agent", None)
     if name != agents.LYLA or show is None:
         return lambda **event: None
-    bring = getattr(ui, "ask_display", None)
-    if bring is not None:
-        bring({"action": "mode", "mode": "agents"})
 
     def tell(**event):
         try:
@@ -2050,6 +2072,10 @@ def main():
     import reminders
     reminders.start_watcher(lambda r, late: fire_reminder(ui, voice, r, late),
                             TURN_GATE, lambda: False)
+
+    import lyla
+    lyla.DESK.configure(tell=getattr(ui, "agent", None),
+                        report=lambda job: report_lyla(ui, voice, job), gate=TURN_GATE)
 
     import clips
     buffer = clips.ReplayBuffer().start()

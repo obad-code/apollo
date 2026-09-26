@@ -1,0 +1,381 @@
+"""LYLA's desk: the research Apollo hands her, done while you carry on.
+
+You ask Apollo for something that takes looking into - "analyse NVDA for
+me", "ابي تحليل لسهم انفيديا" - and instead of going quiet for a minute he
+hands it to LYLA (the `ask_lyla` tool) and is free again at once: you can
+give him the next thing straight away. She works on a thread of her own, one
+job at a time, her card on the display showing each step. When she is done
+Apollo tells you what she found, in his own voice - waiting for any turn in
+progress to finish first, the way a reminder does - and her write-up is kept
+(REPORTS) for the display and for "what did LYLA find?".
+
+She works for Apollo; she does not drive him. She has no tools that touch
+the PC or the display and never asks for the screen: she reads - the price,
+the trading desk, what traders are saying, insiders' trades, the news, the
+web - and writes, and that is all. What is done with what she finds is
+Apollo's call, and yours.
+
+Her brain, the first that answers:
+
+  Hermes   Nous Research's open-source agent (hermes-agent), when you run
+           its API server (`hermes gateway`) and tell Apollo where it is:
+           HERMES_URL (http://127.0.0.1:8642) and HERMES_KEY (the
+           API_SERVER_KEY in ~/.hermes/.env). Hermes itself is free; point
+           it at Gemini and it costs what Gemini costs.
+  Gemini   Otherwise Gemini itself, with Google Search, on the
+           GEMINI_API_KEY Apollo already has. LYLA_MODEL puts a model of
+           your choice at the front.
+
+Nothing here raises into Apollo: a source that fails is left out of what
+she read, and a job that fails is reported as failed.
+"""
+
+import datetime
+import itertools
+import json
+import logging
+import os
+import queue
+import re
+import threading
+import time
+import urllib.request
+
+log = logging.getLogger("apollo.lyla")
+
+NAME = "LYLA"
+MODELS = tuple(filter(None, (os.environ.get("LYLA_MODEL"),
+                             "gemini-flash-latest", "gemini-2.5-flash")))
+HERMES_TIMEOUT = 600       # an agent that searches can take its time
+REPORTS = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
+                       "Apollo", "lyla_reports.json")
+KEEP = 20                  # reports kept, newest first
+
+SYSTEM = (
+    "You are LYLA, the research agent of Apollo, a personal desktop assistant. "
+    "Apollo hands you research jobs; you do them and write up what you found for "
+    "him to pass on. You cannot act on the user's computer and never try to: you "
+    "read and you write. Use what you were given and search the web for the rest. "
+    "Be concrete - numbers, dates, names - and say where each fact came from. "
+    "For a stock, cover: what the company does; how the price has moved; what "
+    "insiders, members of Congress and traders are doing with it; the news and "
+    "the catalysts coming up; the risks; and a lean - bullish, neutral or bearish "
+    "- with the reasons for it. A stock read is a read, not advice: say so once, "
+    "at the end.\n\n"
+    "Answer in exactly this shape. The first line is `SUMMARY:` and two short "
+    "sentences Apollo can say out loud, in the language the job was given in. "
+    "Then a blank line, then the report: short sections under plain headings, "
+    "under 350 words.")
+
+
+# -- what she reads ------------------------------------------------------------------
+
+def _attempt(read, sources, name):
+    try:
+        value = read()
+    except Exception as e:  # noqa: BLE001 - a source that fails is left out
+        log.info("LYLA: %s failed: %s", name, e)
+        sources[name] = "down"
+        return None
+    sources[name] = "ok" if value else "empty"
+    return value
+
+
+def stock_facts(symbol, step=lambda text: None):
+    """Everything Apollo can read about one ticker, for her to start from.
+
+    Each source on its own - one that is down is marked so and skipped.
+    `step` is told what she is reading, for her card."""
+    import feeds
+    import insiders
+    import market
+    import trading
+
+    sources = {}
+    step(f"Reading {symbol}: price and valuation")
+    price = _attempt(lambda: market.history(symbol, "1mo"), sources, "price")
+    facts = {"symbol": symbol, "sources": sources}
+    if price:
+        points = price.pop("points", [])
+        facts["price"] = {k: price[k] for k in ("name", "currency", "price", "change_pct") if k in price}
+        facts["price"]["month_change_pct"] = facts["price"].pop("change_pct", None)
+        if points:
+            closes = [p for _, p in points]
+            facts["price"]["month_high"], facts["price"]["month_low"] = max(closes), min(closes)
+    facts["valuation"] = _attempt(lambda: market.fundamentals(symbol), sources, "valuation")
+
+    step(f"Reading {symbol}: the trading desk")
+    board = _attempt(trading.board, sources, "desk")
+    if board:
+        facts["on_the_desk"] = trading.on_the_desk(symbol, board)
+    step(f"Reading {symbol}: what traders are saying")
+    facts["chatter"] = _attempt(lambda: trading.chatter(symbol), sources, "chatter")
+
+    key = insiders.api_key()
+    if key:
+        step(f"Reading {symbol}: insiders' trades")
+        today = insiders._today()
+        rows = _attempt(lambda: insiders.fetch(symbol, key, today - datetime.timedelta(days=insiders.DAYS)),
+                        sources, "insiders")
+        if rows is not None:
+            facts["insiders"] = insiders.summary(symbol, rows, today=today)
+
+    step(f"Reading {symbol}: the news")
+    name = (facts.get("price") or {}).get("name") or symbol
+    facts["news"] = _attempt(lambda: [{"title": s["title"], "source": s.get("source", ""),
+                                       "age": s.get("age", "")}
+                                      for s in feeds.search(f'"{name}" OR {symbol} stock when:7d', 8)],
+                             sources, "news")
+    return facts
+
+
+def general_facts(task, step=lambda text: None):
+    """For a job that is not one stock: the latest headlines on it."""
+    import feeds
+
+    sources = {}
+    step("Reading the news on it")
+    news = _attempt(lambda: [{"title": s["title"], "source": s.get("source", "")}
+                             for s in feeds.search(task, 8)], sources, "news")
+    return {"news": news, "sources": sources}
+
+
+def prompt_for(job, facts):
+    return (f"The job, as the user gave it to Apollo: {job['task']}\n"
+            + (f"The stock: {job['symbol']}\n" if job.get("symbol") else "")
+            + f"Today is {datetime.date.today().isoformat()}.\n\n"
+            "What Apollo's own sources have on it (JSON; a source marked down "
+            "was unreachable):\n"
+            + json.dumps(facts, default=str, ensure_ascii=False)[:24000])
+
+
+def split(text):
+    """Her answer -> (the two sentences to say, the report). A reply without
+    the SUMMARY line is still used: its first two sentences are said."""
+    text = (text or "").strip()
+    found = re.match(r"\s*\**SUMMARY:?\**\s*(.+?)(?:\n\s*\n|\n|$)(.*)", text, re.S | re.I)
+    if found:
+        return found.group(1).strip(), found.group(2).strip() or found.group(1).strip()
+    sentences = re.split(r"(?<=[.!?؟])\s+", text)
+    return " ".join(sentences[:2]).strip(), text
+
+
+# -- her brain -----------------------------------------------------------------------
+
+def hermes_settings():
+    """Where Hermes' API server is, and its key - or None to use Gemini."""
+    url = (os.environ.get("HERMES_URL") or "").strip().rstrip("/")
+    key = (os.environ.get("HERMES_KEY") or "").strip()
+    if not url or not key:
+        return None
+    return {"url": url, "key": key, "model": os.environ.get("HERMES_MODEL") or "hermes-agent"}
+
+
+def _post(url, payload, key, timeout):
+    """The one call to Hermes. Tests replace this."""
+    request = urllib.request.Request(
+        url, data=json.dumps(payload).encode(), method="POST",
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read())
+
+
+def ask_hermes(prompt, settings):
+    """Hermes, through the OpenAI-style chat endpoint of its API server. It
+    runs its own tools - its searches, its skills - before it answers."""
+    answer = _post(settings["url"] + "/v1/chat/completions",
+                   {"model": settings["model"],
+                    "messages": [{"role": "system", "content": SYSTEM},
+                                 {"role": "user", "content": prompt}]},
+                   settings["key"], HERMES_TIMEOUT)
+    return answer["choices"][0]["message"]["content"]
+
+
+def _generate(model, prompt, search):
+    """The one call to Gemini. Tests replace this."""
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    config = types.GenerateContentConfig(
+        system_instruction=SYSTEM, temperature=0.4,
+        tools=[types.Tool(google_search=types.GoogleSearch())] if search else None)
+    return client.models.generate_content(model=model, contents=prompt, config=config).text
+
+
+def ask_gemini(prompt):
+    """Gemini with Google Search, on each model in turn; without the search
+    as a last try, since the search is the part a free key can run out of."""
+    if not os.environ.get("GEMINI_API_KEY"):
+        raise RuntimeError("LYLA needs GEMINI_API_KEY (or Hermes) to think with.")
+    last = None
+    for model, search in [*((m, True) for m in MODELS), (MODELS[0], False)]:
+        try:
+            text = _generate(model, prompt, search)
+        except Exception as e:  # noqa: BLE001 - the next model may answer
+            log.info("LYLA: %s%s failed: %s", model, " with search" if search else "", e)
+            last = e
+            continue
+        if text and text.strip():
+            return text
+    raise RuntimeError(f"Gemini did not answer: {last}")
+
+
+def think(prompt):
+    """Her answer, and which brain gave it: Hermes if it is set up and
+    answering, Gemini otherwise."""
+    settings = hermes_settings()
+    if settings is not None:
+        try:
+            return ask_hermes(prompt, settings), "Hermes"
+        except Exception as e:  # noqa: BLE001 - Gemini is still there
+            log.info("LYLA: Hermes did not answer (%s); asking Gemini", e)
+    return ask_gemini(prompt), "Gemini"
+
+
+# -- the desk ------------------------------------------------------------------------
+
+def _resolve(stock):
+    import market
+    return market.resolve(stock)
+
+
+def load_reports(path=None):
+    try:
+        with open(path or REPORTS, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def _save_reports(reports, path):
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(reports[:KEEP], f, ensure_ascii=False, indent=1)
+    except OSError:
+        log.info("LYLA: could not keep her reports", exc_info=True)
+
+
+class Desk:
+    """Her jobs, one at a time, on a thread of her own.
+
+    `tell(event)` is her card on the display - {agent, stage, text, ...} as
+    answer_with_agent sends it, with the job's `task` and `symbol`.
+    `report(job)` is Apollo passing on what she found (or that she could
+    not); it runs holding `gate`, so it waits for any turn in progress.
+    `think(prompt)`, `facts(job, step)` and `resolve(stock)` are what she
+    thinks with, reads and finds a ticker with, replaceable in tests.
+    """
+
+    def __init__(self, tell=None, report=None, gate=None, think=think, facts=None,
+                 resolve=None, path=None):
+        self.tell_card = tell
+        self.report = report
+        self.gate = gate
+        self.think = think
+        self.facts = facts or self._read
+        self.resolve = resolve or _resolve
+        self.path = path or REPORTS
+        self.reports = load_reports(self.path)
+        self.jobs = queue.Queue()
+        self.current = None
+        self._ids = itertools.count(1)
+        self._thread = None
+        self._lock = threading.Lock()
+
+    def configure(self, tell=None, report=None, gate=None):
+        """Wire her card and Apollo's voice in, once they exist."""
+        self.tell_card, self.report, self.gate = tell, report, gate
+        return self
+
+    @property
+    def waiting(self):
+        return self.jobs.qsize()
+
+    def take(self, task, stock=""):
+        """A job from Apollo - with the stock it is about, as it was said,
+        if it is about one. Returns at once with where it stands in line."""
+        job = {"id": next(self._ids), "task": " ".join(str(task).split()),
+               "stock": " ".join(str(stock or "").split()), "symbol": "", "asked": time.time()}
+        ahead = self.waiting + (self.current is not None)
+        self.jobs.put(job)
+        with self._lock:
+            if self._thread is None:
+                self._thread = threading.Thread(target=self._work, daemon=True, name="lyla-desk")
+                self._thread.start()
+        return {"job": job["id"], "ahead": ahead}
+
+    def _tell(self, job, **event):
+        if self.tell_card is None:
+            return
+        try:
+            self.tell_card({"agent": NAME, "task": job["task"], "symbol": job["symbol"],
+                            "job": job["id"], **event})
+        except Exception:  # noqa: BLE001 - a card that cannot be told never costs the job
+            log.debug("LYLA's card failed", exc_info=True)
+
+    def _read(self, job, step):
+        return stock_facts(job["symbol"], step) if job["symbol"] else general_facts(job["task"], step)
+
+    def _work(self):
+        while True:
+            try:
+                job = self.jobs.get(timeout=30)
+            except queue.Empty:
+                with self._lock:            # the next job starts her again
+                    if self.jobs.empty():
+                        self._thread = None
+                        return
+                continue
+            self.current = job
+            try:
+                self.run(job)
+            finally:
+                self.current = None
+
+    def run(self, job):
+        """One job, start to finish, and Apollo told how it went."""
+        started = time.monotonic()
+        self._tell(job, stage="received", text=job["task"], by="Apollo")
+        try:
+            if job["stock"]:
+                self._tell(job, stage="step", text=f"Finding the ticker for {job['stock']}")
+                job["symbol"] = self.resolve(job["stock"])
+            facts = self.facts(job, lambda text: self._tell(job, stage="step", text=text))
+            self._tell(job, stage="asking", text="Writing it up")
+            answer, brain = self.think(prompt_for(job, facts))
+            summary, report = split(answer)
+            job.update(ok=True, summary=summary, report=report, brain=brain,
+                       sources=facts.get("sources", {}))
+        except Exception as e:  # noqa: BLE001 - a failed job is reported, not raised
+            log.warning("LYLA's job failed: %s", e)
+            job.update(ok=False, summary="", report="", error=str(e) or type(e).__name__)
+        job["took"] = int((time.monotonic() - started) * 1000)
+        job["done"] = time.time()
+        if job["ok"]:
+            self._tell(job, stage="done", text=job["summary"], report=job["report"],
+                       ms=job["took"], brain=job["brain"])
+            self.reports.insert(0, {k: job[k] for k in ("task", "symbol", "summary", "report",
+                                                         "brain", "asked", "done", "took")})
+            del self.reports[KEEP:]
+            _save_reports(self.reports, self.path)
+        else:
+            self._tell(job, stage="error", text=job["error"])
+        self._pass_on(job)
+
+    def _pass_on(self, job):
+        if self.report is None:
+            return
+        try:
+            if self.gate is None:
+                self.report(job)
+            else:
+                with self.gate:
+                    self.report(job)
+        except Exception:  # noqa: BLE001 - her thread outlives a report that fails
+            log.warning("LYLA's report failed", exc_info=True)
+
+
+DESK = Desk()

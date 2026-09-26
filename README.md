@@ -419,7 +419,11 @@ tool; Bluetooth and location still ask first.
 **Trading mode.** **Trading** on the bar, or *"trading mode"* / *"وضع
 التداول"*, turns the display into a trading desk of six displays
 (`trading.py` reads them, every ten minutes while the desk is up and not at
-all otherwise):
+all otherwise). It has a style of its own rather than Apollo's: the market's
+greens on ink - the ground behind it goes over to them too, and the bar and
+the clock take them while it is up - teal for the labels, gold for a
+warning, red for what falls; set in Space Grotesk, with the tickers and
+figures in Martian Mono (both bundled, SIL Open Font License).
 
 - **The read** - the next picks, where the signals agree: each ticker scored
   by how many kinds of signal point at it (trending with traders, bullish
@@ -452,13 +456,44 @@ traders buying?"* / *"وش السهم الجاي"* gives the read in a few sente
 (the `trading_read` tool). It is a read of the crowd and the filings, not
 advice, and the desk says so.
 
+**LYLA does the research; Apollo stays yours.** Ask Apollo for something
+that takes looking into - *"حلل لي سهم انفيديا"*, *"analyse AMD for me"*,
+*"research the best budget GPUs"* - and he hands it to LYLA (`lyla.py`, the
+`ask_lyla` tool) and is free again at once: give him the next thing while
+she works. She works on a thread of her own, one job at a time. For a stock
+she reads the price and its month, the valuation and the analysts' target,
+where it turns up on the trading desk, what traders are saying about it on
+StockTwits, its insiders' trades and the week's news, then writes it up -
+what the company does, the price, the signals, the catalysts, the risks and
+a lean, a read and not advice - searching the web for the rest. When she is
+done Apollo tells you in two or three sentences, in his voice and your
+language, after any turn in progress (the way a reminder waits); *"what did
+LYLA find?"* reads her report back (`lyla_findings`). While she works her
+line under her HP bar says ON A JOB, and her reports are listed in agents
+mode, newest first - click one for the whole thing. They are kept between
+sessions (`%LOCALAPPDATA%\Apollo\lyla_reports.json`, the last twenty).
+
+She works for Apollo; she does not drive him. She has no tools that touch
+your PC or the display and never takes the screen - she reads and she
+writes. What she thinks with, the first that answers:
+
+- **Hermes** ([hermes-agent](https://github.com/NousResearch/hermes-agent),
+  Nous Research's open-source agent - free, MIT), if you run its API server
+  and tell Apollo where it is: `HERMES_URL` (`http://127.0.0.1:8642`) and
+  `HERMES_KEY` (the `API_SERVER_KEY` in `~/.hermes/.env`). Hermes costs
+  nothing itself; the model it runs on is the cost, and it can run on Gemini
+  with the key you already have.
+- **Gemini** otherwise, with Google Search, on `GEMINI_API_KEY` - nothing to
+  set up. `LYLA_MODEL` puts a model of your choice first.
+
 **Agents mode.** **Agents** on the bar, or *"agents mode"*: each agent as
-its pipeline card - only LYLA, for now. Until you first command her it is a
-preview on a loop and says PREVIEW. Say *"hey LYLA, ..."* and the display
-comes up in agents mode and her card goes LIVE: your command, routed to her
-by name, her asking Claude, then the reply with how long it took (or the
-error), her runs counted and her latency averaged. The card on her HP block
-runs live the same way.
+its pipeline card - only LYLA, for now - and her reports under it. Until
+she first works it is a preview on a loop and says PREVIEW. Hand her a job
+through Apollo, or say *"hey LYLA, ..."*, and her card goes LIVE: the job,
+each thing she reads, her writing it up, then the answer with how long it
+took and what she thought with (or the error), her runs counted and her
+latency averaged. The card on her HP block runs live the same way. Neither
+changes what the display is showing: go to agents mode to watch her.
 
 **Ultra mode.** **Expanded** on the bar along the bottom, or *"ultra mode"* /
 *"وضع الشغل"* / *"جهز الشاشة للشغل"*, gets Apollo ready for work: a channel
@@ -883,12 +918,13 @@ The only thing left is your API key.
 | `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
 | `ui/full/lylaagent.js` | LYLA's agent card, a preview before she is an agent: the pipeline, its moving parts and what opens and shuts it - ported from a React component to plain JS and SVG, so there is still no build step (`tests/test_lyla_agent.py`). |
+| `lyla.py` | LYLA's desk: the research Apollo hands her, on her own thread - what she reads, what she thinks with (Hermes or Gemini), her reports kept, and Apollo told when she is done (`tests/test_lyla_desk.py`). |
 | `trading.py` | Trading mode's desk: insiders (OpenInsider), Congress, the SEC's 8-K filings, market-moving news, StockTwits and Reddit, X when it is set up, and the read of the next picks (`tests/test_trading.py`). |
 | `ui/full/modes.js` | The display's modes - normal, clear, expanded, OSIRIS - and the switches to throw, in order, from one to another (`tests/test_modes.py`). |
 | `ui/full/feed.js` | The feed's rows, fuller: a source's initials for its tile, what a story is about, and the line over the list (`tests/test_feed_rows.py`). |
 | `ui/full/sfx.js` | The display's sounds, synthesized with Web Audio: the recipes, and the player that keeps a sound from doubling up (`tests/test_sfx.py`). |
 | `ui/fonts/thmanyah/` | Thmanyah Sans, as OTFs — what the overlay loads privately at runtime. |
-| `ui/full/fonts/` | The same weights as WOFF2, under the page because pywebview's server roots there - and beside them IBM Plex Mono, Melete, Orbitron and VT323, each with its licence. |
+| `ui/full/fonts/` | The same weights as WOFF2, under the page because pywebview's server roots there - and beside them IBM Plex Mono, Melete, Orbitron, VT323, and trading mode's Space Grotesk and Martian Mono, each with its licence. |
 | `ui/legacy/index.html` | The old generated design, frozen. Nothing in the run reads it. |
 | `build_ui.py` | Builds `ui/legacy/index.html` from the Claude Design export. **Not part of the run.** |
 | `ADD A CITY.dc.html` | The old design source, as exported from the canvas. |

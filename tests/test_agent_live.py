@@ -1,7 +1,8 @@
-"""Commanding LYLA as an agent, in the pipeline card's style: the display
-comes up in agents mode, and her card runs for real - what you said, that
-she is asking, and the reply with how long it took, or the error. Other
-agents, not built yet, are left as they were."""
+"""Commanding LYLA as an agent, in the pipeline card's style: her card runs
+for real - what you said, that she is asking, and the reply with how long it
+took, or the error. She never changes what the display shows: LYLA works for
+Apollo, and the screen is his and yours. Other agents, not built yet, are
+left as they were."""
 import anthropic
 import pytest
 
@@ -35,11 +36,11 @@ def quiet(monkeypatch):
     monkeypatch.setattr(assistant.journal, "answered", lambda *a, **k: None)
 
 
-def test_lyla_comes_up_in_agents_mode_and_runs_live(monkeypatch):
+def test_lyla_runs_live_without_taking_the_screen(monkeypatch):
     ui = UI()
     monkeypatch.setattr(assistant.agents, "handle", lambda name, text, ui, ask: "Your notes are sorted.")
     assistant.answer_with_agent("LYLA", "hey lyla sort my notes", ui)
-    assert ui.asked == [{"action": "mode", "mode": "agents"}]
+    assert ui.asked == []
     stages = [e["stage"] for e in ui.events]
     assert stages == ["received", "asking", "done"]
     assert ui.events[0] == {"agent": "LYLA", "stage": "received", "text": "hey lyla sort my notes"}
@@ -76,3 +77,20 @@ def test_a_ui_without_the_card_still_gets_its_answer(monkeypatch):
     ui = Plain()
     assistant.answer_with_agent("LYLA", "hey lyla", ui)
     assert ui.turns == ["done"]
+
+
+def test_apollo_passes_on_what_she_found(monkeypatch):
+    said = []
+    monkeypatch.setattr(assistant, "announce", lambda ui, voice, instruction, fallback: said.append((instruction, fallback)))
+    job = {"ok": True, "task": "analyse nvidia", "summary": "NVDA is bid.", "report": "Full."}
+    assistant.report_lyla(UI(), None, job)
+    instruction, fallback = said[0]
+    assert "LYLA" in instruction and "NVDA is bid." in instruction and "not advice" in instruction
+    assert fallback == "LYLA is done: NVDA is bid."
+
+
+def test_apollo_says_when_she_could_not_finish(monkeypatch):
+    said = []
+    monkeypatch.setattr(assistant, "announce", lambda ui, voice, instruction, fallback: said.append(fallback))
+    assistant.report_lyla(UI(), None, {"ok": False, "task": "x", "error": "quota gone"})
+    assert "quota gone" in said[0]

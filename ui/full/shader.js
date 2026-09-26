@@ -62,6 +62,7 @@ uniform float flicker;    // the tube's brightness this frame: a breath under 1
 uniform float shimmer;    // how much the lines shimmer against each other this frame
 uniform float grain;      // a fresh seed every frame, for the static
 uniform float osiris;     // 0 Apollo's colours, 1 OSIRIS's - gold and cyan in the void - eased
+uniform float market;     // 0 Apollo's colours, 1 the trading desk's - greens and teal on ink - eased
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
@@ -82,16 +83,22 @@ float fbm(vec2 p) {
 // above it (u > 0), pale along it - the stops read off the reference
 // picture and brightened a little, since the whole ground is dimmed under
 // the panels. With OSIRIS up, the same band in its colours: gold on the warm
-// side, its cyan and blue on the cool, the night a void.
+// side, its cyan and blue on the cool, the night a void. On the trading
+// desk, the market's: deep green through emerald to a pale mint ridge, teal
+// and navy above it.
+vec3 skin(vec3 apollo, vec3 gold, vec3 money) {
+  return mix(mix(apollo, gold, osiris), money, market);
+}
+
 vec3 ramp(float u) {
-  vec3 c0 = mix(vec3(0.30, 0.07, 0.07), vec3(0.22, 0.16, 0.05), osiris);
-  vec3 c1 = mix(vec3(0.62, 0.20, 0.10), vec3(0.58, 0.44, 0.12), osiris);
-  vec3 c2 = mix(vec3(0.80, 0.46, 0.17), vec3(0.83, 0.69, 0.22), osiris);
-  vec3 c3 = mix(vec3(0.78, 0.70, 0.30), vec3(0.94, 0.82, 0.38), osiris);
-  vec3 c4 = mix(vec3(0.68, 0.74, 0.66), vec3(0.80, 0.92, 0.90), osiris);
-  vec3 c5 = mix(vec3(0.36, 0.60, 0.74), vec3(0.00, 0.80, 0.95), osiris);
-  vec3 c6 = mix(vec3(0.14, 0.42, 0.66), vec3(0.10, 0.40, 0.85), osiris);
-  vec3 c7 = mix(vec3(0.07, 0.13, 0.28), vec3(0.03, 0.05, 0.16), osiris);
+  vec3 c0 = skin(vec3(0.30, 0.07, 0.07), vec3(0.22, 0.16, 0.05), vec3(0.02, 0.12, 0.09));
+  vec3 c1 = skin(vec3(0.62, 0.20, 0.10), vec3(0.58, 0.44, 0.12), vec3(0.03, 0.30, 0.21));
+  vec3 c2 = skin(vec3(0.80, 0.46, 0.17), vec3(0.83, 0.69, 0.22), vec3(0.06, 0.55, 0.37));
+  vec3 c3 = skin(vec3(0.78, 0.70, 0.30), vec3(0.94, 0.82, 0.38), vec3(0.30, 0.82, 0.55));
+  vec3 c4 = skin(vec3(0.68, 0.74, 0.66), vec3(0.80, 0.92, 0.90), vec3(0.70, 0.96, 0.82));
+  vec3 c5 = skin(vec3(0.36, 0.60, 0.74), vec3(0.00, 0.80, 0.95), vec3(0.16, 0.70, 0.70));
+  vec3 c6 = skin(vec3(0.14, 0.42, 0.66), vec3(0.10, 0.40, 0.85), vec3(0.06, 0.34, 0.50));
+  vec3 c7 = skin(vec3(0.07, 0.13, 0.28), vec3(0.03, 0.05, 0.16), vec3(0.02, 0.07, 0.17));
   vec3 c = c0;
   c = mix(c, c1, smoothstep(-1.70, -1.05, u));
   c = mix(c, c2, smoothstep(-1.05, -0.60, u));
@@ -219,7 +226,7 @@ void main() {
   // Dim enough to read over, and a floor that is not quite black - darker
   // still with OSIRIS up, whose ground is a void with a little blue in it.
   float dim = 0.62 * mix(1.0, 0.62, osiris);
-  vec3 ground = mix(vec3(0.014, 0.012, 0.018), vec3(0.016, 0.016, 0.040), osiris);
+  vec3 ground = skin(vec3(0.014, 0.012, 0.018), vec3(0.016, 0.016, 0.040), vec3(0.006, 0.018, 0.016));
   gl_FragColor = vec4(colour * dim + ground, 1.0);
 }
 `;
@@ -280,6 +287,8 @@ export class Shader {
     this.shimmer = 1.0;
     this.osirisValue = 0.0;
     this.osirisTarget = 0.0;
+    this.marketValue = 0.0;
+    this.marketTarget = 0.0;
     // Asked for less motion, the set is steadier and the light slower.
     this.still = typeof matchMedia === 'function'
       && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -317,6 +326,7 @@ export class Shader {
     this.flickerUniform = gl.getUniformLocation(program, 'flicker');
     this.grainUniform = gl.getUniformLocation(program, 'grain');
     this.osirisUniform = gl.getUniformLocation(program, 'osiris');
+    this.marketUniform = gl.getUniformLocation(program, 'market');
     this.shimmerUniform = gl.getUniformLocation(program, 'shimmer');
     this.resize();
   }
@@ -346,6 +356,9 @@ export class Shader {
   // OSIRIS up: the lights go over to its colours, in about a second.
   theme(osiris) { this.osirisTarget = osiris ? 1 : 0; }
 
+  // The trading desk up: the lights go over to the market's colours.
+  market(on) { this.marketTarget = on ? 1 : 0; }
+
   /* One frame of the tube: a shimmer too small to see as such, a slow
    * breath of about a second under it, and once in a while the faintest dip,
    * gone in a quarter second. `dt` in seconds, `now` in ms. Chances are per
@@ -372,6 +385,7 @@ export class Shader {
     gl.uniform1f(this.flickerUniform, this.flicker);
     gl.uniform1f(this.grainUniform, Math.random() * 97.0);
     gl.uniform1f(this.osirisUniform, this.osirisValue);
+    gl.uniform1f(this.marketUniform, this.marketValue);
     gl.uniform1f(this.shimmerUniform, this.shimmer);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
@@ -396,6 +410,7 @@ export class Shader {
         this.time += dt * driftPerSecond(this.still) * this.rate;
         this.sleepValue += (this.sleepTarget - this.sleepValue) * Math.min(1, dt * 1.05);
         this.osirisValue += (this.osirisTarget - this.osirisValue) * Math.min(1, dt * 3.2);
+        this.marketValue += (this.marketTarget - this.marketValue) * Math.min(1, dt * 3.2);
         this._set(dt, now);
         this.draw();
       }

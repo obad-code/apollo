@@ -142,6 +142,8 @@ const state = {
   panels: {},             // which panels apollo.py last said are shown
   osiris: false,          // OSIRIS laid into the normal display, and Apollo in its colours
   view: 'normal',         // which view of the display: normal, clear, trading or agents
+  lylaReports: [],        // what LYLA found, newest first (apollo.py keeps them)
+  reportOpen: -1,         // the report of hers opened out, if any
   away: false,            // away mode, as apollo.py last said
   listening: false,       // hands-free, as apollo.py last said
   modeTicket: 0,          // the mode last asked for, so an older one stops half way
@@ -240,8 +242,16 @@ function playIntro() {
 /* What she is doing, under her bar. Her name is over the bar already, so the
  * "LYLA // " lyla.js starts every line with is taken off on the way in. */
 const lylaDoing = {
+  said: '',
+  job: '',
   get textContent() { return $('lyla-label').textContent; },
-  set textContent(text) { $('lyla-label').textContent = String(text).replace(/^LYLA\s*\/\/\s*/, ''); },
+  set textContent(text) { this.said = String(text).replace(/^LYLA\s*\/\/\s*/, ''); this.show(); },
+  /* On a job Apollo handed her, that is what she is doing, whatever her
+   * room says. */
+  show() {
+    $('lyla-label').textContent = this.job || this.said;
+    $('lyla-block').classList.toggle('on-job', Boolean(this.job));
+  },
 };
 
 /* The display's sounds, made on the spot (sfx.js): a tick as the pointer
@@ -1918,6 +1928,44 @@ function render(snapshot) {
 
 // What the display asks apollo.py for while the desk is up: read it now,
 // and again every quarter of an hour it stays up.
+/* LYLA's reports, newest first: the job, the stock it was about, her two
+ * lines, and the whole report folded under them - a click opens it. The
+ * list comes from apollo.py when agents mode comes up, and each new one as
+ * she finishes. */
+const REPORTS_SHOWN = 6;
+function renderReports() {
+  const list = $('lyla-reports');
+  if (!list) return;
+  const reports = state.lylaReports.slice(0, REPORTS_SHOWN);
+  list.innerHTML = reports.length ? reports.map((report, i) => `
+    <li class="report${state.reportOpen === i ? ' open' : ''}" data-report="${i}">
+      <header>${report.symbol ? `<b>${esc(report.symbol)}</b>` : ''}<span class="report-task">${esc(report.task)}</span>
+        <em>${esc(report.brain)}${report.done ? ` · ${esc(ago(report.done))}` : ''}</em></header>
+      <p class="report-sum">${esc(report.summary)}</p>
+      <div class="report-full">${esc(report.report)}</div>
+    </li>`).join('') : '<li class="report-none">No reports yet. Ask Apollo to have LYLA look into something - a stock, say.</li>';
+}
+async function loadReports() {
+  const api = bridge();
+  if (!api || !api.lyla_reports) return renderReports();
+  try {
+    const got = await api.lyla_reports();
+    state.lylaReports = Array.isArray(got && got.reports) ? got.reports : [];
+    const working = got && got.working;
+    lylaDoing.job = working ? `ON A JOB${working.symbol ? ` · ${working.symbol}` : ''}` : '';
+    lylaDoing.show();
+  } catch (e) { /* the list stays as it was */ }
+  renderReports();
+}
+$('lyla-reports')?.addEventListener('click', (event) => {
+  const item = event.target.closest('[data-report]');
+  if (!item) return;
+  const i = Number(item.dataset.report);
+  state.reportOpen = state.reportOpen === i ? -1 : i;
+  sfx.play(state.reportOpen === -1 ? 'down' : 'hud');
+  renderReports();
+});
+
 function wantTrading() {
   const api = bridge();
   if (api && api.trading) api.trading();
@@ -2323,8 +2371,9 @@ function setView(view) {
   channelChange(() => {
     for (const name of ['clear', 'trading', 'agents']) document.body.classList.toggle(name, view === name);
     document.body.classList.toggle('viewing', view !== 'normal');
-    if (view === 'agents') agentsCard.show();
+    if (view === 'agents') { agentsCard.show(); loadReports(); }
     applyRoom({ quiet: true });
+    applySkin();
   });
 }
 
@@ -2509,11 +2558,13 @@ function applyLayout() {
 }
 
 /* Apollo in OSIRIS's colours: while the map is laid into the normal display,
- * and in ultra mode while it is the display expanded. */
+ * and in ultra mode while it is the display expanded. In the market's while
+ * the trading desk is what is on the screen. */
 function applySkin() {
   const skin = state.osiris || (ultraOn() && state.layout.focus === 'osiris');
   document.body.classList.toggle('osiris', skin);
   shader.theme(skin);
+  shader.market(state.view === 'trading' && !skin && !ultraOn());
 }
 
 /* A change of layout that moves displays: each one slides from where it was
@@ -3406,6 +3457,20 @@ window.apollo = {
     if (step.agent && step.agent !== 'LYLA') return;
     agent.live(step);
     agentsCard.live(step);
+    // A job Apollo handed her shows under her bar while she is on it, and
+    // what she found joins her reports.
+    if (step.job) {
+      const on = step.stage !== 'done' && step.stage !== 'error';
+      lylaDoing.job = on ? `ON A JOB${step.symbol ? ` · ${step.symbol}` : ''}` : '';
+      lylaDoing.show();
+    }
+    if (step.stage === 'done' && step.report) {
+      state.lylaReports.unshift({ task: step.task, symbol: step.symbol, summary: step.text,
+                                  report: step.report, brain: step.brain, done: Date.now() / 1000 });
+      state.lylaReports.length = Math.min(state.lylaReports.length, 20);
+      state.reportOpen = -1;
+      renderReports();
+    }
   },
   // Which of Apollo's own modes are on - away, hands-free - for the bar.
   states(states) {

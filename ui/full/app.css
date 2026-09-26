@@ -33,6 +33,15 @@
 @font-face { font-family: "Melete"; font-weight: 500; font-display: block;
              src: url("fonts/melete/Melete-Medium.otf") format("opentype"); }
 
+/* The trading desk's own letters: Space Grotesk for its words and Martian
+   Mono for its tickers and figures, each one variable file for every weight.
+   Both SIL Open Font License (fonts/space-grotesk/OFL.txt,
+   fonts/martian-mono/OFL.txt). */
+@font-face { font-family: "Space Grotesk"; font-weight: 300 700; font-display: block;
+             src: url("fonts/space-grotesk/space-grotesk-latin-wght-normal.woff2") format("woff2"); }
+@font-face { font-family: "Martian Mono"; font-weight: 100 800; font-display: block;
+             src: url("fonts/martian-mono/martian-mono-latin-wght-normal.woff2") format("woff2"); }
+
 /* Thmanyah, carried with Apollo rather than expected from the system, and
    served from under this page because pywebview roots its server here. One
    family sets both scripts, so a reply in Arabic is in the same face as one
@@ -1844,7 +1853,30 @@ body.ultra .console.squeezed { display: none; }
 /* --- the trading desk ----------------------------------------------------------------
    Trading mode: six displays on one screen, in the display's own panels -
    the read of the next picks, the traders, the sensitive filings and
-   headlines, the insiders, Congress, and X (or your stocks). */
+   headlines, the insiders, Congress, and X (or your stocks).
+
+   It is set in its own colours and its own letters rather than Apollo's:
+   the market's greens on ink (the ground goes over to them too - see the
+   shader's `market`), teal for the labels, gold for a warning, red for what
+   falls; Space Grotesk for the words and Martian Mono for the tickers and
+   the figures. The rest of the screen - the bar, the clock - takes the
+   colours while the desk is up. */
+
+body.trading:not(.ultra):not(.osiris-map) {
+  --amber-hot: #19E68C;
+  --amber: #BFEFDB;
+  --amber-bright: #DDFBEE;
+  --cream: #F4FFF9;
+  --you: #F4FFF9;
+  --caption: rgba(160, 226, 204, 0.6);
+  --accent: #36D6E7;
+  --accent-hot: #19E68C;
+  --up: #19E68C;
+  --down: #FF4D6A;
+  --panel: rgba(2, 17, 15, 0.78);
+  --paper: #DDFBEE;
+  text-shadow: 0 0 7px rgba(25, 230, 140, 0.35);
+}
 
 #trading, #agents { display: none; }
 body.trading:not(.ultra):not(.osiris-map) #stage > :not(#trading),
@@ -1856,71 +1888,97 @@ body.agents:not(.ultra):not(.osiris-map) #stage {
 body.trading:not(.ultra):not(.osiris-map) #trading {
   grid-area: view; display: flex; flex-direction: column; gap: 12px; min-height: 0;
 }
+#trading {
+  --desk-green: #19E68C;
+  --desk-teal: #36D6E7;
+  --desk-gold: #F5C542;
+  --desk-red: #FF4D6A;
+  --desk-text: #BFEFDB;
+  --desk-bright: #F4FFF9;
+  --desk-caption: rgba(160, 226, 204, 0.6);
+  --desk-line: rgba(120, 240, 190, 0.1);
+  --desk-words: "Space Grotesk", "Thmanyah", system-ui, sans-serif;
+  --desk-figures: "Martian Mono", "IBM Plex Mono", "Thmanyah", ui-monospace, monospace;
+  font-family: var(--desk-words);
+  color: var(--desk-text);
+}
 .desk-head { display: flex; align-items: baseline; gap: 18px; padding: 0 4px; }
-.desk-head b { font: 800 13px var(--hud); letter-spacing: .28em; color: var(--amber-bright); white-space: nowrap; }
-#desk-verdict { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--cream);
+.desk-head b { font: 700 13px var(--desk-figures); letter-spacing: .22em; color: var(--desk-green); white-space: nowrap; }
+.desk-head b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%;
+                       background: var(--desk-green); box-shadow: 0 0 10px var(--desk-green); vertical-align: 1px;
+                       animation: desk-live 1.6s ease-in-out infinite; }
+@keyframes desk-live { 50% { opacity: .35; } }
+#desk-verdict { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; letter-spacing: -.005em; color: var(--desk-bright);
                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#desk-age { font-style: normal; font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
-            color: var(--caption); white-space: nowrap; }
+#desk-age { font: 400 11px var(--desk-figures); font-style: normal; letter-spacing: .08em; text-transform: uppercase;
+            color: var(--desk-caption); white-space: nowrap; }
 .desk-grid { flex: 1; min-height: 0; display: grid; gap: 14px;
              grid-template-columns: 1.15fr 1fr 1.1fr; grid-template-rows: minmax(0, 1.1fr) minmax(0, 1fr); }
 .desk-panel {
-  min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 16px 18px 12px;
-  border-radius: 14px; background: var(--panel); border: 1px solid rgba(255, 214, 150, .1);
+  position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 16px 18px 12px;
+  border-radius: 6px; background: var(--panel); border: 1px solid var(--desk-line);
   backdrop-filter: blur(7px) saturate(1.2);
 }
+/* A tab of colour along each panel's top edge, as on a terminal. */
+.desk-panel::before { content: ""; position: absolute; left: 18px; right: 18px; top: -1px; height: 2px; border-radius: 1px;
+                      background: linear-gradient(90deg, var(--desk-teal), transparent); opacity: .8; }
+#desk-read::before { background: linear-gradient(90deg, var(--desk-green), transparent); }
+#desk-sensitive::before { background: linear-gradient(90deg, var(--desk-gold), transparent); }
 .desk-panel h3 { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px;
-                 font: 800 12px var(--hud); letter-spacing: .24em; text-transform: uppercase; color: var(--amber-bright); }
-.desk-panel h3 em { font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--caption);
+                 font: 700 11px var(--desk-figures); letter-spacing: .2em; text-transform: uppercase; color: var(--desk-teal); }
+.desk-panel h3 em { font: 500 11px var(--desk-words); font-style: normal; letter-spacing: .02em; color: var(--desk-caption);
                     text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .desk-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
-.desk-body h4 { margin: 8px 0 4px; font: 700 11px var(--hud); letter-spacing: .16em; text-transform: uppercase;
-                color: rgba(127, 227, 255, .75); }
+.desk-body h4 { margin: 8px 0 4px; font: 600 11px var(--desk-figures); letter-spacing: .14em; text-transform: uppercase;
+                color: rgba(54, 214, 231, .7); }
 .desk-body h4:first-child { margin-top: 0; }
-.desk-row { display: flex; align-items: center; gap: 10px; padding: 6px 2px; font-size: 12px;
-            border-bottom: 1px solid rgba(255, 240, 210, .05); color: var(--amber-bright); }
-.desk-row b { min-width: 46px; font-weight: 800; letter-spacing: .04em; color: var(--cream); }
+.desk-row { display: flex; align-items: center; gap: 10px; padding: 6px 2px; font-size: 13px;
+            border-bottom: 1px solid rgba(120, 240, 190, .06); color: var(--desk-text); }
+.desk-row b { min-width: 52px; font: 700 12px var(--desk-figures); letter-spacing: .02em; color: var(--desk-bright); }
 .desk-row .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.desk-row small { display: block; font-size: 11px; color: var(--caption); overflow: hidden; text-overflow: ellipsis; }
-.desk-row .num { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--cream); }
-.desk-row .rank { width: 16px; color: var(--caption); font-size: 11px; text-align: right; }
-.desk-row .when { font-size: 11px; color: var(--caption); }
+.desk-row small { display: block; font-size: 11px; color: var(--desk-caption); overflow: hidden; text-overflow: ellipsis; }
+.desk-row .num { font: 600 12px var(--desk-figures); font-variant-numeric: tabular-nums; color: var(--desk-bright); }
+.desk-row .rank { width: 16px; font: 400 11px var(--desk-figures); color: var(--desk-caption); text-align: right; }
+.desk-row .when { font: 400 11px var(--desk-figures); color: var(--desk-caption); }
 .desk-row.link { cursor: pointer; }
-.desk-row.link:hover { background: rgba(255, 214, 150, .05); }
-.desk-row.moving .grow { color: #ffd0a0; }
-.desk-row .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: rgba(255, 214, 150, .3); }
-.desk-row.w5 .dot { background: #ff4d5e; box-shadow: 0 0 8px rgba(255, 77, 94, .9); }
-.desk-row.w4 .dot { background: #ff8a3d; box-shadow: 0 0 6px rgba(255, 138, 61, .8); }
-.desk-row.w3 .dot { background: var(--amber-bright); }
-.desk-empty { padding: 6px 2px; font-size: 11px; line-height: 1.5; color: var(--caption); }
-.tag { flex: none; padding: 2px 7px; border-radius: 5px; font: 800 11px var(--hud); letter-spacing: .08em;
-       border: 1px solid rgba(255, 214, 150, .25); color: var(--amber-bright); }
-.tag.up { color: var(--up); border-color: rgba(95, 227, 154, .45); }
-.tag.down { color: var(--down); border-color: rgba(255, 107, 122, .45); }
-.rise { font-size: 11px; color: var(--caption); font-variant-numeric: tabular-nums; }
-.rise.up { color: var(--up); }
+.desk-row.link:hover { background: rgba(25, 230, 140, .06); }
+.desk-row.moving .grow { color: var(--desk-gold); }
+.desk-row .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: rgba(160, 226, 204, .3); }
+.desk-row.w5 .dot { background: var(--desk-red); box-shadow: 0 0 8px rgba(255, 77, 106, .9); }
+.desk-row.w4 .dot { background: #FF8A3D; box-shadow: 0 0 6px rgba(255, 138, 61, .8); }
+.desk-row.w3 .dot { background: var(--desk-gold); }
+.desk-empty { padding: 6px 2px; font-size: 12px; line-height: 1.5; color: var(--desk-caption); }
+.tag { flex: none; padding: 2px 7px; border-radius: 3px; font: 600 11px var(--desk-figures); letter-spacing: .04em;
+       border: 1px solid rgba(54, 214, 231, .35); color: var(--desk-teal); }
+/* BUY and SELL the same width, so the tickers after them line up. */
+.desk-row > .tag:first-child { min-width: 50px; text-align: center; }
+.tag.up { color: var(--desk-green); border-color: rgba(25, 230, 140, .45); background: rgba(25, 230, 140, .08); }
+.tag.down { color: var(--desk-red); border-color: rgba(255, 77, 106, .45); background: rgba(255, 77, 106, .08); }
+.rise { font: 500 11px var(--desk-figures); color: var(--desk-caption); font-variant-numeric: tabular-nums; }
+.rise.up { color: var(--desk-green); }
 /* How bullish the messages are: green over red, and the share. */
 .bull { position: relative; flex: none; width: 54px; height: 6px; border-radius: 3px; overflow: hidden;
-        background: rgba(255, 107, 122, .55); }
-.bull i { position: absolute; inset: 0 auto 0 0; background: var(--up); }
-.bull.none { width: auto; height: auto; background: none; font-size: 11px; color: var(--caption); }
-.bull-n { flex: none; width: 34px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--cream); }
+        background: rgba(255, 77, 106, .55); }
+.bull i { position: absolute; inset: 0 auto 0 0; background: var(--desk-green); }
+.bull.none { width: auto; height: auto; background: none; font-size: 11px; color: var(--desk-caption); }
+.bull-n { flex: none; width: 40px; font: 500 11px var(--desk-figures); font-variant-numeric: tabular-nums; color: var(--desk-bright); }
 /* The read: each pick, its weight, its reasons, and why the crowd is on it. */
-.pick { display: flex; gap: 12px; padding: 9px 2px 10px; border-bottom: 1px solid rgba(255, 240, 210, .06); }
-.pick-n { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
-          font: 800 12px var(--hud); color: #121012; background: var(--paper); }
+.pick { display: flex; gap: 12px; padding: 9px 2px 10px; border-bottom: 1px solid rgba(120, 240, 190, .07); }
+.pick-n { flex: none; width: 22px; height: 22px; border-radius: 4px; display: grid; place-items: center;
+          font: 700 11px var(--desk-figures); color: #03140F; background: var(--desk-green);
+          text-shadow: none; box-shadow: 0 0 12px rgba(25, 230, 140, .45); }
 .pick-main { flex: 1; min-width: 0; }
 .pick-line { display: flex; align-items: center; gap: 10px; }
-.pick-line b { font: 800 17px var(--hud); letter-spacing: .06em; color: var(--cream); }
-.pick-name { flex: 1; min-width: 0; font-size: 12px; color: var(--caption); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.score { display: block; height: 3px; margin: 6px 0 5px; border-radius: 2px; background: rgba(255, 214, 150, .08); overflow: hidden; }
-.score i { display: block; height: 100%; background: linear-gradient(90deg, var(--amber), var(--amber-bright)); }
-.pick ul { list-style: none; font-size: 12px; line-height: 1.5; color: var(--amber-bright); }
-.pick li::before { content: "› "; color: var(--caption); }
-.pick-why { margin-top: 3px; font-size: 11px; line-height: 1.45; color: var(--caption);
+.pick-line b { font: 700 16px var(--desk-figures); letter-spacing: .02em; color: var(--desk-bright); }
+.pick-name { flex: 1; min-width: 0; font-size: 13px; color: var(--desk-caption); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score { display: block; height: 3px; margin: 6px 0 5px; border-radius: 2px; background: rgba(120, 240, 190, .08); overflow: hidden; }
+.score i { display: block; height: 100%; background: linear-gradient(90deg, var(--desk-teal), var(--desk-green)); }
+.pick ul { list-style: none; font-size: 13px; line-height: 1.5; color: var(--desk-text); }
+.pick li::before { content: "▸ "; color: var(--desk-green); }
+.pick-why { margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--desk-caption);
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .x-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.desk-foot { padding: 0 4px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--caption); }
+.desk-foot { padding: 0 4px; font: 400 11px var(--desk-figures); letter-spacing: .08em; text-transform: uppercase; color: var(--desk-caption); }
 
 /* --- the agents ------------------------------------------------------------------------
    Agents mode: each agent as its pipeline card, large, in the middle of the
@@ -1942,3 +2000,29 @@ body.agents:not(.ultra):not(.osiris-map) #agents {
 .agent-out.wait { fill: #f59e0b; animation: agent-status 1.1s ease-in-out infinite; }
 .agent-out.ok { fill: #22c55e; animation: none; opacity: .95; }
 .agent-out.err { fill: #ff4d5e; animation: none; }
+/* Her reports under the card: the job, her two lines, the report folded
+   under them. In the card's own blue on black. */
+#lyla-reports {
+  width: min(900px, 90%); max-height: 34vh; overflow-y: auto; scrollbar-width: none; list-style: none;
+  display: flex; flex-direction: column; gap: 8px;
+}
+#lyla-reports .report, #lyla-reports .report-none {
+  padding: 12px 16px; border-radius: 10px; background: rgba(9, 9, 9, .9);
+  border: 1px solid rgba(0, 82, 255, .22); color: rgba(255, 255, 255, .72); font-size: 12px; text-shadow: none;
+}
+#lyla-reports .report { cursor: pointer; }
+#lyla-reports .report:hover { border-color: rgba(51, 117, 255, .5); }
+#lyla-reports .report-none { color: rgba(255, 255, 255, .4); }
+#lyla-reports header { display: flex; align-items: baseline; gap: 10px; }
+#lyla-reports header b { font: 700 12px var(--mono); letter-spacing: .06em; color: #fff; padding: 1px 7px;
+                         border-radius: 4px; background: rgba(0, 82, 255, .35); }
+.report-task { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: rgba(255, 255, 255, .85); }
+#lyla-reports header em { font-style: normal; font-size: 11px; color: rgba(51, 117, 255, .75); white-space: nowrap; }
+.report-sum { margin-top: 6px; line-height: 1.5; color: rgba(255, 255, 255, .6); }
+.report-full { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .07);
+               white-space: pre-wrap; line-height: 1.55; font-size: 12px; color: rgba(255, 255, 255, .7);
+               max-height: 40vh; overflow-y: auto; }
+.report.open .report-full { display: block; }
+/* On a job Apollo handed her: her line under the bar in her agent's blue,
+   breathing. */
+#lyla-block.on-job #lyla-label { color: #5b8cff; animation: agent-status 1.9s ease-in-out infinite; }

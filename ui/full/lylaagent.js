@@ -5,9 +5,9 @@
  *
  * Until you first command her it is a preview, and says PREVIEW: a demo
  * run on a loop. The moment you do (apollo.py calls `live`), it goes LIVE
- * and shows the real thing - what you said, that it was routed to her by
- * name, that she is asking Claude, and the reply with how long it took (or
- * the error) - and the demo stops for good.
+ * and shows the real thing - the job (yours, called by name, or one Apollo
+ * handed her), each step of it, what she is thinking with, and the answer
+ * with how long it took (or the error) - and the demo stops for good.
  *
  * Ported from a React component (ai-agent-pipeline, framer-motion) to this
  * page's own JS, SVG and CSS, so the display still needs no build step: the
@@ -98,8 +98,8 @@ export function markup() {
     ${wire(PATHS.p1, true, true)}${wire(PATHS.p2, true, true)}
     ${wire(PATHS.p3)}${wire(PATHS.p4)}${wire(PATHS.p5)}
     ${DOTS.map(dot).join('')}
-    ${node(16, 100, ['TRIGGER', 'TRIGGER'], ['User Query', 'Your command'], ['node-01', 'Ctrl+Alt'])}
-    ${node(158, 110, ['VECTOR DB', 'ROUTER'], ['Semantic Search', 'Called by name'], ['pinecone', 'agents.py'], 11)}
+    ${node(16, 100, ['TRIGGER', 'TRIGGER'], ['User Query', 'A job'], ['node-01', 'Apollo · you'])}
+    ${node(158, 110, ['VECTOR DB', 'READING'], ['Semantic Search', 'Desk · news · web'], ['pinecone', 'lyla.py'], 11)}
     <rect x="306" y="53" width="105" height="70" rx="10" fill="#050D1C" stroke="#0052FF" stroke-width="1"/>
     <rect x="318" y="53.5" width="80" height="1" rx="0.5" fill="rgba(51,117,255,0.5)"/>
     <text x="358" y="78" text-anchor="middle" font-size="9.5" fill="rgba(51,117,255,0.65)" letter-spacing=".07em">LYLA</text>
@@ -107,7 +107,7 @@ export function markup() {
     <circle class="agent-think" cx="346" cy="113" r="2.8" fill="#0052FF"/>
     <circle class="agent-think" cx="358" cy="113" r="2.8" fill="#0052FF" style="animation-delay:.4s"/>
     <circle class="agent-think" cx="370" cy="113" r="2.8" fill="#0052FF" style="animation-delay:.8s"/>
-    <text x="358" y="139" text-anchor="middle" font-size="8.5" fill="rgba(0,82,255,0.4)">claude</text>
+    <text x="358" y="139" text-anchor="middle" font-size="8.5" fill="rgba(0,82,255,0.4)" class="agent-brain" data-live="gemini · hermes">claude</text>
     ${output(35, ['Email Draft', 'Voice reply'], '#22c55e')}
     ${output(73, ['CRM Update', 'On screen'], '#f59e0b', 'animation-duration:1.9s')}
     ${output(111, ['Report Gen', 'Journal'], '#f59e0b', 'animation-duration:2.2s;animation-delay:.35s')}
@@ -120,7 +120,7 @@ export function markup() {
     <div><small data-live="RUNS">WORKFLOWS</small><b class="agent-count"></b></div>
     <div><small data-live="LAST">TOKENS</small><b class="agent-last">4.2M</b></div>
     <div><small>AVG LATENCY</small><b class="agent-latency">342ms</b></div>
-    <div class="agent-stack"><small>STACK</small><em data-live="Claude · agents.py">Claude · Pinecone</em></div>
+    <div class="agent-stack"><small>STACK</small><em data-live="Gemini · lyla.py">Claude · Pinecone</em></div>
   </div>`;
 }
 
@@ -145,6 +145,8 @@ export class LylaAgent {
     this.last = root.querySelector('.agent-last');
     this.latency = root.querySelector('.agent-latency');
     this.meta = root.querySelector('.agent-meta');
+    this.stack = root.querySelector('.agent-stack em');
+    this.brain = root.querySelector('.agent-brain');
     this.line.textContent = MESSAGES[this.message];
     this.count.textContent = count(this.workflows);
   }
@@ -174,20 +176,27 @@ export class LylaAgent {
     this.jobs = [];
   }
 
-  /* A run of hers, as it happens: `stage` is received (with what you
-   * said), asking, done (with the reply and how many ms it took) or error
-   * (with what went wrong). */
+  /* A run of hers, as it happens: `stage` is received (with the job, and
+   * `by` Apollo when he handed it to her), step (what she is reading),
+   * asking (she is thinking it through), done (with the answer, how many ms
+   * it took and the `brain` that gave it) or error (with what went wrong). */
   live(event) {
-    const { stage, text = '', ms = 0 } = event || {};
+    const { stage, text = '', ms = 0, by = '', brain = '' } = event || {};
     if (!this.isLive) this.goLive();
     if (stage === 'received') {
       this.runs += 1;
       this.count.textContent = count(this.runs);
       this.outputs('wait');
-      this.say(`Received: "${short(text, 60)}"`);
+      this.say(by ? `From ${by}: "${short(text, 56)}"` : `Received: "${short(text, 60)}"`);
+    } else if (stage === 'step') {
+      this.say(`${short(text, 70)}…`);
     } else if (stage === 'asking') {
-      this.say('Routed to LYLA - called by name. Asking Claude…');
+      this.say(text ? `${short(text, 60)}…` : 'Routed to LYLA - called by name. Asking Claude…');
     } else if (stage === 'done') {
+      if (brain) {
+        this.stack.textContent = `${brain} · lyla.py`;
+        this.brain.textContent = brain.toLowerCase();
+      }
       const took = Math.round(Number(ms) || 0);
       this.times.push(took);
       const average = this.times.reduce((a, b) => a + b, 0) / this.times.length;

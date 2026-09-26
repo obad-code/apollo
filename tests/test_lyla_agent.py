@@ -237,3 +237,23 @@ def test_live_it_reopens_without_the_demo(tmp_path):
         agent.hide(); agent.show();
         return clock.jobs.size;""")
     assert jobs == 0
+
+
+def test_a_job_from_apollo_shows_each_step_and_her_brain(tmp_path):
+    lines = run(tmp_path, LIVE + """
+        const said = [];
+        agent.live({ stage: 'received', text: 'analyse nvidia', by: 'Apollo' });
+        clock.advance(300); said.push(line());
+        agent.live({ stage: 'step', text: 'Reading NVDA: the trading desk' });
+        clock.advance(300); said.push(line());
+        agent.live({ stage: 'asking', text: 'Writing it up' });
+        clock.advance(300); said.push(line());
+        agent.live({ stage: 'done', text: 'NVDA is bid.', ms: 5100, brain: 'Gemini' });
+        clock.advance(300); said.push(line());
+        said.push(root.querySelector('.agent-stack em').textContent);
+        return said;""")
+    assert lines[0] == 'From Apollo: "analyse nvidia"'
+    assert lines[1] == "Reading NVDA: the trading desk…"
+    assert lines[2] == "Writing it up…"
+    assert lines[3] == "Done in 5100 ms: NVDA is bid."
+    assert lines[4] == "Gemini · lyla.py"

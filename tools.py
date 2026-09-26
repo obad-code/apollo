@@ -255,6 +255,7 @@ import clips  # noqa: E402
 import displays  # noqa: E402
 import feeds  # noqa: E402
 import live  # noqa: E402
+import lyla  # noqa: E402
 import market  # noqa: E402
 import overlay_content  # noqa: E402
 import panels  # noqa: E402
@@ -620,6 +621,49 @@ def _trading_read(ctx):
             "filings": [{"company": f["company"], "ticker": f["ticker"],
                          "what": [i["label"] for i in f["items"]]} for f in board["filings"][:5]],
             "headlines": [n["title"] for n in board["news"][:5]]}
+
+
+@_tool("ask_lyla", "handing it to LYLA",
+       "Hand a research job to LYLA, Apollo's research agent, who works on it in "
+       "the background while you and the user carry on. Use this whenever the "
+       "user asks for an analysis, a deep look or research that takes more than "
+       "a quick lookup - above all an analysis of a stock: \"حلل لي سهم انفيديا\", "
+       "\"ابي تحليل عن تسلا\", \"analyse AMD for me\", \"research the best "
+       "budget GPUs\". It returns at once. Tell the user in one short sentence "
+       "that LYLA is on it, and do not do the research yourself; you will be "
+       "told what she found when she is done, and pass it on then. Pass the "
+       "job in the user's words, and for a stock, the company or ticker.",
+       _obj({"task": _str("The job, in the user's words"),
+             "stock": _str("The company or ticker, when the job is about one stock")},
+            ("task",)))
+def _ask_lyla(ctx, task="", stock=""):
+    taken = lyla.DESK.take(task, stock)
+    ahead = taken["ahead"]
+    return {"ok": True, "job": taken["job"],
+            "result": ("LYLA is on it now." if not ahead else
+                       f"LYLA has it; {ahead} job{'s' if ahead > 1 else ''} ahead of it."),
+            "note": "She reports back when she is done. Carry on with the user meanwhile."}
+
+
+@_tool("lyla_findings", "reading LYLA's report",
+       "What LYLA found in her latest research jobs: the job, her two-line "
+       "summary, and her full report for the one asked about (1 is the most "
+       "recent). Use this when the user asks what LYLA found, for more detail "
+       "on her report, or whether she is still working on something.",
+       _obj({"number": {"type": "integer", "description": "Which report, 1 the latest"}}))
+def _lyla_findings(ctx, number=1):
+    desk = lyla.DESK
+    working = desk.current
+    reports = desk.reports
+    out = {"ok": True, "working_on": working["task"] if working else None,
+           "waiting": desk.waiting,
+           "reports": [{"number": i + 1, "task": r["task"], "stock": r.get("symbol", ""),
+                        "summary": r["summary"]} for i, r in enumerate(reports[:5])]}
+    if 1 <= number <= len(reports):
+        out["report"] = reports[number - 1]["report"]
+    elif not reports:
+        out["result"] = "LYLA has not finished a job yet."
+    return out
 
 
 # What "put everything back" sounds like: every display back in the grid.
