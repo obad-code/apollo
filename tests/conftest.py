@@ -80,3 +80,11 @@ def private_issues(tmp_path, monkeypatch):
     monkeypatch.setattr(issues, "PATH", str(tmp_path / "issues.json"))
     monkeypatch.setattr(issues, "_listener", None)
     monkeypatch.setattr(diagnostics, "SEEN_PATH", str(tmp_path / "diagnostics.json"))
+
+
+@pytest.fixture(autouse=True)
+def no_world_fetch(monkeypatch):
+    """OSIRIS mode's panel reads the USGS and Google News; no test should."""
+    import world
+    monkeypatch.setattr(world, "quakes", lambda limit=world.QUAKES: [])
+    monkeypatch.setattr(world, "headlines", lambda limit=world.HEADLINES: [])

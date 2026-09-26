@@ -999,12 +999,34 @@ body.osiris-map #stage {
   grid-template-columns: 30% 1fr;
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
-    "clock   osiris"
-    "markets osiris"
-    "status  eye";
+    "clock osiris"
+    "world osiris"
+    "world osiris";
   padding-bottom: var(--dock-room);
 }
 body.osiris-map #osiris { display: flex; }
+/* Only what belongs with a map: the world panel takes the stocks' and the
+   meters' place, and the scanner steps aside. */
+body.osiris-map #markets, body.osiris-map #status-block, body.osiris-map #scan-block { display: none; }
+#world { display: none; grid-area: world; flex-direction: column; gap: 6px; min-height: 0; }
+body.osiris-map:not(.ultra) #world { display: flex; }
+.world-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.world-head b { font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--accent); }
+#world h3 { margin-top: 10px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+            color: var(--caption); }
+.world-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; min-height: 0;
+              overflow: hidden; }
+#world-news { flex: 1; }
+.world-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 2px; font-size: 13px; line-height: 1.4;
+             border-bottom: 1px solid rgba(212, 175, 55, .08); }
+.world-row.link { cursor: pointer; }
+.world-row.link:hover { background: rgba(0, 229, 255, .06); }
+.world-row .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.world-row em { flex: none; font-style: normal; font-size: 11px; color: var(--caption); }
+.world-row .mag { flex: none; min-width: 42px; font-size: 12px; font-weight: 700; color: var(--amber-bright); }
+.world-row .mag.big { color: var(--down); }
+.world-empty { padding: 7px 2px; font-size: 12px; color: var(--caption); }
+#world-layers { font-size: 12px; line-height: 1.6; color: var(--you); }
 body.osiris-map #core, body.osiris-map #headlines, body.osiris-map #lyla-block,
 body.osiris-map #answer { display: none; }
 body.osiris-map #lyla { opacity: 0; }

@@ -43,6 +43,8 @@ UNTRUSTED = re.compile(
     r"|trade\.(?:name|date)"
     # What Apollo found wrong with itself: exception text, paths, file names.
     r"|issue\.(?:title|detail|key)"
+    # OSIRIS mode's world panel: the USGS's words and the headlines'.
+    r"|quake\.(?:place|link|mag|when)"
     r"|market\.status"
     r"|weather\.text"
     r"|system\.gpu_name"

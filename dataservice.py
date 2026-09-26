@@ -26,6 +26,7 @@ import trading
 import usage
 import watchlist
 import weather
+import world
 
 log = logging.getLogger("apollo.data")
 
@@ -37,7 +38,7 @@ INTERVALS = {"market": 60, "news": 600, "posts": 300, "weather": 900, "system": 
              "prayer": 300,
              "finds": 60,
              "talks": 15, "projects": 300, "ideas": 15, "insiders": 21600,
-             "trading": 600}
+             "trading": 600, "world": 600}
 # Trading mode's board is only read while it is wanted: this long after the
 # page last asked for it (it asks again while trading mode stays up).
 TRADING_FOR = 1800
@@ -53,6 +54,8 @@ class DataService:
                          "projects": {"sessions": [], "folders": [], "repos": []},
                          "ideas": {"ideas": [], "reminders": []}, "insiders": {},
                          "trading": {},
+                         # OSIRIS mode's own panel: the world's news and quakes.
+                         "world": {"news": [], "quakes": []},
                          "updated": 0.0,
                          # When each reader last came back with something. A
                          # reader that fails keeps its last good value, and the
@@ -191,6 +194,18 @@ class DataService:
         kept = dict(self.snapshot["news"])
         kept.update({topic: stories for topic, stories in fresh.items() if stories})
         self.snapshot["news"] = kept
+        return True
+
+    def _read_world(self):
+        news, quakes = world.headlines(), world.quakes()
+        if not news and not quakes:
+            return False
+        kept = dict(self.snapshot["world"])
+        if news:
+            kept["news"] = news
+        if quakes:
+            kept["quakes"] = quakes
+        self.snapshot["world"] = kept
         return True
 
     def _read_posts(self):

@@ -636,6 +636,11 @@ function tickClock() {
   $('seconds').textContent = ':' + String(now.getSeconds()).padStart(2, '0');
   $('date').textContent = now.toLocaleDateString('en-GB',
     { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  // The map's time, beside the map.
+  if (state.osiris) {
+    $('world-utc').textContent = `${String(now.getUTCHours()).padStart(2, '0')}:`
+      + `${String(now.getUTCMinutes()).padStart(2, '0')} UTC`;
+  }
 }
 setInterval(tickClock, 250);
 tickClock();
@@ -2059,8 +2064,49 @@ function render(snapshot) {
   renderSystem(snapshot);
   renderSummaries();
   renderTrading(snapshot.trading);
+  renderWorld(snapshot.world);
   enter();
 }
+
+/* --- the world, beside OSIRIS -------------------------------------------------------
+ * OSIRIS mode shows only what belongs with a map (world.py): the day's
+ * strongest earthquakes, the world's headlines, and the map's own layers. */
+
+const LAYER_NAMES = { cctv_previews: 'CCTV previews', live_news: 'live news', day_night: 'day and night',
+                      global_incidents: 'incidents', sdk_sea: 'sea traffic', sdk_air: 'air traffic',
+                      sdk_naval: 'naval', cctv: 'CCTV' };
+
+function renderWorld(world) {
+  if (!world) return;
+  const quakes = world.quakes || [];
+  const news = world.news || [];
+  $('world-quakes').innerHTML = quakes.map((quake) => `
+    <li class="world-row${quake.link ? ' link' : ''}" data-link="${esc(quake.link)}">
+      <b class="mag${Number(quake.mag) >= 6 ? ' big' : ''}">M${esc((Number(quake.mag) || 0).toFixed(1))}</b>
+      <span class="grow">${esc(quake.place)}</span><em>${esc(ago(quake.when))}</em></li>`).join('')
+    || '<li class="world-empty">No strong earthquakes today.</li>';
+  $('world-news').innerHTML = news.map((story) => `
+    <li class="world-row${story.link ? ' link' : ''}" data-link="${esc(story.link)}">
+      <span class="grow">${esc(story.title)}</span><em>${esc(story.source)}</em></li>`).join('')
+    || '<li class="world-empty">The world\'s news is not in yet.</li>';
+  renderWorldLayers();
+}
+
+function renderWorldLayers() {
+  const layers = (state.layout && state.layout.layers) || [];
+  $('world-layers').textContent = layers.length
+    ? layers.map((layer) => LAYER_NAMES[layer] || layer.replace(/_/g, ' ')).join(' · ')
+    : 'No layers on';
+}
+
+$('world').addEventListener('click', (event) => {
+  const row = event.target.closest('[data-link]');
+  const api = bridge();
+  if (row && row.dataset.link && api && api.open_link) {
+    sfx.play('open');
+    api.open_link(row.dataset.link);
+  }
+});
 
 /* --- trading mode ------------------------------------------------------------------
  *
@@ -2667,6 +2713,7 @@ for (const [id, tile] of Object.entries(TILE_OF)) {
  * display's own grid places the same blocks by id. */
 function applyLayout() {
   const layout = state.layout;
+  renderWorldLayers();                   // the map's layers, beside it
   const ultra = ultraOn();
   const focusing = ultra && Boolean(layout.focus);
   document.body.classList.toggle('focusing', focusing);

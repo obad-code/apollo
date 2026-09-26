@@ -168,6 +168,19 @@
     </div>
   </section>
 
+  <!-- OSIRIS mode's own panel, in place of the stocks and the machine's
+       meters: the world beside the map - the time on it, the day's
+       strongest earthquakes, the world's headlines and the map's layers. -->
+  <section id="world" class="panel" aria-label="The world">
+    <h2 class="world-head"><span>World</span><b id="world-utc">--:-- UTC</b></h2>
+    <h3>Earthquakes · last 24 hours</h3>
+    <ul id="world-quakes" class="world-list"></ul>
+    <h3>Headlines</h3>
+    <ul id="world-news" class="world-list"></ul>
+    <h3>On the map</h3>
+    <p id="world-layers"></p>
+  </section>
+
   <!-- Ultra mode's own displays: the side panel's tabs, each a display of
        its own. Their lists move in here while ultra mode is on, and back
        into the side panel after. -->
