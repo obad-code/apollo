@@ -201,6 +201,11 @@ def _beside(path):
     return f"{stem}-{os.getpid()}{ext}"
 
 
+# A replay buffer that died with you here is tried again after this long,
+# twice as long each time it dies again, up to half an hour.
+CLIPS_RETRY = 60
+CLIPS_RETRY_MOST = 30 * 60
+
 CRASH_PATH = os.path.join(os.path.dirname(LOG_PATH), "crash.log")
 
 
@@ -1246,14 +1251,17 @@ class Apollo:
     # -- lifecycle ----------------------------------------------------------
 
     def toggle_clips(self):
-        """Tray: stop or restart the replay buffer. True if it is recording."""
+        """Tray: pause or resume the replay buffer. True if it is recording.
+        Paused here, it stays paused - `keep_clips` does not bring it back."""
         if self.clips is None:
             return False
-        if self.clips.running:
+        self.clips_wanted = not self.clips.running
+        if self.clips_wanted:
+            self._clips_paused = False
+            self.clips.start()
+        else:
             self.clips.stop()
-            return False
-        self.clips.start()
-        return True
+        return self.clips_wanted
 
     def on_shown(self):
         """Only the tray. The window is deliberately left completely alone.
@@ -1855,20 +1863,9 @@ class Apollo:
         # Locking the PC is asking for idle mode: once per lock, so waking it
         # on the lock screen does not put it straight back to sleep.
         locked = pc_locked()
-        was_locked = getattr(self, "_was_locked", False)
-        recorder = getattr(self, "clips", None)
-        if locked and not was_locked:
+        if locked and not getattr(self, "_was_locked", False):
             log.info("the PC was locked: idle mode")
             self.request_idle()
-            # Windows allows no screen capture while it is locked, so the
-            # replay buffer dies on the lock screen; whether it was recording
-            # going in is whether it comes back on the way out.
-            self._clips_at_lock = recorder is not None and recorder.running
-        if was_locked and not locked and getattr(self, "_clips_at_lock", False):
-            self._clips_at_lock = False
-            if recorder is not None and not recorder.running:
-                log.info("unlocked: the replay buffer is recording again")
-                recorder.start()
         self._was_locked = locked
         # Away mode (away.py): out by what you say - once the answer is over,
         # or Apollo's own voice would count as you being here - and back at a
@@ -1898,8 +1895,46 @@ class Apollo:
                 and screen_busy())
         if self.presence.check(idle, now=now, screen_busy=busy):
             self.apply_mode()
+        self.keep_clips(now, locked)
         self.check_briefing(idle)
         self.check_prayer()
+
+    def keep_clips(self, now, locked):
+        """The replay buffer records while you are here to be recorded.
+
+        It is the heaviest thing Apollo does - the whole screen captured and
+        encoded thirty times a second, most of a core - and it ran day and
+        night: asleep, with Apollo's own display over the screen, it was
+        recording Apollo's display. So it is paused while Apollo is asleep or
+        the PC is locked (where Windows allows no capture anyway, and it used
+        to die and stay dead), and back the moment you are - unless you
+        paused it yourself from the tray. One that dies with you here is tried
+        again, a minute later, then less and less often if it keeps dying.
+        """
+        recorder = getattr(self, "clips", None)
+        if recorder is None:
+            return
+        wanted = getattr(self, "clips_wanted", True)
+        if not (wanted and not locked and not self.presence.asleep):
+            if recorder.running:
+                recorder.stop()
+            self._clips_paused = wanted
+            return
+        if recorder.running:
+            return
+        if getattr(self, "_clips_paused", False):
+            self._clips_paused = False
+            self._clips_retry = CLIPS_RETRY
+        else:
+            last = getattr(self, "_clips_started", None)
+            retry = getattr(self, "_clips_retry", CLIPS_RETRY)
+            if last is not None and now - last < retry:
+                return
+            if last is not None:
+                self._clips_retry = min(retry * 2, CLIPS_RETRY_MOST)
+            log.info("the replay buffer had stopped; recording again")
+        self._clips_started = now
+        recorder.start()
 
     def check_overlay_alive(self):
         """Keep the window the shape it is supposed to be.

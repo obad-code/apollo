@@ -61,6 +61,7 @@ import sounddevice as sd
 from google import genai
 from google.genai import types
 
+import agents
 import interests
 
 log = logging.getLogger("apollo.gemini")
@@ -112,9 +113,9 @@ REPLY_TIMEOUT = 60       # ...and for one spoken answer to finish
 SYSTEM_INSTRUCTION = (
     "You are Apollo, a voice assistant running on the user's own Windows PC, "
     "answering out loud.\n\n"
-    "Language: reply in the language the user just spoke. If they speak Arabic, "
-    "answer in Arabic in their dialect (they are Saudi); if English, in English. "
-    "Keep numbers as digits.\n\n"
+    "Language: the user speaks only Arabic or English. Reply in the one they just "
+    "spoke: Arabic in their dialect (they are Saudi), or English. Never reply in "
+    "any other language, whatever you think you heard. Keep numbers as digits.\n\n"
     "Length: one or two sentences unless they ask for detail. No markdown, lists "
     "or emoji. Never read out a URL.\n\n"
     "Character: optimistic, game for a challenge, firm - lead with the move, "
@@ -139,6 +140,27 @@ SYSTEM_INSTRUCTION = (
     "Safety: sleep, restart, shut down and sign out need the user's explicit yes. "
     "Ask first; call system_power with confirmed=true only after they say yes."
 )
+
+
+# What you speak, as the transcription is told it (BCP-47).
+LANGUAGES = ("ar-SA", "en-US")
+# Names it would otherwise spell as it pleased - and the agents are routed on
+# the transcript by name, so a misspelt one is a summons missed.
+VOCABULARY = ("Apollo", "LYLA", "OSIRIS", "Private Eye", "TradingView", *agents.NAMES)
+
+_ARABIC = ((0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF), (0xFB50, 0xFDFF), (0xFE70, 0xFEFF))
+
+
+def foreign(text):
+    """True if a transcript is written in neither Arabic nor Latin letters -
+    the transcription wandering into another language, not you speaking.
+    Text with no letters at all (digits, punctuation) is not judged."""
+    letters = [c for c in str(text or "") if c.isalpha()]
+    if not letters:
+        return False
+    ours = sum(1 for c in letters
+               if ord(c) < 0x250 or any(low <= ord(c) <= high for low, high in _ARABIC))
+    return ours * 2 < len(letters)
 
 
 def system_instruction(now=None):
@@ -188,7 +210,11 @@ def _config(auto_vad=False, tools=None, instruction=None):
         # Your words, transcribed by the model, in both modes: this is Apollo's
         # transcript of you now - the live line on screen and the agent-name
         # routing - and unlike the local Whisper it had, it understands Arabic.
-        input_audio_transcription=types.AudioTranscriptionConfig(),
+        # Arabic and English only: left to detect the language itself, it
+        # heard Telugu and Thai in Arabic speech and in the room's noise. The
+        # names you call things by are its vocabulary, so they come out right.
+        input_audio_transcription=types.AudioTranscriptionConfig(
+            language_codes=list(LANGUAGES), custom_vocabulary=list(VOCABULARY)),
         # Apollo's tools, and Google Search for anything current.
         tools=([types.Tool(function_declarations=list(tools))] if tools else [])
               + [types.Tool(google_search=types.GoogleSearch())],
@@ -916,6 +942,9 @@ class LiveSession:
 
     def _note_heard(self, text):
         """Your own words, as the model transcribes them - both modes now."""
+        if foreign(text):
+            log.debug("transcript in another script, not taken: %r", text)
+            return
         first = not self._heard
         self._heard.append(text)
         self._last_heard = time.monotonic()
