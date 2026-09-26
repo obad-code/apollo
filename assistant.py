@@ -35,7 +35,6 @@ import keyboard
 import numpy as np
 import pyttsx3
 import sounddevice as sd
-from faster_whisper import WhisperModel
 
 import agents
 import briefing
@@ -1461,39 +1460,57 @@ def check_api():
         raise RuntimeError(api_error_detail(e))
 
 
+def _whisper_model(size):
+    """faster-whisper, imported only here: the import alone - CTranslate2 and
+    ONNX Runtime - reserves some 400 MB, and the model another 2 GB."""
+    from faster_whisper import WhisperModel
+    return WhisperModel(size, device="cpu", compute_type="int8")
+
+
 class WhisperBackup:
-    """Whisper, loaded in the background, for the rare turn Gemini missed.
+    """Whisper, for the rare turn Gemini missed - loaded when first needed.
 
     Gemini's own transcript is Apollo's transcript now (it streams while you
     hold the chord, and it understands Arabic). Whisper stays as the backup
-    for a turn where that transcript never arrives, so it must not delay
-    startup: the model loads on a thread of its own, the first run
-    downloading it, and a transcription asked for before it is ready waits
-    up to 20 s and then returns nothing.
+    for a turn where that transcript never arrives, or for when the voice
+    service is down. It used to load at every start, and was most of
+    Apollo's memory for something most days never use; now the first
+    transcription asked of it starts the load (on a thread of its own, the
+    first run downloading it) and waits up to 20 s for it, and every one
+    after uses the model it loaded.
     """
 
     def __init__(self, size=None):
+        self._size = size or WHISPER_SIZE
         self._model = None
         self._ready = threading.Event()
-        threading.Thread(target=self._load, args=(size or WHISPER_SIZE,),
-                         daemon=True, name="whisper-load").start()
+        self._loading = None
+        self._lock = threading.Lock()
 
-    def _load(self, size):
+    def _start(self):
+        with self._lock:
+            if self._loading is None:
+                self._loading = threading.Thread(target=self._load, daemon=True,
+                                                 name="whisper-load")
+                self._loading.start()
+
+    def _load(self):
         try:
-            self._model = WhisperModel(size, device="cpu", compute_type="int8")
+            self._model = _whisper_model(self._size)
         except Exception:
             self._model = None
         finally:
             self._ready.set()
 
     def transcribe(self, audio, **kw):
+        self._start()
         if not self._ready.wait(timeout=20) or self._model is None:
             return iter(()), None
         return self._model.transcribe(audio, **kw)
 
 
 def load_whisper():
-    """The backup transcriber. Returns at once; the model loads behind it."""
+    """The backup transcriber. Nothing is loaded until it is first used."""
     return WhisperBackup()
 
 
@@ -1508,6 +1525,12 @@ def greet(ui):
         speak(GREETING)
     finally:
         ui.status(IDLE)
+
+
+# A voice session that would not open is tried again this long after, twice
+# as long each time it fails again, up to a minute (see run_loop).
+VOICE_RETRY = 5
+VOICE_RETRY_MOST = 60
 
 
 class Voice:
@@ -1609,6 +1632,7 @@ class Voice:
             try:
                 live.start()
             except RuntimeError as e:
+                log.warning("voice session did not open: %s", e)
                 self.ui.note(f"Gemini Live unavailable.\n  {e}")
                 live.close()
                 return False
@@ -1987,6 +2011,8 @@ def run_loop(ui, whisper, stop=None, esc_quits=False, voice=None, toggle=None):
     # back off the session, so that a failed connection does not leave the
     # loop retrying every fiftieth of a second forever.
     applied = voice.auto_vad if voice is not None else False
+    # When to try again for a session that would not open - see below.
+    retry_at, retry_wait = None, VOICE_RETRY
 
     while stop is None or not stop():
         if esc_quits and keyboard.is_pressed("esc"):
@@ -2018,6 +2044,25 @@ def run_loop(ui, whisper, stop=None, esc_quits=False, voice=None, toggle=None):
             # key. IDLE puts it back exactly where it was before.
             ui.status(LISTENING if want else IDLE)
             continue
+
+        # A session that would not open - no network, or no audio device (a
+        # monitor's speakers vanish while it sleeps) - is tried again, less
+        # often each time it fails. Left as None it was never tried again,
+        # and Apollo stayed deaf until he was restarted.
+        if voice.live is None and not voice.busy and gemini_live.available():
+            now = time.monotonic()
+            if retry_at is None:
+                retry_at = now + retry_wait
+            elif now >= retry_at:
+                if voice.open(applied):
+                    log.info("voice session back")
+                    retry_at, retry_wait = None, VOICE_RETRY
+                    ui.status(LISTENING if applied else IDLE)
+                    continue
+                retry_wait = min(retry_wait * 2, VOICE_RETRY_MOST)
+                retry_at = now + retry_wait
+        else:
+            retry_at, retry_wait = None, VOICE_RETRY
 
         if voice.busy:
             time.sleep(0.05)   # a reconnect is under way; the mic is nobody's
