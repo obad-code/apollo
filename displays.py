@@ -30,10 +30,11 @@ MIN_W = 2
 
 # The order they are packed in by default (tiles.DISPLAYS), each with its
 # columns and rows.
-ORDER = ("today", "osiris", "feed", "markets", "projects", "ideas", "core", "system", "talks")
+ORDER = ("today", "osiris", "feed", "markets", "projects", "ideas", "core", "system", "talks",
+         "scan")
 SPANS = {"today": (3, 4), "osiris": (6, 8), "feed": (3, 8), "markets": (3, 8),
          "projects": (2, 4), "ideas": (2, 4), "core": (2, 4), "system": (3, 4),
-         "talks": (3, 4)}
+         "talks": (3, 4), "scan": (3, 4)}
 
 # osiris.LAYERS, each one a switch in the map's settings.
 LAYERS = ("maritime", "cctv", "cctv_previews", "live_news", "earthquakes",
@@ -42,7 +43,7 @@ LAYERS = ("maritime", "cctv", "cctv_previews", "live_news", "earthquakes",
 # What Apollo calls each one when it talks about it.
 NAMES = {"today": "today", "osiris": "OSIRIS", "feed": "the feed", "markets": "the stocks",
          "projects": "projects", "ideas": "ideas", "core": "Apollo",
-         "system": "the system", "talks": "talks"}
+         "system": "the system", "talks": "talks", "scan": "the scanner"}
 
 # id -> every word that should find it.
 WORDS = {
@@ -64,6 +65,7 @@ WORDS = {
                "الحالة", "جيميني", "كلود"),
     "talks": ("talks", "conversations", "history", "chats", "المحادثات", "محادثات",
               "السوالف"),
+    "scan": ("scanner", "scan", "file scanner", "الفاحص", "فحص الملفات", "الماسح"),
 }
 
 # Apollo's own name finds Apollo's display only when it is all that was said:
@@ -76,7 +78,7 @@ _lock = threading.Lock()
 
 def default():
     """The layout with nothing saved: every cell of the screen used once."""
-    items = {d: {"shown": d != "talks", "w": SPANS[d][0], "h": SPANS[d][1], "min": False}
+    items = {d: {"shown": d not in ("talks", "scan"), "w": SPANS[d][0], "h": SPANS[d][1], "min": False}
              for d in ORDER}
     return {"ultra": False, "focus": None, "order": list(ORDER), "items": items,
             "layers": list(LAYERS), "folded": False, "feedFolded": False}

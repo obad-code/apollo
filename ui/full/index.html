@@ -123,6 +123,16 @@
     <article id="story" aria-hidden="true"></article>
   </section>
 
+  <!-- Under the feed: the scanner. Drop a file anywhere on the display and
+       it is read - never run, never opened - and judged here (scanner.py).
+       A display of its own in ultra mode. -->
+  <section id="scan-block" class="panel" data-display="scan" aria-label="File scanner">
+    <header class="scan-head"><svg class="scan-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3M4 8h8"/></svg><b>Scanner</b><span id="scan-hint">Drop a file anywhere to scan it</span>
+      <button id="scan-close" type="button" data-sfx="none" title="Put the report away">✕</button>
+    </header>
+    <div id="scan-body"></div>
+  </section>
+
   <section id="core" data-display="core">
     <!-- Apollo: a wireframe globe with a star of light at its heart, on its
          canvas, and a warm glow behind it lifting the colour of the ground
@@ -261,6 +271,10 @@
      stocks. Outside the panels, so a panel's rounded clip does not cut them
      off. -->
 <div id="peek" class="peek" aria-hidden="true"></div>
+<!-- A file carried over the display: where to let go of it. -->
+<div id="drop-zone" aria-hidden="true">
+  <div class="drop-card"><svg class="scan-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3M4 8h8"/></svg><b>Drop to scan</b><span>Read and checked - never opened or run</span></div>
+</div>
 <div id="chart-peek" class="peek" aria-hidden="true"></div>
 
 <!-- Along the bottom edge: every mode, the one that is on lit - the

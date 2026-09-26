@@ -17,11 +17,12 @@ export const MIN_W = 2;            // narrower than two columns is not a display
 // grid packs them in: the map in the middle, the markets and the feed
 // either side of it, and the work along the bottom.
 export const DISPLAYS = ['today', 'osiris', 'feed', 'markets', 'projects', 'ideas',
-                         'core', 'system', 'talks'];
+                         'core', 'system', 'talks', 'scan'];
 
 export const NAMES = {
   today: 'Today', osiris: 'OSIRIS', feed: 'Feed', markets: 'Markets',
   projects: 'Projects', ideas: 'Ideas', core: 'Apollo', system: 'System', talks: 'Talks',
+  scan: 'Scanner',
 };
 
 // Sizes by name, smallest first: columns by rows.
@@ -34,16 +35,17 @@ export const LAYERS = ['maritime', 'cctv', 'cctv_previews', 'live_news', 'earthq
 
 const SPANS = {
   today: [3, 4], osiris: [6, 8], feed: [3, 8], markets: [3, 8], projects: [2, 4],
-  ideas: [2, 4], core: [2, 4], system: [3, 4], talks: [3, 4],
+  ideas: [2, 4], core: [2, 4], system: [3, 4], talks: [3, 4], scan: [3, 4],
 };
 
 export function defaultLayout() {
   const items = {};
   for (const id of DISPLAYS) {
     const [w, h] = SPANS[id];
-    // Talks is kept back: the record of what was said matters less to a
-    // morning's work than the rest, and the screen is full without it.
-    items[id] = { shown: id !== 'talks', w, h, min: false };
+    // Talks and the scanner are kept back: the record of what was said
+    // matters less to a morning's work than the rest, the scanner shows
+    // itself when a file is dropped, and the screen is full without them.
+    items[id] = { shown: id !== 'talks' && id !== 'scan', w, h, min: false };
   }
   return { ultra: false, focus: null, order: [...DISPLAYS], items, layers: [...LAYERS],
            folded: false, feedFolded: false };
@@ -306,6 +308,14 @@ export function summary(id, snapshot, extra = {}) {
     }
     case 'core':
       return PHASES[extra.phase] || PHASES.idle;
+    case 'scan': {
+      const scan = isObject(extra.scan) ? extra.scan : null;
+      if (!scan) return 'Drop a file anywhere to scan it';
+      if (scan.state === 'scanning' || scan.state === 'step') return `Scanning ${cut(String(scan.name || ''), 40)}`;
+      const report = isObject(scan.report) ? scan.report : {};
+      const said = { clean: 'Clean', caution: 'Careful', danger: 'Danger', error: 'Could not scan' };
+      return `${said[report.verdict] || 'Scanned'} · ${cut(String(report.name || scan.name || ''), 50)}`;
+    }
     default:
       return '';
   }

@@ -2068,11 +2068,136 @@ function render(snapshot) {
   enter();
 }
 
+/* --- the scanner ----------------------------------------------------------------------
+ * A file dropped anywhere on the display goes to apollo.py - its path comes
+ * with pywebview's drop event - and is scanned there (scanner.py). This page
+ * shows the file coming, the steps, and the report: under the feed, as a
+ * display of its own in ultra mode, or floating over a view that has no room
+ * for it (clear, trading, agents, OSIRIS). */
+
+const VERDICTS = { clean: 'Clean', caution: 'Careful', danger: 'Danger', error: 'Could not scan' };
+const sizeOf = (n) => (n >= 2 ** 30 ? `${(n / 2 ** 30).toFixed(1)} GB` : n >= 2 ** 20
+  ? `${(n / 2 ** 20).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} bytes`);
+
+let dragDepth = 0;
+const carriesFiles = (event) => Boolean(event.dataTransfer)
+  && [...(event.dataTransfer.types || [])].includes('Files');
+document.addEventListener('dragenter', (event) => {
+  if (!carriesFiles(event)) return;
+  event.preventDefault();
+  dragDepth += 1;
+  if (dragDepth === 1) { document.body.classList.add('dropping'); sfx.play('show'); }
+});
+document.addEventListener('dragover', (event) => {
+  if (!carriesFiles(event)) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+});
+document.addEventListener('dragleave', (event) => {
+  if (!carriesFiles(event)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) { document.body.classList.remove('dropping'); sfx.play('hide'); }
+});
+document.addEventListener('drop', (event) => {
+  event.preventDefault();            // a file is never opened in place of the page
+  const had = dragDepth > 0 || carriesFiles(event);
+  dragDepth = 0;
+  document.body.classList.remove('dropping');
+  if (had) sfx.play('drop');
+});
+
+function openScan() {
+  document.body.classList.add('scan-open');
+  if (ultraOn()) {
+    document.body.classList.remove('scan-float');
+    revealDisplay('scan');
+  } else {
+    document.body.classList.toggle('scan-float', state.view !== 'normal' || Boolean(state.osiris));
+  }
+}
+
+function closeScan() {
+  if (!document.body.classList.contains('scan-open')) return;
+  sfx.play('close');
+  document.body.classList.remove('scan-open', 'scan-float');
+}
+$('scan-close').addEventListener('click', closeScan);
+
+function onScan(event) {
+  if (!event) return;
+  if (event.state === 'scanning') {
+    state.scan = { state: 'scanning', name: String(event.name || ''), steps: [] };
+    sfx.play('scan');
+    openScan();
+  } else if (event.state === 'step') {
+    if (state.scan && state.scan.state === 'scanning') state.scan.steps.push(String(event.text || ''));
+  } else if (event.state === 'done') {
+    state.scan = { state: 'done', name: String(event.name || ''), report: event.report || {} };
+    sfx.play(state.scan.report.verdict === 'clean' ? 'clean' : 'alert');
+  } else if (event.state === 'error') {
+    state.scan = { state: 'done', name: String(event.name || ''),
+                   report: { verdict: 'error', headline: String(event.text || ''), findings: [] } };
+    sfx.play('fault');
+    openScan();
+  }
+  renderScan();
+  renderSummaries();
+}
+
+function renderScan() {
+  const scan = state.scan;
+  const body = $('scan-body');
+  $('scan-block').dataset.verdict = !scan ? '' : scan.state === 'done' ? (scan.report.verdict || '') : 'scanning';
+  if (!scan) { body.innerHTML = ''; return; }
+  if (scan.state === 'scanning') {
+    body.innerHTML = `
+      <p class="scan-file">${esc(scan.name)}</p>
+      <div class="scan-sweep"><i></i></div>
+      <ul class="scan-steps">${scan.steps.map((text) => `<li>${esc(text)}…</li>`).join('')}</ul>`;
+    return;
+  }
+  const report = scan.report || {};
+  const findings = report.findings || [];
+  const defender = report.defender || {};
+  const facts = [];
+  if (report.verdict !== 'error') {
+    facts.push(['Defender', defender.ran ? (defender.clean ? 'No threats found' : esc(defender.threat))
+                                        : esc(defender.why || 'Did not run')]);
+  }
+  if (report.origin) facts.push(['From', esc(report.origin)]);
+  if (report.pe) {
+    facts.push(['Program', `${Number(report.pe.bits) || ''}-bit · ${Number(report.pe.imports) || 0} imports`
+                         + ` · ${(report.pe.sections || []).length} sections`]);
+  }
+  if ((report.urls || []).length) facts.push(['Links in it', report.urls.slice(0, 4).map((url) => esc(url)).join('<br>')]);
+  if (report.sha256) facts.push(['SHA-256', `<span class="hash">${esc(report.sha256)}</span>`]);
+  body.innerHTML = `
+    <div class="scan-verdict"><b>${esc(VERDICTS[report.verdict] || 'Scanned')}</b><span>${esc(report.headline)}</span></div>
+    <p class="scan-file">${esc(report.name || scan.name)}<em>${esc(report.kind || '')}${
+      report.size ? ` · ${esc(sizeOf(Number(report.size)))}` : ''}</em></p>
+    ${findings.length ? `<ul class="scan-findings">${findings.map((finding) =>
+      `<li class="${esc(finding.level)}"><i></i>${esc(finding.text)}</li>`).join('')}</ul>` : ''}
+    ${facts.length ? `<dl class="scan-facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}
+    ${report.lookup ? `<button type="button" class="scan-lookup" data-link="${esc(report.lookup)}" data-sfx="none">Look it up on VirusTotal</button>` : ''}
+    <p class="scan-again">Drop another file to scan it.</p>`;
+}
+
+$('scan-body').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-link]');
+  const api = bridge();
+  if (button && api && api.open_link) {
+    sfx.play('open');
+    api.open_link(button.dataset.link);
+  }
+});
+
 /* --- the world, beside OSIRIS -------------------------------------------------------
  * OSIRIS mode shows only what belongs with a map (world.py): the day's
  * strongest earthquakes, the world's headlines, and the map's own layers. */
 
-const LAYER_NAMES = { cctv_previews: 'CCTV previews', live_news: 'live news', day_night: 'day and night',
+// The map's layers in words (the settings' own names come later, in LAYER_NAMES,
+// which this runs before).
+const WORLD_LAYERS = { cctv_previews: 'CCTV previews', live_news: 'live news', day_night: 'day and night',
                       global_incidents: 'incidents', sdk_sea: 'sea traffic', sdk_air: 'air traffic',
                       sdk_naval: 'naval', cctv: 'CCTV' };
 
@@ -2082,7 +2207,7 @@ function renderWorld(world) {
   const news = world.news || [];
   $('world-quakes').innerHTML = quakes.map((quake) => `
     <li class="world-row${quake.link ? ' link' : ''}" data-link="${esc(quake.link)}">
-      <b class="mag${Number(quake.mag) >= 6 ? ' big' : ''}">M${esc((Number(quake.mag) || 0).toFixed(1))}</b>
+      <b class="mag${Number(quake.mag) >= 6 ? ' quake-strong' : ''}">M${esc((Number(quake.mag) || 0).toFixed(1))}</b>
       <span class="grow">${esc(quake.place)}</span><em>${esc(ago(quake.when))}</em></li>`).join('')
     || '<li class="world-empty">No strong earthquakes today.</li>';
   $('world-news').innerHTML = news.map((story) => `
@@ -2095,7 +2220,7 @@ function renderWorld(world) {
 function renderWorldLayers() {
   const layers = (state.layout && state.layout.layers) || [];
   $('world-layers').textContent = layers.length
-    ? layers.map((layer) => LAYER_NAMES[layer] || layer.replace(/_/g, ' ')).join(' · ')
+    ? layers.map((layer) => WORLD_LAYERS[layer] || layer.replace(/_/g, ' ')).join(' · ')
     : 'No layers on';
 }
 
@@ -3088,7 +3213,7 @@ function renderDisplayChips() {
 function renderSummaries() {
   if (!ultraOn()) return;
   const extra = { clock: $('hhmm').textContent, phase: state.phase,
-                  layers: state.layout.layers.length, feed: state.feed };
+                  layers: state.layout.layers.length, feed: state.feed, scan: state.scan };
   for (const [id, tile] of Object.entries(TILE_OF)) {
     const line = tile.querySelector('.tile-sum');
     if (line) line.textContent = Tiles.summary(id, state.snapshot || {}, extra);
@@ -3717,6 +3842,8 @@ window.apollo = {
   bootDone(summary) { if (!boot.done) boot.done = summary || bootSoFar(); },
   // What is wrong, for the System panel; and the checks run again, done.
   issues(items) { renderIssues(items); },
+  // The scanner: a file scanning, each step, and the report (apollo.py).
+  scan(event) { onScan(event); },
   checked(summary) {
     state.rechecking = false;
     sfx.play(summary && summary.issues ? 'alert' : 'clean');

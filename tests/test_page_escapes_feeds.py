@@ -45,6 +45,9 @@ UNTRUSTED = re.compile(
     r"|issue\.(?:title|detail|key)"
     # OSIRIS mode's world panel: the USGS's words and the headlines'.
     r"|quake\.(?:place|link|mag|when)"
+    # The scanner's report: a file's name and what was read out of it.
+    r"|report\.(?:name|headline|kind|origin|sha256|lookup)|finding\.(?:text|level)"
+    r"|defender\.(?:threat|why)|scan\.name"
     r"|market\.status"
     r"|weather\.text"
     r"|system\.gpu_name"

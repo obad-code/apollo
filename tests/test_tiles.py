@@ -25,7 +25,7 @@ def run(tmp_path, body):
     return json.loads(out.stdout)
 
 
-EVERY = ["today", "osiris", "feed", "markets", "projects", "ideas", "core", "system", "talks"]
+EVERY = ["today", "osiris", "feed", "markets", "projects", "ideas", "core", "system", "talks", "scan"]
 
 
 def test_every_display_has_a_place_and_a_name(tmp_path):

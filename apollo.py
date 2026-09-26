@@ -123,6 +123,7 @@ import journal  # noqa: E402
 import live  # noqa: E402
 import lyla  # noqa: E402
 import private_eye  # noqa: E402
+import scanner  # noqa: E402
 import projects  # noqa: E402
 import orb as orb_module  # noqa: E402
 import osiris as osiris_module  # noqa: E402
@@ -960,6 +961,10 @@ class WebReporter:
         """The checks, run again from the System panel, are done."""
         self._call("checked", dict(summary))
 
+    def scan(self, event):
+        """The scanner: {state: scanning|step|done|error, name, text, report}."""
+        self._call("scan", dict(event))
+
     def story(self, number):
         """Open story `number` on the display's feed (0 closes it).
 
@@ -1247,6 +1252,7 @@ class Apollo:
         self.away_requested = False
         self.intro_wanted = False  # the word, once; see `check_intro`
         self.intro_until = 0.0     # ...playing until then (monotonic)
+        self._scan_lock = threading.Lock()   # one file scanned at a time
         self.boot_done_at = None   # when the checks and the start were both done
         self._boot_parts = set()
         self._boot_results = []
@@ -1390,6 +1396,7 @@ class Apollo:
                               on_activity=self.on_activity,
                               app=self)
         issues.set_listener(self.tell_issues)
+        self.listen_for_drops()
         self.want_intro()
         threading.Thread(target=self.worker, daemon=True).start()
 
@@ -1505,6 +1512,51 @@ class Apollo:
         ui = getattr(self, "ui", None)
         if ui is not None and ui.alive:
             ui.boot_done(summary)
+
+    # -- the scanner: files dropped on the display --------------------------
+
+    def listen_for_drops(self):
+        """Files dropped anywhere on the display come here with their full
+        paths (pywebview's drop event) - and the drop is kept from the
+        WebView, which would otherwise open the file in place of the page."""
+        try:
+            from webview.dom import DOMEventHandler
+            self.window.dom.document.events.drop += DOMEventHandler(self.on_drop, prevent_default=True)
+        except Exception:  # noqa: BLE001 - no scanner is survivable; no display is not
+            log.warning("files dropped on the display cannot be scanned", exc_info=True)
+
+    def on_drop(self, event):
+        files = ((event or {}).get("dataTransfer") or {}).get("files") or []
+        paths = [f.get("pywebviewFullPath") for f in files if isinstance(f, dict)]
+        paths = [p for p in paths if p]
+        ui = getattr(self, "ui", None)
+        if not paths:
+            if ui is not None and ui.alive:
+                ui.scan({"state": "error", "name": "",
+                         "text": "That did not come with a file - drop a file from File Explorer."})
+            return
+        threading.Thread(target=self._scan_all, args=(paths[:10],), daemon=True, name="scan").start()
+
+    def _scan_all(self, paths):
+        for path in paths:
+            self.scan_file(path)
+
+    def scan_file(self, path):
+        """Scan one file (scanner.py), telling the page as it goes."""
+        ui = getattr(self, "ui", None)
+
+        def tell(event):
+            if ui is not None and ui.alive:
+                ui.scan(event)
+
+        name = os.path.basename(path)
+        with self._scan_lock:
+            tell({"state": "scanning", "name": name})
+            report = scanner.scan(path, on_step=lambda text: tell({"state": "step", "name": name,
+                                                                    "text": text}))
+            log.info("scanned %s: %s", name, report.get("verdict"))
+            tell({"state": "done", "name": name, "report": report})
+        return report
 
     def tell_issues(self, items):
         """The System panel's list, whenever it changes (issues.py)."""
