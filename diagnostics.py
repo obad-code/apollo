@@ -54,14 +54,33 @@ def check_network(host="generativelanguage.googleapis.com", port=443, timeout=3.
     return OK, "online"
 
 
-def _device(kind):
+def _listed(kind):
+    """The default device's name, or an exception if there is none."""
     import sounddevice as sd
+    return str(sd.query_devices(kind=kind).get("name", ""))
+
+
+def _opens(kind):
+    """Open the device the way Apollo does, and let it go at once: a device
+    can be listed and still refuse every program (a Bluetooth pair gone
+    quiet answers MME error 1)."""
+    import sounddevice as sd
+    stream = (sd.RawInputStream if kind == "input" else sd.RawOutputStream)(
+        samplerate=16000 if kind == "input" else 24000, channels=1, dtype="int16")
+    stream.close()
+
+
+def _device(kind):
     what = "microphone" if kind == "input" else "speakers"
     try:
-        device = sd.query_devices(kind=kind)
+        name = _listed(kind)
     except Exception as e:  # noqa: BLE001 - PortAudio says why in its own words
         return FAIL, f"no {what} ({e})"
-    return OK, str(device.get("name", what))[:40]
+    try:
+        _opens(kind)
+    except Exception as e:  # noqa: BLE001
+        return FAIL, f"{name[:30]} will not open ({str(e)[-40:]})"
+    return OK, name[:40]
 
 
 def check_mic():

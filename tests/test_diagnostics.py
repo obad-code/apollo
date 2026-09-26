@@ -107,3 +107,18 @@ def test_the_real_checks_are_all_listed():
                    "lastrun", "self", "sources"):
         assert wanted in ids
     assert len(set(ids)) == len(ids)
+
+
+def test_a_device_that_is_there_but_will_not_open_is_a_failure(monkeypatch):
+    """The speakers were listed, and nothing could play through them (MME
+    error 1, a Bluetooth pair gone quiet): listed is not working."""
+    monkeypatch.setattr(d, "_listed", lambda kind: "Speakers (picun G2)")
+
+    def refuses(kind):
+        raise RuntimeError("Error opening RawOutputStream: Undefined external error")
+
+    monkeypatch.setattr(d, "_opens", refuses)
+    status, detail = d.check_speakers()
+    assert status == d.FAIL and "picun G2" in detail and "will not open" in detail
+    monkeypatch.setattr(d, "_opens", lambda kind: None)
+    assert d.check_speakers() == (d.OK, "Speakers (picun G2)")
