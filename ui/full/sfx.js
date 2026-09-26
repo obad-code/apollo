@@ -18,6 +18,25 @@
 const blip = (wave, from, to, dur, gain, more = {}) => ({ wave, from, to, dur, gain, ...more });
 const hiss = (dur, gain, filter, more = {}) => ({ wave: 'noise', dur, gain, filter, ...more });
 
+/* A cloud of grains, the way a granular synth makes a sound: `count` tiny
+ * blips of `len` seconds scattered over `span`, their pitch going `from` ->
+ * `to` across it, each a little off the line. The scatter is a fixed table
+ * rather than Math.random, so a sound is the same every time it plays. */
+const SCATTER = [0.13, 0.71, 0.42, 0.93, 0.27, 0.58, 0.05, 0.84, 0.36, 0.66, 0.19, 0.49, 0.77, 0.31, 0.88, 0.02];
+function grains({ count, span, from, to, len = 0.026, gain = 0.018, wave = 'triangle', at = 0,
+                  spread = 0.12, filter }) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const p = count === 1 ? 0 : i / (count - 1);
+    const jitter = SCATTER[i % SCATTER.length];
+    const hz = from * Math.pow(to / from, p) * (1 + (jitter - 0.5) * spread);
+    out.push(blip(wave, hz, hz * (1 + (jitter - 0.5) * 0.04), len, gain,
+                  { at: at + p * span + (jitter - 0.5) * (span / count) * 0.6 + span / count * 0.3,
+                    attack: 0.002, ...(filter ? { filter } : {}) }));
+  }
+  return out;
+}
+
 export const SOUNDS = {
   // A pointer over a button: the lightest tick.
   tick: [blip('sine', 3200, 2600, 0.022, 0.03, { attack: 0.002 })],
@@ -94,6 +113,81 @@ export const SOUNDS = {
   wake: [
     blip('sine', 220, 880, 0.35, 0.06, { attack: 0.05 }),
     blip('triangle', 1320, 1320, 0.15, 0.03, { at: 0.25 }),
+  ],
+  // --- the granular family: a sound for every change on the display -------
+  // A display expanded, or restored: grains rising, a swell under them.
+  expand: [
+    ...grains({ count: 10, span: 0.22, from: 520, to: 2400 }),
+    blip('sine', 300, 900, 0.26, 0.04, { attack: 0.04 }),
+  ],
+  // ...and put back, or minimized: falling.
+  collapse: [
+    ...grains({ count: 10, span: 0.2, from: 2200, to: 460 }),
+    blip('sine', 900, 260, 0.22, 0.035, { attack: 0.01 }),
+  ],
+  // A display, a panel or a list shown, and hidden.
+  show: [...grains({ count: 7, span: 0.14, from: 900, to: 2600, wave: 'sine', gain: 0.022 })],
+  hide: [...grains({ count: 7, span: 0.14, from: 2400, to: 700, wave: 'sine', gain: 0.022 })],
+  // Two displays trading places: a thunk each, and a glint between them.
+  swap: [
+    blip('triangle', 230, 160, 0.06, 0.07, { attack: 0.002 }),
+    ...grains({ count: 6, span: 0.1, from: 1400, to: 1900, gain: 0.014, at: 0.03 }),
+    blip('triangle', 200, 140, 0.07, 0.07, { at: 0.1, attack: 0.002 }),
+  ],
+  // One grain: a display's corner passing a cell as it is resized.
+  grain: [blip('triangle', 2400, 2300, 0.018, 0.03, { attack: 0.002 })],
+  // A mode switched: the set changing channel - static, a fizz of grains
+  // and the tube's whine.
+  channel: [
+    hiss(0.12, 0.05, { type: 'bandpass', from: 3200, to: 1400, q: 0.8 }, { attack: 0.004 }),
+    ...grains({ count: 8, span: 0.12, from: 4200, to: 1200, wave: 'square', gain: 0.011,
+                filter: { type: 'lowpass', from: 6000, q: 0.7 } }),
+    blip('sine', 9000, 8800, 0.1, 0.008, { attack: 0.01 }),
+  ],
+  // Something opened - a story, a stock, a display's settings - and closed.
+  open: [
+    ...grains({ count: 6, span: 0.1, from: 700, to: 1800, gain: 0.016 }),
+    blip('sine', 880, 880, 0.08, 0.03, { at: 0.06 }),
+  ],
+  close: [
+    ...grains({ count: 6, span: 0.1, from: 1800, to: 700, gain: 0.016 }),
+    blip('sine', 660, 660, 0.08, 0.025, { at: 0.06 }),
+  ],
+  // The boot screen: a check passing, a check failing, and the machine
+  // ready - grains climbing into a chord.
+  check: [
+    blip('square', 1800, 1700, 0.02, 0.025, { attack: 0.002, filter: { type: 'lowpass', from: 4000, q: 0.7 } }),
+    ...grains({ count: 3, span: 0.03, from: 2600, to: 3000, gain: 0.012, at: 0.015 }),
+  ],
+  fault: [
+    blip('square', 180, 150, 0.18, 0.05, { filter: { type: 'lowpass', from: 900, q: 1.5 } }),
+    ...grains({ count: 4, span: 0.1, from: 420, to: 300, gain: 0.02, at: 0.04 }),
+  ],
+  ready: [
+    ...grains({ count: 12, span: 0.42, from: 400, to: 3200, gain: 0.015 }),
+    blip('sine', 523, 523, 0.5, 0.04, { at: 0.3, attack: 0.02 }),
+    blip('sine', 784, 784, 0.48, 0.03, { at: 0.36, attack: 0.02 }),
+    blip('sine', 1046, 1046, 0.44, 0.02, { at: 0.42, attack: 0.02 }),
+  ],
+  // The scanner: a file landing on it, the sweep while it reads, and the
+  // answer - clean, or something to look at.
+  drop: [
+    blip('sine', 180, 90, 0.12, 0.08, { attack: 0.003 }),
+    ...grains({ count: 6, span: 0.08, from: 3000, to: 1500, gain: 0.015, at: 0.01 }),
+  ],
+  scan: [
+    ...grains({ count: 14, span: 0.6, from: 300, to: 3000, gain: 0.012, wave: 'sine' }),
+    blip('sine', 200, 1200, 0.6, 0.03, { attack: 0.05 }),
+  ],
+  clean: [
+    blip('sine', 880, 880, 0.1, 0.05),
+    blip('sine', 1318, 1318, 0.16, 0.05, { at: 0.08 }),
+    ...grains({ count: 4, span: 0.08, from: 2600, to: 3200, gain: 0.01, at: 0.1 }),
+  ],
+  alert: [
+    blip('square', 880, 880, 0.09, 0.04, { filter: { type: 'lowpass', from: 2400, q: 0.8 } }),
+    blip('square', 660, 660, 0.09, 0.04, { at: 0.11, filter: { type: 'lowpass', from: 2400, q: 0.8 } }),
+    blip('square', 880, 880, 0.09, 0.04, { at: 0.22, filter: { type: 'lowpass', from: 2400, q: 0.8 } }),
   ],
   // LYLA's own two, from the old page: an alien button and a liquid hit -
   // soft, because she says something every few seconds while she chats.

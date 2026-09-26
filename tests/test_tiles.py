@@ -260,3 +260,29 @@ def test_folded_the_feed_keeps_its_newest_few(tmp_path):
 def test_a_layout_saved_muted_no_longer_says_so(tmp_path):
     assert run(tmp_path, "'muted' in T.sanitize({ ...T.defaultLayout(), muted: true })") is False
     assert run(tmp_path, "'muted' in T.defaultLayout()") is False
+
+
+def test_each_change_to_the_layout_has_its_sound(tmp_path):
+    """changeLayout plays what the change was: a display expanded or put
+    back, minimized or restored, hidden or shown, two swapped, one resized,
+    the map's layers changed, a list folded."""
+    heard = run(tmp_path, """(() => {
+      const a = T.setUltra(T.defaultLayout(), true);
+      return {
+        expand: T.soundFor(a, T.focus(a, 'feed')),
+        back: T.soundFor(T.focus(a, 'feed'), a),
+        min: T.soundFor(a, T.setMin(a, 'feed', true)),
+        restore: T.soundFor(T.setMin(a, 'feed', true), a),
+        hide: T.soundFor(a, T.setShown(a, 'feed', false)),
+        show: T.soundFor(T.setShown(a, 'feed', false), a),
+        swap: T.soundFor(a, T.swap(a, 'feed', 'markets')),
+        resize: T.soundFor(a, T.resize(a, 'feed', 4, 8)),
+        layers: T.soundFor(a, T.setLayers(a, ['cctv'])),
+        fold: T.soundFor(a, T.setFeedFolded(a, true)),
+        unfold: T.soundFor(T.setFolded(a, true), a),
+        same: T.soundFor(a, a),
+      };
+    })()""")
+    assert heard == {"expand": "expand", "back": "collapse", "min": "collapse", "restore": "expand",
+                     "hide": "hide", "show": "show", "swap": "swap", "resize": "grain",
+                     "layers": "tick", "fold": "fold", "unfold": "unfold", "same": None}

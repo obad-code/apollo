@@ -1168,6 +1168,7 @@ function openStory(index) {
 function closeStory() {
   const open = state.open;
   if (!open) return;
+  sfx.play('close');
   state.open = null;
   const card = $('story');
   card.setAttribute('aria-hidden', 'true');
@@ -1459,6 +1460,7 @@ function openOver(view, panel, from) {
 function closeStock() {
   const open = state.stock;
   if (!open) return;
+  sfx.play('close');
   state.stock = null;
   const view = $('stock');
   view.setAttribute('aria-hidden', 'true');
@@ -2331,6 +2333,7 @@ function setRoom(shown, { quiet = false } = {}) {
  * stretched frame by frame, which would lay the whole page out again on
  * every one of them. */
 function channelChange(swap) {
+  sfx.play('channel');
   document.body.classList.remove('switching');
   void document.body.offsetWidth;          // from the start, every time
   document.body.classList.add('switching');
@@ -2540,10 +2543,10 @@ for (const [id, tile] of Object.entries(TILE_OF)) {
   const controls = document.createElement('div');
   controls.className = 'tile-ctl';
   controls.innerHTML = `<span class="tile-grip">${ICON.grip}</span>`
-    + `<button type="button" data-tile="min" title="Minimize">${ICON.min}</button>`
-    + `<button type="button" data-tile="focus" title="Expand">${ICON.focus}</button>`
-    + `<button type="button" data-tile="config" title="Settings">${ICON.config}</button>`
-    + `<button type="button" data-tile="hide" title="Hide">${ICON.hide}</button>`;
+    + `<button type="button" data-tile="min" data-sfx="none" title="Minimize">${ICON.min}</button>`
+    + `<button type="button" data-tile="focus" data-sfx="none" title="Expand">${ICON.focus}</button>`
+    + `<button type="button" data-tile="config" data-sfx="none" title="Settings">${ICON.config}</button>`
+    + `<button type="button" data-tile="hide" data-sfx="none" title="Hide">${ICON.hide}</button>`;
   const corner = document.createElement('i');
   corner.className = 'tile-resize';
   corner.title = 'Drag to resize';
@@ -2649,7 +2652,11 @@ function flip(change, { skip = null } = {}) {
   }
 }
 
-function changeLayout(next, { animate: moving = true, save = true } = {}) {
+function changeLayout(next, { animate: moving = true, save = true, quiet = false } = {}) {
+  // What the change was, heard: expanded, put back, minimized, hidden,
+  // shown, swapped, resized, a list folded (tiles.soundFor, sfx.js).
+  const heard = quiet ? null : Tiles.soundFor(state.layout, next);
+  if (heard) sfx.play(heard);
   const run = () => { state.layout = next; applyLayout(); };
   if (moving && ultraOn() && next.ultra) flip(run);
   else run();
@@ -2662,7 +2669,6 @@ function changeLayout(next, { animate: moving = true, save = true } = {}) {
  * kept with the layout like the stocks'. */
 function setFeedFolded(on) {
   if (Boolean(on) === Boolean(state.layout.feedFolded)) return;
-  sfx.play(on ? 'fold' : 'unfold');
   closeStory();
   unlight();
   changeLayout(Tiles.setFeedFolded(state.layout, on), { animate: false });
@@ -2673,7 +2679,6 @@ $('feed-fold').addEventListener('click', () => setFeedFolded(!state.layout.feedF
  * the layout, so it is the same tomorrow. */
 function setFolded(on) {
   if (Boolean(on) === Boolean(state.layout.folded)) return;
-  sfx.play(on ? 'fold' : 'unfold');
   closeStock();
   unlightRow();
   changeLayout(Tiles.setFolded(state.layout, on), { animate: false });
@@ -2831,7 +2836,7 @@ function pulse(id) {
 function adoptLayout(raw) {
   const next = Tiles.sanitize(raw);
   if (next.ultra !== ultraOn()) { setUltra(next.ultra, { quiet: true, layout: next }); return; }
-  changeLayout(next, { animate: false, save: false });
+  changeLayout(next, { animate: false, save: false, quiet: true });
 }
 
 /* --- the map among the displays -----------------------------------------------
@@ -2919,7 +2924,7 @@ function renderDisplayChips() {
   $('ultra-chips').innerHTML = Tiles.DISPLAYS.map((id) => {
     const shown = layout.items[id].shown;
     return `<button type="button" class="dchip${shown ? ' on' : ''}${layout.focus === id ? ' lead' : ''}"
-              data-chip="${id}" data-sfx="tab" aria-pressed="${shown ? 'true' : 'false'}"
+              data-chip="${id}" data-sfx="none" aria-pressed="${shown ? 'true' : 'false'}"
               title="${shown ? 'Hide' : 'Show'} ${Tiles.NAMES[id]}"><i class="led"></i>${Tiles.NAMES[id]}</button>`;
   }).join('');
 }
@@ -3125,6 +3130,7 @@ function endDrag() {
   flip(() => {
     drag.tile.style.removeProperty('transform');
     if (drag.over) {
+      sfx.play('swap');
       state.layout = Tiles.swap(state.layout, drag.id, drag.over.dataset.display);
       applyLayout();
     }
@@ -3161,6 +3167,7 @@ function startResize(tile, event) {
                                    dy: e.clientY - from.y, ...from.grid });
     const now = state.layout.items[id];
     if (spans.w === now.w && spans.h === now.h) return;
+    sfx.play('grain');
     flip(() => {
       state.layout = Tiles.resize(state.layout, id, spans.w, spans.h);
       applyLayout();
@@ -3177,6 +3184,7 @@ function startResize(tile, event) {
 /* --- a display's settings ------------------------------------------------------------ */
 
 function openConfig(id, anchor) {
+  sfx.play('open');
   state.configFor = id;
   const pop = $('tile-config');
   renderConfig();
@@ -3194,6 +3202,7 @@ function openConfig(id, anchor) {
 
 function closeConfig() {
   if (!state.configFor) return;
+  sfx.play('close');
   state.configFor = null;
   $('tile-config').classList.remove('on');
   $('tile-config').setAttribute('aria-hidden', 'true');

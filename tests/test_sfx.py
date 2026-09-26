@@ -188,3 +188,27 @@ def test_every_sound_the_page_and_lyla_ask_for_exists(tmp_path):
     asked.discard("none")
     assert {"ly1", "ly2", "hud"} <= asked                  # LYLA's own, from the old page
     assert asked <= known, asked - known
+
+
+# The granular family: every change on the display has a sound of its own,
+# made of grains - many tiny blips, scattered in time and pitch - rather than
+# the one click every button used to share.
+GRANULAR = ["expand", "collapse", "show", "hide", "swap", "grain", "channel", "open", "close",
+            "check", "fault", "ready", "scan", "clean", "alert", "drop"]
+
+
+def test_the_granular_family_is_all_there(tmp_path):
+    known = set(run(tmp_path, "return Object.keys(S.SOUNDS);"))
+    assert set(GRANULAR) <= known, set(GRANULAR) - known
+
+
+def test_a_granular_sound_is_made_of_grains(tmp_path):
+    for name in ("expand", "collapse", "channel", "scan", "ready"):
+        sources = run(tmp_path, PLAYED + f"return played({json.dumps(name)});")
+        grains = [s for s in sources if s["stopped"] - s["started"] <= 0.08]
+        assert len(grains) >= 6, (name, len(grains))
+
+
+def test_the_grains_fall_the_same_way_every_time(tmp_path):
+    first, again = run(tmp_path, PLAYED + "return [played('expand'), played('expand')];")
+    assert first == again

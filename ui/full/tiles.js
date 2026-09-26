@@ -190,6 +190,28 @@ export function foldedStories(items, folded) {
   return firstFew(items, folded, FEED_FOLDED);
 }
 
+/* The sound a change to the layout makes (sfx.js's granular family), or
+ * null: the page plays it as it lays the change out. The biggest change
+ * says it - a display expanded outranks the others moving to make room. */
+export function soundFor(prev, next) {
+  const a = sanitize(prev), b = sanitize(next);
+  if (a.focus !== b.focus) return b.focus ? 'expand' : 'collapse';
+  for (const id of DISPLAYS) {
+    if (a.items[id].shown !== b.items[id].shown) return b.items[id].shown ? 'show' : 'hide';
+  }
+  for (const id of DISPLAYS) {
+    if (a.items[id].min !== b.items[id].min) return b.items[id].min ? 'collapse' : 'expand';
+  }
+  if (a.order.join() !== b.order.join()) return 'swap';
+  for (const id of DISPLAYS) {
+    if (a.items[id].w !== b.items[id].w || a.items[id].h !== b.items[id].h) return 'grain';
+  }
+  if (a.layers.join() !== b.layers.join()) return 'tick';
+  if (a.folded !== b.folded) return b.folded ? 'fold' : 'unfold';
+  if (a.feedFolded !== b.feedFolded) return b.feedFolded ? 'fold' : 'unfold';
+  return null;
+}
+
 export function setLayers(layout, layers) {
   return sanitize({ ...copy(layout), layers: Array.isArray(layers) ? layers : [] });
 }
