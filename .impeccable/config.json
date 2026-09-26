@@ -74,6 +74,15 @@
         ],
         "createdAt": "2026-09-26T10:45:14.479Z",
         "reason": "the display is a fixed full-screen window that never scrolls, so html/body clip on purpose; measured 26 Sep 2026: nothing positioned is clipped at 1440x900 or at the real 2560x1392 - only the 1081px dock at a 1024px viewport Apollo never runs at"
+      },
+      {
+        "rule": "marquee",
+        "value": ".scan-sweep i — infinite horizontal loop animation \"scan-sweep\"",
+        "files": [
+          "ui/full/index.html"
+        ],
+        "createdAt": "2026-09-26T12:41:43.943Z",
+        "reason": "not scrolling content: the scanner's indeterminate progress bar, drawn only while a file is being scanned (a few seconds of genuinely live work) and gone with the report"
       }
     ]
   }
