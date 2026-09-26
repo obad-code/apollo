@@ -416,6 +416,28 @@ the machine they run on - a scan of your own PC's local ports and addresses,
 a Bluetooth scanner, live location - and each runs only when you open that
 tool; Bluetooth and location still ask first.
 
+**The scanner.** Under the feed. **Choose file** opens File Explorer over
+the display - which fills the screen, so there is nothing behind it to
+drag from - and what you pick is read and judged, never run or opened:
+clean, careful or dangerous, with why (`scanner.py`). A file dropped on the
+display is scanned the same way, and so is asking: *"scan a file"* / *"افحص
+ملف"* opens File Explorer (the `scan_file` tool). The SCAN button on the
+console does it too.
+
+**The HUD.** The normal display is yours to arrange. **F2**, HUD on the
+console, or *"customize the HUD"* / *"عدل الواجهة"* opens the editor: every
+panel - the clock, the stocks, the system, Apollo, LYLA, the feed, the
+scanner and the two consoles - in a frame. Drag one and it follows your hand
+on a spring, leaning into the way it moves, and lands on the grid or lines
+up with the edge or middle of another panel (a cyan guide shows which); a
+corner resizes it, and Apollo and the consoles grow as a whole; the wheel
+or **+ / −** makes what is inside larger or smaller (double-click for 100%);
+the eye hides it; the arrow keys nudge the one you last touched. **Snap**
+turns the pulling off, **Reset all** flies every panel home, and **Done**,
+Enter or Escape closes it. It is kept (`hud.py`,
+`%LOCALAPPDATA%\Apollo\hud.json`) and laid out whenever the normal display
+is up; every other view and ultra mode lay themselves out as ever.
+
 **Trading mode.** **Trading** on the bar, or *"trading mode"* / *"وضع
 التداول"*, turns the display into a trading desk of six displays
 (`trading.py` reads them, every ten minutes while the desk is up and not at
@@ -524,10 +546,12 @@ and **hide**. The bar along the bottom has the modes, switches each display
 on and off, puts the grid back, and resets the lot. Either side of it sits
 a facility's desk, for the look of the place: switches that flip with their
 lights, a strip of blinking status lights, armed buttons that fire (SCAN,
-UPLINK, LOCK, PURGE), a dial that turns a quarter at a time, and readouts
-that tick - the time up, the link, the core, the temperature. They click
-and light and do nothing else; on a screen narrower than 1900 pixels they
-step away to leave the bar its room. By voice: *"put the projects on my
+HUD, LOCK, PURGE), a dial that turns a quarter at a time, and readouts
+that tick - the time up, the link, the core, the temperature. Two of the
+buttons do something: SCAN opens File Explorer to choose a file for the
+scanner, HUD opens the HUD editor (below); the rest click and light. On a
+screen narrower than 1900 pixels they step away to leave the bar its room,
+and in the normal display they sit under Apollo. By voice: *"put the projects on my
 screen"* / *"حط المشاريع على الشاشة"* pulls that display up, expanded, with
 the rest minimized - bringing the display up first if it has to; *"all of
 them"* puts the grid back; *"hide the ideas"* and *"show my talks"* work on
@@ -921,6 +945,8 @@ The only thing left is your API key.
 | `ui/full/app.css` | Its skin: the overlay's palette, the CRT surface, the grid. |
 | `ui/full/shader.js` | The ground: an old set's slot mask lit by the CRT gradient, in plain WebGL. |
 | `ui/full/globe.js` | Apollo's shape as data: the globe's meridians as it turns, its parallels, the star at its heart, and the easing of its pace. No DOM, so node tests it (`tests/test_globe.py`). |
+| `ui/full/hud.js` | The normal display's HUD: the panels, cleaning a kept arrangement, snapping to the grid and to each other, resizing by a corner, the box a scaled panel needs, and the spring a drag rides on. No DOM, so node tests it (`tests/test_hud.py`). |
+| `hud.py` | The HUD as you arranged it, kept - cleaned by the same rules as `hud.js` - and handed to the display as it opens. |
 | `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
 | `ui/full/lylaagent.js` | The agents' pipeline card - LYLA's live, ATLAS's, NOVA's and ECHO's as previews, each in its own look - and each agent's mark: the pipeline, its moving parts and what opens and shuts it, ported from a React component to plain JS and SVG, so there is still no build step (`tests/test_lyla_agent.py`, `tests/test_agents_rail.py`). |

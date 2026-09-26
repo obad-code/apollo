@@ -886,7 +886,15 @@ body.scan-open:not(.ultra):not(.osiris-map) #stage {
                color: var(--amber-bright); }
 #scan-hint { min-width: 0; font-size: 12px; color: var(--caption); white-space: nowrap; overflow: hidden;
              text-overflow: ellipsis; }
-#scan-close { display: none; margin-left: auto; font: inherit; font-size: 12px; color: var(--caption);
+#scan-pick { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; padding: 4px 10px;
+             font: inherit; font-size: 12px; letter-spacing: .06em; color: var(--amber-bright); cursor: pointer;
+             background: rgba(255, 176, 0, .08); border: 1px solid rgba(255, 176, 0, .3); border-radius: 7px;
+             transition: background .18s, border-color .18s, transform .18s; }
+#scan-pick svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4;
+                 stroke-linecap: round; stroke-linejoin: round; }
+#scan-pick:hover { background: rgba(255, 176, 0, .18); border-color: rgba(255, 176, 0, .6); transform: translateY(-1px); }
+#scan-block.picking #scan-pick { opacity: .55; pointer-events: none; }
+#scan-close { display: none; margin-left: 4px; font: inherit; font-size: 12px; color: var(--caption);
               background: none; border: 0; padding: 0 4px; cursor: pointer; }
 #scan-close:hover { color: var(--amber-bright); }
 body.scan-open #scan-close { display: block; }
@@ -1970,6 +1978,117 @@ body.answering .console { opacity: .18; }
    the width, the desk steps away (app.js measures: .squeezed). */
 @media (min-width: 1900px) { body.ultra #stage { padding-bottom: 142px; } }
 @media (max-width: 1899px) { body.ultra .console { display: none; } }
+/* In the normal display too: under Apollo, either side of the middle, on the
+   line the side panels end on. Arranged by hand like any panel (the HUD). */
+body:not(.viewing):not(.ultra):not(.osiris-map) .console { display: block; bottom: var(--room); }
+body.roomless:not(.viewing):not(.ultra):not(.osiris-map) .console { bottom: var(--dock-room); }
+body:not(.viewing):not(.ultra):not(.osiris-map) #console-left { left: calc(50% - 258px); }
+body:not(.viewing):not(.ultra):not(.osiris-map) #console-right { left: calc(50% + 12px); right: auto; }
+/* Its two buttons that do something: SCAN chooses a file, HUD arranges. */
+.arm.live i { background: #7fe3ff; box-shadow: 0 0 6px rgba(127, 227, 255, .8); }
+
+/* --- the HUD: the normal display arranged by hand --------------------------------
+   Once anything is moved (body.hud-free) every panel is laid out where you
+   put it - its box from hud.js, scaled about its centre by --hs - instead
+   of by the grid. Only in the normal display: every other view and ultra
+   mode lay themselves out as ever. */
+body.hud-free:not(.viewing):not(.ultra):not(.osiris-map) #stage { display: block; }
+/* Each panel's own rules place it by id; these carry an id too, so they win. */
+/* Important, because the display's own layout reaches some of them with
+   longer selectors (the feed makes room for LYLA's bar by a margin). */
+body.hud-free:not(.viewing):not(.ultra):not(.osiris-map) :is(#stage > .hud-panel, #console-left, #console-right) {
+  position: absolute !important; left: var(--hl) !important; top: var(--ht) !important;
+  width: var(--hw) !important; height: var(--hh) !important; right: auto !important; bottom: auto !important;
+  margin: 0 !important; min-height: 0; max-height: none; align-self: auto;
+  scale: var(--hs, 1); transform-origin: 50% 50%;
+}
+body.hud-free:not(.viewing):not(.ultra):not(.osiris-map) :is(#stage > .hud-panel:not(.hud-whole)) { overflow: hidden; }
+body.hud-free:not(.viewing):not(.ultra):not(.osiris-map) :is(#console-left, #console-right) { position: fixed !important; }
+body.hud-free:not(.hud-editing):not(.viewing):not(.ultra):not(.osiris-map) :is(#stage > .hud-panel, #console-left, #console-right).hud-hidden { display: none !important; }
+/* The scanner's report grows out of its line - upwards when it is low on the
+   screen - rather than being cut to the line's height. */
+body.hud-free.scan-open:not(.viewing):not(.ultra):not(.osiris-map) #stage > #scan-block.hud-grow {
+  height: auto !important; max-height: 64vh; overflow-y: auto;
+}
+body.hud-free.scan-open:not(.viewing):not(.ultra):not(.osiris-map) #stage > #scan-block.hud-grow.up {
+  top: auto !important; bottom: calc(100% - var(--ht) - var(--hh)) !important; transform-origin: 50% 100%;
+}
+/* What follows a panel: the answer under Apollo, LYLA's card under her bar. */
+body.hud-free:not(.viewing):not(.ultra):not(.osiris-map) #stage > #answer { left: var(--al, 50%); top: var(--at, 48%); }
+body.hud-free:not(.viewing):not(.ultra):not(.osiris-map) #stage > #lyla-agent {
+  position: absolute; left: var(--ll); top: var(--lt); width: var(--lw); margin: 0; z-index: 30;
+}
+/* Discrete changes - a scale step, a panel shown or hidden, a reset - ease;
+   a drag follows the hand on a spring instead (app.js). */
+.hud-panel.hud-easing { transition: left .26s cubic-bezier(.2, .9, .3, 1.15), top .26s cubic-bezier(.2, .9, .3, 1.15),
+                          width .26s cubic-bezier(.2, .9, .3, 1.15), height .26s cubic-bezier(.2, .9, .3, 1.15),
+                          scale .26s cubic-bezier(.2, .9, .3, 1.15), opacity .2s; }
+.hud-panel.hud-flip { transition: translate .62s cubic-bezier(.2, .9, .25, 1.08), scale .62s cubic-bezier(.2, .9, .25, 1.08);
+                      transition-delay: var(--flip-delay, 0s); }
+.hud-panel.hud-lifted { z-index: 40; box-shadow: 0 30px 70px rgba(0, 0, 0, .6), 0 0 0 1px rgba(255, 214, 150, .35);
+                        filter: brightness(1.08); }
+
+/* The editor: the grid under everything, a frame over each panel, the guides
+   it lines up on, and its bar along the top. */
+#hud-edit { position: fixed; inset: 0; z-index: 60; display: none; }
+body.hud-editing #hud-edit { display: block; }
+body.hud-editing .hud-panel { transition: opacity .3s, filter .3s; }
+body.hud-editing .hud-panel.hud-hidden { opacity: .22; filter: grayscale(1); }
+#hud-grid { position: absolute; inset: 0; pointer-events: none; opacity: 0;
+            background-image: radial-gradient(circle, rgba(255, 214, 150, .22) 1px, transparent 1.4px);
+            background-size: 16px 16px; animation: hud-in .5s ease-out forwards; }
+#hud-guides { position: absolute; inset: 0; pointer-events: none; }
+.hud-guide { position: absolute; background: #7fe3ff; box-shadow: 0 0 8px rgba(127, 227, 255, .9); opacity: .9; }
+.hud-guide.x { top: 0; bottom: 0; width: 1px; }
+.hud-guide.y { left: 0; right: 0; height: 1px; }
+.hud-frame {
+  position: absolute; border: 1px dashed rgba(255, 214, 150, .55); border-radius: 12px; cursor: grab;
+  background: rgba(255, 176, 0, .035); touch-action: none; opacity: 0;
+  animation: hud-frame-in .42s cubic-bezier(.2, .9, .3, 1.2) forwards; animation-delay: calc(var(--i) * 45ms);
+  transition: border-color .18s, background .18s;
+}
+.hud-frame:hover, .hud-frame.picked { border-color: rgba(255, 214, 150, .95); background: rgba(255, 176, 0, .07); }
+.hud-frame.active { cursor: grabbing; border-style: solid; border-color: #7fe3ff; background: rgba(127, 227, 255, .06); }
+.hud-frame.is-hidden { border-color: rgba(255, 255, 255, .25); }
+.hud-tag {
+  position: absolute; left: -1px; bottom: calc(100% + 6px); display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px;
+  border-radius: 8px; background: rgba(12, 10, 8, .92); border: 1px solid rgba(255, 214, 150, .25);
+  font: 700 11px var(--hud); letter-spacing: .12em; text-transform: uppercase; color: var(--amber-bright);
+  text-shadow: none; white-space: nowrap; cursor: default;
+}
+.hud-frame.tag-in .hud-tag { bottom: auto; top: 8px; left: 8px; }
+.hud-tag em { font-style: normal; font-weight: 500; color: var(--caption); letter-spacing: .04em; min-width: 34px; text-align: right; }
+.hud-tag button { width: 22px; height: 22px; display: grid; place-items: center; padding: 0; cursor: pointer;
+                  font: 700 13px var(--hud); color: var(--amber-bright); background: rgba(255, 176, 0, .1);
+                  border: 1px solid rgba(255, 214, 150, .25); border-radius: 6px; }
+.hud-tag button:hover { background: rgba(255, 176, 0, .25); }
+.hud-tag button svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.hud-handle { position: absolute; width: 14px; height: 14px; border-radius: 4px; background: #121012;
+              border: 1.5px solid var(--amber-bright); box-shadow: 0 0 8px rgba(255, 176, 0, .5);
+              transition: transform .15s; }
+.hud-handle:hover { transform: scale(1.35); background: var(--amber-bright); }
+.hud-handle[data-corner="nw"] { left: -7px; top: -7px; cursor: nwse-resize; }
+.hud-handle[data-corner="ne"] { right: -7px; top: -7px; cursor: nesw-resize; }
+.hud-handle[data-corner="sw"] { left: -7px; bottom: -7px; cursor: nesw-resize; }
+.hud-handle[data-corner="se"] { right: -7px; bottom: -7px; cursor: nwse-resize; }
+.hud-frame.whole .hud-handle { border-radius: 50%; }
+#hud-bar {
+  position: absolute; bottom: 88px; left: 50%; display: flex; align-items: center; gap: 14px; padding: 8px 10px 8px 16px;
+  border-radius: 14px; background: rgba(10, 9, 8, .94); border: 1px solid rgba(255, 214, 150, .28);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .6); backdrop-filter: blur(10px); text-shadow: none;
+  transform: translate(-50%, 160%); opacity: 0; animation: hud-bar-in .5s cubic-bezier(.2, .9, .3, 1.15) .05s forwards;
+}
+#hud-bar b { display: flex; align-items: center; gap: 8px; font: 800 12px var(--hud); letter-spacing: .24em; color: var(--amber-bright); }
+#hud-bar b i { width: 7px; height: 7px; border-radius: 50%; background: #7fe3ff; box-shadow: 0 0 8px #7fe3ff; }
+.hud-tips { font-size: 12px; color: var(--caption); white-space: nowrap; }
+#hud-bar button { font: 700 12px var(--hud); letter-spacing: .08em; padding: 6px 12px; cursor: pointer; border-radius: 8px;
+                  color: var(--amber-bright); background: rgba(255, 176, 0, .08); border: 1px solid rgba(255, 214, 150, .3); }
+#hud-bar button:hover { background: rgba(255, 176, 0, .2); }
+#hud-bar button[aria-pressed="false"] { color: var(--caption); background: none; }
+#hud-bar button.primary { color: #121012; background: var(--amber-bright); border-color: transparent; }
+@keyframes hud-in { to { opacity: 1; } }
+@keyframes hud-frame-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes hud-bar-in { to { transform: translate(-50%, 0); opacity: 1; } }
 body.ultra .console.squeezed { display: none; }
 @media (max-width: 1920px) {
   body.clear:not(.ultra):not(.osiris-map) #ring { width: 560px; height: 348px; }
@@ -2116,8 +2235,8 @@ body.trading:not(.ultra):not(.osiris-map) #trading {
 .desk-row > .tag:first-child { min-width: 50px; text-align: center; }
 .tag.up { color: var(--desk-green); border-color: rgba(25, 230, 140, .45); background: rgba(25, 230, 140, .08); }
 .tag.down { color: var(--desk-red); border-color: rgba(255, 77, 106, .45); background: rgba(255, 77, 106, .08); }
-.rise { font: 500 11px var(--desk-figures); color: var(--desk-caption); font-variant-numeric: tabular-nums; }
-.rise.up { color: var(--desk-green); }
+.desk-rise { font: 500 11px var(--desk-figures); color: var(--desk-caption); font-variant-numeric: tabular-nums; }
+.desk-rise.up { color: var(--desk-green); }
 /* How bullish the messages are: green over red, and the share. */
 .bull { position: relative; flex: none; width: 54px; height: 6px; border-radius: 3px; overflow: hidden;
         background: rgba(255, 77, 106, .55); }

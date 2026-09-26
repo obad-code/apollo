@@ -123,11 +123,15 @@
     <article id="story" aria-hidden="true"></article>
   </section>
 
-  <!-- Under the feed: the scanner. Drop a file anywhere on the display and
-       it is read - never run, never opened - and judged here (scanner.py).
+  <!-- Under the feed: the scanner. Choose a file (File Explorer opens over
+       the display) or drop one anywhere on it, and it is read - never run,
+       never opened - and judged here (scanner.py).
        A display of its own in ultra mode. -->
   <section id="scan-block" class="panel" data-display="scan" aria-label="File scanner">
-    <header class="scan-head"><svg class="scan-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3M4 8h8"/></svg><b>Scanner</b><span id="scan-hint">Drop a file anywhere to scan it</span>
+    <header class="scan-head"><svg class="scan-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3M4 8h8"/></svg><b>Scanner</b><span id="scan-hint">Choose a file, or drop one anywhere</span>
+      <button id="scan-pick" type="button" data-sfx="none" title="Open File Explorer and pick a file to scan">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5V13h13V6H7.5L6 4.5z"/><path d="M8 8v3.5M6.3 9.7L8 8l1.7 1.7"/></svg><span>Choose file</span>
+      </button>
       <button id="scan-close" type="button" data-sfx="none" title="Put the report away">✕</button>
     </header>
     <div id="scan-body"></div>
@@ -369,14 +373,31 @@
 <aside id="console-right" class="console" aria-label="Protocol console (decorative)">
   <div class="console-head"><i class="beacon"></i><b>PROTOCOL 9</b><em class="console-read" data-read="link">LINK 99.2%</em></div>
   <div class="console-row">
-    <button class="arm" type="button" tabindex="-1" data-sfx="ping"><i></i>SCAN</button>
-    <button class="arm" type="button" tabindex="-1" data-sfx="hud"><i></i>UPLINK</button>
+    <button class="arm live" type="button" tabindex="-1" data-sfx="ping" data-console="scan" title="Choose a file to scan"><i></i>SCAN</button>
+    <button class="arm live" type="button" tabindex="-1" data-sfx="hud" data-console="hud" title="Arrange the display (F2)"><i></i>HUD</button>
     <button class="arm" type="button" tabindex="-1" data-sfx="rev"><i></i>LOCK</button>
     <button class="arm danger" type="button" tabindex="-1" data-sfx="down"><i></i>PURGE</button>
     <button class="knob" type="button" tabindex="-1" data-sfx="tab" aria-label="Gain"><i></i></button>
   </div>
   <div class="console-foot"><em class="console-read" data-read="core">CORE 0x3FA2</em><span class="console-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><em class="console-read" data-read="temp">TEMP 41°C</em></div>
 </aside>
+
+<!-- The HUD editor (F2, HUD on the console, or "customize the HUD"): every
+     panel of the normal display in a frame - drag it to move it, a corner
+     to resize it, the wheel or +/- to scale what is inside, the eye to hide
+     it. hud.js has the rules, app.js the hands; hud.py keeps the result. -->
+<div id="hud-edit" aria-hidden="true">
+  <div id="hud-grid"></div>
+  <div id="hud-guides"></div>
+  <div id="hud-frames"></div>
+  <div id="hud-bar" role="toolbar" aria-label="HUD editor">
+    <b><i></i>HUD EDITOR</b>
+    <span class="hud-tips">Drag to move · corners to resize · wheel to scale · double-click for 100%</span>
+    <button type="button" id="hud-snap" aria-pressed="true" data-sfx="none">Snap</button>
+    <button type="button" id="hud-reset" data-sfx="none">Reset all</button>
+    <button type="button" id="hud-done" class="primary" data-sfx="none">Done</button>
+  </div>
+</div>
 
 <!-- One display's settings in ultra mode: its size, and what it shows. -->
 <div id="tile-config" role="dialog" aria-hidden="true"></div>

@@ -671,6 +671,40 @@ def _lyla_findings(ctx, number=1):
     return out
 
 
+@_tool("scan_file", "opening File Explorer",
+       "Open File Explorer over the display so the user can pick a file for "
+       "the scanner to read and judge - clean, careful or dangerous - without "
+       "running it. Use this when the user asks to scan or check a file, or "
+       "whether a file is safe: \"افحص ملف\", \"شيك على هذا الملف\", \"scan a "
+       "file for me\". Say in a few words that File Explorer is open; the "
+       "report shows on the display when they pick one.",
+       _obj({}))
+def _scan_file(ctx):
+    ctx.activity("opening File Explorer")
+    opened = ctx.display({"action": "scan"})
+    return {"ok": bool(opened),
+            "result": ("File Explorer is opening on the display." if opened
+                       else "The display is not up, so there is nowhere to open it.")}
+
+
+@_tool("hud_editor", "arranging the display",
+       "The normal display is a HUD the user can arrange: move a panel, resize "
+       "it, make what is inside it bigger or smaller, hide it. \"edit\" opens "
+       "the HUD editor on the display, \"done\" closes it, \"reset\" puts every "
+       "panel back where it started. Use this when the user wants to arrange, "
+       "customize, move or resize the display or its panels - \"عدل الواجهة\", "
+       "\"ابي احرك الشاشات\", \"رجع الواجهة زي ما كانت\", \"customize the HUD\".",
+       _obj({"action": _enum(("edit", "done", "reset"), "What to do with the HUD")}, ("action",)))
+def _hud_editor(ctx, action="edit"):
+    ctx.activity("arranging the display")
+    done = ctx.display({"action": "hud_edit", "do": action})
+    said = {"edit": "The HUD editor is open: drag a panel to move it, a corner to resize it, "
+                    "the wheel to scale what is inside, and Done when it is right.",
+            "done": "The HUD is kept as it is.",
+            "reset": "Every panel is back where it started."}[action]
+    return {"ok": bool(done), "result": said if done else "The display is not up."}
+
+
 # What "put everything back" sounds like: every display back in the grid.
 _EVERYTHING = {"", "all", "everything", "every display", "all displays", "all of them",
                "grid", "the grid", "كل", "الكل", "كلها", "كل الشاشات", "الشبكة"}

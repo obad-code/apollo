@@ -120,6 +120,7 @@ import ideas  # noqa: E402
 import interests  # noqa: E402
 import issues  # noqa: E402
 import journal  # noqa: E402
+import hud  # noqa: E402
 import live  # noqa: E402
 import lyla  # noqa: E402
 import private_eye  # noqa: E402
@@ -1183,6 +1184,11 @@ class Api:
         self._app.want_trading()
         return True
 
+    def pick_file(self):
+        """Choose file, on the scanner: File Explorer opens over the display
+        and what you pick is scanned (Apollo.choose_and_scan)."""
+        return self._app.choose_and_scan() if self._app is not None else False
+
     def lyla_reports(self):
         """LYLA's latest reports and what she is on now, for agents mode to
         list when the page comes up (it hears of each new one as it lands)."""
@@ -1201,6 +1207,13 @@ class Api:
         a display hidden or expanded: kept, so the screen you set up is the
         one you get tomorrow. Cleaned first - it came over the bridge."""
         displays.save(layout)
+        return True
+
+    def save_hud(self, layout):
+        """The normal display as you arranged it - a panel moved, resized,
+        scaled or hidden - kept for tomorrow (hud.py). Cleaned first - it
+        came over the bridge."""
+        hud.save(layout)
         return True
 
     def osiris_park(self):
@@ -1537,6 +1550,27 @@ class Apollo:
             return
         threading.Thread(target=self._scan_all, args=(paths[:10],), daemon=True, name="scan").start()
 
+    def choose_and_scan(self):
+        """File Explorer's own open dialog, over the display, and what you
+        pick scanned like a drop. The display fills the screen, so there is
+        nothing behind it to drag a file from. True if a file was chosen."""
+        window = getattr(self, "window", None)
+        if window is None:
+            return False
+        kind = getattr(getattr(webview, "FileDialog", None), "OPEN", None)
+        if kind is None:
+            kind = getattr(webview, "OPEN_DIALOG", 10)
+        try:
+            chosen = window.create_file_dialog(kind, allow_multiple=True)
+        except Exception:  # noqa: BLE001 - no dialog is a note, not a crash
+            log.warning("the file dialog would not open", exc_info=True)
+            return False
+        paths = [p for p in (chosen or ()) if p]
+        if not paths:
+            return False
+        threading.Thread(target=self._scan_all, args=(paths[:10],), daemon=True, name="scan").start()
+        return True
+
     def _scan_all(self, paths):
         for path in paths:
             self.scan_file(path)
@@ -1668,7 +1702,8 @@ class Apollo:
         them is something to look at. Hiding one, or leaving ultra mode,
         leaves the screen as it is."""
         action = request.get("action")
-        return (action in ("focus", "show", "mode")
+        return (action in ("focus", "show", "mode", "scan")
+                or (action == "hud_edit" and request.get("do") in ("edit", "reset"))
                 or (action == "ultra" and bool(request.get("on"))))
 
     def check_displays(self):
@@ -1724,7 +1759,8 @@ class Apollo:
                 # ...and ultra mode's displays the way you laid them out.
                 laid_out = getattr(ui, "display", None)
                 if laid_out is not None:
-                    laid_out({"action": "layout", "layout": displays.state()})
+                    # ...with the normal display's HUD the way you arranged it.
+                    laid_out({"action": "layout", "layout": displays.state(), "hud": hud.state()})
                 # ...and which of Apollo's own modes are on, for the bar.
                 self._tell_states()
                 # ...and what is wrong, for the System panel.

@@ -21,6 +21,7 @@ import { Sfx } from './sfx.js';
 import { LylaAgent, LOOKS, emblem } from './lylaagent.js';
 import * as Feed from './feed.js';
 import * as Modes from './modes.js';
+import * as Hud from './hud.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -145,6 +146,9 @@ const state = {
   lylaReports: [],        // what LYLA found, newest first (apollo.py keeps them)
   reportOpen: -1,         // the report of hers opened out, if any
   agentOpen: null,        // the agent whose process agents mode is showing, if any
+  hud: Hud.emptyHud(),    // the normal display as arranged by hand (hud.js), kept by apollo.py
+  hudEdit: false,         // the HUD editor is up
+  hudSnap: true,          // edges pull onto the grid and each other while it is
   away: false,            // away mode, as apollo.py last said
   listening: false,       // hands-free, as apollo.py last said
   modeTicket: 0,          // the mode last asked for, so an older one stops half way
@@ -437,7 +441,7 @@ function toggleAgent() {
 $('lyla-block').addEventListener('click', toggleAgent);
 
 // Click the display and LYLA comes after the pointer for a while (lyla.js).
-document.addEventListener('pointerdown', (event) => lyla.follow(event.clientX, event.clientY));
+document.addEventListener('pointerdown', (event) => { if (!state.hudEdit) lyla.follow(event.clientX, event.clientY); });
 document.addEventListener('pointermove', (event) => lyla.pointer(event.clientX, event.clientY));
 
 /* Apollo's shape: a globe, the way a wireframe icon draws one, with a star
@@ -2107,6 +2111,7 @@ document.addEventListener('drop', (event) => {
 });
 
 function openScan() {
+  if (state.hudEdit) exitHudEdit();
   document.body.classList.add('scan-open');
   if (ultraOn()) {
     document.body.classList.remove('scan-float');
@@ -2122,6 +2127,25 @@ function closeScan() {
   document.body.classList.remove('scan-open', 'scan-float');
 }
 $('scan-close').addEventListener('click', closeScan);
+
+/* The display fills the screen, so there is nothing to drag a file from:
+ * Choose file opens File Explorer's own open dialog over it instead
+ * (apollo.py), and what you pick is scanned like a drop. Apollo opens it
+ * too when asked to scan a file. */
+async function pickFile() {
+  const api = bridge();
+  if (!api || !api.pick_file) return false;
+  sfx.play('open');
+  $('scan-block').classList.add('picking');
+  try {
+    return Boolean(await api.pick_file());
+  } catch (e) {
+    return false;
+  } finally {
+    $('scan-block').classList.remove('picking');
+  }
+}
+$('scan-pick').addEventListener('click', pickFile);
 
 function onScan(event) {
   if (!event) return;
@@ -2179,7 +2203,7 @@ function renderScan() {
       `<li class="${esc(finding.level)}"><i></i>${esc(finding.text)}</li>`).join('')}</ul>` : ''}
     ${facts.length ? `<dl class="scan-facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}
     ${report.lookup ? `<button type="button" class="scan-lookup" data-link="${esc(report.lookup)}" data-sfx="none">Look it up on VirusTotal</button>` : ''}
-    <p class="scan-again">Drop another file to scan it.</p>`;
+    <p class="scan-again">Choose or drop another file to scan it.</p>`;
 }
 
 $('scan-body').addEventListener('click', (event) => {
@@ -2350,7 +2374,7 @@ function renderTrading(board) {
     ${movers.map((mover) => `
       <div class="desk-row"><b>${esc(mover.ticker)}</b><span class="grow">${esc(mover.name)}</span>
         <span class="num">${Number(mover.mentions) || 0}</span>
-        <span class="rise ${Number(mover.rise) >= 1.5 ? 'up' : ''}">${(Number(mover.rise) || 0).toFixed(1)}x</span></div>`).join('') || empty('Reddit is quiet or unreachable.')}`;
+        <span class="desk-rise ${Number(mover.rise) >= 1.5 ? 'up' : ''}">${(Number(mover.rise) || 0).toFixed(1)}x</span></div>`).join('') || empty('Reddit is quiet or unreachable.')}`;
 
   const filings = board.filings || [];
   const news = (board.news || []).slice(0, 8);
@@ -2691,6 +2715,7 @@ function setView(view) {
   view = Modes.VIEWS.includes(view) ? view : 'normal';
   if (view === state.view) return;
   const was = state.view;
+  if (state.hudEdit) exitHudEdit();
   state.view = view;
   const back = view === 'normal';
   sfx.play(back ? 'down' : 'hud');
@@ -2712,6 +2737,7 @@ function setView(view) {
     }
     applyRoom({ quiet: true });
     applySkin();
+    applyHud();
   });
 }
 
@@ -2981,6 +3007,7 @@ function setUltra(on, { quiet = false, layout = null } = {}) {
   on = Boolean(on);
   const next = layout || Tiles.setUltra(state.layout, on);
   if (on === ultraOn()) { changeLayout(next); return on; }
+  if (on && state.hudEdit) exitHudEdit();
   if (!quiet) sfx.play(on ? 'swipe' : 'down');
   closeStory();
   closeStock();
@@ -3270,6 +3297,456 @@ function renderSummaries() {
     read('temp', `TEMP ${38 + Math.floor(Math.random() * 7)}°C`);
   }, 1000);
 })();
+
+/* --- the HUD: the normal display arranged by hand -----------------------------------
+ * F2, HUD on the console, or "customize the HUD": every panel of the normal
+ * display in a frame. Drag one and it follows the hand on a spring, leaning
+ * into the way it is going, and lets go onto the grid or the nearest edge of
+ * another - with the guide it lined up on; a corner resizes it (Apollo and
+ * the consoles keep their shape); the wheel or +/- scales what is inside;
+ * the eye hides it. Reset all flies every panel home. The result is kept
+ * (hud.py) and laid out whenever the normal display is up; every other view
+ * lays itself out as ever. hud.js has the numbers. */
+
+const panelOf = (id) => $(Hud.ELEMENT[id]);
+const hudFree = () => state.hud.free;
+function stageBox() {
+  const r = $('stage').getBoundingClientRect();
+  return { x: r.left, y: r.top, w: r.width, h: r.height };
+}
+function seenRect(id, stage = stageBox()) {
+  const r = panelOf(id).getBoundingClientRect();
+  return { x: r.left - stage.x, y: r.top - stage.y, w: r.width, h: r.height };
+}
+
+/* One panel laid out to cover `rect` (px on the stage) with its insides
+ * scaled by `s`. The consoles live outside the stage, fixed to the window. */
+function placePanel(id, rect, s, stage = stageBox()) {
+  const panel = panelOf(id);
+  const b = Hud.box(rect, s);
+  const outside = panel.classList.contains('console');
+  panel.style.setProperty('--hl', `${b.left + (outside ? stage.x : 0)}px`);
+  panel.style.setProperty('--ht', `${b.top + (outside ? stage.y : 0)}px`);
+  panel.style.setProperty('--hw', `${b.width}px`);
+  panel.style.setProperty('--hh', `${b.height}px`);
+  panel.style.setProperty('--hs', String(s));
+}
+
+/* The answer sits under Apollo wherever he is, LYLA's card under her bar,
+ * and the scanner's report grows out of its line. */
+function hudFollowers(stage = stageBox()) {
+  const { core, lyla, scan } = state.hud.items;
+  if (core) {
+    const r = Hud.toPixels(core, stage);
+    const half = Math.min(450, window.innerWidth * 0.31);
+    $('answer').style.setProperty('--al', `${Math.min(Math.max(r.x + r.w / 2, half + 16), stage.w - half - 16)}px`);
+    $('answer').style.setProperty('--at', `${r.y + r.h * 0.795}px`);
+  }
+  if (lyla) {
+    const r = Hud.toPixels(lyla, stage);
+    $('lyla-agent').style.setProperty('--ll', `${r.x}px`);
+    $('lyla-agent').style.setProperty('--lt', `${r.y + r.h + 6}px`);
+    $('lyla-agent').style.setProperty('--lw', `${Math.max(r.w, 420)}px`);
+  }
+  const block = $('scan-block');
+  block.classList.toggle('hud-grow', Boolean(scan) && !state.hudEdit);
+  block.classList.toggle('up', Boolean(scan) && (scan.y + scan.h / 2) > 0.5);
+}
+
+function applyHud() {
+  const stage = stageBox();
+  document.body.classList.toggle('hud-free', hudFree());
+  for (const id of Hud.PANELS) {
+    const panel = panelOf(id);
+    if (!panel) continue;
+    panel.classList.add('hud-panel');
+    panel.classList.toggle('hud-whole', Hud.WHOLE.has(id));
+    const item = state.hud.items[id];
+    panel.classList.toggle('hud-hidden', Boolean(hudFree() && item && item.hidden));
+    if (!hudFree() || !item) {
+      for (const name of ['--hl', '--ht', '--hw', '--hh', '--hs']) panel.style.removeProperty(name);
+      continue;
+    }
+    placePanel(id, Hud.toPixels(item, stage), item.s, stage);
+  }
+  if (hudFree()) hudFollowers(stage);
+  if (state.hudEdit) drawFrames();
+}
+window.addEventListener('resize', () => applyHud());
+
+let hudSaving = null;
+function saveHud() {
+  clearTimeout(hudSaving);
+  hudSaving = setTimeout(() => {
+    const api = bridge();
+    if (api && api.save_hud) api.save_hud(state.hud);
+  }, 350);
+}
+
+/* The first arrangement: every panel taken from where the grid put it. One
+ * not on the screen right now starts small in the middle, hidden. */
+function captureHud() {
+  const stage = stageBox();
+  const items = {};
+  for (const id of Hud.PANELS) {
+    const rect = seenRect(id, stage);
+    const seen = rect.w > 2 && rect.h > 2;
+    items[id] = Hud.toItem(seen ? rect : { x: stage.w * 0.4, y: stage.h * 0.4, w: stage.w * 0.2, h: stage.h * 0.1 },
+                           stage, 1, !seen);
+  }
+  state.hud = Hud.sanitize({ free: true, items });
+}
+
+/* A change that is not a drag - a scale step, a panel hidden, a nudge -
+ * eases into place. */
+function easeHud(ids, change) {
+  for (const id of ids) panelOf(id).classList.add('hud-easing');
+  change();
+  applyHud();
+  setTimeout(() => ids.forEach((id) => panelOf(id).classList.remove('hud-easing')), 320);
+}
+
+// -- the editor -------------------------------------------------------------------------
+
+const EYE = '<svg viewBox="0 0 16 16"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>';
+const EYE_SHUT = '<svg viewBox="0 0 16 16"><path d="M2 2l12 12M6.2 3.8C6.8 3.6 7.4 3.5 8 3.5c4.1 0 6.5 4.5 6.5 4.5a11 11 0 0 1-2 2.6M9.8 12.2c-.6.2-1.2.3-1.8.3-4.1 0-6.5-4.5-6.5-4.5a11 11 0 0 1 2-2.6"/></svg>';
+
+function frameStyle(rect, stage) {
+  return `left:${stage.x + rect.x}px;top:${stage.y + rect.y}px;width:${rect.w}px;height:${rect.h}px`;
+}
+
+/* The frames: drawn afresh - flying in one after another - as the editor
+ * opens, and after that only moved and relabelled, so the one in your hand
+ * is never taken from under it. */
+function drawFrames() {
+  const stage = stageBox();
+  const frames = $('hud-frames');
+  if (frames.children.length) {
+    for (const id of Hud.PANELS) {
+      const item = state.hud.items[id];
+      const frame = frames.querySelector(`.hud-frame[data-hud="${id}"]`);
+      if (!item || !frame) continue;
+      moveFrame(id, Hud.toPixels(item, stage), stage);
+      frame.classList.toggle('is-hidden', item.hidden);
+      frame.querySelector('.hud-tag em').textContent = `${Math.round(item.s * 100)}%`;
+      const eye = frame.querySelector('[data-hud-act="hide"]');
+      eye.innerHTML = item.hidden ? EYE_SHUT : EYE;
+      eye.title = item.hidden ? 'Show it' : 'Hide it';
+    }
+    return;
+  }
+  frames.innerHTML = Hud.PANELS.map((id, i) => {
+    const item = state.hud.items[id];
+    if (!item) return '';
+    const rect = Hud.toPixels(item, stage);
+    // Its tag sits over the frame, unless the frame is at the top of the screen.
+    const inside = stage.y + rect.y < 40;
+    return `<div class="hud-frame${item.hidden ? ' is-hidden' : ''}${Hud.WHOLE.has(id) ? ' whole' : ''}${state.hudPick === id ? ' picked' : ''}${inside ? ' tag-in' : ''}"
+        data-hud="${id}" style="${frameStyle(rect, stage)};--i:${i}">
+      <div class="hud-tag"><b>${Hud.NAMES[id]}</b><em>${Math.round(item.s * 100)}%</em>
+        <button type="button" data-hud-act="smaller" data-sfx="none" title="Smaller inside">−</button>
+        <button type="button" data-hud-act="bigger" data-sfx="none" title="Bigger inside">+</button>
+        <button type="button" data-hud-act="hide" data-sfx="none" title="${item.hidden ? 'Show it' : 'Hide it'}">${item.hidden ? EYE_SHUT : EYE}</button>
+      </div>
+      <i class="hud-handle" data-corner="nw"></i><i class="hud-handle" data-corner="ne"></i>
+      <i class="hud-handle" data-corner="sw"></i><i class="hud-handle" data-corner="se"></i>
+    </div>`;
+  }).join('');
+}
+
+function moveFrame(id, rect, stage = stageBox()) {
+  const frame = document.querySelector(`.hud-frame[data-hud="${id}"]`);
+  if (!frame) return;
+  frame.setAttribute('style', `${frameStyle(rect, stage)};--i:0;opacity:1;animation:none`);
+  frame.classList.toggle('tag-in', stage.y + rect.y < 40);
+}
+function clearFrames() {
+  $('hud-frames').innerHTML = '';
+}
+
+function showGuides(lines, stage = stageBox()) {
+  $('hud-guides').innerHTML = lines.map((line) => (line.axis === 'x'
+    ? `<i class="hud-guide x" style="left:${stage.x + line.at}px"></i>`
+    : `<i class="hud-guide y" style="top:${stage.y + line.at}px"></i>`)).join('');
+}
+
+function othersThan(id, stage) {
+  return Hud.PANELS.filter((other) => other !== id && state.hud.items[other] && !state.hud.items[other].hidden)
+    .map((other) => Hud.toPixels(state.hud.items[other], stage));
+}
+
+function enterHudEdit() {
+  if (state.hudEdit) return;
+  if (state.view !== 'normal' || ultraOn() || state.osiris) {
+    // Arranged in the normal display, so that is where it goes first.
+    setMode('normal');
+    setTimeout(enterHudEdit, 1300);
+    return;
+  }
+  closeScan();
+  closeStory();
+  closeStock();
+  if (agent.open) toggleAgent();
+  if (!hudFree()) captureHud();
+  state.hudEdit = true;
+  document.body.classList.add('hud-editing');
+  $('hud-edit').setAttribute('aria-hidden', 'false');
+  sfx.play('expand');
+  clearFrames();
+  applyHud();
+}
+
+function exitHudEdit() {
+  if (!state.hudEdit) return;
+  state.hudEdit = false;
+  state.hudPick = null;
+  document.body.classList.remove('hud-editing');
+  $('hud-edit').setAttribute('aria-hidden', 'true');
+  clearFrames();
+  $('hud-guides').innerHTML = '';
+  sfx.play('collapse');
+  applyHud();
+  saveHud();
+}
+
+/* Every panel home, flown there: where each is now is measured, the grid
+ * lays them out, and each starts from where it was and eases to where it
+ * belongs - a little after the one before. */
+function resetHud() {
+  const firsts = Object.fromEntries(Hud.PANELS.map((id) => [id, panelOf(id).getBoundingClientRect()]));
+  state.hud = Hud.emptyHud();
+  applyHud();
+  if (state.hudEdit) { captureHud(); applyHud(); }
+  sfx.play('swap');
+  Hud.PANELS.forEach((id, i) => {
+    const panel = panelOf(id);
+    const first = firsts[id];
+    const last = panel.getBoundingClientRect();
+    if (!first.width || !last.width) return;
+    const dx = (first.left + first.width / 2) - (last.left + last.width / 2);
+    const dy = (first.top + first.height / 2) - (last.top + last.height / 2);
+    panel.classList.remove('hud-flip');
+    panel.style.translate = `${dx}px ${dy}px`;
+    panel.style.scale = String(first.width / last.width);
+    void panel.offsetWidth;
+    panel.style.setProperty('--flip-delay', `${i * 0.035}s`);
+    panel.classList.add('hud-flip');
+    panel.style.translate = '';
+    panel.style.scale = '';
+    setTimeout(() => panel.classList.remove('hud-flip'), 700 + i * 35);
+  });
+  saveHud();
+}
+
+// -- the hands --------------------------------------------------------------------------
+
+let hudHand = null;
+
+function handLoop(now) {
+  const hand = hudHand;
+  if (!hand || hand.kind !== 'move') return;
+  const stage = stageBox();
+  // The spring is stepped once per sixtieth of a second, however often the
+  // screen is drawn, so it feels the same on a slow frame.
+  const steps = Math.min(4, Math.max(1, Math.round((now - (hand.at || now - 16.7)) / 16.7)));
+  hand.at = now;
+  for (let i = 0; i < steps; i++) {
+    [hand.pos.x, hand.vel.x] = Hud.spring(hand.pos.x, hand.vel.x, hand.target.x);
+    [hand.pos.y, hand.vel.y] = Hud.spring(hand.pos.y, hand.vel.y, hand.target.y);
+    // It leans into the way it is going, and straightens as it slows.
+    const lean = Math.max(-6, Math.min(6, hand.vel.x * 0.45));
+    [hand.tilt, hand.tiltV] = Hud.spring(hand.tilt, hand.tiltV, hand.let ? 0 : lean, { stiffness: 0.18, damping: 0.7 });
+  }
+  const rect = { x: hand.pos.x, y: hand.pos.y, w: hand.start.w, h: hand.start.h };
+  placePanel(hand.id, rect, hand.s, stage);
+  panelOf(hand.id).style.rotate = `${hand.tilt.toFixed(2)}deg`;
+  moveFrame(hand.id, rect, stage);
+  const still = Math.abs(hand.vel.x) + Math.abs(hand.vel.y) < 0.08
+    && Math.abs(hand.target.x - hand.pos.x) + Math.abs(hand.target.y - hand.pos.y) < 0.4
+    && Math.abs(hand.tilt) < 0.05;
+  if (hand.let && still) {
+    settleHand(hand, { x: hand.target.x, y: hand.target.y, w: hand.start.w, h: hand.start.h });
+    return;
+  }
+  requestAnimationFrame(handLoop);
+}
+
+function settleHand(hand, rect) {
+  const stage = stageBox();
+  const was = state.hud.items[hand.id];
+  state.hud.items[hand.id] = Hud.toItem(rect, stage, hand.s, was.hidden);
+  const panel = panelOf(hand.id);
+  panel.style.rotate = '';
+  panel.classList.remove('hud-lifted');
+  hudHand = null;
+  showGuides([]);
+  applyHud();
+  saveHud();
+}
+
+$('hud-frames').addEventListener('pointerdown', (event) => {
+  const frame = event.target.closest('.hud-frame');
+  if (!frame || event.button !== 0 || event.target.closest('.hud-tag button')) return;
+  if (event.target.closest('.hud-tag') && !event.target.closest('.hud-tag b')) return;
+  event.preventDefault();
+  // One still settling from the last drag is put where it was going first.
+  if (hudHand) {
+    const was = hudHand;
+    settleHand(was, was.kind === 'move' ? { ...was.start, x: was.target.x, y: was.target.y } : was.rect);
+  }
+  const id = frame.dataset.hud;
+  const stage = stageBox();
+  const item = state.hud.items[id];
+  const start = Hud.toPixels(item, stage);
+  const corner = event.target.closest('.hud-handle')?.dataset.corner || null;
+  state.hudPick = id;
+  document.querySelectorAll('.hud-frame.picked').forEach((f) => f.classList.remove('picked'));
+  frame.classList.add('picked', 'active');
+  frame.setPointerCapture(event.pointerId);
+  hudHand = {
+    id, kind: corner ? 'size' : 'move', corner, start, s: item.s, s0: item.s,
+    px: event.clientX, py: event.clientY, pos: { x: start.x, y: start.y }, vel: { x: 0, y: 0 },
+    target: { x: start.x, y: start.y }, tilt: 0, tiltV: 0, let: false, rect: start,
+  };
+  panelOf(id).classList.add('hud-lifted');
+  sfx.play('grain');
+  if (!corner) requestAnimationFrame(handLoop);
+});
+
+$('hud-frames').addEventListener('pointermove', (event) => {
+  const hand = hudHand;
+  if (!hand || hand.let) return;
+  const stage = stageBox();
+  const dx = event.clientX - hand.px;
+  const dy = event.clientY - hand.py;
+  const others = othersThan(hand.id, stage);
+  if (hand.kind === 'move') {
+    const raw = { x: hand.start.x + dx, y: hand.start.y + dy, w: hand.start.w, h: hand.start.h };
+    const snapped = state.hudSnap ? Hud.snap(raw, others, stage) : { rect: Hud.clampInto(raw, stage), lines: [] };
+    hand.target = { x: snapped.rect.x, y: snapped.rect.y };
+    showGuides(snapped.lines, stage);
+    return;
+  }
+  const whole = Hud.WHOLE.has(hand.id);
+  const sized = Hud.resize(hand.start, hand.corner, dx, dy, stage,
+                           { others, whole, pull: state.hudSnap ? Hud.PULL : 0, grid: state.hudSnap ? Hud.GRID : 1 });
+  let rect = sized.rect;
+  if (whole) {
+    // A whole panel is its scale: the corner makes all of it larger.
+    hand.s = Math.min(Hud.SCALE_MAX, Math.max(Hud.SCALE_MIN, hand.s0 * sized.k));
+    const k = hand.s / hand.s0;
+    const w = hand.start.w * k;
+    const h = hand.start.h * k;
+    rect = Hud.clampInto({ x: hand.corner.includes('w') ? hand.start.x + hand.start.w - w : hand.start.x,
+                           y: hand.corner.includes('n') ? hand.start.y + hand.start.h - h : hand.start.y, w, h }, stage);
+  }
+  hand.rect = rect;
+  placePanel(hand.id, rect, hand.s, stage);
+  moveFrame(hand.id, rect, stage);
+  showGuides(sized.lines, stage);
+});
+
+function letGo(event) {
+  const hand = hudHand;
+  if (!hand || hand.let) return;
+  const frame = event.target.closest('.hud-frame');
+  if (frame) frame.classList.remove('active');
+  hand.let = true;
+  sfx.play('swap');
+  if (hand.kind === 'size') settleHand(hand, hand.rect);
+}
+$('hud-frames').addEventListener('pointerup', letGo);
+$('hud-frames').addEventListener('pointercancel', letGo);
+
+/* What is inside a panel, a step larger or smaller - a whole panel grows
+ * about its middle. */
+function scaleHud(id, steps) {
+  const item = state.hud.items[id];
+  if (!item) return;
+  const s = Hud.scaled(item.s, steps);
+  if (s === item.s) return;
+  sfx.play(steps > 0 ? 'show' : 'hide');
+  easeHud([id], () => {
+    const stage = stageBox();
+    if (Hud.WHOLE.has(id)) {
+      const r = Hud.toPixels(item, stage);
+      const k = s / item.s;
+      const rect = Hud.clampInto({ x: r.x + (r.w - r.w * k) / 2, y: r.y + (r.h - r.h * k) / 2, w: r.w * k, h: r.h * k }, stage);
+      state.hud.items[id] = Hud.toItem(rect, stage, s, item.hidden);
+    } else {
+      state.hud.items[id] = { ...item, s };
+    }
+  });
+  saveHud();
+}
+
+$('hud-frames').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-hud-act]');
+  if (!button) return;
+  const id = button.closest('.hud-frame').dataset.hud;
+  const act = button.dataset.hudAct;
+  if (act === 'bigger') scaleHud(id, 1);
+  if (act === 'smaller') scaleHud(id, -1);
+  if (act === 'hide') {
+    const item = state.hud.items[id];
+    sfx.play(item.hidden ? 'show' : 'hide');
+    easeHud([id], () => { state.hud.items[id] = { ...item, hidden: !item.hidden }; });
+    saveHud();
+  }
+});
+
+$('hud-frames').addEventListener('dblclick', (event) => {
+  const frame = event.target.closest('.hud-frame');
+  if (!frame || event.target.closest('.hud-tag button')) return;
+  const item = state.hud.items[frame.dataset.hud];
+  if (item && item.s !== 1) scaleHud(frame.dataset.hud, Math.round((1 - item.s) / Hud.SCALE_STEP));
+});
+
+$('hud-frames').addEventListener('wheel', (event) => {
+  const frame = event.target.closest('.hud-frame');
+  if (!frame) return;
+  event.preventDefault();
+  scaleHud(frame.dataset.hud, event.deltaY < 0 ? 1 : -1);
+}, { passive: false });
+
+$('hud-done').addEventListener('click', exitHudEdit);
+$('hud-reset').addEventListener('click', resetHud);
+$('hud-snap').addEventListener('click', () => {
+  state.hudSnap = !state.hudSnap;
+  $('hud-snap').setAttribute('aria-pressed', state.hudSnap ? 'true' : 'false');
+  sfx.play(state.hudSnap ? 'check' : 'tick');
+});
+
+// F2 opens and closes it; Escape or Enter closes it; the arrows nudge the
+// panel last touched - a grid step, or a pixel with Shift.
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'F2') {
+    event.preventDefault();
+    if (state.hudEdit) exitHudEdit(); else enterHudEdit();
+    return;
+  }
+  if (!state.hudEdit) return;
+  if (event.key === 'Escape' || event.key === 'Enter') {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    exitHudEdit();
+    return;
+  }
+  const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+  const id = state.hudPick;
+  if (!step || !id || !state.hud.items[id]) return;
+  event.preventDefault();
+  const stage = stageBox();
+  const by = event.shiftKey ? 1 : Hud.GRID;
+  const r = Hud.toPixels(state.hud.items[id], stage);
+  const rect = Hud.clampInto({ ...r, x: r.x + step[0] * by, y: r.y + step[1] * by }, stage);
+  easeHud([id], () => { state.hud.items[id] = Hud.toItem(rect, stage, state.hud.items[id].s, state.hud.items[id].hidden); });
+  saveHud();
+}, true);
+
+// The console's two live buttons: SCAN chooses a file, HUD arranges.
+document.querySelector('[data-console="scan"]').addEventListener('click', () => pickFile());
+document.querySelector('[data-console="hud"]').addEventListener('click', () => enterHudEdit());
 
 $('ultra-grid').addEventListener('click', () => focusDisplay(null));
 $('ultra-chips').addEventListener('click', (event) => {
@@ -3860,6 +4337,14 @@ window.apollo = {
     if (asked.action === 'focus') focusDisplay(asked.id || null);
     if (asked.action === 'show' || asked.action === 'hide') showDisplay(asked.id, asked.action === 'show');
     if (asked.action === 'mode') setMode(String(asked.mode || ''));
+    if (asked.action === 'scan') pickFile();
+    // The layout as the display opens carries the normal display's HUD too.
+    if (asked.action === 'layout' && 'hud' in asked) { state.hud = Hud.sanitize(asked.hud); applyHud(); }
+    if (asked.action === 'hud_edit') {
+      if (asked.do === 'edit') enterHudEdit();
+      if (asked.do === 'done') exitHudEdit();
+      if (asked.do === 'reset') resetHud();
+    }
     return { ultra: state.layout.ultra, focus: state.layout.focus, mode: Modes.current(modeFlags()) };
   },
   // "Open story three": opens it and says what it is. 0 closes it.
