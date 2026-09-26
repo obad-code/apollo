@@ -71,3 +71,10 @@ def test_quitting_says_so(records):
         ticker=None, learner=None, eye=None, orb=None, tray=None, window=None)
     apollo.Apollo.quit(app)
     assert any("quitting" in r.getMessage() for r in records)
+
+
+def test_the_window_closing_says_so_too(records):
+    """Closing the display's window ends Apollo by another road than quit."""
+    app = types.SimpleNamespace(stopping=threading.Event(), close_live=lambda: None, ui=None)
+    apollo.Apollo.on_closed(app)
+    assert any("closed" in r.getMessage() for r in records)

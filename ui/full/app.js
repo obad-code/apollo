@@ -3490,6 +3490,11 @@ window.apollo = {
     // a window nobody can see is a GPU burning for nothing.
     // Nothing on the sign moves while nobody can see it.
     document.body.classList.toggle('offscreen', name !== 'full');
+    // ...and the SVGs' own animations (LYLA's agent map), which no
+    // stylesheet reaches.
+    document.querySelectorAll('svg').forEach((svg) => {
+      if (up) svg.unpauseAnimations(); else svg.pauseAnimations();
+    });
     if (name === 'full') {
       shader.start();
       if (!asleep.on) { if (roomShown()) lyla.start(); ringStart(); }

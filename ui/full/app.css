@@ -1311,6 +1311,11 @@ body.answering #core { transition: transform .6s cubic-bezier(.32,.72,0,1); }
   animation: ap-orb-glow 6.4s ease-in-out infinite;
 }
 body.offscreen #orb .glow, body.asleep #orb .glow { animation-play-state: paused; }
+/* The display hidden, nothing on it moves. Windows hides it, not the browser,
+   so to WebView2 the page is still on screen, and an animation left running
+   is drawn by the GPU for nobody. They carry on from where they were when the
+   display is back. */
+body.offscreen *, body.offscreen *::before, body.offscreen *::after { animation-play-state: paused !important; }
 #ring { position: relative; width: 380px; height: 236px; }
 /* The name as a neon sign, the way the old display had it: the one place on
    the display that is a name and not a number. Melete, each letter pulsing

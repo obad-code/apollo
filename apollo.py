@@ -1351,6 +1351,7 @@ class Apollo:
 
     def on_closed(self):
         self.stopping.set()
+        log.info("the window closed: quitting")
         self.close_live()
         if getattr(self, "ui", None):
             self.ui.alive = False
