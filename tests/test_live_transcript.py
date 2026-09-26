@@ -22,6 +22,9 @@ def session(auto_vad):
     live._on_user_text = None
     live.shown = []
     live._on_heard = live.shown.append
+    # What hush holds while it stops the speaker (see test_live_speaker_race).
+    live._speaker_lock = threading.Lock()
+    live._hushes = 0
     return live
 
 

@@ -82,6 +82,7 @@ composites unreliably outside the normal window hierarchy.
 import collections
 import ctypes
 from ctypes import wintypes
+import faulthandler
 import json
 import logging
 import logging.handlers
@@ -198,6 +199,29 @@ def _beside(path):
     """Where to write when the usual file is held: next to it, by pid."""
     stem, ext = os.path.splitext(path)
     return f"{stem}-{os.getpid()}{ext}"
+
+
+CRASH_PATH = os.path.join(os.path.dirname(LOG_PATH), "crash.log")
+
+
+def watch_crashes(path=CRASH_PATH):
+    """Have a crash leave a line, where under pythonw it left nothing.
+
+    An exception nobody caught - on the main thread or any other - goes into
+    the log with its traceback. A crash inside a DLL (PortAudio, WebView2)
+    never reaches Python's handlers at all; faulthandler writes every
+    thread's stack to `path` as it happens, which is what says where it was.
+    Returns the crash file, kept open for as long as Apollo runs.
+    """
+    def logged(kind, exc_type, exc, tb):
+        log.critical("%s crashed", kind, exc_info=(exc_type, exc, tb))
+
+    sys.excepthook = lambda *exc: logged("Apollo", *exc)
+    threading.excepthook = lambda a: logged(
+        f"thread {a.thread.name if a.thread else '?'}", a.exc_type, a.exc_value, a.exc_traceback)
+    handle = open(path, "a", encoding="utf-8")
+    faulthandler.enable(file=handle, all_threads=True)
+    return handle
 
 
 # The hand-written display. `ui/legacy/` holds the generated page this one
@@ -1330,6 +1354,7 @@ class Apollo:
         if self.stopping.is_set():
             return
         self.stopping.set()
+        log.info("quitting")
         self.close_live()
         if self.clips is not None:
             self.clips.stop()
@@ -1830,9 +1855,20 @@ class Apollo:
         # Locking the PC is asking for idle mode: once per lock, so waking it
         # on the lock screen does not put it straight back to sleep.
         locked = pc_locked()
-        if locked and not getattr(self, "_was_locked", False):
+        was_locked = getattr(self, "_was_locked", False)
+        recorder = getattr(self, "clips", None)
+        if locked and not was_locked:
             log.info("the PC was locked: idle mode")
             self.request_idle()
+            # Windows allows no screen capture while it is locked, so the
+            # replay buffer dies on the lock screen; whether it was recording
+            # going in is whether it comes back on the way out.
+            self._clips_at_lock = recorder is not None and recorder.running
+        if was_locked and not locked and getattr(self, "_clips_at_lock", False):
+            self._clips_at_lock = False
+            if recorder is not None and not recorder.running:
+                log.info("unlocked: the replay buffer is recording again")
+                recorder.start()
         self._was_locked = locked
         # Away mode (away.py): out by what you say - once the answer is over,
         # or Apollo's own voice would count as you being here - and back at a
@@ -2075,6 +2111,10 @@ def main():
     # After the lock: the copy that exits because one is already running
     # must not write "started" into the running one's log.
     start_log()
+    try:
+        _crashes = watch_crashes()  # noqa: F841 - held open while Apollo runs
+    except OSError:
+        log.warning("no crash file; native crashes will go unrecorded")
     log.info("started, pid %s", os.getpid())
 
     Apollo()

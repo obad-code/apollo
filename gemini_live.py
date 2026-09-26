@@ -98,6 +98,7 @@ VOICE = "Puck"
 INPUT_RATE = 16000       # what we send
 OUTPUT_RATE = 24000      # what Gemini sends back
 BLOCK = 1600             # 100 ms of input per callback
+SLICE = 960              # 40 ms of reply per write - see `_write`
 
 CONNECT_TIMEOUT = 20     # seconds to wait for the websocket at startup
 REPLY_TIMEOUT = 60       # ...and for one spoken answer to finish
@@ -259,6 +260,13 @@ class LiveSession:
         self._session = None
         self._mic = None
         self._speaker = None
+        # The speaker is written from a worker thread, hushed from the one you
+        # interrupted on and closed from the loop, and PortAudio allows none
+        # of those at once: a write that meets an abort ends the session
+        # ("Stream is stopped"), and one that meets a close reads freed memory
+        # and takes the whole app down. Everything that touches it holds this.
+        self._speaker_lock = threading.Lock()
+        self._hushes = 0    # bumped by hush: a write under way stops at its next slice
 
         # Cross-thread flags. `_closing` is checked by the PortAudio callback
         # and so is a threading.Event, not an asyncio one - see the module
@@ -683,25 +691,52 @@ class LiveSession:
             samplerate=INPUT_RATE, blocksize=BLOCK, channels=1,
             dtype="int16", callback=self._mic_callback,
         )
-        self._speaker = sd.RawOutputStream(
+        speaker = sd.RawOutputStream(
             samplerate=OUTPUT_RATE, channels=1, dtype="int16",
         )
         self._mic.start()
-        self._speaker.start()
+        speaker.start()
+        with self._speaker_lock:      # handed over started, never half-way
+            self._speaker = speaker
 
     def _close_streams(self):
-        for stream in (self._mic, self._speaker):
-            if stream is None:
-                continue
-            try:
-                stream.abort(ignore_errors=True)
-            except Exception:
-                pass
-            try:
-                stream.close(ignore_errors=True)
-            except Exception:
-                pass
-        self._mic = self._speaker = None
+        # The speaker under its lock: a write still running on its worker
+        # thread - cancelling the task does not stop the thread - finishes its
+        # slice first, and finds no speaker when it comes back for the next.
+        with self._speaker_lock:
+            speaker, self._speaker = self._speaker, None
+            self._shut(speaker)
+        self._shut(self._mic)
+        self._mic = None
+
+    @staticmethod
+    def _shut(stream):
+        if stream is None:
+            return
+        try:
+            stream.abort(ignore_errors=True)
+        except Exception:
+            pass
+        try:
+            stream.close(ignore_errors=True)
+        except Exception:
+            pass
+
+    def _write(self, chunk):
+        """The reply's audio to the sound card, on a worker thread.
+
+        A slice at a time, each under the speaker's lock, so a hush or a close
+        waits no longer than one slice and never lands in the middle of a
+        write - and the rest of a chunk that was hushed is not played after it.
+        """
+        hushes = self._hushes
+        step = SLICE * 2          # int16: two bytes a sample
+        for at in range(0, len(chunk), step):
+            with self._speaker_lock:
+                speaker = self._speaker
+                if speaker is None or self._hushes != hushes:
+                    return
+                speaker.write(chunk[at:at + step])
 
     def _mic_callback(self, indata, _frames, _time, status):
         """PortAudio's thread, not ours. Cheap, and defensive about the loop."""
@@ -857,14 +892,16 @@ class LiveSession:
         """
         self._play_open.clear()
         self._drain(self._play_q)
-        speaker = self._speaker
-        if speaker is None:
-            return
-        try:
-            speaker.abort()
-            speaker.start()
-        except Exception:  # noqa: BLE001 - a device that will not flush is
-            pass           # still a device that should keep working
+        with self._speaker_lock:
+            self._hushes += 1
+            speaker = self._speaker
+            if speaker is None:
+                return
+            try:
+                speaker.abort()
+                speaker.start()
+            except Exception:  # noqa: BLE001 - a device that will not flush is
+                pass           # still a device that should keep working
 
     def _finish_turn_transcript(self):
         """Forget what was heard, so the next sentence stands on its own.
@@ -1013,5 +1050,5 @@ class LiveSession:
                 return
             # Blocking in C: off the loop, or the receive loop stalls behind
             # the sound card and the reply arrives in stutters.
-            await asyncio.to_thread(self._speaker.write, chunk)
+            await asyncio.to_thread(self._write, chunk)
             self._last_write = time.monotonic()
