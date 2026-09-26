@@ -435,8 +435,8 @@ all otherwise):
   of control, deals signed or ended, executives leaving...), and
   market-moving headlines (Finnhub's market news and a search for halts,
   FDA decisions, deals, probes, guidance cuts, downgrades). The SEC answers
-  only requests that name a contact, so its filings wait for your email in
-  `SEC_CONTACT`.
+  only requests that name a contact, and Apollo gives it yours (`SEC_CONTACT`
+  in `trading.py`; the `SEC_CONTACT` variable overrides it, `off` stops it).
 - **Insiders** - OpenInsider's screens of Form 4 filings: cluster buys
   (several insiders of one company buying at once, the strongest insider
   signal) and the biggest open-market purchases.

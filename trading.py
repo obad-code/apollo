@@ -16,8 +16,8 @@ actually reachable (September 2026):
                events a company must disclose within four business days:
                bankruptcy, restatements, delisting notices, a change of
                control, deals signed or ended, executives leaving. The SEC
-               only answers requests that name a contact email, so this
-               source waits for one in SEC_CONTACT.
+               only answers requests that name a contact email: yours
+               (SEC_CONTACT below, or the SEC_CONTACT variable).
   news         Market-moving headlines: Finnhub's market news with the key
                Apollo already has, and a news search for the words that
                move prices (halted, FDA, merger, probe, guidance cut...).
@@ -269,14 +269,35 @@ def parse_8k(body, tickers=None):
     return filings
 
 
+# The contact the SEC is given: yours, as you said to use it (26 September
+# 2026). SEC_CONTACT overrides it; set it to "off" to stop asking the SEC.
+SEC_CONTACT = "youcancallmeobad@gmail.com"
+
+
 def sec_contact():
-    return (os.environ.get("SEC_CONTACT") or "").strip()
+    given = (os.environ.get("SEC_CONTACT") or SEC_CONTACT or "").strip()
+    return "" if given.lower() == "off" else given
 
 
 def _sec_tickers(headers):
+    """CIK -> ticker. A company with several (its warrants, its units) is
+    known by its common stock: the ticker with no suffix, the shortest."""
     data = _json(_get("tickers", SEC_TICKERS, headers)) or {}
-    return {str(v.get("cik_str")): str(v.get("ticker", "")).upper() for v in data.values()
-            if isinstance(v, dict)}
+    return pick_tickers(data)
+
+
+def pick_tickers(data):
+    best = {}
+    for v in (data or {}).values():
+        if not isinstance(v, dict):
+            continue
+        cik, ticker = str(v.get("cik_str")), str(v.get("ticker", "")).upper()
+        if not ticker:
+            continue
+        rank = ("-" in ticker, len(ticker))
+        if cik not in best or rank < best[cik][0]:
+            best[cik] = (rank, ticker)
+    return {cik: ticker for cik, (_, ticker) in best.items()}
 
 
 def sensitive_filings(limit=10):

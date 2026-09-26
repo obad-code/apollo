@@ -117,8 +117,22 @@ def test_8k_filings_the_serious_ones_first_and_only_those_that_say_something():
 
 def test_without_a_contact_the_sec_is_not_asked(monkeypatch):
     monkeypatch.delenv("SEC_CONTACT", raising=False)
+    monkeypatch.setattr(trading, "SEC_CONTACT", "")
     monkeypatch.setattr(trading, "_download", lambda *a, **k: pytest.fail("asked the SEC"))
     assert trading.sensitive_filings() is None
+
+
+def test_the_sec_is_given_your_contact_and_it_can_be_turned_off(monkeypatch):
+    monkeypatch.delenv("SEC_CONTACT", raising=False)
+    assert trading.sec_contact() == trading.SEC_CONTACT and "@" in trading.SEC_CONTACT
+    monkeypatch.setenv("SEC_CONTACT", "off")
+    assert trading.sec_contact() == ""
+
+
+def test_a_company_is_known_by_its_common_stock_not_its_warrants():
+    data = {"0": {"cik_str": 1, "ticker": "SLND-WT"}, "1": {"cik_str": 1, "ticker": "SLND"},
+            "2": {"cik_str": 2, "ticker": "PSKY"}}
+    assert trading.pick_tickers(data) == {"1": "SLND", "2": "PSKY"}
 
 
 def test_trending_is_companies_not_coins_or_funds():
@@ -240,9 +254,9 @@ def test_one_source_down_does_not_take_the_board_down(monkeypatch):
         raise OSError("unexpected " + url)
     trading._cache.clear()
     monkeypatch.setattr(trading, "_download", fake)
-    monkeypatch.delenv("SEC_CONTACT", raising=False)
+    monkeypatch.setenv("SEC_CONTACT", "off")
     monkeypatch.delenv("X_BEARER_TOKEN", raising=False)
-    monkeypatch.setattr(trading.feeds, "headlines", lambda *a, **k: [])
+    monkeypatch.setattr(trading.feeds, "search", lambda *a, **k: [])
     b = trading.board()
     assert b["buys"] == [] and b["clusters"] == []
     assert b["sources"]["filings"] == "off" and b["sources"]["x"] == "off"
