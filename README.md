@@ -422,8 +422,8 @@ tool; Bluetooth and location still ask first.
 all otherwise). It has a style of its own rather than Apollo's: the market's
 greens on ink - the ground behind it goes over to them too, and the bar and
 the clock take them while it is up - teal for the labels, gold for a
-warning, red for what falls; set in Space Grotesk, with the tickers and
-figures in Martian Mono (both bundled, SIL Open Font License).
+warning, red for what falls; set in Thmanyah like the rest of Apollo, with
+the tickers and figures in Martian Mono (bundled, SIL Open Font License).
 
 - **The read** - the next picks, where the signals agree: each ticker scored
   by how many kinds of signal point at it (trending with traders, bullish
@@ -930,7 +930,7 @@ The only thing left is your API key.
 | `ui/full/feed.js` | The feed's rows, fuller: a source's initials for its tile, what a story is about, and the line over the list (`tests/test_feed_rows.py`). |
 | `ui/full/sfx.js` | The display's sounds, synthesized with Web Audio: the recipes, and the player that keeps a sound from doubling up (`tests/test_sfx.py`). |
 | `ui/fonts/thmanyah/` | Thmanyah Sans, as OTFs — what the overlay loads privately at runtime. |
-| `ui/full/fonts/` | The same weights as WOFF2, under the page because pywebview's server roots there - and beside them IBM Plex Mono, Melete, Orbitron, VT323, and trading mode's Space Grotesk and Martian Mono, each with its licence. |
+| `ui/full/fonts/` | The same weights as WOFF2, under the page because pywebview's server roots there - and beside them IBM Plex Mono, Melete, Orbitron, VT323, and trading mode's Martian Mono, each with its licence. |
 | `ui/legacy/index.html` | The old generated design, frozen. Nothing in the run reads it. |
 | `build_ui.py` | Builds `ui/legacy/index.html` from the Claude Design export. **Not part of the run.** |
 | `ADD A CITY.dc.html` | The old design source, as exported from the canvas. |

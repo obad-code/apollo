@@ -1,6 +1,6 @@
 """Trading mode in its own style: its own colours - the market's greens on
 ink, the ground behind the desk going over to them - and its own letters,
-Space Grotesk for the words and Martian Mono for the tickers and figures,
+Thmanyah for the words and Martian Mono for the tickers and figures,
 carried with Apollo like the rest of its fonts."""
 import pathlib
 import re
@@ -18,7 +18,7 @@ def block(selector):
 
 
 def test_its_own_letters_are_bundled_with_their_licences():
-    for family, folder in (("Space Grotesk", "space-grotesk"), ("Martian Mono", "martian-mono")):
+    for family, folder in (("Martian Mono", "martian-mono"),):
         assert f'font-family: "{family}"' in CSS
         assert list((FULL / "fonts" / folder).glob("*.woff2"))
         assert "Open Font License" in (FULL / "fonts" / folder / "OFL.txt").read_text(encoding="utf-8")
@@ -26,7 +26,7 @@ def test_its_own_letters_are_bundled_with_their_licences():
 
 def test_the_desk_is_set_in_them():
     desk = block("#trading")
-    assert '"Space Grotesk"' in desk and '"Martian Mono"' in desk
+    assert '"Thmanyah"' in desk and '"Martian Mono"' in desk
     assert "font-family: var(--desk-words)" in desk
 
 

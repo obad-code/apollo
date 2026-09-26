@@ -29,6 +29,10 @@ RENAMES = (
     ("this.state.phase", "this.phase"),
     ("this.props.", "this.opts."),
     ("this.sfx(", "this.sound("),
+    # Her health bar moves by transform rather than width (a layout property
+    # animated every frame) - the one line changed on purpose.
+    ("el.style.width = hp.toFixed(1) + '%';",
+     "el.style.transform = 'scaleX(' + (hp / 100).toFixed(3) + ')';"),
 )
 
 

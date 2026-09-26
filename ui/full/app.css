@@ -33,12 +33,9 @@
 @font-face { font-family: "Melete"; font-weight: 500; font-display: block;
              src: url("fonts/melete/Melete-Medium.otf") format("opentype"); }
 
-/* The trading desk's own letters: Space Grotesk for its words and Martian
-   Mono for its tickers and figures, each one variable file for every weight.
-   Both SIL Open Font License (fonts/space-grotesk/OFL.txt,
-   fonts/martian-mono/OFL.txt). */
-@font-face { font-family: "Space Grotesk"; font-weight: 300 700; font-display: block;
-             src: url("fonts/space-grotesk/space-grotesk-latin-wght-normal.woff2") format("woff2"); }
+/* The trading desk's figures: Martian Mono for its tickers and numbers, one
+   variable file for every weight. SIL Open Font License
+   (fonts/martian-mono/OFL.txt). Its words are in Thmanyah, like Apollo's. */
 @font-face { font-family: "Martian Mono"; font-weight: 100 800; font-display: block;
              src: url("fonts/martian-mono/martian-mono-latin-wght-normal.woff2") format("woff2"); }
 
@@ -905,7 +902,7 @@ body.answering #dock { opacity: .18; }
 /* Tighter on ultra mode's bar, which carries every display too: Apollo's
    own three by their icons alone (their names on the pointer). */
 .mode { white-space: nowrap; }
-#ultra-bar .mode { padding: 8px 8px; font-size: 10px; letter-spacing: .08em; gap: 6px; }
+#ultra-bar .mode { padding: 8px 8px; font-size: 11px; letter-spacing: .08em; gap: 6px; }
 #ultra-bar .modes:not(.own) .mode .led { display: none; }
 #ultra-bar .own .mode { font-size: 0; gap: 0; padding: 8px 9px; }
 #ultra-bar .own .mode-icon { width: 15px; height: 15px; }
@@ -1340,11 +1337,6 @@ body.offscreen *, body.offscreen *::before, body.offscreen *::after { animation-
   33% { opacity: .85; filter: blur(11px) hue-rotate(-22deg); transform: scaleX(1.06); }
   66% { opacity: .42; filter: blur(8px) hue-rotate(26deg); transform: scaleX(.97); }
 }
-@keyframes ap-dotseq {
-  0% { opacity: .12; box-shadow: none; }
-  6%, 27% { opacity: 1; box-shadow: 0 0 7px currentColor, 0 0 14px currentColor; }
-  36%, 100% { opacity: .12; box-shadow: none; }
-}
 #wordmark { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
             margin-top: 6px; pointer-events: none; transition: opacity .26s ease; }
 #wordmark .bloom { position: absolute; left: -16px; right: -16px; top: -7px; height: 38px;
@@ -1366,9 +1358,7 @@ body.offscreen *, body.offscreen *::before, body.offscreen *::after { animation-
 #wordmark .letters b.bad { animation: ap-sign-bad 5.2s steps(1, end) infinite; }
 #wordmark .dots { display: flex; gap: 9px; align-items: center; margin-top: 2px; }
 #wordmark .dots i { width: 4px; height: 4px; border-radius: 50%; color: #fff; background: currentColor;
-                    animation: ap-dotseq 1.5s ease-in-out infinite; }
-#wordmark .dots i:nth-child(2) { animation-delay: .5s; }
-#wordmark .dots i:nth-child(3) { animation-delay: 1s; }
+                    opacity: .35; }
 body.listening #wordmark, body.answering #wordmark { opacity: 0; }
 /* Nobody is looking - the overlay has the screen, or the idle screen is
    over it - so nothing on the sign moves. */
@@ -1464,8 +1454,8 @@ body:not(.ultra) #stage:has(#lyla-block:not(.away)) #headlines { margin-top: cal
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: repeating-linear-gradient(90deg, transparent 0 9px, rgba(8, 7, 6, .9) 9px 11px);
 }
-#lyla-bar { position: absolute; inset: 0 auto 0 0; width: 88%; background: var(--amber);
-            transition: width .6s ease-out; }
+#lyla-bar { position: absolute; inset: 0 auto 0 0; width: 100%; background: var(--amber);
+            transform-origin: left center; transform: scaleX(.88); transition: transform .6s ease-out; }
 #lyla-label { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap;
               overflow: hidden; text-overflow: ellipsis; color: var(--caption); }
 #lyla-block { cursor: pointer; }
@@ -1501,8 +1491,7 @@ body.answering #lyla-agent { opacity: .18; transition: opacity .45s ease-in-out;
               border-bottom: 1px solid rgba(255, 255, 255, .06); }
 .agent-live { display: flex; align-items: center; gap: 7px; font-size: 11px; letter-spacing: .1em;
               color: rgba(255, 255, 255, .3); }
-.agent-live i { width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
-                animation: agent-blink 2s ease-in-out infinite; }
+.agent-live i { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
 .agent-meta { font-size: 11px; color: rgba(255, 255, 255, .18); }
 .agent-map { display: block; }
 .agent-map text { font-family: var(--mono); }
@@ -1511,7 +1500,7 @@ body.answering #lyla-agent { opacity: .18; transition: opacity .45s ease-in-out;
 .agent-say { display: flex; gap: 8px; align-items: flex-start; height: 52px; padding: 9px 18px;
              border-top: 1px solid rgba(255, 255, 255, .06); }
 .agent-prompt { flex: none; font-size: 13px; line-height: 1.5; color: rgba(var(--agent-rgb, 0, 82, 255), .55); }
-.agent-line { flex: 1; min-width: 0; font-size: 11px; line-height: 1.55; color: rgba(255, 255, 255, .42);
+.agent-line { flex: 1; min-width: 0; font-size: 12px; line-height: 1.55; color: rgba(255, 255, 255, .42);
               transition: opacity .25s, transform .25s; }
 /* Out upwards, then the next in from below - what AnimatePresence did. */
 .agent-line.leaving { opacity: 0; transform: translateY(-5px); }
@@ -1526,7 +1515,6 @@ body.answering #lyla-agent { opacity: .18; transition: opacity .45s ease-in-out;
 .agent-stack { margin-left: auto; text-align: right; }
 .agent-stack small { color: rgba(255, 255, 255, .18); }
 .agent-stack em { font-style: normal; font-size: 11px; color: rgba(var(--agent-rgb, 0, 82, 255), .7); }
-@keyframes agent-blink { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
 @keyframes agent-think { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
 @keyframes agent-status { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
 @keyframes agent-pop { from { transform: scale(1.05); } to { transform: scale(1); } }
@@ -1789,7 +1777,7 @@ body.answering .console { opacity: .18; }
 .console-head b { color: var(--amber-bright); font-weight: 800; letter-spacing: .18em; }
 .console-read { margin-left: auto; font-style: normal; font-variant-numeric: tabular-nums; color: rgba(127, 227, 255, .8); }
 .beacon { width: 7px; height: 7px; border-radius: 50%; background: #ff4d4d;
-          box-shadow: 0 0 8px rgba(255, 77, 77, .9); animation: console-blink 1.4s steps(2, jump-none) infinite; }
+          box-shadow: 0 0 8px rgba(255, 77, 77, .9); }
 .console-row { display: flex; align-items: flex-end; gap: 5px; }
 .console-row .arm, .console-row .flip { min-width: 0; }
 .console-row button { font: inherit; letter-spacing: .1em; cursor: pointer; }
@@ -1863,7 +1851,7 @@ body.ultra .console.squeezed { display: none; }
    It is set in its own colours and its own letters rather than Apollo's:
    the market's greens on ink (the ground goes over to them too - see the
    shader's `market`), teal for the labels, gold for a warning, red for what
-   falls; Space Grotesk for the words and Martian Mono for the tickers and
+   falls; Thmanyah for the words and Martian Mono for the tickers and
    the figures. The rest of the screen - the bar, the clock - takes the
    colours while the desk is up. */
 
@@ -1902,7 +1890,7 @@ body.trading:not(.ultra):not(.osiris-map) #trading {
   --desk-bright: #F4FFF9;
   --desk-caption: rgba(160, 226, 204, 0.6);
   --desk-line: rgba(120, 240, 190, 0.1);
-  --desk-words: "Space Grotesk", "Thmanyah", system-ui, sans-serif;
+  --desk-words: "Thmanyah", system-ui, sans-serif;
   --desk-figures: "Martian Mono", "IBM Plex Mono", "Thmanyah", ui-monospace, monospace;
   font-family: var(--desk-words);
   color: var(--desk-text);
@@ -1910,9 +1898,7 @@ body.trading:not(.ultra):not(.osiris-map) #trading {
 .desk-head { display: flex; align-items: baseline; gap: 18px; padding: 0 4px; }
 .desk-head b { font: 700 13px var(--desk-figures); letter-spacing: .22em; color: var(--desk-green); white-space: nowrap; }
 .desk-head b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%;
-                       background: var(--desk-green); box-shadow: 0 0 10px var(--desk-green); vertical-align: 1px;
-                       animation: desk-live 1.6s ease-in-out infinite; }
-@keyframes desk-live { 50% { opacity: .35; } }
+                       background: var(--desk-green); box-shadow: 0 0 10px var(--desk-green); vertical-align: 1px; }
 #desk-verdict { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; letter-spacing: -.005em; color: var(--desk-bright);
                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #desk-age { font: 400 11px var(--desk-figures); font-style: normal; letter-spacing: .08em; text-transform: uppercase;
@@ -1983,7 +1969,7 @@ body.trading:not(.ultra):not(.osiris-map) #trading {
 .pick-why { margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--desk-caption);
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .x-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.desk-foot { padding: 0 4px; font: 400 11px var(--desk-figures); letter-spacing: .08em; text-transform: uppercase; color: var(--desk-caption); }
+.desk-foot { padding: 0 4px; font: 400 12px var(--desk-words); color: var(--desk-caption); }
 
 /* --- the agents ------------------------------------------------------------------------
    Agents mode: the agents by their marks down the left - LYLA, and ATLAS,
@@ -1999,7 +1985,7 @@ body.agents:not(.ultra):not(.osiris-map) #agents {
 .agents-head { display: flex; flex-direction: column; gap: 4px; padding: 0 6px 4px; }
 .agents-head b { font: 800 13px var(--hud); letter-spacing: .3em; color: var(--amber-bright); }
 .agents-head em { font-style: normal; font-size: 11px; color: var(--caption); }
-.agents-foot { padding: 4px 6px 0; font-size: 11px; line-height: 1.5; color: var(--caption); }
+.agents-foot { padding: 4px 6px 0; font-size: 12px; line-height: 1.5; color: var(--caption); }
 #agent-marks { display: flex; flex-direction: column; gap: 8px; }
 .agent-mark {
   --agent-rgb: 0, 82, 255;
@@ -2031,7 +2017,7 @@ body.agents:not(.ultra):not(.osiris-map) #agents {
                       animation: agent-status 1.6s ease-in-out infinite; }
 #agent-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
                min-width: 0; min-height: 0; max-height: 100%; }
-#agent-pick { font-size: 13px; letter-spacing: .06em; color: var(--caption); }
+#agent-pick { font-size: 13px; color: var(--caption); }
 #agent-pick[hidden], #lyla-reports[hidden] { display: none; }
 #agent-stage .agent-card {
   --agent-rgb: 0, 82, 255;

@@ -1580,7 +1580,7 @@ export class Lyla {
     const low = hp < 26;
     if (this.bar) {
       const el = this.bar;
-      el.style.width = hp.toFixed(1) + '%';
+      el.style.transform = 'scaleX(' + (hp / 100).toFixed(3) + ')';
       const col = low ? '#FF7A2B' : charging ? '#FFD48A' : '#FFB000';
       el.style.background = col;
       el.style.boxShadow = '0 0 9px ' + (low ? 'rgba(255,122,43,.8)' : 'rgba(255,176,0,.75)');
