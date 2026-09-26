@@ -18,7 +18,7 @@ import { bootLines, typed } from './boot.js';
 import * as Tiles from './tiles.js';
 import * as Globe from './globe.js';
 import { Sfx } from './sfx.js';
-import { LylaAgent } from './lylaagent.js';
+import { LylaAgent, LOOKS, emblem } from './lylaagent.js';
 import * as Feed from './feed.js';
 import * as Modes from './modes.js';
 
@@ -144,6 +144,7 @@ const state = {
   view: 'normal',         // which view of the display: normal, clear, trading or agents
   lylaReports: [],        // what LYLA found, newest first (apollo.py keeps them)
   reportOpen: -1,         // the report of hers opened out, if any
+  agentOpen: null,        // the agent whose process agents mode is showing, if any
   away: false,            // away mode, as apollo.py last said
   listening: false,       // hands-free, as apollo.py last said
   modeTicket: 0,          // the mode last asked for, so an older one stops half way
@@ -288,6 +289,55 @@ lyla.start();
 const agent = new LylaAgent($('lyla-agent'), { sound: (name) => sfx.play(name) });
 // ...and the same card in agents mode, which has its own sound for arriving.
 const agentsCard = new LylaAgent($('agent-lyla'));
+
+/* Agents mode: each agent by its mark down the left - LYLA, and ATLAS,
+ * NOVA and ECHO as previews of the agents to come - and a click on one
+ * opens its process (its pipeline card) beside the marks; a click on it
+ * again puts it away. LYLA's reports go with hers. */
+const AGENTS = ['LYLA', 'ATLAS', 'NOVA', 'ECHO'];
+const agentCards = {
+  LYLA: agentsCard,
+  ...Object.fromEntries(AGENTS.slice(1).map((key) =>
+    [key, new LylaAgent($(`agent-${key.toLowerCase()}`), { look: LOOKS[key] })])),
+};
+function agentState(key) {
+  if (key !== 'LYLA') return ['PREVIEW', 'preview'];
+  if (lylaDoing.job) return ['ON A JOB', 'working'];
+  return agentsCard.isLive ? ['LIVE', 'live'] : ['READY', 'ready'];
+}
+function renderMarks() {
+  $('agent-marks').innerHTML = AGENTS.map((key) => {
+    const look = LOOKS[key];
+    const [said, kind] = agentState(key);
+    const picked = state.agentOpen === key;
+    return `<button type="button" class="agent-mark${picked ? ' chosen' : ''}" data-agent="${key}"
+        data-sfx="none" aria-pressed="${picked ? 'true' : 'false'}" style="--agent-rgb:${look.rgb};--agent-mark:${look.mark || look.hex}">
+      <span class="mark-emblem">${emblem(key, 40)}</span>
+      <span class="mark-name"><b>${key}</b><small>${look.role}</small></span>
+      <em class="mark-state ${kind}">${said}</em>
+    </button>`;
+  }).join('');
+}
+function openAgent(key) {
+  const was = state.agentOpen;
+  state.agentOpen = was === key ? null : key;
+  for (const name of AGENTS) {
+    if (name !== state.agentOpen) agentCards[name].hide();
+  }
+  if (state.agentOpen) agentCards[state.agentOpen].show();
+  sfx.play(state.agentOpen ? 'hud' : 'down');
+  showAgentStage();
+}
+function showAgentStage() {
+  const open = state.agentOpen;
+  $('agent-pick').hidden = Boolean(open);
+  $('lyla-reports').hidden = open !== 'LYLA';
+  renderMarks();
+}
+$('agent-marks').addEventListener('click', (event) => {
+  const mark = event.target.closest('[data-agent]');
+  if (mark) openAgent(mark.dataset.agent);
+});
 function toggleAgent() {
   agent.toggle();
   $('lyla-agent-toggle').setAttribute('aria-expanded', agent.open ? 'true' : 'false');
@@ -1956,6 +2006,7 @@ async function loadReports() {
     lylaDoing.show();
   } catch (e) { /* the list stays as it was */ }
   renderReports();
+  if (state.view === 'agents') renderMarks();
 }
 $('lyla-reports')?.addEventListener('click', (event) => {
   const item = event.target.closest('[data-report]');
@@ -2366,12 +2417,16 @@ function setView(view) {
   unlightRow();
   if (agent.open) toggleAgent();
   if (view === 'trading') wantTrading();
-  if (was === 'agents') agentsCard.hide();
+  if (was === 'agents') for (const key of AGENTS) agentCards[key].hide();
   renderModes();
   channelChange(() => {
     for (const name of ['clear', 'trading', 'agents']) document.body.classList.toggle(name, view === name);
     document.body.classList.toggle('viewing', view !== 'normal');
-    if (view === 'agents') { agentsCard.show(); loadReports(); }
+    if (view === 'agents') {
+      if (state.agentOpen) agentCards[state.agentOpen].show();
+      showAgentStage();
+      loadReports();
+    }
     applyRoom({ quiet: true });
     applySkin();
   });
@@ -3464,6 +3519,7 @@ window.apollo = {
       lylaDoing.job = on ? `ON A JOB${step.symbol ? ` · ${step.symbol}` : ''}` : '';
       lylaDoing.show();
     }
+    if (state.view === 'agents') renderMarks();
     if (step.stage === 'done' && step.report) {
       state.lylaReports.unshift({ task: step.task, symbol: step.symbol, summary: step.text,
                                   report: step.report, brain: step.brain, done: Date.now() / 1000 });

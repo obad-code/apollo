@@ -215,11 +215,23 @@
   <!-- Agents mode: every agent as its pipeline. LYLA, for now - live while
        you command her. -->
   <section id="agents" aria-label="Agents">
-    <header class="agents-head"><b>AGENTS</b><span>LYLA</span><em>Ask Apollo for research - he hands it to LYLA and you carry on. Her pipeline runs live here.</em></header>
-    <div id="agent-lyla" class="agent-card"></div>
-    <!-- What she found, newest first: the job, her two lines, and the whole
-         report under them. -->
-    <ol id="lyla-reports" aria-label="LYLA's reports"></ol>
+    <!-- The agents, each by its mark down the left (lylaagent.js draws them,
+         app.js lists them): a click opens that agent's process beside it. -->
+    <nav id="agent-rail" aria-label="The agents">
+      <header class="agents-head"><b>AGENTS</b><em>Pick one to see its process</em></header>
+      <div id="agent-marks"></div>
+      <p class="agents-foot">Ask Apollo for research - he hands it to LYLA and you carry on.</p>
+    </nav>
+    <div id="agent-stage">
+      <p id="agent-pick">Pick an agent on the left to see its process.</p>
+      <div id="agent-lyla" class="agent-card"></div>
+      <div id="agent-atlas" class="agent-card"></div>
+      <div id="agent-nova" class="agent-card"></div>
+      <div id="agent-echo" class="agent-card"></div>
+      <!-- What LYLA found, newest first: the job, her two lines, and the
+           whole report under them. -->
+      <ol id="lyla-reports" aria-label="LYLA's reports"></ol>
+    </div>
   </section>
 </main>
 

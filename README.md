@@ -486,9 +486,15 @@ writes. What she thinks with, the first that answers:
 - **Gemini** otherwise, with Google Search, on `GEMINI_API_KEY` - nothing to
   set up. `LYLA_MODEL` puts a model of your choice first.
 
-**Agents mode.** **Agents** on the bar, or *"agents mode"*: each agent as
-its pipeline card - only LYLA, for now - and her reports under it. Until
-she first works it is a preview on a loop and says PREVIEW. Hand her a job
+**Agents mode.** **Agents** on the bar, or *"agents mode"*: the agents by
+their marks down the left, each in its own colour and shape - LYLA's lens
+(blue, research), and as previews of the agents to come, ATLAS's compass
+(orange, a planner), NOVA's burst (magenta, a creator) and ECHO's waves
+(teal, memory). Click a mark and that agent's process opens beside it -
+its pipeline card, in its colours, with LYLA's reports under hers; click it
+again to put it away. Her mark says READY, LIVE or ON A JOB; the other
+three say PREVIEW, run a demo of what they will do, and never go live.
+Until LYLA first works her card is a preview on a loop too and says PREVIEW. Hand her a job
 through Apollo, or say *"hey LYLA, ..."*, and her card goes LIVE: the job,
 each thing she reads, her writing it up, then the answer with how long it
 took and what she thought with (or the error), her runs counted and her
@@ -917,7 +923,7 @@ The only thing left is your API key.
 | `ui/full/globe.js` | Apollo's shape as data: the globe's meridians as it turns, its parallels, the star at its heart, and the easing of its pace. No DOM, so node tests it (`tests/test_globe.py`). |
 | `ui/full/tiles.js` | Ultra mode's rules: the displays, the default layout, moving, resizing, minimizing and expanding, and the line each says when minimized. No DOM, so node tests it (`tests/test_tiles.py`). |
 | `ui/full/lyla.js` | LYLA, lifted out of the old page byte for byte. `tests/test_lyla_port.py` pins the two together. |
-| `ui/full/lylaagent.js` | LYLA's agent card, a preview before she is an agent: the pipeline, its moving parts and what opens and shuts it - ported from a React component to plain JS and SVG, so there is still no build step (`tests/test_lyla_agent.py`). |
+| `ui/full/lylaagent.js` | The agents' pipeline card - LYLA's live, ATLAS's, NOVA's and ECHO's as previews, each in its own look - and each agent's mark: the pipeline, its moving parts and what opens and shuts it, ported from a React component to plain JS and SVG, so there is still no build step (`tests/test_lyla_agent.py`, `tests/test_agents_rail.py`). |
 | `lyla.py` | LYLA's desk: the research Apollo hands her, on her own thread - what she reads, what she thinks with (Hermes or Gemini), her reports kept, and Apollo told when she is done (`tests/test_lyla_desk.py`). |
 | `trading.py` | Trading mode's desk: insiders (OpenInsider), Congress, the SEC's 8-K filings, market-moving news, StockTwits and Reddit, X when it is set up, and the read of the next picks (`tests/test_trading.py`). |
 | `ui/full/modes.js` | The display's modes - normal, clear, expanded, OSIRIS - and the switches to throw, in order, from one to another (`tests/test_modes.py`). |

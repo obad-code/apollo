@@ -1505,7 +1505,7 @@ body.answering #lyla-agent { opacity: .18; transition: opacity .45s ease-in-out;
 .agent-status { animation: agent-status 1.9s ease-in-out infinite; }
 .agent-say { display: flex; gap: 8px; align-items: flex-start; height: 52px; padding: 9px 18px;
              border-top: 1px solid rgba(255, 255, 255, .06); }
-.agent-prompt { flex: none; font-size: 13px; line-height: 1.5; color: rgba(0, 82, 255, .55); }
+.agent-prompt { flex: none; font-size: 13px; line-height: 1.5; color: rgba(var(--agent-rgb, 0, 82, 255), .55); }
 .agent-line { flex: 1; min-width: 0; font-size: 11px; line-height: 1.55; color: rgba(255, 255, 255, .42);
               transition: opacity .25s, transform .25s; }
 /* Out upwards, then the next in from below - what AnimatePresence did. */
@@ -1520,7 +1520,7 @@ body.answering #lyla-agent { opacity: .18; transition: opacity .45s ease-in-out;
 .agent-count.pop { animation: agent-pop .3s ease-out; }
 .agent-stack { margin-left: auto; text-align: right; }
 .agent-stack small { color: rgba(255, 255, 255, .18); }
-.agent-stack em { font-style: normal; font-size: 11px; color: rgba(0, 82, 255, .55); }
+.agent-stack em { font-style: normal; font-size: 11px; color: rgba(var(--agent-rgb, 0, 82, 255), .7); }
 @keyframes agent-blink { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
 @keyframes agent-think { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
 @keyframes agent-status { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
@@ -1981,29 +1981,69 @@ body.trading:not(.ultra):not(.osiris-map) #trading {
 .desk-foot { padding: 0 4px; font: 400 11px var(--desk-figures); letter-spacing: .08em; text-transform: uppercase; color: var(--desk-caption); }
 
 /* --- the agents ------------------------------------------------------------------------
-   Agents mode: each agent as its pipeline card, large, in the middle of the
-   screen - LYLA, for now, live while you command her. */
+   Agents mode: the agents by their marks down the left - LYLA, and ATLAS,
+   NOVA and ECHO as previews - and the process of the one you pick beside
+   them, large: its pipeline card, LYLA's live while she works, with her
+   reports under it. Each agent in its own colour (--agent-rgb). */
 
 body.agents:not(.ultra):not(.osiris-map) #agents {
-  grid-area: view; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  grid-area: view; display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 40px;
+  align-items: center; min-height: 0; padding: 0 2vw;
 }
-.agents-head { display: flex; align-items: baseline; gap: 16px; width: min(900px, 90%); }
+#agent-rail { display: flex; flex-direction: column; gap: 14px; align-self: center; }
+.agents-head { display: flex; flex-direction: column; gap: 4px; padding: 0 6px 4px; }
 .agents-head b { font: 800 13px var(--hud); letter-spacing: .3em; color: var(--amber-bright); }
-.agents-head span { font: 800 13px var(--hud); letter-spacing: .2em; color: #3375ff; }
-.agents-head em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--caption); }
-#agent-lyla {
-  width: min(900px, 90%); font-family: var(--mono); color: rgba(255, 255, 255, .72);
+.agents-head em { font-style: normal; font-size: 11px; color: var(--caption); }
+.agents-foot { padding: 4px 6px 0; font-size: 11px; line-height: 1.5; color: var(--caption); }
+#agent-marks { display: flex; flex-direction: column; gap: 8px; }
+.agent-mark {
+  --agent-rgb: 0, 82, 255;
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  width: 100%; padding: 10px 14px 10px 10px; border-radius: 14px; cursor: pointer; text-align: left;
+  font: inherit; color: rgba(255, 255, 255, .8); text-shadow: none;
+  background: rgba(9, 9, 9, .82); border: 1px solid rgba(255, 255, 255, .07);
+  backdrop-filter: blur(8px); transition: border-color .2s, background .2s, transform .2s;
+}
+.agent-mark:hover { border-color: rgba(var(--agent-rgb), .45); transform: translateX(3px); }
+.agent-mark.chosen {
+  border-color: rgba(var(--agent-rgb), .75); background: rgba(var(--agent-rgb), .12);
+  box-shadow: 0 0 0 1px rgba(var(--agent-rgb), .25), 0 12px 34px rgba(var(--agent-rgb), .18);
+}
+.mark-emblem { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 12px;
+               background: radial-gradient(circle, rgba(var(--agent-rgb), .18), rgba(var(--agent-rgb), .03) 70%); }
+.mark-emblem .emblem { filter: drop-shadow(0 0 6px rgba(var(--agent-rgb), .55)); transition: transform .5s ease; }
+.agent-mark:hover .emblem, .agent-mark.chosen .emblem { transform: scale(1.08); }
+.agent-mark.chosen .emblem-atlas { transform: rotate(45deg) scale(1.08); }
+.agent-mark.chosen .emblem-nova { animation: nova-turn 9s linear infinite; }
+@keyframes nova-turn { to { transform: rotate(360deg); } }
+.mark-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mark-name b { font: 800 14px var(--hud); letter-spacing: .18em; color: #fff; }
+.mark-name small { font-size: 11px; letter-spacing: .06em; color: var(--agent-mark); }
+.mark-state { font-style: normal; font-size: 11px; letter-spacing: .08em; padding: 2px 7px; border-radius: 5px;
+              color: rgba(255, 255, 255, .45); border: 1px solid rgba(255, 255, 255, .12); white-space: nowrap; }
+.mark-state.live, .mark-state.ready { color: #22c55e; border-color: rgba(34, 197, 94, .4); }
+.mark-state.working { color: #fff; background: rgba(var(--agent-rgb), .55); border-color: transparent;
+                      animation: agent-status 1.6s ease-in-out infinite; }
+#agent-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+               min-width: 0; min-height: 0; max-height: 100%; }
+#agent-pick { font-size: 13px; letter-spacing: .06em; color: var(--caption); }
+#agent-pick[hidden], #lyla-reports[hidden] { display: none; }
+#agent-stage .agent-card {
+  --agent-rgb: 0, 82, 255;
+  display: none; width: min(900px, 100%); font-family: var(--mono); color: rgba(255, 255, 255, .72);
   background: rgba(9, 9, 9, .94); border: 1px solid rgba(255, 255, 255, .08); border-radius: 14px;
   overflow: hidden; backdrop-filter: blur(8px); box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
 }
-#agent-lyla.live, #lyla-agent.live { border-color: rgba(0, 82, 255, .35); }
+#agent-stage .agent-card.open { display: block; animation: agent-arrive .32s cubic-bezier(.2, .8, .2, 1); }
+@keyframes agent-arrive { from { opacity: 0; transform: translateX(-12px); } }
+#agent-stage .agent-card.open, #agent-lyla.live, #lyla-agent.live { border-color: rgba(var(--agent-rgb, 0, 82, 255), .35); }
 .agent-out.wait { fill: #f59e0b; animation: agent-status 1.1s ease-in-out infinite; }
 .agent-out.ok { fill: #22c55e; animation: none; opacity: .95; }
 .agent-out.err { fill: #ff4d5e; animation: none; }
 /* Her reports under the card: the job, her two lines, the report folded
    under them. In the card's own blue on black. */
 #lyla-reports {
-  width: min(900px, 90%); max-height: 34vh; overflow-y: auto; scrollbar-width: none; list-style: none;
+  width: min(900px, 100%); max-height: 34vh; overflow-y: auto; scrollbar-width: none; list-style: none;
   display: flex; flex-direction: column; gap: 8px;
 }
 #lyla-reports .report, #lyla-reports .report-none {
