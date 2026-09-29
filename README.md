@@ -1,4 +1,4 @@
-# apollo
+# Apollo
 
 ai assistant - a voice assistant for your Windows PC.
 
