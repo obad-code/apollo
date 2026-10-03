@@ -1181,6 +1181,13 @@ class Api:
         self._app.request_away(grace=CLICK_GRACE)
         return True
 
+    def wake(self):
+        """Back, on the idle screen: the one thing that ends a held idle."""
+        if self._app is None:
+            return False
+        self._app.wake_requested = True
+        return True
+
     def listen(self, on):
         if self._app is None:
             return False
@@ -1305,7 +1312,10 @@ class Apollo:
         self.turn_busy = False     # listening, thinking, or speaking
         self.last_engaged = 0.0    # when a turn last ran; the recap waits it out
         self.prayers = prayer.Watch()
-        self.presence = presence.Presence(AFK_SECONDS)
+        # Idle mode holds until Back on the idle screen (APOLLO_IDLE_HOLD=0 for
+        # the old way, where any key or mouse move woke it).
+        self.presence = presence.Presence(
+            AFK_SECONDS, hold=os.environ.get("APOLLO_IDLE_HOLD", "1").strip() not in ("0", "false", "no"))
         self.wake = presence.VoiceWake()    # asleep, a voice wakes it
         self.asleep_shown = False           # what the page was last told
         self.last_status = None    # the phase the overlay last acted on
@@ -2120,6 +2130,10 @@ class Apollo:
                 and not getattr(self, "turn_busy", False)):
             self.idle_requested = None
             self.presence.sleep_now(now, getattr(self, "idle_grace", None))
+            self.apply_mode()
+        if getattr(self, "wake_requested", False):
+            self.wake_requested = False
+            self.presence.wake_now()
             self.apply_mode()
         # Only asked on the way to sleep; see `screen_busy`.
         busy = (idle >= self.presence.afk_seconds and not self.presence.asleep

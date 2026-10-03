@@ -429,11 +429,21 @@
 
 <!-- Asleep: ten quiet minutes, and this is all there is. -->
 <section id="sleep" aria-hidden="true">
+  <!-- The idle screen's sky (idlescenes.js): the event horizon or the ember
+       nebula, switched below, and kept until Back. -->
+  <canvas id="idle-scene" aria-hidden="true"></canvas>
+  <div id="idle-controls">
+    <div id="idle-scenes" role="group" aria-label="Idle scene">
+      <button type="button" data-scene="horizon" data-sfx="none">Event horizon</button>
+      <button type="button" data-scene="nebula" data-sfx="none">Ember nebula</button>
+    </div>
+    <button id="idle-back" type="button" data-sfx="none" aria-label="Back to Apollo">‹ Back</button>
+  </div>
   <div id="sleep-copy">
     <div id="sleep-name"><canvas id="sleep-word" role="img" aria-label="Apollo"></canvas><span id="sleep-tag"></span></div>
     <p id="sleep-fact"></p>
   </div>
-  <div id="sleep-wake">Press any key or say anything to wake Apollo</div>
+  <div id="sleep-wake">Press Back to return to Apollo</div>
 </section>
 
 <!-- As Apollo comes up: an old machine boots on a green tube - its checks

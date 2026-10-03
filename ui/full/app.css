@@ -1906,6 +1906,23 @@ body.lingering #lyla { opacity: .18; }
 }
 body.asleep #sleep { opacity: 1; visibility: visible;
                      transition: opacity 1.4s ease-in-out .35s, visibility 0s; }
+/* The sky behind the idle screen, and its two buttons: which sky, and Back. */
+#idle-scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: -1;
+              pointer-events: auto; cursor: crosshair; opacity: 0; transition: opacity 1.6s ease-in-out .4s; }
+body.asleep #idle-scene.on { opacity: 1; }
+#idle-controls { position: absolute; top: 34px; left: 50%; transform: translateX(-50%); z-index: 2;
+                 display: flex; gap: 14px; align-items: center; pointer-events: auto; }
+#idle-scenes { display: flex; padding: 4px; gap: 4px; border-radius: 999px; background: rgba(10, 7, 4, .55);
+               border: 1px solid rgba(255, 214, 150, .16); backdrop-filter: blur(12px); }
+#idle-scenes button, #idle-back {
+  padding: 8px 16px; border-radius: 999px; border: 0; cursor: pointer; font: 700 11px var(--hud);
+  letter-spacing: .16em; text-transform: uppercase; color: var(--amber); background: transparent;
+  transition: background .3s, color .3s, box-shadow .3s; }
+#idle-scenes button.on { color: #160c00; background: linear-gradient(135deg, #FFD48A, #FFB000);
+                         box-shadow: 0 0 22px rgba(255, 176, 0, .55); }
+#idle-back { border: 1px solid rgba(255, 214, 150, .3); background: rgba(10, 7, 4, .55); color: var(--cream);
+             backdrop-filter: blur(12px); }
+#idle-back:hover { border-color: var(--amber-bright); box-shadow: 0 0 22px rgba(255, 176, 0, .35); }
 body.asleep #stage,
 body.asleep #lyla,
 body.asleep .peek { opacity: 0 !important; pointer-events: none; transition: opacity .8s ease-in-out; }

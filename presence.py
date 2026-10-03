@@ -26,8 +26,12 @@ class Presence:
     over the desktop wakes back to the desktop.
     """
 
-    def __init__(self, afk_seconds):
+    def __init__(self, afk_seconds, hold=False):
         self.afk_seconds = afk_seconds
+        # Held: once asleep, only `wake_now` (Back on the idle screen) or the
+        # display chord ends it - a mouse moved, a key, a voice do not. So
+        # the idle screen can be looked at, and its sky played with.
+        self.hold = hold
         self.peek_open = False
         self.afk_open = False
         self.asleep = False
@@ -74,6 +78,13 @@ class Presence:
         if not self.peek_open:
             self.afk_open = True
 
+    def wake_now(self):
+        """Back, from the idle screen: awake at once, whatever was held."""
+        self.asleep = False
+        self._slept_at = None
+        if not self.peek_open:
+            self.afk_open = False
+
     def check(self, idle, now=None, screen_busy=False):
         """Feed seconds-since-last-input. True if `full` or `asleep` changed.
 
@@ -84,6 +95,8 @@ class Presence:
         if self._touched is not None and now is not None:
             idle = min(idle, max(0.0, now - self._touched))
         before = (self.full, self.asleep)
+        if self.asleep and self.hold:
+            return False                      # only Back wakes a held sleep
         if self._slept_at is not None and now is not None:
             if now - idle <= self._slept_at + self._sleep_grace:
                 return False                  # nothing since you asked

@@ -28,6 +28,7 @@ import * as CrewView from './crewview.js';
 import { Wheel } from './wheel.js';
 import { WidgetGrid } from './widgetgrid.js';
 import { OptionWheel } from './optionwheel.js';
+import { IdleScenes } from './idlescenes.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -2743,6 +2744,30 @@ function tickSleep() {
   $('sleep-tag').textContent = `${clock(now)} · ${now.toLocaleDateString('en-GB', { weekday: 'short' })}`;
 }
 
+/* The idle screen's sky: the scene last chosen, kept for next time. */
+const idleScenes = new IdleScenes($('idle-scene'), { scene: (() => {
+  try { return localStorage.getItem('idle-scene') || 'horizon'; } catch { return 'horizon'; }
+})() });
+function markIdleScene() {
+  document.querySelectorAll('#idle-scenes [data-scene]').forEach((b) =>
+    b.classList.toggle('on', b.dataset.scene === idleScenes.scene));
+}
+markIdleScene();
+$('idle-scenes').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-scene]');
+  if (!button || button.dataset.scene === idleScenes.scene) return;
+  idleScenes.setScene(button.dataset.scene);
+  try { localStorage.setItem('idle-scene', idleScenes.scene); } catch { /* private */ }
+  markIdleScene();
+  sfx.play('swap');
+});
+// Only Back leaves the idle screen: a mouse moved past it, or a key, does not.
+$('idle-back').addEventListener('click', () => {
+  const api = bridge();
+  if (api && api.wake) api.wake();
+  else setSleep(false);
+});
+
 function setSleep(on) {
   on = Boolean(on);
   if (on === asleep.on) return;
@@ -2764,8 +2789,11 @@ function setSleep(on) {
     tickSleep();
     nextFact();
     asleep.timer = setInterval(nextFact, FACT_EVERY);
+    if (idleScenes.start()) $('idle-scene').classList.add('on');
   } else {
     sleepWord.stop();
+    idleScenes.stop();
+    $('idle-scene').classList.remove('on');
   }
   if (!on && state.mode === 'full') {
     ringStart();

@@ -134,3 +134,21 @@ def test_speaking_wakes_it_and_it_starts_over_after():
     heard = [wake.feed(level) for level in (0.4, 0.5, 0.1, 0.6, 0.7)]
     assert heard == [False, False, False, False, True]
     assert wake.feed(0.6) is False            # one wake per utterance
+
+
+def test_a_held_idle_screen_is_only_left_by_back():
+    p = presence.Presence(afk_seconds=600, hold=True)
+    p.check(idle=700, now=1000.0)
+    assert p.asleep and p.full
+    assert p.check(idle=0, now=1001.0) is False and p.asleep      # the mouse moved: still idle
+    p.touch(1002.0)
+    assert p.check(idle=0, now=1003.0) is False and p.asleep      # a voice: still idle
+    p.wake_now()
+    assert not p.asleep and not p.full
+
+
+def test_without_hold_the_mouse_still_wakes_it():
+    p = presence.Presence(afk_seconds=600)
+    p.check(idle=700, now=1000.0)
+    p.check(idle=0, now=1001.0)
+    assert not p.asleep
