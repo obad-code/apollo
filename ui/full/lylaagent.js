@@ -94,8 +94,8 @@ export const LOOKS = {
     ],
   },
   MONEYPENNY: {
-    key: 'MONEYPENNY', role: 'Markets', rgb: '16,185,129', hex: '#10B981', light: '110,231,183', deep: '#02140D',
-    mark: '#34D399', file: 'crew.py',
+    key: 'MONEYPENNY', role: 'Markets', rgb: '58,196,170', hex: '#3AC4AA', light: '140,226,210', deep: '#03140F',
+    mark: '#6FD8C4', file: 'crew.py',
     trigger: [['TRIGGER', 'TRIGGER'], ['A stock', 'A job'], ['node-moneypenny', 'Apollo · you']],
     read: [['READING', 'READING'], ['Price · desk · insiders', 'Price · desk · insiders'], ['market.py', 'crew.py']],
     brain: ['gemini', 'gemini'],

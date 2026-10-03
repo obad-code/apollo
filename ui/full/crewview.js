@@ -61,8 +61,8 @@ const look = (key) => LOOKS[key] || LOOKS.LYLA;
 const CREATURES = {
   THEIA: { eye: '#000', at: [[36, 52], [64, 52]], mouth: [50, 66],
     body: '<circle cx="50" cy="52" r="40" fill="#fff"/>' },
-  MONEYPENNY: { eye: '#fff', at: [[36, 52], [64, 52]], mouth: [50, 66],
-    body: '<rect x="12" y="13" width="76" height="76" rx="24" fill="#09090b" stroke="rgba(255,255,255,.22)" stroke-width="1.5"/>' },
+  MONEYPENNY: { eye: '#0b1f1b', at: [[36, 52], [64, 52]],
+    body: '<rect x="12" y="13" width="76" height="76" rx="24" fill="#3AC4AA"/>' },
   Q: { eye: '#000', at: [[39, 64], [61, 64]], mouth: [50, 75],
     body: '<path d="M50 12Q55 12 58 17L92 79Q96 88 86 88H14Q4 88 8 79L42 17Q45 12 50 12Z" fill="#fff"/>' },
   LYLA: { eye: '#120c02', at: [[37, 52], [63, 52]], mouth: [50, 66], square: true,
