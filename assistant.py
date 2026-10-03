@@ -1767,6 +1767,14 @@ def report_agent(ui, voice, job):
     holding TURN_GATE (see lyla.Desk), so it waits for any turn in progress."""
     who = job.get("agent") or agents.LYLA
     task = job.get("task", "")
+    if job.get("routine"):
+        # A standing job: no interrupting. It waits in crew_findings, and
+        # MONEYPENNY's daily call goes to the inbox.
+        if job.get("ok"):
+            journal.answered(job["summary"] + "\n\n" + job["report"], who=who)
+            if job.get("email"):
+                email_routine(job)
+        return
     if job.get("ok"):
         journal.answered(job["summary"] + "\n\n" + job["report"], who=who)
         instruction = (
@@ -1784,6 +1792,22 @@ def report_agent(ui, voice, job):
             f"one short sentence, in the language they last spoke.")
         fallback = f"{who} couldn't finish that: {job.get('error', '')}"
     announce(ui, voice, instruction, fallback)
+
+
+def email_routine(job):
+    """MONEYPENNY's daily call, as a short email that leads with the move."""
+    try:
+        import emailer
+        if not emailer.ready():
+            return
+        summary = job.get("summary", "")
+        tone = next((t for t, words in (("SELL", "PULL MONEY OUT"), ("BUY", "BUY MORE"), ("HOLD", "HOLD"))
+                     if words in summary.upper()), "")
+        lines = [line for line in job.get("report", "").splitlines() if line.strip()][:14]
+        emailer.send(f"{job.get('agent', 'Apollo')}: {summary[:90]}", summary + "\n\n" + "\n".join(lines),
+                     rich=emailer.card("Your watchlist today", lines, action=summary[:120], tone=tone))
+    except Exception:  # noqa: BLE001 - an email that fails never costs the job
+        logging.getLogger("apollo").info("routine email failed", exc_info=True)
 
 
 report_lyla = report_agent      # the name the desk was first wired with

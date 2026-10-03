@@ -1127,6 +1127,10 @@ class Api:
     def suggestions(self):
         return stockdesk.suggestions()
 
+    def crew_check(self):
+        """Ping each brain the crew thinks with; what each said."""
+        return crew.check()
+
     def analysis(self, symbol):
         """The whole look at a stock: the call, its flags, the company, news."""
         import analysis
@@ -2356,6 +2360,10 @@ class Apollo:
         youtube.DOWNLOADS.configure(
             report=lambda job: assistant.report_download(ui, self.voice, job),
             gate=assistant.TURN_GATE, tell=ui.agent)
+
+        # The crew's standing jobs, on their own every day (routines.py).
+        import routines
+        routines.start(self.stopping.is_set)
 
         # Big market news: emailed to you, and said out loud while Apollo
         # is up - after any turn in progress (alerts.py).

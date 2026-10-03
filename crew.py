@@ -274,6 +274,8 @@ def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=No
         working = one.current
         agents[name] = {"role": ROLES[name], "waiting": one.waiting,
                         "working": working["task"] if working else "",
+                        "steps": list(getattr(one, "steps", [])),
+                        "error": getattr(one, "last_error", None),
                         "done_today": 0}
         for report in one.reports:
             done = float(report.get("done") or 0)
@@ -310,3 +312,20 @@ def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=No
             "spend": spend, "issues": {"count": len(problems), "failing": failed,
                                        "top": [i.get("title", "") for i in problems[:3]]},
             "alerts": alerts_state, "now": now.timestamp()}
+
+
+def check():
+    """Can the crew think? One tiny question to each brain they use, and
+    what each said - so a dead key shows as a reason, not as silence."""
+    out = {}
+    for label, call in (("Gemini", lambda: lyla.ask_gemini("Reply with OK.", "Reply with OK.", FAST_MODELS)),
+                        ("Hermes", lambda: lyla.ask_hermes("Reply with OK.", lyla.hermes_settings())
+                         if lyla.hermes_settings() else None),
+                        ("Claude", lambda: _claude("Reply with OK.", "Reply with OK.")
+                         if os.environ.get("ANTHROPIC_API_KEY") else None)):
+        try:
+            answer = call()
+            out[label] = {"ok": answer is not None, "why": "" if answer is not None else "not set up"}
+        except Exception as e:  # noqa: BLE001
+            out[label] = {"ok": False, "why": str(e)[:200] or type(e).__name__}
+    return out

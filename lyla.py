@@ -232,9 +232,16 @@ def think(prompt, system=None, models=None):
                     else ask_hermes(prompt, settings)), "Hermes"
         except Exception as e:  # noqa: BLE001 - Gemini is still there
             log.info("Hermes did not answer (%s); asking Gemini", e)
-    if system or models:
-        return ask_gemini(prompt, system, models), "Gemini"
-    return ask_gemini(prompt), "Gemini"
+    try:
+        if system or models:
+            return ask_gemini(prompt, system, models), "Gemini"
+        return ask_gemini(prompt), "Gemini"
+    except Exception as e:  # noqa: BLE001 - Claude is the last brain standing
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            raise
+        log.info("Gemini did not answer (%s); asking Claude", e)
+        import assistant
+        return assistant.ask_once(system or SYSTEM, prompt, max_tokens=3000), "Claude"
 
 
 # -- the desk ------------------------------------------------------------------------
@@ -286,6 +293,7 @@ class Desk:
         self.reports = load_reports(self.path)
         self.jobs = queue.Queue()
         self.current = None
+        self.last_error = None          # (when, why) of the last failed job
         self._ids = itertools.count(1)
         self._thread = None
         self._lock = threading.Lock()
@@ -316,6 +324,11 @@ class Desk:
         return {"job": job["id"], "ahead": ahead}
 
     def _tell(self, job, **event):
+        # What the board shows of the job in hand: each step, with its time.
+        if event.get("stage") == "received":
+            self.steps = []
+        self.steps = (getattr(self, "steps", []) + [{"stage": event.get("stage"),
+                      "text": str(event.get("text", ""))[:140], "t": time.time()}])[-12:]
         if self.tell_card is None:
             return
         try:
@@ -374,6 +387,7 @@ class Desk:
             del self.reports[KEEP:]
             _save_reports(self.reports, self.path)
         else:
+            self.last_error = {"when": job["done"], "why": job["error"], "task": job["task"]}
             self._tell(job, stage="error", text=job["error"])
         self._pass_on(job)
 
