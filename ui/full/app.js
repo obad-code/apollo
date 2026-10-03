@@ -29,6 +29,7 @@ import { Wheel } from './wheel.js';
 import { WidgetGrid } from './widgetgrid.js';
 import { OptionWheel } from './optionwheel.js';
 import { IdleScenes } from './idlescenes.js';
+import * as CrewPage from './crewpage.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -443,7 +444,38 @@ async function loadCrew() {
   refreshCrew();
 }
 
+/* The crew page: its look kept per viewer, one lane open at a time. */
+const page = { open: null, look: (() => { try { return localStorage.getItem('crew-look') || 'minimal'; } catch { return 'minimal'; } })() };
+function drawCrewPage() {
+  CrewPage.render($('crew-page'), { ...crew.board, agents: crewAgents() }, page);
+}
+$('crew-page').addEventListener('click', (event) => {
+  const api = bridge();
+  const look = event.target.closest('[data-look]');
+  if (look) {
+    page.look = look.dataset.look;
+    try { localStorage.setItem('crew-look', page.look); } catch { /* private */ }
+    sfx.play('tick');
+    drawCrewPage();
+    return;
+  }
+  const open = event.target.closest('.cp-open');
+  if (open) {
+    if (api && open.dataset.link && api.open_link) api.open_link(open.dataset.link);
+    else if (api && open.dataset.file && api.open_crew_file) api.open_crew_file(open.dataset.file);
+    return;
+  }
+  const lane = event.target.closest('.cp-lane');
+  if (lane && !event.target.closest('.cp-detail')) {
+    page.open = page.open === lane.dataset.key ? null : lane.dataset.key;
+    sfx.play(page.open ? 'expand' : 'collapse');
+    drawCrewPage();
+  }
+});
+window.addEventListener('resize', () => { if (state.view === 'agents') drawCrewPage(); });
+
 function refreshCrew() {
+  drawCrewPage();
   if (crew.grid) crew.grid.refresh();
   const agents = crewAgents();
   if (crew.wheel) {
@@ -536,7 +568,7 @@ function showAgents() {
   ensureCrew();
   loadCrew();
   clearInterval(crew.poll);
-  crew.poll = setInterval(() => { if (state.view === 'agents') loadCrew(); }, 15000);
+  crew.poll = setInterval(() => { if (state.view === 'agents') loadCrew(); }, 4000);
 }
 function leaveAgents() {
   clearInterval(crew.poll);
