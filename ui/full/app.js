@@ -30,6 +30,7 @@ import { WidgetGrid } from './widgetgrid.js';
 import { OptionWheel } from './optionwheel.js';
 import { IdleScenes } from './idlescenes.js';
 import * as CrewPage from './crewpage.js';
+import { Ambient } from './ambient.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -366,6 +367,7 @@ const lylaDoing = {
  * coming, the display up and away, asleep and awake. LYLA has her own two.
  * Always on. */
 const sfx = new Sfx();
+const ambient = new Ambient();     // the room's sound (ambient.js)
 const PRESSABLE = 'button, .tab, .chip, [data-sfx]';
 let hovered = null;
 document.addEventListener('pointerover', (event) => {
@@ -419,7 +421,10 @@ function crewAgents() {
 }
 
 function ensureCrew() {
-  if (crew.wheel) return;
+  // The crew page (crewpage.js) replaced the wheel and the widget board.
+  // They are not built any more: the wheel turned by itself while hidden
+  // and ticked every time an agent came round to the front.
+  return;
   // Twice round, so the drum is full: eight orbs, four agents.
   const orbs = [...AGENTS, ...AGENTS].map((key) => CrewView.orb(key));
   crew.wheel = new Wheel($('crew-wheel'), {
@@ -3004,6 +3009,7 @@ function setSleep(on) {
   if (state.mode === 'full') sfx.play(on ? 'sleep' : 'wake');
   document.body.classList.toggle('asleep', on);
   $('sleep').setAttribute('aria-hidden', on ? 'false' : 'true');
+  syncAmbient();
   shader.sleep(on);
   clearInterval(asleep.timer);
   if (on) {
@@ -3166,7 +3172,27 @@ function modeFlags() {
   return { ultra: ultraOn(), osiris: state.osiris, view: state.view };
 }
 
+/* The room's sound follows the mode (ambient.js): the ship's engine in the
+ * normal display, fans in agents mode, air in trading, a cabin when clear,
+ * deep space expanded; the engine idling while asleep; silent while the
+ * display is away. */
+function syncAmbient() {
+  if (state.mode !== 'full') { ambient.pause(true); return; }
+  ambient.pause(false);
+  ambient.play(asleep.on ? 'asleep' : state.osiris ? 'osiris' : ultraOn() ? 'expanded' : state.view);
+}
+function showAmbientToggle() {
+  $('ambient-toggle').setAttribute('aria-pressed', ambient.on ? 'true' : 'false');
+}
+$('ambient-toggle').addEventListener('click', () => {
+  ambient.setOn(!ambient.on);
+  showAmbientToggle();
+  if (ambient.on) syncAmbient();
+});
+showAmbientToggle();
+
 function renderModes() {
+  syncAmbient();
   const mode = Modes.current(modeFlags());
   document.querySelectorAll('[data-mode]').forEach((button) =>
     button.setAttribute('aria-pressed', button.dataset.mode === mode ? 'true' : 'false'));
@@ -4749,6 +4775,9 @@ window.apollo = {
     // which has its own.
     const up = name === 'full';
     if (was !== name && !$('intro').classList.contains('on')) sfx.play(up ? 'hud' : 'down');
+    // The display coming up: the engine spins up, then the room's bed.
+    if (up && was !== name) ambient.powerUp();
+    syncAmbient();
     // The overlay has the screen while Apollo is at rest; a shader drawing to
     // a window nobody can see is a GPU burning for nothing.
     // Nothing on the sign moves while nobody can see it.

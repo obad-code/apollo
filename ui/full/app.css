@@ -3153,3 +3153,68 @@ body.nav-open:not(.ultra) #stage:has(#markets.wall) { grid-template-columns: 42%
 .deck-card .deck-body { position: relative; }
 .deck-card:has(.deck-art) .deck-body { background: linear-gradient(90deg, rgba(10,10,12,.85), rgba(10,10,12,.2)); height: calc(100% - 29px); }
 #markets.wall .proj-deck { margin-left: -14px; }
+
+/* ---- Y2K / CYBERCORE: chrome, holographic foil, a grid floor running to
+   the horizon, aqua glass and pixel type - the year 2000's idea of the
+   future. ---- */
+#crew-page.look-y2k { background:
+  linear-gradient(180deg, transparent 58%, rgba(0, 255, 240, .05) 100%),
+  radial-gradient(60% 50% at 50% 0%, rgba(120, 80, 255, .35), transparent 70%),
+  linear-gradient(180deg, #070616 0%, #0b0a25 55%, #120a2c 100%); overflow-x: hidden; }
+.look-y2k::before { content: ''; position: absolute; left: -20%; right: -20%; bottom: 0; height: 45%; pointer-events: none;
+  background: linear-gradient(rgba(0, 255, 240, .35) 1px, transparent 1px) 0 0 / 100% 34px,
+              linear-gradient(90deg, rgba(255, 60, 220, .35) 1px, transparent 1px) 0 0 / 60px 100%;
+  transform: perspective(420px) rotateX(62deg); transform-origin: 50% 100%;
+  -webkit-mask: linear-gradient(180deg, transparent, #000 60%); animation: y2k-floor 3s linear infinite; }
+@keyframes y2k-floor { to { background-position: 0 34px, 0 0; } }
+.look-y2k::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background: radial-gradient(1.5px 1.5px at 12% 20%, #fff, transparent), radial-gradient(1px 1px at 78% 14%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 40% 8%, #bff, transparent), radial-gradient(1px 1px at 90% 40%, #fbf, transparent),
+    radial-gradient(1px 1px at 22% 46%, #fff, transparent), radial-gradient(1.5px 1.5px at 64% 30%, #fff, transparent); }
+.look-y2k > * { position: relative; z-index: 1; }
+.look-y2k .cp-top h1 { font: 400 26px VT323, monospace; letter-spacing: .3em;
+  background: linear-gradient(180deg, #fff 0%, #c9d4ff 45%, #6c7cff 52%, #e6f0ff 100%); -webkit-background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 8px rgba(120, 160, 255, .7)); }
+.look-y2k .cp-meta { color: #9fe9ff; }
+.look-y2k .cp-meta b { color: #fff; }
+.look-y2k .cp-looks { border-color: rgba(160, 200, 255, .3); background: rgba(255,255,255,.04); }
+.look-y2k .cp-looks button.on { color: #10102a; background: linear-gradient(180deg, #ffffff, #b8c6ff 50%, #8fa2ff 51%, #e8edff); }
+/* the hub: a chrome lozenge */
+.look-y2k .cc-hub .cp-node.apollo { font-family: VT323, monospace; font-size: 22px; letter-spacing: .3em; color: #1a1440; padding: 6px 28px; border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff 0%, #d9def0 40%, #8a90ad 50%, #cfd4ea 62%, #ffffff 100%);
+  box-shadow: 0 0 0 2px rgba(255,255,255,.6), 0 0 30px rgba(140, 120, 255, .65), 0 8px 18px rgba(0,0,0,.6); }
+.look-y2k .cc-wire { stroke: rgba(0, 255, 240, .45); stroke-dasharray: 1 7; stroke-width: 2.5; }
+.look-y2k .cc-wire.busy { stroke: #ff5cf0; filter: drop-shadow(0 0 5px #ff5cf0); }
+/* the cards: dark aqua glass inside a holographic foil frame */
+.look-y2k .cc-card { border: 0; border-radius: 22px; padding: 2px;
+  background: conic-gradient(from var(--y2k-a, 0deg), #ff5cf0, #6c7cff, #00fff0, #b4ff6c, #ffe36c, #ff5cf0);
+  box-shadow: 0 0 34px rgba(120, 100, 255, .35), 0 18px 40px rgba(0,0,0,.6); animation: y2k-foil 8s linear infinite; }
+@property --y2k-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes y2k-foil { to { --y2k-a: 360deg; } }
+.look-y2k .cc-card::before, .look-y2k .cc-card::after { content: none; }
+.look-y2k .cc-top, .look-y2k .cc-bottom { background: transparent; }
+.look-y2k .cc-card > * { position: relative; }
+.look-y2k .cc-top { border-radius: 20px 20px 0 0; background: linear-gradient(180deg, rgba(20, 22, 60, .96), rgba(14, 14, 40, .96));
+  border-bottom: 1px solid rgba(0, 255, 240, .25); }
+.look-y2k .cc-top::before { content: ''; position: absolute; left: 10px; right: 10px; top: 6px; height: 40%; border-radius: 16px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.18), transparent); }
+.look-y2k .cc-bottom { margin: 0; border-radius: 0 0 20px 20px; background: linear-gradient(180deg, rgba(10, 30, 50, .97), rgba(8, 14, 34, .97));
+  box-shadow: inset 0 0 30px rgba(0, 255, 240, .08); }
+.look-y2k .cc-more { background: rgba(8, 10, 30, .97); border-radius: 0 0 20px 20px; margin-top: -2px; }
+.look-y2k .cc-top h3 { font: 400 24px VT323, monospace; letter-spacing: .14em;
+  background: linear-gradient(180deg, #fff, #d6dcff 45%, #7d8bff 55%, #fff); -webkit-background-clip: text; color: transparent; }
+.look-y2k .cc-top em { font-family: VT323, monospace; font-size: 16px; letter-spacing: .1em; color: #00fff0; filter: none; text-shadow: 0 0 8px rgba(0,255,240,.6); }
+.look-y2k .cc-top p { color: #c9d0ff; }
+.look-y2k .cc-badge { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffffff, #b9f3ff 30%, #3aa0ff 70%, #1a3a9a);
+  box-shadow: 0 0 16px rgba(80, 180, 255, .8), inset 0 -4px 8px rgba(0, 20, 80, .5); }
+.look-y2k .cc-now { color: #fff; font-family: VT323, monospace; font-size: 18px; }
+.look-y2k .cc-steps i { height: 8px; border-radius: 0; background: rgba(0, 255, 240, .12); }
+.look-y2k .cc-steps i.done { background: #00fff0; box-shadow: 0 0 6px #00fff0; }
+.look-y2k .cc-steps i.now { background: #ff5cf0; box-shadow: 0 0 10px #ff5cf0; }
+.look-y2k .cc-bottom small { color: #8fa8ff; }
+.look-y2k .cp-open { color: #ff9cf6; font-family: VT323, monospace; font-size: 17px; }
+.look-y2k .cp-foot { background: none; border: 0; gap: 14px; }
+.look-y2k .cp-g { border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.03));
+  border: 1px solid rgba(180, 200, 255, .35); box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 0 18px rgba(120, 100, 255, .2); backdrop-filter: blur(10px); }
+.look-y2k .cp-g b { font: 400 40px/1 VT323, monospace; color: #00fff0; text-shadow: 0 0 10px rgba(0,255,240,.7); }
+.look-y2k .cp-g span { color: #c9d0ff; }

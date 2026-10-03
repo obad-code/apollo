@@ -166,12 +166,12 @@ function cardWires(root, agents) {
 }
 
 const looks = (look) => `<div class="cp-looks" role="group" aria-label="Look">
-  ${['cards', 'minimal', 'console'].map((l) => `<button type="button" data-look="${l}" class="${look === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}
+  ${['cards', 'y2k', 'minimal', 'console'].map((l) => `<button type="button" data-look="${l}" class="${look === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}
 </div>`;
 
 export function render(root, board = {}, { look = 'cards', open = null } = {}) {
-  if (look === 'cards') {
-    root.className = 'cp look-cards';
+  if (look === 'cards' || look === 'y2k') {
+    root.className = `cp look-cards${look === 'y2k' ? ' look-y2k' : ''}`;
     renderCards(root, board, totals(board), look, open, board.now || Date.now() / 1000);
     return;
   }
