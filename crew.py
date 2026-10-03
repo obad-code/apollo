@@ -195,9 +195,39 @@ def _desk(name, system, facts, deep=False, think=None):
                     path=os.path.join(_HERE, f"{name.lower()}_reports.json"))
 
 
+def lyla_think(prompt):
+    """LYLA thinks the way she always has - unless the job is for the
+    connectors, which go through Claude and your MCP servers."""
+    if prompt.startswith(CONNECT_MARK):
+        import connectors
+        task = prompt[len(CONNECT_MARK):]
+        return connectors.ask(task), "Claude · connectors"
+    return lyla.think(prompt)
+
+
+CONNECT_MARK = "[[connectors]]\n"
+
+
+class LylaDesk(lyla.Desk):
+    """LYLA's desk: a connectors job goes straight to them, with no reading."""
+
+    def prompt_for(self, job, facts):
+        if job.get("connectors"):
+            return CONNECT_MARK + job["task"]
+        return lyla.prompt_for(job, facts)
+
+    def _read(self, job, step):
+        if job.get("connectors"):
+            step("Opening your connectors")
+            return {"sources": {}}
+        return super()._read(job, step)
+
+
 THEIA_DESK = _desk(THEIA, THEIA_SYSTEM, theia_facts, deep=True)
 MONEYPENNY_DESK = _desk(MONEYPENNY, MONEYPENNY_SYSTEM, moneypenny_facts)
 Q_DESK = _desk(Q, Q_SYSTEM, q_facts, think=q_think)
+
+lyla.DESK = LylaDesk(think=lyla_think)
 
 DESKS = {LYLA: lyla.DESK, THEIA: THEIA_DESK, MONEYPENNY: MONEYPENNY_DESK, Q: Q_DESK}
 

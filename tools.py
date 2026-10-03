@@ -1317,3 +1317,53 @@ def _crew_findings(ctx, agent, number=1):
     elif not reports:
         out["result"] = f"{agent} has not finished a job yet."
     return out
+
+
+# --- email and alerts ----------------------------------------------------------
+
+import alerts  # noqa: E402
+import emailer  # noqa: E402
+
+
+@_tool("send_email", "sending the email",
+       "Send an email for the user from their Gmail - to someone else, or to "
+       "themselves when they say \"ارسل لي\" / \"email me this\". Read back who it "
+       "goes to and what it says, and send only after they say yes.",
+       _obj({"to": _str("One email address; leave empty to send it to the user"),
+             "subject": _str("The subject"),
+             "body": _str("The message, in full")}, ("subject", "body")),
+       confirm=True)
+def _send_email(ctx, subject, body, to=""):
+    if not emailer.ready():
+        return {"ok": False, "error": "Email is not set up yet - see the README, Email."}
+    done = emailer.send(subject, body, to=to or None)
+    return {"ok": True, "result": f"Sent to {done['to']}."}
+
+
+@_tool("market_alerts", "checking the alerts",
+       "The market alerts Apollo watches for: whether they are on, by email and "
+       "by voice, and the most recent ones he sent. Use when the user asks about "
+       "alerts or breaking market news Apollo told them about.",
+       _obj({}))
+def _market_alerts(ctx):
+    watcher = alerts.WATCHER
+    return {"ok": True, "watching": watcher is not None, "email_ready": emailer.ready(),
+            "checks_every_seconds": alerts.CHECK_EVERY,
+            "sent_this_hour": len(watcher.sent) if watcher else 0}
+
+
+import connectors  # noqa: E402
+
+
+@_tool("use_connectors", "handing it to LYLA",
+       "LYLA does a job with the user's own accounts - email, messages, calendar, "
+       "notes and whatever else is connected (connectors.json): \"شوف ايميلاتي "
+       "المهمة\", \"any new messages from Ahmed?\", \"what's on my calendar\". She "
+       "reads and reports; she sends, replies or deletes only when the user asked "
+       "for exactly that - read such a request back to them before you hand it on. "
+       "It returns at once and you are told what she found.",
+       _obj({"task": _str("The job, in the user's words")}, ("task",)))
+def _use_connectors(ctx, task):
+    if not connectors.load():
+        return {"ok": False, "error": "No connectors are set up yet - see the README, Connectors."}
+    return _handed("LYLA", lyla.DESK.take(task, connectors=True))

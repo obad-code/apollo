@@ -123,6 +123,7 @@ import journal  # noqa: E402
 import hud  # noqa: E402
 import live  # noqa: E402
 import lyla  # noqa: E402
+import alerts  # noqa: E402
 import crew  # noqa: E402
 import youtube  # noqa: E402
 import private_eye  # noqa: E402
@@ -2307,6 +2308,11 @@ class Apollo:
         youtube.DOWNLOADS.configure(
             report=lambda job: assistant.report_download(ui, self.voice, job),
             gate=assistant.TURN_GATE, tell=ui.agent)
+
+        # Big market news: emailed to you, and said out loud while Apollo
+        # is up - after any turn in progress (alerts.py).
+        alerts.start(speak=lambda alert: assistant.fire_alert(ui, self.voice, alert),
+                     stopping=self.stopping.is_set)
 
         # Say hello, so you know the mic is live before you ever press a key.
         assistant.greet(ui)

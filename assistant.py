@@ -1788,6 +1788,20 @@ def report_agent(ui, voice, job):
 report_lyla = report_agent      # the name the desk was first wired with
 
 
+def fire_alert(ui, voice, alert):
+    """A market alert, said out loud - after any turn in progress."""
+    story = alert["story"]
+    instruction = (
+        f"Breaking market news you are telling the user without being asked: "
+        f"\"{story['title']}\" ({story.get('source', '')}). What it means: "
+        f"{alert.get('explained') or story.get('summary', '')} Tell them in two or "
+        f"three short sentences - what happened and which way it may push the "
+        f"stock - in the language they last spoke, their dialect if Arabic. Say "
+        f"it is a read, not advice. An email with the details is on its way.")
+    with TURN_GATE:
+        announce(ui, voice, instruction, f"Market alert: {story['title']}")
+
+
 def report_download(ui, voice, job):
     """LYLA's download is saved, or it is not."""
     if job.get("ok"):

@@ -390,4 +390,4 @@ class Desk:
             log.warning("%s's report failed", self.name, exc_info=True)
 
 
-DESK = Desk()
+DESK = Desk()      # crew.py puts LYLA's own desk here
