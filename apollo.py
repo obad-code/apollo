@@ -2278,10 +2278,18 @@ class Apollo:
         # "clip that" has something to save. Nothing reaches the disk until
         # you ask. A machine that cannot record says so once and Apollo
         # carries on without clips.
-        self.clips = clips.ReplayBuffer().start()
-        tools.set_clip_buffer(self.clips)
-        self.boot_step({"id": "clips", "label": "REPLAY BUFFER", "status": "ok",
-                        "detail": "recording"}, keep=False)
+        # Off by default: recording the whole screen itself cost frames in
+        # games. Clips go to NVIDIA Instant Replay or the Xbox Game Bar instead
+        # (tools.save_clip). APOLLO_REPLAY_BUFFER=1 brings Apollo's own back.
+        if os.environ.get("APOLLO_REPLAY_BUFFER", "0").strip() in ("1", "true", "yes"):
+            self.clips = clips.ReplayBuffer().start()
+            tools.set_clip_buffer(self.clips)
+            self.boot_step({"id": "clips", "label": "REPLAY BUFFER", "status": "ok",
+                            "detail": "recording"}, keep=False)
+        else:
+            self.clips = None
+            self.boot_step({"id": "clips", "label": "CLIPS", "status": "ok",
+                            "detail": tools.clip_recorder()}, keep=False)
 
         # Everything the display and the briefing read - prices, headlines,
         # posts, weather, the machine - refreshed on a timer rather than

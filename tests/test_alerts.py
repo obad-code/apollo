@@ -52,7 +52,7 @@ def watcher(tmp_path, stories, prices=None, **kw):
     told = {"email": [], "voice": []}
     w = alerts.Watcher(speak=told["voice"].append, email=told["email"].append,
                        watch=lambda: ["NVDA"], prices=lambda watch: dict(prices or {}),
-                       sources=lambda watch: list(stories), explain=lambda s, t: "it matters",
+                       sources=lambda watch: list(stories), explain=lambda s, t: "ACTION: BUY X\nSUMMARY: it matters",
                        path=str(tmp_path / "seen.json"), clock=lambda: NOW, **kw)
     return w, told
 
@@ -69,7 +69,7 @@ def test_a_new_story_is_emailed_and_said_once(tmp_path):
     w.check(quiet=True)
     stories.append(story("Nvidia misses earnings, stock plunges"))
     first = w.check()
-    assert len(first) == 1 and first[0]["explained"] == "it matters"
+    assert len(first) == 1 and first[0]["call"]["summary"] == "it matters"
     assert len(told["email"]) == 1 and len(told["voice"]) == 1
     assert w.check() == []
 
@@ -124,3 +124,38 @@ def test_email_goes_to_you_by_default_and_refuses_lists(monkeypatch):
 def test_the_alert_card_escapes_what_it_shows():
     html = emailer.card("<b>AMD</b> tops $1T", ["up & away"], "https://x/?a=1&b=2")
     assert "&lt;b&gt;AMD" in html and "up &amp; away" in html and "a=1&amp;b=2" in html
+
+
+def test_the_call_is_read_off_the_desks_answer():
+    call = alerts.parse_call("ACTION: SELL TSLA\nSUMMARY: Recall of 2M cars. Margins at risk.\n"
+                             "WHY:\n- recall\n- margins\n- guidance cut\nCONFIDENCE: high")
+    assert call == {"action": "SELL", "ticker": "TSLA", "summary": "Recall of 2M cars. Margins at risk.",
+                    "why": ["recall", "margins", "guidance cut"], "confidence": "high"}
+
+
+def test_ignored_news_is_not_sent(tmp_path):
+    stories = []
+    w, told = watcher(tmp_path, stories)
+    w.explain = lambda s, t: "ACTION: IGNORE NVDA\nSUMMARY: Noise."
+    w.check(quiet=True)
+    stories.append(story("Nvidia misses earnings, stock plunges"))
+    assert w.check() == [] and told["email"] == []
+
+
+def test_a_hold_on_a_stock_you_do_not_watch_is_not_sent(tmp_path):
+    stories = []
+    w, told = watcher(tmp_path, stories)
+    w.explain = lambda s, t: "ACTION: HOLD AAPL\nSUMMARY: Fine."
+    w.check(quiet=True)
+    stories.append(story("Apple to acquire a chipmaker in record buyout"))
+    assert w.check() == []
+
+
+def test_the_email_leads_with_the_call(tmp_path, monkeypatch):
+    monkeypatch.setenv("APOLLO_SMTP_USER", "me@gmail.com")
+    monkeypatch.setenv("APOLLO_SMTP_PASSWORD", "x")
+    sent = []
+    monkeypatch.setattr(emailer, "_deliver", lambda found, message: sent.append(message))
+    alerts.Watcher._email({"story": story("Tesla recall"), "tickers": ["TSLA"], "why": [],
+                           "explained": "ACTION: SELL TSLA\nSUMMARY: Bad.\nCONFIDENCE: high"})
+    assert sent[0]["Subject"].startswith("SELL - TAKE YOUR MONEY OUT TSLA")

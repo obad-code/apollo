@@ -193,12 +193,42 @@ class Moves:
 # -- telling you -----------------------------------------------------------------
 
 EXPLAIN = (
-    "You are Apollo's market alert desk. A story just broke. In plain words, "
-    "and in the language asked for: what happened (one sentence), why it "
-    "matters, and which way it is likely to push the stock(s) named - up, "
-    "down or unclear - with a confidence of low, medium or high and the "
-    "reason. Use search to check the facts. Under 120 words. End with: Not "
-    "financial advice.")
+    "You are Apollo's market alert desk. A story just broke. Check the facts "
+    "with search, then decide what the user should DO. The user knows this is "
+    "not financial advice and wants a straight call, so give one. Answer in "
+    "exactly this shape, in the language asked for:\n"
+    "ACTION: one of BUY, SELL, HOLD or IGNORE, then the ticker. SELL means take "
+    "money out - use it when the news is genuinely dangerous for a stock the user "
+    "watches. IGNORE means it does not matter enough to act on.\n"
+    "SUMMARY: two short sentences - what happened, and why that is the call.\n"
+    "WHY:\n- three short bullets: the facts the call rests on.\n"
+    "CONFIDENCE: low, medium or high.")
+
+ACTIONS = ("BUY", "SELL", "HOLD", "IGNORE")
+
+
+def parse_call(text):
+    """The desk's answer -> {action, ticker, summary, why, confidence}.
+    Anything it did not say is left empty; no ACTION reads as HOLD."""
+    import re
+    out = {"action": "HOLD", "ticker": "", "summary": "", "why": [], "confidence": ""}
+    text = str(text or "")
+    found = re.search(r"ACTION:\s*\**\s*(BUY|SELL|HOLD|IGNORE)\b\s*\**\s*([A-Z0-9.\-]{1,10})?", text, re.I)
+    if found:
+        out["action"] = found.group(1).upper()
+        out["ticker"] = (found.group(2) or "").upper()
+    summary = re.search(r"SUMMARY:\s*(.+?)(?:\n\s*WHY:|\n\s*CONFIDENCE:|$)", text, re.S | re.I)
+    if summary:
+        out["summary"] = " ".join(summary.group(1).split())
+    why = re.search(r"WHY:\s*(.+?)(?:\n\s*CONFIDENCE:|$)", text, re.S | re.I)
+    if why:
+        out["why"] = [line.strip(" -•*\t") for line in why.group(1).splitlines() if line.strip(" -•*\t")][:4]
+    confidence = re.search(r"CONFIDENCE:\s*(low|medium|high)", text, re.I)
+    if confidence:
+        out["confidence"] = confidence.group(1).lower()
+    if not out["summary"] and not found:
+        out["summary"] = " ".join(text.split())[:300]
+    return out
 
 
 def explain(story, tickers, language=LANGUAGE, think=None):
@@ -313,8 +343,16 @@ class Watcher:
             if not self._room():
                 log.info("alert held back - %d already this hour", MOST_PER_HOUR)
                 break
-            self.sent.append(now)
             alert["explained"] = self.explain(alert["story"], alert["tickers"])
+            alert["call"] = parse_call(alert["explained"])
+            # Only news worth acting on is told: the desk's IGNORE is not, and
+            # nor is a HOLD on a stock you do not watch - that was the spam.
+            if alert["call"]["action"] == "IGNORE" or (
+                    alert["call"]["action"] == "HOLD"
+                    and not any(t in watch for t in alert["tickers"])):
+                log.info("alert not told (%s): %s", alert["call"]["action"], alert["story"]["title"])
+                continue
+            self.sent.append(now)
             self._tell(alert)
             told.append(alert)
         return told
@@ -334,11 +372,17 @@ class Watcher:
         if not emailer.ready():
             return
         story = alert["story"]
-        lines = [alert.get("explained") or story.get("summary", ""),
-                 f"Why Apollo flagged it: {'; '.join(alert['why'])}.",
-                 f"Source: {story.get('source', '')}"]
-        emailer.send(f"⚡ {story['title']}", "\n\n".join(lines + [story.get("link", "")]),
-                     rich=emailer.card(story["title"], lines, story.get("link", "")))
+        call = alert.get("call") or parse_call(alert.get("explained"))
+        ticker = call["ticker"] or ", ".join(alert.get("tickers", [])[:2])
+        verb = {"BUY": "BUY", "SELL": "SELL - TAKE YOUR MONEY OUT", "HOLD": "HOLD"}.get(call["action"], call["action"])
+        head = f"{verb} {ticker}".strip()
+        lines = [call["summary"] or story.get("summary", ""),
+                 *[f"• {reason}" for reason in call["why"]],
+                 f"Confidence: {call['confidence'] or 'not given'} · Source: {story.get('source', '')}"]
+        emailer.send(f"{head} — {story['title']}"[:180],
+                     "\n".join([head, ""] + lines + ["", story.get("link", "")]),
+                     rich=emailer.card(story["title"], lines, story.get("link", ""), action=head,
+                                       tone=call["action"]))
 
 
 def _watchlist():

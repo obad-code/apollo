@@ -80,8 +80,15 @@ def send(subject, text, to=None, rich=None):
     return {"to": to}
 
 
-def card(title, lines, link="", accent="#F5B83D"):
-    """A small dark HTML card for an alert, in Apollo's colours."""
+TONES = {"BUY": "#3ddc84", "SELL": "#ff5a5f", "HOLD": "#F5B83D"}
+
+
+def card(title, lines, link="", accent="#F5B83D", action="", tone=""):
+    """A small dark HTML card for an alert, in Apollo's colours. `action` is
+    the call, set large at the top in its colour (`tone`)."""
+    colour = TONES.get(tone, accent)
+    banner = (f"<div style='font-size:26px;font-weight:800;letter-spacing:.04em;color:{colour};"
+              f"margin:2px 0 12px'>{html.escape(action)}</div>" if action else "")
     body = "".join(f"<p style='margin:0 0 10px;line-height:1.5'>{html.escape(line)}</p>"
                    for line in lines if line)
     button = (f"<p style='margin:18px 0 0'><a href='{html.escape(link)}' style='color:{accent};"
@@ -91,5 +98,5 @@ def card(title, lines, link="", accent="#F5B83D"):
             f"border-radius:16px;padding:22px;color:#e9e9ee'>"
             f"<div style='font-size:11px;letter-spacing:.14em;color:{accent};margin-bottom:8px'>"
             f"APOLLO · MARKET ALERT</div>"
-            f"<h2 style='margin:0 0 14px;font-size:19px;color:#fff'>{html.escape(title)}</h2>"
+            f"{banner}<h2 style='margin:0 0 14px;font-size:17px;color:#fff'>{html.escape(title)}</h2>"
             f"{body}{button}</div></div>")

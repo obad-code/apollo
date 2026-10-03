@@ -29,10 +29,14 @@ def test_save_clip_passes_a_shorter_request(monkeypatch):
     assert buffer.asked == [15]
 
 
-def test_save_clip_reports_unavailable():
+def test_with_no_buffer_the_gpus_recorder_saves_it(monkeypatch):
+    """Apollo's own buffer is off by default (it cost frames in games): the
+    clip is saved by NVIDIA Instant Replay's shortcut instead."""
+    pressed = []
+    monkeypatch.setattr(tools.pc_control, "press_keys", lambda keys: pressed.append(keys) or "Pressed.")
     tools.set_clip_buffer(None)
     result = tools.run("save_clip", {})
-    assert result["ok"] is False and "recorder" in result["error"].lower()
+    assert result["ok"] is True and pressed == [tools.CLIP_KEYS[tools.CLIPPER]]
 
 
 def test_apollo_can_open_the_clips_folder(monkeypatch):

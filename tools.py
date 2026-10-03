@@ -464,6 +464,18 @@ def _open_tradingview(ctx, symbol):
 _CLIP_BUFFER = None
 
 
+# Who keeps clips when Apollo's own replay buffer is off (the default):
+# NVIDIA Instant Replay (Alt+F10 saves it) or the Xbox Game Bar (Win+Alt+G
+# records what just happened). APOLLO_CLIPPER picks; Instant Replay or
+# background recording has to be switched on in that app once.
+CLIPPER = (os.environ.get("APOLLO_CLIPPER") or "nvidia").strip().lower()
+CLIP_KEYS = {"nvidia": "alt+f10", "xbox": "win+alt+g"}
+
+
+def clip_recorder():
+    return "NVIDIA Instant Replay (Alt+F10)" if CLIPPER != "xbox" else "Xbox Game Bar (Win+Alt+G)"
+
+
 def set_clip_buffer(buffer):
     """Apollo hands its replay buffer here once it is running."""
     global _CLIP_BUFFER
@@ -484,8 +496,15 @@ def set_clip_buffer(buffer):
                          "description": "How far back to save, 5-60 (default 60)"}}))
 def _save_clip(ctx, seconds=60):
     if _CLIP_BUFFER is None:
-        return {"ok": False, "error": "The screen recorder isn't running, so there's "
-                                      "nothing to clip."}
+        # No recorder of Apollo's own: the one the GPU or Windows already
+        # runs keeps the clip - its save shortcut, pressed for you.
+        keys = CLIP_KEYS.get(CLIPPER, CLIP_KEYS["nvidia"])
+        said = pc_control.press_keys(keys)
+        if said.startswith("Failed"):
+            return {"ok": False, "error": said}
+        return {"ok": True, "result": f"Saved with {clip_recorder()}.",
+                "where": ("Videos\\<game name> (NVIDIA)" if CLIPPER == "nvidia"
+                          else "Videos\\Captures (Xbox Game Bar)")}
     ctx.activity("saving the clip")
     result = _CLIP_BUFFER.save(max(5, min(60, int(seconds))))
     if result.get("ok"):
