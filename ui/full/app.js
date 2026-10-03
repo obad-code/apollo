@@ -5022,3 +5022,33 @@ $('headlines').addEventListener('contextmenu', (event) => {
   rollNews(false);
 });
 $('headlines').classList.add('news-rolled');
+
+/* The crew at a glance in the normal display: each agent a small square,
+ * its creature, its name, and a health bar - full and green while all is
+ * well (pulsing while it works), amber when stuck, red when its last job
+ * failed; its length the day's success rate. */
+async function drawCrewMini() {
+  const box = $('crew-mini');
+  if (!box || state.view !== 'normal' || state.mode !== 'full') return;
+  const api = bridge();
+  let board = crew.board || {};
+  try { if (api && api.crew_board) board = crew.board = (await api.crew_board()) || {}; } catch { /* keep */ }
+  const now = board.now || Date.now() / 1000;
+  box.innerHTML = AGENTS.map((key) => {
+    const a = (board.agents || {})[key] || {};
+    const h = CrewView.health(a, now);
+    const done = a.done_today || 0, failed = a.failed_today || 0;
+    const hp = done + failed ? Math.round((done / (done + failed)) * 100) : 100;
+    return `<button type="button" class="cm-card cm-${h.state}" data-key="${key}" title="${esc(key)} · ${esc(h.text)}">
+      <span class="cm-hp"><i style="width:${h.state === 'failing' ? Math.min(hp, 30) : hp}%"></i></span>
+      <span class="cm-face">${CrewView.creature(key, 34)}</span>
+      <b>${key === 'MONEYPENNY' ? 'M.PENNY' : key}</b>
+      <small>${esc(h.state === 'working' ? 'working' : h.state === 'idle' ? `${done} today` : h.state)}</small>
+    </button>`;
+  }).join('');
+}
+$('crew-mini').addEventListener('click', (event) => {
+  if (event.target.closest('.cm-card')) setMode('agents');
+});
+setInterval(drawCrewMini, 10000);
+setTimeout(drawCrewMini, 1500);
