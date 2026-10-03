@@ -72,3 +72,12 @@ def test_every_widget_draws_with_no_data(tmp_path):
     drawn = run(tmp_path, "return C.WIDGETS.map((w) => C.widget(w.id, {}).length > 40);",
                 module="crewview.js", name="C")
     assert all(drawn)
+
+
+def test_the_option_wheel_curves_away_from_the_chosen_item(tmp_path):
+    got = run(tmp_path, """
+        const at = (d) => O.placeItem(d, {rowH: 30, tilt: 6, blur: 2, fade: .25});
+        const z = at(0), up = at(-2), down = at(2);
+        return [z.x, z.y, z.lit, up.y < 0, down.y > 0, up.x < 0, down.opacity < 1, down.blur, at(-2).rot === -at(2).rot];""",
+              module="optionwheel.js", name="O")
+    assert got == [0, 0, 1, True, True, True, True, 4, True]

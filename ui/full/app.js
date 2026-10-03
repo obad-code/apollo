@@ -27,6 +27,7 @@ import * as Explain from './explain.js';
 import * as CrewView from './crewview.js';
 import { Wheel } from './wheel.js';
 import { WidgetGrid } from './widgetgrid.js';
+import { OptionWheel } from './optionwheel.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -1974,49 +1975,104 @@ $('panel-tabs').addEventListener('click', (event) => {
 
 const ago = (when) => (when ? `${words(Math.max(0, Date.now() / 1000 - when))} ago` : '');
 
+/* Talks: each exchange with Apollo as a soft square - what you said, what
+ * he (or an agent) answered, the tools it took. */
 function renderTalks(list) {
-  $('pane-talks').innerHTML = (list || []).map((talk) => `
-    <div class="talk">
+  const talks = (list || []).map((talk, i) => `
+    <div class="talk" style="--i:${Math.min(i, 8)}">
       <span class="when">${esc(talk.day === 'today' ? talk.time : 'yday ' + talk.time)}</span>
       <div class="lines">
-        <p class="you">${esc(talk.you)}</p>
-        <p class="said"><b>${esc(talk.who)}</b> ${esc(talk.apollo || '…')}</p>
+        <p class="you" dir="auto">${esc(talk.you)}</p>
+        <p class="said" dir="auto"><b>${esc(talk.who)}</b> ${esc(talk.apollo || '…')}</p>
         ${(talk.tools || []).length ? `<p class="used">${(talk.tools || []).map((name) =>
           `<i>${esc(name)}</i>`).join('')}</p>` : ''}
       </div>
-    </div>`).join('')
-    || '<p class="quiet">Nothing said yet today. Hold Ctrl+Alt and ask him something.</p>';
+    </div>`).join('');
+  $('pane-talks').innerHTML = talks ? `<div class="talks-grid">${talks}</div>`
+    : '<p class="quiet">Nothing said yet today. Hold Ctrl+Alt and ask him something.</p>';
 }
 
+/* Projects: every project you have - Claude Code sessions, git folders on
+ * this PC, GitHub repos - on a wheel down the left (optionwheel.js), the one
+ * in front as a soft card beside it. Open it (click it again, or Enter) and
+ * the wheel folds away while the card grows into the whole pane; back, and
+ * the wheel comes round again. */
+const KIND_NAMES = { claude: 'Claude Code', pc: 'On this PC', github: 'GitHub' };
+
+function projectList(p) {
+  return [
+    ...(p.sessions || []).map((s) => ({ kind: 'claude', name: s.title || s.project, sub: s.project,
+      when: s.when, lines: [s.prompt && s.prompt !== s.title ? s.prompt : ''] })),
+    ...(p.folders || []).map((f, n) => ({ kind: 'pc', name: f.name, sub: f.branch ? `on ${f.branch}` : '',
+      when: f.when, lines: [f.last ? `Last commit: ${f.last}` : ''], folder: n })),
+    ...(p.repos || []).map((r, n) => ({ kind: 'github', name: r.name, sub: r.private ? 'private' : 'public',
+      when: r.when, lines: [r.about || ''], repo: n })),
+  ];
+}
+
+function projectCard(item, open = false) {
+  if (!item) return '<p class="quiet">No projects found yet.</p>';
+  const action = item.folder !== undefined ? `<button class="proj-go link" data-folder="${item.folder}" type="button">Open the folder</button>`
+    : item.repo !== undefined ? `<button class="proj-go link" data-repo="${item.repo}" type="button">Open on GitHub</button>` : '';
+  return `<article class="proj-card k-${item.kind}${open ? ' open' : ''}">
+    <span class="proj-kind"><i></i>${esc(KIND_NAMES[item.kind])}</span>
+    <h3>${esc(item.name)}</h3>
+    ${item.sub ? `<p class="proj-sub">${esc(item.sub)}</p>` : ''}
+    ${item.lines.filter(Boolean).map((line) => `<p class="proj-line">${esc(line)}</p>`).join('')}
+    <footer><span>${esc(ago(item.when))}</span>${open ? action : '<em>Open ›</em>'}</footer>
+  </article>`;
+}
+
+let projWheel = null;
 function renderProjects(p) {
-  const group = (title, rows, empty) => `<h3>${title}</h3>${rows || `<p class="quiet">${empty}</p>`}`;
-  const sessions = (p.sessions || []).map((session) => `
-    <div class="work">
-      <b>${esc(session.title)}</b>
-      <span>${esc(session.project)} · ${esc(ago(session.when))}</span>
-      ${session.prompt && session.prompt !== session.title ? `<i>${esc(session.prompt)}</i>` : ''}
-    </div>`).join('');
-  const folders = (p.folders || []).map((folder, n) => `
-    <div class="work link" data-folder="${n}">
-      <b>${esc(folder.name)}</b>
-      <span>${esc(folder.branch)} · ${esc(ago(folder.when))}</span>
-      ${folder.last ? `<i>${esc(folder.last)}</i>` : ''}
-    </div>`).join('');
-  const repos = (p.repos || []).map((repo, n) => `
-    <div class="work link" data-repo="${n}">
-      <b>${esc(repo.name)}${repo.private ? ' <em>private</em>' : ''}</b>
-      <span>${esc(ago(repo.when))}</span>
-      ${repo.about ? `<i>${esc(repo.about)}</i>` : ''}
-    </div>`).join('');
   state.projects = p;
-  $('pane-projects').innerHTML =
-    group('Claude Code', sessions, 'No sessions found.')
-    + group('On this PC', folders, 'No git folders on the Desktop or in Documents.')
-    + group('GitHub', repos, 'Nothing public to show. Save a GitHub token as '
-            + 'GITHUB_TOKEN to see private repos too.');
+  const items = projectList(p);
+  state.projectItems = items;
+  const pane = $('pane-projects');
+  if (!pane.querySelector('.proj')) {
+    pane.innerHTML = `<div class="proj">
+      <div class="proj-wheel"><div id="proj-wheel"></div></div>
+      <div class="proj-side"></div>
+      <div class="proj-open" hidden><button class="proj-back" type="button" data-sfx="none">‹ All projects</button><div class="proj-body"></div></div>
+    </div>`;
+    projWheel = null;
+  }
+  const names = items.map((item) => `<i class="ow-dot k-${item.kind}"></i>${esc(item.name)}`);
+  // Read through state, so a wheel made with an earlier list shows this one.
+  const choose = (i) => { pane.querySelector('.proj-side').innerHTML = projectCard((state.projectItems || [])[i]); };
+  if (!projWheel) {
+    projWheel = new OptionWheel($('proj-wheel'), {
+      items: names, onChange: choose, onOpen: openProject, sound: (name) => sfx.play(name),
+      fontSize: 1.0, spacing: 2.1, tilt: 3, blur: 0.7, fade: 0.15, inset: 8,
+    });
+  } else {
+    projWheel.setItems(names, projWheel.selected);
+  }
+  choose(projWheel.selected);
+}
+
+function openProject(i) {
+  const item = (state.projectItems || [])[i];
+  if (!item) return;
+  const proj = $('pane-projects').querySelector('.proj');
+  proj.querySelector('.proj-body').innerHTML = projectCard(item, true);
+  proj.querySelector('.proj-open').hidden = false;
+  proj.classList.add('opened');
+  sfx.play('expand');
+}
+
+function closeProject() {
+  const proj = $('pane-projects').querySelector('.proj');
+  if (!proj) return;
+  proj.classList.remove('opened');
+  setTimeout(() => { if (!proj.classList.contains('opened')) proj.querySelector('.proj-open').hidden = true; }, 420);
+  sfx.play('collapse');
 }
 
 $('pane-projects').addEventListener('click', (event) => {
+  if (event.target.closest('.proj-back')) { closeProject(); return; }
+  const card = event.target.closest('.proj-side .proj-card');
+  if (card && projWheel) { openProject(projWheel.selected); return; }
   const row = event.target.closest('.link');
   const p = state.projects || {};
   const api = window.pywebview && window.pywebview.api;
