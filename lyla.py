@@ -294,6 +294,7 @@ class Desk:
         self.jobs = queue.Queue()
         self.current = None
         self.last_error = None          # (when, why) of the last failed job
+        self.failures = []              # when each job failed, for the board
         self._ids = itertools.count(1)
         self._thread = None
         self._lock = threading.Lock()
@@ -388,6 +389,7 @@ class Desk:
             _save_reports(self.reports, self.path)
         else:
             self.last_error = {"when": job["done"], "why": job["error"], "task": job["task"]}
+            self.failures = (self.failures + [job["done"]])[-50:]
             self._tell(job, stage="error", text=job["error"])
         self._pass_on(job)
 

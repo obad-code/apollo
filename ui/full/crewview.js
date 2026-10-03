@@ -43,14 +43,61 @@ const short = (text, most = 64) => {
 };
 const look = (key) => LOOKS[key] || LOOKS.LYLA;
 
-/* One orb: a sphere of light in the agent's colour, its mark inside, a
- * gloss on top, and a ring that runs while it is working. */
+/* One agent: a small creature - a plain shape with fully white or fully
+ * black eyes that blink and look about, bouncing while it works. LYLA keeps
+ * her own look: the little amber robot from her room. */
+const CREATURES = {
+  THEIA: { eye: '#000', at: [[37, 50], [63, 50]], mouth: [50, 66],
+    body: '<circle cx="50" cy="52" r="40" fill="#fff"/>' },
+  MONEYPENNY: { eye: '#fff', at: [[37, 50], [63, 50]], mouth: [50, 66],
+    body: '<rect x="12" y="13" width="76" height="76" rx="24" fill="#09090b" stroke="rgba(255,255,255,.22)" stroke-width="1.5"/>' },
+  Q: { eye: '#000', at: [[40, 62], [60, 62]], mouth: [50, 75],
+    body: '<path d="M50 12Q55 12 58 17L92 79Q96 88 86 88H14Q4 88 8 79L42 17Q45 12 50 12Z" fill="#fff"/>' },
+  LYLA: { eye: '#120c02', at: [[39, 50], [61, 50]], mouth: [50, 66], square: true,
+    body: '<rect x="47.5" y="3" width="5" height="13" rx="2" fill="#FFB000"/><circle cx="50" cy="5" r="5" fill="#ff7a00"/>'
+      + '<rect x="12" y="16" width="76" height="72" rx="22" fill="#FFB000"/>'
+      + '<circle cx="27" cy="64" r="5" fill="#ff7a00" opacity=".55"/><circle cx="73" cy="64" r="5" fill="#ff7a00" opacity=".55"/>' },
+};
+
+export function creature(key, size = 100) {
+  const c = CREATURES[key] || CREATURES.THEIA;
+  const eyes = c.at.map(([x, y]) => (c.square
+    ? `<rect class="cr-eye" x="${x - 5}" y="${y - 7}" width="10" height="14" rx="3" fill="${c.eye}"/>`
+    : `<ellipse class="cr-eye" cx="${x}" cy="${y}" rx="5.5" ry="7.5" fill="${c.eye}"/>`)).join('');
+  const [mx, my] = c.mouth;
+  return `<svg class="cr-svg" width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true">
+    <g class="cr-body">${c.body}<g class="cr-look"><g class="cr-eyes">${eyes}</g>
+    <path d="M${mx - 6} ${my}q6 5 12 0" stroke="${c.eye}" stroke-width="3" fill="none" stroke-linecap="round"/></g></g></svg>`;
+}
+
 export function orb(key) {
   const l = look(key);
-  return `<span class="orb" style="--rgb:${l.rgb};--hex:${l.hex};--lit:${l.light}">
-    <i class="orb-bloom"></i><i class="orb-ring"></i><i class="orb-gloss"></i>
-    <span class="orb-mark">${emblem(key, 64)}</span>
+  return `<span class="orb creature cr-${key.toLowerCase()}" style="--rgb:${l.rgb};--hex:${l.hex};--lit:${l.light}">
+    <i class="orb-ring"></i>${creature(key)}
   </span><span class="orb-name"><b>${key}</b><small>${esc(ROLES[key][0])}</small></span>`;
+}
+
+/* Is it really working? From what the desk reports: a step in the last
+ * three minutes is working; a job with no step for longer is stuck; a
+ * failure newer than its last good job is failing; else it is idle. */
+export function health(agent = {}, now = Date.now() / 1000) {
+  const steps = agent.steps || [];
+  const last = steps.length ? steps[steps.length - 1].t : 0;
+  if (agent.working) {
+    return now - last > 180 ? { state: 'stuck', text: `No move for ${ago(now - last)}` }
+      : { state: 'working', text: `Moving · last step ${ago(now - last)} ago` };
+  }
+  const err = agent.error;
+  if (err && err.when > (agent.last_done || 0)) return { state: 'failing', text: `Last job failed: ${short(err.why, 90)}` };
+  return { state: 'idle', text: agent.last_done ? `Ready · last job ${ago(now - agent.last_done)} ago` : 'Ready · no jobs yet' };
+}
+
+function ago(seconds) {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.round(s / 60)}m`;
+  if (s < 86400) return `${Math.round(s / 3600)}h`;
+  return `${Math.round(s / 86400)}d`;
 }
 
 /* What an agent is doing, in a line. */
@@ -61,16 +108,32 @@ export function doing(agent) {
   return agent.done_today ? `Ready · ${agent.done_today} done today` : 'Ready';
 }
 
-/* The focus card around an agent's orb. */
-export function focusMarkup(key, agent, last) {
-  const l = look(key);
-  return `<div class="focus-orb">${orb(key)}</div>
-    <div class="focus-text" style="--rgb:${l.rgb}">
+/* An agent brought forward: the creature, and its work as it happens - a
+ * calm line of steps drawing in, the one in hand pulsing, and a plain
+ * verdict on whether it is really working. */
+export function focusMarkup(key, agent = {}, last, now = Date.now() / 1000) {
+  const l = look(key), h = health(agent, now);
+  const steps = agent.working ? (agent.steps || []) : [];
+  const done = agent.done_today || 0, failed = agent.failed_today || 0;
+  const rate = done + failed ? Math.round((done / (done + failed)) * 100) : null;
+  const line = steps.length ? `<ol class="work-steps">${steps.map((s, i) => `
+      <li class="${i === steps.length - 1 ? 'now' : ''}" style="--i:${i}"><i></i>
+        <span>${esc(short(s.text || s.stage, 80))}</span><em>${ago(now - s.t)}</em></li>`).join('')}</ol>`
+    : `<p class="work-empty">${agent.working ? 'Starting…' : 'Nothing in hand right now.'}</p>`;
+  return `<div class="focus-orb${agent.working ? ' busy' : ''}">${orb(key)}</div>
+    <div class="focus-text work" style="--rgb:${l.rgb}">
       <h2>${key}</h2>
       <p class="focus-role">${esc(ROLES[key][0])}</p>
-      <p class="focus-what">${esc(ROLES[key][1])}</p>
-      <p class="focus-now${agent && agent.working ? ' busy' : ''}"><i></i>${esc(doing(agent))}</p>
-      ${last ? `<p class="focus-last"><small>LAST</small>${esc(short(last.summary || last.task, 120))}</p>` : ''}
+      <p class="work-health h-${h.state}"><i></i><b>${h.state.toUpperCase()}</b><span>${esc(h.text)}</span></p>
+      ${agent.working ? `<p class="work-task">${esc(short(agent.working, 140))}</p>` : ''}
+      ${line}
+      <div class="work-stats">
+        <div><b>${done}</b><span>done today</span></div>
+        <div><b>${rate === null ? '—' : `${rate}%`}</b><span>success</span></div>
+        <div><b>${agent.avg_ms ? `${(agent.avg_ms / 1000).toFixed(0)}s` : '—'}</b><span>avg job</span></div>
+        <div><b>${agent.waiting || 0}</b><span>waiting</span></div>
+      </div>
+      ${last ? `<p class="focus-last"><small>LAST RESULT</small>${esc(short(last.summary || last.task, 160))}</p>` : ''}
     </div>`;
 }
 
@@ -161,13 +224,14 @@ export function mapMarkup(agents = {}, focus = null) {
 /* --- the board's widgets -------------------------------------------------------- */
 
 export const WIDGETS = [
-  { id: 'crew', size: 'wide', label: 'The crew' },
-  { id: 'spend', size: 'sm', label: 'Spend today' },
-  { id: 'issues', size: 'sm', label: 'Issues' },
-  { id: 'hours', size: 'wide', label: 'Jobs by hour' },
-  { id: 'jobs', size: 'wide', label: 'Latest jobs' },
-  { id: 'alerts', size: 'sm', label: 'Market alerts' },
-  { id: 'tools', size: 'sm', label: 'Tools used today' },
+  { id: 'runs', size: 'wide', label: 'Runs' },
+  { id: 'status', size: 'sm', label: 'System status' },
+  { id: 'cost', size: 'sm', label: 'Cost' },
+  { id: 'errors', size: 'sm', label: 'Errors' },
+  { id: 'traces', size: 'wide', label: 'Traces' },
+  { id: 'evals', size: 'sm', label: 'Evals' },
+  { id: 'tools', size: 'sm', label: 'Tools' },
+  { id: 'tokens', size: 'sm', label: 'Token usage' },
 ];
 
 const shell = (title, meta, body) => `<section class="w-shell">
@@ -179,60 +243,73 @@ const tokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n 
 
 export function widget(id, board = {}) {
   const agents = board.agents || {};
-  if (id === 'crew') {
-    return shell('The crew', `${KEYS.filter((k) => agents[k] && agents[k].working).length} working`,
-      `<ul class="w-crew">${KEYS.map((k) => {
-        const l = look(k), a = agents[k] || {};
-        return `<li style="--rgb:${l.rgb}"><i class="w-dot${a.working ? ' busy' : ''}"></i>
-          <b>${k}</b><span>${esc(short(doing(a), 34))}</span><em>${a.done_today || 0}</em></li>`;
-      }).join('')}</ul>`);
-  }
-  if (id === 'spend') {
-    const s = board.spend || {};
-    const g = (s.gemini || {}), c = (s.claude || {});
-    const gt = (g.prompt || 0) + (g.response || 0), ct = (c.prompt || 0) + (c.response || 0);
-    const total = gt + ct || 1;
-    return shell('Spend today', 'estimated', `<p class="w-big">${money(s.cost)}</p>
-      <p class="w-sub">${tokens(s.tokens || 0)} tokens · ${s.turns || 0} turns</p>
-      <div class="w-split"><i style="flex:${gt / total || 0.0001};background:#FFB000"></i><i style="flex:${ct / total || 0.0001};background:#a77be0"></i></div>
-      <p class="w-legend"><span><i style="background:#FFB000"></i>Gemini</span><span><i style="background:#a77be0"></i>Claude</span></p>`);
-  }
-  if (id === 'issues') {
-    const i = board.issues || {};
-    return shell('Issues', i.failing ? `<b class="bad">${i.failing} failing</b>` : 'all clear',
-      `<p class="w-big">${i.count || 0}</p>${(i.top || []).map((t) => `<p class="w-line"><i class="w-dot ${i.failing ? 'bad' : ''}"></i>${esc(short(t, 26))}</p>`).join('')
-      || '<p class="w-sub">Nothing is wrong.</p>'}`);
-  }
-  if (id === 'hours') {
+  const now = board.now || Date.now() / 1000;
+  if (id === 'runs') {
     const hours = board.hours || {};
     const peak = Math.max(1, ...KEYS.flatMap((k) => hours[k] || []));
-    const now = new Date((board.now || Date.now() / 1000) * 1000).getHours();
+    const hour = new Date(now * 1000).getHours();
     const total = KEYS.reduce((n, k) => n + (hours[k] || []).reduce((a, b) => a + b, 0), 0);
-    return shell('Jobs by hour', `${total} today`, `<div class="w-heat">${KEYS.map((k) => {
+    return shell('Runs', `${total} today`, `<div class="w-heat">${KEYS.map((k) => {
       const l = look(k);
       return `<span class="w-heat-name">${k.slice(0, 5)}</span><span class="w-heat-row">${(hours[k] || new Array(24).fill(0)).map((v, h) =>
-        `<i title="${k} ${h}:00 · ${v}" style="--a:${v ? 0.25 + 0.75 * (v / peak) : 0.06};--rgb:${l.rgb}"${h === now ? ' class="now"' : ''}></i>`).join('')}</span>`;
+        `<i title="${k} ${h}:00 · ${v}" style="--a:${v ? 0.25 + 0.75 * (v / peak) : 0.06};--rgb:${l.rgb}"${h === hour ? ' class="now"' : ''}></i>`).join('')}</span>`;
     }).join('')}<span></span><span class="w-heat-hours"><b>00</b><b>06</b><b>12</b><b>18</b></span></div>`);
   }
-  if (id === 'jobs') {
-    const jobs = board.jobs || [];
-    return shell('Latest jobs', 'newest first', jobs.length ? `<ol class="w-jobs">${jobs.slice(0, 4).map((j) => {
-      const l = look(j.agent);
-      return `<li style="--rgb:${l.rgb}"><i class="w-dot"></i><b>${esc(j.agent)}</b>
-        <span>${esc(short(j.task, 48))}</span><em>${j.took ? `${(j.took / 1000).toFixed(1)}s` : ''}</em></li>`;
-    }).join('')}</ol>` : '<p class="w-sub">No jobs yet. Ask Apollo to have one of them look into something.</p>');
+  if (id === 'status') {
+    const brains = board.brains || {};
+    const states = KEYS.map((k) => [k, health(agents[k], now)]);
+    const bad = states.filter(([, h]) => h.state === 'stuck' || h.state === 'failing').length;
+    return shell('System status', bad ? `<b class="bad">${bad} need a look</b>` : '<b class="ok">operational</b>',
+      `<ul class="w-status">${states.map(([k, h]) => `<li><i class="w-dot s-${h.state}"></i><b>${k}</b><em>${h.state}</em></li>`).join('')}
+      ${Object.entries(brains).map(([name, on]) => `<li><i class="w-dot ${on ? 's-idle' : 's-off'}"></i><b>${name}</b><em>${on ? 'key set' : 'not set'}</em></li>`).join('')}</ul>`);
   }
-  if (id === 'alerts') {
-    const a = board.alerts || {};
-    return shell('Market alerts', a.watching ? '<b class="ok">watching</b>' : 'off',
-      `<p class="w-big">${a.sent_hour || 0}</p><p class="w-sub">sent this hour · big news by email and voice</p>`);
+  if (id === 'cost') {
+    const s = board.spend || {};
+    return shell('Cost', 'today, estimated', `<p class="w-big">${money(s.cost)}</p>
+      <p class="w-sub">${s.turns || 0} turns · ${tokens(s.tokens || 0)} tokens</p>`);
+  }
+  if (id === 'errors') {
+    const i = board.issues || {};
+    const agentErrs = KEYS.filter((k) => health(agents[k], now).state === 'failing')
+      .map((k) => `${k}: ${short((agents[k].error || {}).why, 22)}`);
+    const lines = [...agentErrs, ...(i.top || [])];
+    const n = agentErrs.length + (i.count || 0);
+    return shell('Errors', n ? `<b class="bad">${n}</b>` : '<b class="ok">none</b>',
+      `<p class="w-big">${n}</p>${lines.slice(0, 3).map((t) => `<p class="w-line"><i class="w-dot bad"></i>${esc(short(t, 30))}</p>`).join('')
+      || '<p class="w-sub">Nothing is failing.</p>'}`);
+  }
+  if (id === 'traces') {
+    const jobs = (board.jobs || []).slice(0, 5);
+    const longest = Math.max(1, ...jobs.map((j) => j.took || 0));
+    return shell('Traces', 'latest jobs', jobs.length ? `<ol class="w-traces">${jobs.map((j) => {
+      const l = look(j.agent);
+      return `<li style="--rgb:${l.rgb}"><b>${esc(j.agent)}</b><span>${esc(short(j.task, 40))}</span>
+        <i style="--w:${Math.max(4, ((j.took || 0) / longest) * 100)}%"></i><em>${j.took ? `${(j.took / 1000).toFixed(1)}s` : ''}</em></li>`;
+    }).join('')}</ol>` : '<p class="w-sub">No jobs yet. They start on their own every day, or ask Apollo.</p>');
+  }
+  if (id === 'evals') {
+    const done = KEYS.reduce((n, k) => n + ((agents[k] || {}).done_today || 0), 0);
+    const failed = KEYS.reduce((n, k) => n + ((agents[k] || {}).failed_today || 0), 0);
+    const rate = done + failed ? done / (done + failed) : null;
+    const deg = rate === null ? 0 : rate * 360;
+    return shell('Evals', 'jobs finished well', `<div class="w-ring" style="--deg:${deg}deg"><b>${rate === null ? '—' : `${Math.round(rate * 100)}%`}</b></div>
+      <p class="w-sub">${done} ok · ${failed} failed today</p>`);
   }
   if (id === 'tools') {
     const list = board.tools || [];
     const top = Math.max(1, ...list.map((t) => t[1]));
-    return shell('Tools used', 'today', list.length ? `<ul class="w-bars">${list.slice(0, 4).map(([name, n]) =>
+    return shell('Tools', 'today', list.length ? `<ul class="w-bars">${list.slice(0, 4).map(([name, n]) =>
       `<li><span>${esc(name)}</span><i style="--w:${(n / top) * 100}%"></i><em>${n}</em></li>`).join('')}</ul>`
       : '<p class="w-sub">None yet today.</p>');
+  }
+  if (id === 'tokens') {
+    const s = board.spend || {};
+    const g = (s.gemini || {}), c = (s.claude || {});
+    const gt = (g.prompt || 0) + (g.response || 0), ct = (c.prompt || 0) + (c.response || 0);
+    const total = gt + ct || 1;
+    return shell('Token usage', tokens(gt + ct), `<ul class="w-bars">
+      <li><span>Gemini</span><i style="--w:${(gt / total) * 100}%;--c:#FFB000"></i><em>${tokens(gt)}</em></li>
+      <li><span>Claude</span><i style="--w:${(ct / total) * 100}%;--c:#a77be0"></i><em>${tokens(ct)}</em></li></ul>`);
   }
   return '';
 }

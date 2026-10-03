@@ -26,8 +26,11 @@ def test_every_agent_is_on_the_wheel_and_a_pick_brings_it_forward():
     assert "function focusAgent(key)" in APP and "function openMap(" in APP
 
 
-def test_the_map_follows_the_focus_by_itself():
-    assert re.search(r"crew\.timer = setTimeout\(\(\) => openMap\(key\), CrewView\.FOCUS_MS\);", APP)
+def test_an_agent_forward_stays_and_shows_its_work_live():
+    """No jump to a workflow map: the agent stays forward, its work refreshing."""
+    assert "openMap(key), CrewView.FOCUS_MS" not in APP
+    assert re.search(r"crew\.timer = setInterval\(", APP)
+    assert "crew-map-open" not in section()
 
 
 def test_nothing_is_forward_until_you_pick():

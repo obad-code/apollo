@@ -459,6 +459,9 @@ function drawFocus(key) {
   const agents = crewAgents();
   const last = (crew.board.jobs || []).find((j) => j.agent === key);
   const focus = $('crew-focus');
+  // Steps draw in once; a refresh of the same agent only updates them.
+  focus.classList.toggle('settled', crew.drawn === key);
+  crew.drawn = key;
   focus.querySelector('.focus-main').innerHTML = CrewView.focusMarkup(key, agents[key], last);
   focus.style.setProperty('--rgb', LOOKS[key].rgb);
 }
@@ -466,7 +469,7 @@ function drawFocus(key) {
 /* An agent brought forward: who it is, what it is doing, its live card -
  * and after a few seconds, the whole crew as a map with it lit. */
 function focusAgent(key) {
-  clearTimeout(crew.timer);
+  clearInterval(crew.timer);
   crew.focus = key;
   for (const name of AGENTS) agentCards[name].hide();
   agentCards[key].show();
@@ -480,7 +483,8 @@ function focusAgent(key) {
   focus.classList.add('arriving');
   sfx.play('hud');
   if (crew.wheel) crew.wheel.paused = true;
-  crew.timer = setTimeout(() => openMap(key), CrewView.FOCUS_MS);
+  // Live while it is forward: its steps move as they happen.
+  crew.timer = setInterval(() => { if (crew.focus === key) loadCrew(); }, 4000);
 }
 
 function openMap(key = null) {
@@ -501,7 +505,8 @@ function openMap(key = null) {
 }
 
 function closeCrewLayers() {
-  clearTimeout(crew.timer);
+  clearInterval(crew.timer);
+  crew.drawn = null;
   crew.focus = null;
   for (const name of AGENTS) agentCards[name].hide();
   for (const id of ['crew-focus', 'crew-map']) {
@@ -515,7 +520,6 @@ function closeCrewLayers() {
 for (const button of document.querySelectorAll('#agents .crew-close')) {
   button.addEventListener('click', closeCrewLayers);
 }
-$('crew-map-open').addEventListener('click', () => openMap(null));
 $('crew-map').addEventListener('click', (event) => {
   const node = event.target.closest('.map-agent');
   if (!node) return;

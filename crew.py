@@ -276,6 +276,10 @@ def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=No
                         "working": working["task"] if working else "",
                         "steps": list(getattr(one, "steps", [])),
                         "error": getattr(one, "last_error", None),
+                        "failed_today": sum(1 for t in getattr(one, "failures", []) if t >= start),
+                        "last_done": max((float(r.get("done") or 0) for r in one.reports), default=0),
+                        "avg_ms": int(sum(r.get("took", 0) for r in one.reports[:10])
+                                      / max(1, len(one.reports[:10]))),
                         "done_today": 0}
         for report in one.reports:
             done = float(report.get("done") or 0)
@@ -311,7 +315,10 @@ def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=No
             "tools": sorted(tools_used.items(), key=lambda t: -t[1])[:6],
             "spend": spend, "issues": {"count": len(problems), "failing": failed,
                                        "top": [i.get("title", "") for i in problems[:3]]},
-            "alerts": alerts_state, "now": now.timestamp()}
+            "alerts": alerts_state, "now": now.timestamp(),
+            "brains": {"Gemini": bool(os.environ.get("GEMINI_API_KEY")),
+                       "Claude": bool(os.environ.get("ANTHROPIC_API_KEY")),
+                       "Hermes": lyla.hermes_settings() is not None}}
 
 
 def check():

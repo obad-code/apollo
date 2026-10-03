@@ -2686,3 +2686,78 @@ body:not(.ultra) #status-block:not(:hover) :is(#gauges, #system-line) { display:
 .deep-card header b { font-size: 24px; margin-right: 10px; }
 .deep-card header span { opacity: .65; }
 .deep-close { font: inherit; font-size: 12px; background: none; border: 1px solid rgba(255,255,255,.15); border-radius: 999px; color: inherit; padding: 4px 12px; cursor: pointer; }
+
+/* --- The crew as small creatures (crewview.js) --------------------------- */
+.orb.creature { background: none; box-shadow: none; border-radius: 0; }
+.orb.creature .cr-svg { width: 100%; height: 100%; overflow: visible;
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,.55)) drop-shadow(0 0 calc(10px + var(--near,1) * 18px) rgba(var(--rgb), .35)); }
+.cr-body { transform-box: fill-box; transform-origin: 50% 100%; }
+.cr-eyes { transform-box: fill-box; transform-origin: center; animation: cr-blink 5.2s infinite; }
+.cr-look { animation: cr-look 8s ease-in-out infinite; }
+.cr-theia .cr-eyes { animation-delay: -1.3s; } .cr-theia .cr-look { animation-delay: -2s; }
+.cr-moneypenny .cr-eyes { animation-delay: -2.7s; } .cr-moneypenny .cr-look { animation-delay: -5s; }
+.cr-q .cr-eyes { animation-delay: -4.1s; } .cr-q .cr-look { animation-delay: -3.4s; }
+@keyframes cr-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.08); } }
+@keyframes cr-look { 0%, 20%, 100% { transform: translate(0, 0); } 30%, 45% { transform: translate(-3px, 1px); }
+                     60%, 75% { transform: translate(3px, -1px); } }
+.wheel-ball.busy .cr-body, .focus-orb.busy .cr-body { animation: cr-hop .9s cubic-bezier(.3,.7,.4,1) infinite; }
+@keyframes cr-hop { 0%, 100% { transform: translateY(0) scale(1, 1); } 40% { transform: translateY(-7px) scale(.97, 1.03); }
+                    80% { transform: translateY(0) scale(1.04, .96); } }
+.orb.creature .orb-ring { inset: auto 18% -10px; height: 6px; border: 0; border-radius: 50%;
+  background: radial-gradient(rgba(var(--rgb), .7), transparent 70%); animation: none; }
+.wheel-ball.busy .orb.creature .orb-ring, .focus-orb.busy .orb.creature .orb-ring { animation: cr-shadow .9s infinite; }
+@keyframes cr-shadow { 40% { transform: scaleX(.75); opacity: .5; } }
+
+/* An agent forward: its work, live and plain. */
+#crew-focus #agent-stage, #crew-focus .focus-timer { display: none; }
+#crew-focus .focus-side { display: none; }
+.focus-orb { width: 220px; }
+.work { max-width: 520px; gap: 12px; }
+.work-health { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 9px 14px; border-radius: 12px;
+               background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+.work-health b { font: 800 12px var(--hud); letter-spacing: .18em; }
+.work-health span { color: var(--cream); opacity: .85; }
+.work-health i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.h-working i, .s-working { background: #3ddc84 !important; animation: w-ping 1.4s ease-out infinite; --rgb: 61,220,132; }
+.h-working b { color: #3ddc84; }
+.h-idle i, .s-idle { background: #8a8f98 !important; } .h-idle b { color: #c9ccd2; }
+.h-stuck i, .s-stuck { background: #F5B83D !important; } .h-stuck b { color: #F5B83D; }
+.h-failing i, .s-failing { background: #ff5a5f !important; } .h-failing b { color: #ff5a5f; }
+.s-off { background: rgba(255,255,255,.15) !important; }
+.work-task { font-size: 15px; color: #fff; line-height: 1.45; }
+.work-steps { list-style: none; margin: 2px 0; padding: 0 0 0 6px; display: grid; gap: 0; }
+.work-steps li { position: relative; display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: baseline;
+                 padding: 6px 0; font-size: 13px; color: var(--amber); opacity: 0;
+                 animation: step-in .5s cubic-bezier(.32,.72,0,1) both; animation-delay: calc(var(--i) * 80ms); }
+.work-steps li::before { content: ''; position: absolute; left: 4px; top: 18px; bottom: -6px; width: 1px;
+                         background: rgba(var(--rgb), .35); transform-origin: top; animation: step-line .6s both;
+                         animation-delay: calc(var(--i) * 80ms + 200ms); }
+.work-steps li:last-child::before { display: none; }
+.work-steps li i { width: 9px; height: 9px; border-radius: 50%; background: rgba(var(--rgb), .55); transform: translateY(1px); }
+.work-steps li.now { color: #fff; }
+.work-steps li.now i { background: rgba(var(--rgb), 1); animation: w-ping 1.2s ease-out infinite; }
+.work-steps em { font-style: normal; font-size: 11px; opacity: .5; }
+@keyframes step-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes step-line { from { transform: scaleY(0); } }
+.work-empty { font-size: 13px; opacity: .55; }
+.work-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.work-stats div { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); }
+.work-stats b { display: block; font: 800 20px var(--hud); color: #fff; }
+.work-stats span { font-size: 10.5px; letter-spacing: .08em; opacity: .6; }
+
+/* The board's new widgets. */
+.w-status, .w-traces { list-style: none; display: flex; flex-direction: column; gap: 7px; padding: 0; margin: 0; }
+.w-status li { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; font-size: 12px; }
+.w-status em { font-style: normal; font-size: 11px; opacity: .6; text-transform: uppercase; letter-spacing: .08em; }
+.w-traces li { display: grid; grid-template-columns: 92px 1fr 34%  48px; gap: 10px; align-items: center; font-size: 12px; }
+.w-traces b { color: rgba(var(--rgb), 1); filter: brightness(1.5); font-size: 11px; letter-spacing: .1em; }
+.w-traces span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; opacity: .85; }
+.w-traces i { height: 6px; border-radius: 3px; width: var(--w); background: linear-gradient(90deg, rgba(var(--rgb), .4), rgba(var(--rgb), 1)); }
+.w-traces em { font-style: normal; font-size: 11px; opacity: .6; text-align: right; }
+.w-ring { width: 92px; height: 92px; margin: 4px auto 8px; border-radius: 50%; display: grid; place-items: center;
+          background: conic-gradient(#3ddc84 var(--deg), rgba(255,255,255,.08) 0); }
+.w-ring b { width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; background: #121014;
+            font: 800 20px var(--hud); color: #fff; }
+#crew-focus.settled .work-steps li, #crew-focus.settled .work-steps li::before,
+#crew-focus.settled .focus-orb { animation: none; opacity: 1; }
+#crew-focus.settled .focus-orb.busy .cr-body { animation: cr-hop .9s cubic-bezier(.3,.7,.4,1) infinite; }
