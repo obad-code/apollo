@@ -2901,3 +2901,16 @@ body.agents #crew-page.look-minimal { background: #0b0b0d; }
 @media (prefers-reduced-motion: reduce) { .cp-run, .look-console .cp-foot div::before { animation: none; } }
 .look-console .cp-step.now i { background: radial-gradient(circle at 35% 30%, #fff, #7dffb5 40%, #22b866); animation: glow 1.2s ease-in-out infinite; }
 @keyframes glow { 50% { box-shadow: 0 0 16px #3ddc84, 0 0 4px #fff; } }
+/* The console's number panels: room under them, and a little air inside. */
+#crew-page { padding-bottom: 40px; }
+.look-console .cp-lane { padding: 12px 18px 24px; }
+.look-console .cp-lanes { gap: 10px; }
+.look-console .cp-foot { margin-top: 26px; margin-bottom: 6px; }
+.look-console .cp-foot div { padding: 18px 20px 16px; }
+.look-console .cp-foot span { display: block; margin-top: 6px; }
+/* Neumorphic number panels stand apart: a soft outer shadow each, and the
+   grid kept inside the panel's rim instead of running into its edges. */
+.look-console .cp-foot { gap: 18px; }
+.look-console .cp-foot div { box-shadow: 7px 7px 16px rgba(0,0,0,.55), -5px -5px 13px rgba(255,255,255,.05),
+  inset 0 1px 0 rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.05); }
+.look-console .cp-foot div::before { inset: 7px; border-radius: 12px; background-position: 11px 11px, 11px 11px; }
