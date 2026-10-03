@@ -605,7 +605,7 @@ class MiniApollo:
     HEAD_ROW = 24           # the icon row above the well
 
     INK = (14, 14, 17)
-    WELL = (24, 24, 29)
+    WELL = (46, 46, 54)            # lighter than the bar: the words sit in it
     LINE = (255, 255, 255)
     FACE = (250, 250, 247)
     EYE = (16, 16, 18)

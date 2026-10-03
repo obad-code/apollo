@@ -158,20 +158,24 @@ function cardWires(root, agents) {
     const b = el.getBoundingClientRect();
     const x = b.left + b.width / 2 - top.left;
     const busy = Boolean((agents[el.dataset.key] || {}).working);
-    const d = `M${x0},0 C${x0},${top.height * 0.6} ${x},${top.height * 0.4} ${x},${top.height}`;
+    const y = b.top - top.top;
+    const d = `M${x0},0 C${x0},${y * 0.6} ${x},${y * 0.4} ${x},${y}`;
     return `<path class="cc-wire${busy ? ' busy' : ''}" d="${d}" style="--g:${GLOW[el.dataset.key]}"/>${busy
       ? `<circle r="3" class="cc-spark" style="--g:${GLOW[el.dataset.key]}"><animateMotion dur="1.6s" repeatCount="indefinite" path="${d}"/></circle>` : ''}`;
   }).join('');
   void base;
 }
 
+export const LOOKS = ['minimal', 'console', 'y2k'];
 const looks = (look) => `<div class="cp-looks" role="group" aria-label="Look">
-  ${['cards', 'y2k', 'minimal', 'console'].map((l) => `<button type="button" data-look="${l}" class="${look === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}
+  ${LOOKS.map((l) => `<button type="button" data-look="${l}" class="${look === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}
 </div>`;
 
 export function render(root, board = {}, { look = 'cards', open = null } = {}) {
-  if (look === 'cards' || look === 'y2k') {
-    root.className = `cp look-cards${look === 'y2k' ? ' look-y2k' : ''}`;
+  // Every look is the cards; the looks only dress them differently.
+  look = LOOKS.includes(look) ? look : 'minimal';
+  {
+    root.className = `cp look-cards look-${look}`;
     renderCards(root, board, totals(board), look, open, board.now || Date.now() / 1000);
     return;
   }

@@ -544,8 +544,8 @@ class Orb:
 
     # -- Mini Apollo's bar: eyes at rest, Apollo while you talk, words in it --
 
-    ISLAND_REST = (64, 34)         # just Apollo's mark
-    ISLAND_ON = (120, 34)          # his mark, chat and +
+    ISLAND_REST = (300, 34)        # the long bar, Apollo's mark in the middle
+    ISLAND_ON = (300, 34)          # chat and + join it on the left
     ISLAND_TEXT_W = 540            # the bar, with what is said in its well
     ISLAND_LINES = 4
     ISLAND_LH = 22
@@ -638,12 +638,12 @@ class Orb:
         x0 = cx - w / 2.0
         row = self.overhang + 4 + overlay_paint.MiniApollo.HEAD_ROW / 2.0
         spin = 5.0 if self.view.state == overlay_state.SEARCHING else 1.0
-        self.mark.draw_at(g, x0 + 24, row, 8.5 + 1.5 * self._level, t * spin, level=self._level, fade=fade)
+        self.mark.draw_at(g, cx, row, 8.5 + 1.5 * self._level, t * spin, level=self._level, fade=fade)
         self._hits = {}
         if icons > 0.02:
             ia = a * icons
             hover = getattr(self, "_hover", None)
-            for name, ix in (("chat", x0 + 54), ("plus", x0 + 80)):
+            for name, ix in (("chat", x0 + 26), ("plus", x0 + 52)):
                 if hover == name:
                     pill = self.mini._round(ix - 11, row - 10, 22, 20, 10)
                     g.FillPath(self.mini.brushes.brush(self.mini.LINE, ia * 0.14), pill)

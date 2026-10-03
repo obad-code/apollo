@@ -450,7 +450,7 @@ async function loadCrew() {
 }
 
 /* The crew page: its look kept per viewer, one lane open at a time. */
-const page = { open: null, look: (() => { try { return localStorage.getItem('crew-look') || 'cards'; } catch { return 'cards'; } })() };
+const page = { open: null, look: (() => { try { return localStorage.getItem('crew-look') || 'minimal'; } catch { return 'minimal'; } })() };
 function drawCrewPage() {
   CrewPage.render($('crew-page'), { ...crew.board, agents: crewAgents() }, page);
 }
