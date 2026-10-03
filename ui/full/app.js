@@ -1952,14 +1952,16 @@ function applyLive(batch) {
  * opens it in the browser (projects.py). Ideas: the ideas you told Apollo to
  * keep, and your reminders (ideas.py). */
 
-const TABS = ['stocks', 'talks', 'projects', 'ideas'];
+const TABS = ['stocks', 'talks', 'projects', 'ideas', 'reminders'];
+const NAV = [['stocks', 'Markets'], ['projects', 'Projects'], ['talks', 'Talks'],
+  ['ideas', 'Ideas'], ['reminders', 'Reminders']];
 
 function showTab(name) {
   if (!TABS.includes(name)) return;
   // In ultra mode every tab is a display of its own: asked for, it is
   // brought forward instead.
   if (ultraOn()) {
-    revealDisplay(name === 'stocks' ? 'markets' : name);
+    revealDisplay(name === 'stocks' ? 'markets' : name === 'reminders' ? 'ideas' : name);
     return;
   }
   state.tab = name;
@@ -1968,6 +1970,33 @@ function showTab(name) {
   for (const tab of TABS) $(`pane-${tab}`).hidden = tab !== name;
   if (name !== 'stocks') closeStock();
 }
+
+/* The roller is the panel's main menu: rolled, only it shows; a page picked
+ * from it opens as it always was, with the panel made larger. */
+let navWheel = null;
+function rollNav(open, name) {
+  document.body.classList.toggle('nav-open', open);
+  $('markets').classList.toggle('rolled', !open);
+  if (open) {
+    showTab(name);
+    sfx.play('expand');
+  } else {
+    if (navWheel) navWheel.root.focus();
+    sfx.play('collapse');
+  }
+}
+navWheel = new OptionWheel($('nav-roller'), {
+  items: NAV.map(([, label]) => label),
+  onOpen: (i) => rollNav(true, NAV[i][0]),
+  sound: (name) => sfx.play(name),
+  fontSize: 1.5, spacing: 1.9, tilt: 5, blur: 0.9, fade: 0.2, inset: 18,
+});
+$('nav-roller').addEventListener('click', (event) => {
+  const item = event.target.closest('.ow-item');
+  if (item && Number(item.dataset.i) === navWheel.selected) rollNav(true, NAV[navWheel.selected][0]);
+});
+$('nav-back').addEventListener('click', () => rollNav(false));
+$('markets').classList.add('rolled');
 
 $('panel-tabs').addEventListener('click', (event) => {
   const tab = event.target.closest('.tab');
@@ -2098,8 +2127,9 @@ function renderIdeas(data) {
   const due = (data.reminders || []).map((reminder) => `
     <div class="idea due"><p>${esc(reminder.text)}</p><span>${esc(reminder.due)}</span></div>`).join('');
   $('pane-ideas').innerHTML = `<h3>Ideas</h3>${list
-    || '<p class="quiet">No ideas kept yet. Say “فكرة” or “idea:” and what it is.</p>'}`
-    + `<h3>Reminders</h3>${due || '<p class="quiet">No reminders set.</p>'}`;
+    || '<p class="quiet">No ideas kept yet. Say “فكرة” or “idea:” and what it is.</p>'}`;
+  $('pane-reminders').innerHTML = `<h3>Reminders</h3>${due
+    || '<p class="quiet">No reminders set. Ask Apollo to remind you of something.</p>'}`;
 }
 
 /* Two clicks to take an idea off: the first asks, the second does it. */

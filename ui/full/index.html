@@ -77,11 +77,16 @@
   <section id="markets" class="panel rise" data-display="markets">
     <!-- The side panel's tabs: the stocks, your talks with Apollo, your
          projects, your ideas. -->
+    <!-- The main menu: a roller of the side panel's pages. Pick one and that
+         page opens, larger; "‹ Menu" rolls it back. -->
+    <div id="nav-roll"><div id="nav-roller"></div></div>
+    <button id="nav-back" type="button" data-sfx="none">‹ Menu</button>
     <h2 id="panel-tabs">
       <span class="tab on" data-tab="stocks" id="markets-head" data-sfx="tab">Markets</span>
       <span class="tab" data-tab="talks" data-sfx="tab">Talks</span>
       <span class="tab" data-tab="projects" data-sfx="tab">Projects</span>
       <span class="tab" data-tab="ideas" data-sfx="tab">Ideas</span>
+      <span class="tab" data-tab="reminders" data-sfx="tab">Reminders</span>
       <!-- The stocks folded away to a few, small, or all of them back. -->
       <button id="stocks-fold" class="fold" type="button" data-sfx="none" aria-pressed="false"
               title="Fold the stocks away to a few">
@@ -101,6 +106,7 @@
     <div class="pane" id="pane-talks" hidden></div>
     <div class="pane" id="pane-projects" hidden></div>
     <div class="pane" id="pane-ideas" hidden></div>
+    <div class="pane" id="pane-reminders" hidden></div>
     <!-- One stock, opened out of its card; or the stocks you can add. -->
     <article id="stock" aria-hidden="true"></article>
   </section>

@@ -2615,3 +2615,16 @@ body.agents:not(.ultra):not(.osiris-map) #agents {
 /* On a job Apollo handed her: her line under the bar in her agent's blue,
    breathing. */
 #lyla-block.on-job #lyla-label { color: #5b8cff; animation: agent-status 1.9s ease-in-out infinite; }
+
+/* The roller menu (the side panel's main navigation). */
+#nav-roll, #nav-back { display: none; }
+#markets.rolled > :not(#nav-roll):not(#stock) { display: none !important; }
+#markets.rolled #nav-roll { display: flex; flex: 1; min-height: 260px; align-items: center; }
+#nav-roller { width: 100%; height: 100%; min-height: 260px; outline: none; }
+body.nav-open #nav-back {
+  display: inline-block; align-self: flex-start; margin: 0 0 10px; padding: 4px 12px;
+  border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: transparent;
+  color: inherit; font: inherit; font-size: 12px; letter-spacing: .08em; opacity: .75; cursor: pointer;
+}
+body.nav-open #nav-back:hover { opacity: 1; }
+body.nav-open:not(.ultra) #stage { grid-template-columns: 48% 1fr 22%; transition: grid-template-columns .4s; }
