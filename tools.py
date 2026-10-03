@@ -1417,3 +1417,57 @@ def _explain_visually(ctx, title, steps, figures=None):
              for f in (figures or []) if isinstance(f, dict) and f.get("label") and f.get("value")][:6]
     shown = ctx.explain({"title": str(title)[:90], "steps": clean, "cards": cards})
     return {"ok": True, "result": "On the display." if shown else "The display is not up."}
+
+
+import screen  # noqa: E402
+
+
+@_tool("look_at_screen", "looking at your screen",
+       "Look at the user's screen right now and answer their question about it: "
+       "\"وش هذا؟\", \"شوف شاشتي\", \"explain this chart\", \"what does this error "
+       "mean\", \"is this a good entry?\". Takes one screenshot, only now. Use it "
+       "whenever they refer to something on their screen - \"this\", \"here\", "
+       "\"what I'm looking at\". Speak only what it returns.",
+       _obj({"question": _str("Their question about the screen, in their words")}, ("question",)))
+def _look_at_screen(ctx, question):
+    ctx.activity("looking at your screen")
+    return {"ok": True, "saw": screen.look(question)}
+
+
+# --- what Apollo can do ------------------------------------------------------------
+
+FEATURES = {
+    "talk": "Hold Ctrl+Alt and speak, or Ctrl+1 for hands-free; Arabic or English. "
+            "Remembers what you ask him to (remember / forget), and the day's conversation.",
+    "your PC": "Open and close apps, sites, files and folders; media; volume; windows; "
+               "type and press keys; lock, sleep, restart (asks first); reminders; prayer times.",
+    "files": "Writes, reads and lists files in Documents\\Apollo; keeps a problem log you can "
+             "add to by voice.",
+    "see and show": "Looks at your screen when you ask (look_at_screen); draws pictures "
+                    "(show_image); lays out explanations as steps; charts any stock.",
+    "markets": "Quotes and charts, the watchlist, the trading desk (insiders, Congress, "
+               "filings, traders), earnings dates, and market alerts by email and voice "
+               "when big news breaks.",
+    "the crew": "LYLA researches, reads your connected accounts and downloads videos; THEIA "
+                "analyses any idea (analysis, critique, best way; deep on request); "
+                "MONEYPENNY gives stock verdicts and red flags, or reviews the watchlist; "
+                "Q files requests for Claude to build on GitHub. Each reports back in "
+                "Apollo's voice.",
+    "email": "Sends an email for you after reading it back; market alerts come by email.",
+    "the display": "Ctrl+` brings it up. Modes: normal, clear, trading, agents (the crew's "
+                   "wheel, workflow map and dashboard), expanded (every display), OSIRIS "
+                   "(the world map). Arrange the HUD by voice; clips of the last minute.",
+    "news": "Headlines on what you follow, posts that move markets, a daily briefing, "
+            "Private Eye's finds.",
+}
+
+
+@_tool("apollo_features", "checking what I can do",
+       "Everything Apollo can do, by area. Use it when the user asks what you can do, "
+       "whether you can do something, or how to use a feature - then answer from it, "
+       "briefly, for the part they asked about.",
+       _obj({"area": _str("One area, if they asked about one (optional)")}))
+def _apollo_features(ctx, area=""):
+    area = str(area or "").strip().lower()
+    found = {k: v for k, v in FEATURES.items() if area and (area in k or k in area)}
+    return {"ok": True, "features": found or FEATURES}
