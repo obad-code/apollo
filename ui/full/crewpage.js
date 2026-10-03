@@ -126,3 +126,37 @@ function wires(root, agents) {
       ? `<circle r="2.6" class="cp-spark"><animateMotion dur="1.5s" repeatCount="indefinite" path="${d}"/></circle>` : ''}`;
   }).join('');
 }
+
+/* A job handed over: a bright pulse runs down the wire from Apollo to
+ * `key`'s lane, and the lane lights as it arrives. */
+export function sendTo(root, key) {
+  const svg = root && root.querySelector('.cp-wires');
+  const lanes = root ? [...root.querySelectorAll('.cp-lane')] : [];
+  const i = lanes.findIndex((el) => el.dataset.key === key);
+  if (!svg || i < 0) return;
+  const path = svg.querySelectorAll('.cp-wire')[i];
+  if (!path) return;
+  const d = path.getAttribute('d');
+  const ns = 'http://www.w3.org/2000/svg';
+  const trail = document.createElementNS(ns, 'path');
+  trail.setAttribute('d', d);
+  trail.setAttribute('class', 'cp-send-trail');
+  const dot = document.createElementNS(ns, 'circle');
+  dot.setAttribute('r', '4.5');
+  dot.setAttribute('class', 'cp-send');
+  const move = document.createElementNS(ns, 'animateMotion');
+  move.setAttribute('dur', '0.9s');
+  move.setAttribute('fill', 'freeze');
+  move.setAttribute('path', d);
+  move.setAttribute('begin', 'indefinite');
+  dot.appendChild(move);
+  svg.append(trail, dot);
+  root.querySelector('.cp-node.apollo')?.classList.add('sending');
+  move.beginElement();
+  setTimeout(() => {
+    lanes[i].classList.add('incoming');
+    dot.remove();
+    root.querySelector('.cp-node.apollo')?.classList.remove('sending');
+  }, 900);
+  setTimeout(() => { trail.remove(); lanes[i].classList.remove('incoming'); }, 2200);
+}

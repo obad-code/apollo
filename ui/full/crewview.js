@@ -95,6 +95,7 @@ export function health(agent = {}, now = Date.now() / 1000) {
   const steps = agent.steps || [];
   const last = steps.length ? steps[steps.length - 1].t : 0;
   if (agent.working) {
+    if (!last) return { state: 'working', text: 'Starting…' };
     return now - last > 180 ? { state: 'stuck', text: `No move for ${ago(now - last)}` }
       : { state: 'working', text: `Moving · last step ${ago(now - last)} ago` };
   }

@@ -3000,3 +3000,23 @@ body:not(.ultra) #feed-wheel { display: block; position: relative; flex: 1; min-
   transform: translate3d(calc(var(--i) * 46px), calc(var(--i) * -22px), calc(var(--i) * -60px)) rotateY(-18deg); }
 .deck-card:hover { transform: translate3d(calc(var(--i) * 46px), calc(var(--i) * -22px - 24px), calc(var(--i) * -60px + 50px)) rotateY(-8deg); }
 .deck-card { bottom: 64px; }
+
+/* Apollo hears you (rings spread from him while you talk), then hands the
+   job on: a pulse runs the wire, and the agent's lane lights as it lands. */
+.cp-node.apollo { position: relative; }
+body.listening #crew-page .cp-node.apollo { color: #fff; border-color: #FFB000; }
+body.listening #crew-page .cp-node.apollo::before, body.listening #crew-page .cp-node.apollo::after {
+  content: ''; position: absolute; inset: -2px; border-radius: inherit; border: 1.5px solid rgba(255,176,0,.7);
+  animation: cp-hear 1.6s ease-out infinite; pointer-events: none; }
+body.listening #crew-page .cp-node.apollo::after { animation-delay: .8s; }
+@keyframes cp-hear { from { transform: scale(1); opacity: .9; } to { transform: scale(1.5, 2.1); opacity: 0; } }
+.cp-node.apollo.sending { box-shadow: 0 0 0 2px rgba(255,176,0,.6), 0 0 26px rgba(255,176,0,.7) !important; transition: box-shadow .2s; }
+.cp-send { fill: #fff6dc; filter: drop-shadow(0 0 6px #FFB000) drop-shadow(0 0 12px #FFB000); }
+.cp-send-trail { fill: none; stroke: #FFB000; stroke-width: 2.5; stroke-linecap: round; filter: drop-shadow(0 0 5px #FFB000);
+  stroke-dasharray: 400; stroke-dashoffset: 400; animation: cp-trail 2.2s ease-out forwards; }
+@keyframes cp-trail { 40% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+.cp-lane.incoming { animation: cp-land 1.3s ease-out; }
+@keyframes cp-land { 0% { box-shadow: inset 0 0 0 1px rgba(255,176,0,.9), 0 0 30px rgba(255,176,0,.35); background: rgba(255,176,0,.08); }
+  100% { box-shadow: none; } }
+.cp-lane.incoming .cp-badge { animation: cp-badge 0.6s cubic-bezier(.3,1.6,.5,1); }
+@keyframes cp-badge { 40% { transform: scale(1.25) rotate(-6deg); } }

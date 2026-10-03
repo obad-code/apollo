@@ -4737,6 +4737,10 @@ window.apollo = {
   // cards; LYLA's to both of hers.
   agent(event) {
     const step = event || {};
+    // In agents mode, a new job is seen leaving Apollo for its agent.
+    if (step.stage === 'received' && step.agent && state.view === 'agents') {
+      setTimeout(() => CrewPage.sendTo($('crew-page'), step.agent), 160);
+    }
     if (step.agent && step.agent !== 'LYLA') {
       const card = agentCards[step.agent];
       if (!card) return;
