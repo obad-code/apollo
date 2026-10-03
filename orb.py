@@ -268,6 +268,7 @@ class Orb:
         self._D, self._WF, self._IntPtr = D, WF, IntPtr
         self.paint = overlay_paint.Backdrop(D)
         self.mark = overlay_paint.GlobeMark(D)
+        self.mini = overlay_paint.MiniApollo(D)
 
         def build():
             try:
@@ -507,6 +508,8 @@ class Orb:
         """The card's full height, hidden quarter included."""
         return int(round(self.content_height() / (1.0 - overlay_paint.HIDDEN)))
 
+    MINI_W = overlay_paint.MiniApollo.W + 40
+
     def _targets(self):
         """The size the window is heading for: (width, height).
 
@@ -515,7 +518,8 @@ class Orb:
         delay the point at which text has room to wrap into.
         """
         if self.view.panel_open <= 0.005 and self._content is None and not self._heard:
-            return float(self.art), float(self.art)
+            # At rest: wide enough for Mini Apollo's bar and its shadow.
+            return float(max(self.art, self.MINI_W)), float(self.art)
         width = float(max(self.art, self.PANEL_W + self.WINDOW_MARGIN * 2))
         height = (self.overhang - self.hidden_height() + self.panel_height()
                   + self.SHADOW_ROOM)
@@ -994,8 +998,10 @@ class Orb:
         try:
             ring_fade = self.view.ring_fade
             if ring_fade > 0.01:
-                self._draw_ring(g, (w - self.art) // 2, 0, self.art, self.art,
-                                t, ring_fade)
+                # Mini Apollo, hanging from the screen's edge (`overhang` is
+                # where that edge falls in the window).
+                self.mini.draw_at(g, w / 2.0, self.overhang, t, level=self._level, fade=ring_fade,
+                                  busy=self.view.state == overlay_state.SEARCHING)
             if self.view.panel_open > 0.005:
                 self._draw_panel(g, w, t, now)
         finally:

@@ -199,3 +199,11 @@ def test_the_card_has_scanlines(draw, surface):
             if all(light[i] < light[i - 1] and light[i] < light[i + 1]
                    for i in range(1, len(light) - 1) if i % 3 == offset)]
     assert dips, f"no row in three is darker than its neighbours: {light}"
+
+
+def test_mini_apollo_blinks_and_looks_about():
+    import overlay_paint as P
+    shut = [P.MiniApollo.blink(t / 100) for t in range(0, 900)]
+    assert max(shut) == 1.0 and min(shut) == 0.0
+    assert sum(1 for s in shut if s > 0.5) < len(shut) * 0.1        # open most of the time
+    assert P.MiniApollo.gaze(1.0, busy=True) != P.MiniApollo.gaze(1.0)

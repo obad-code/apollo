@@ -585,3 +585,173 @@ def horizon(g, draw, x, y, w, fade=1.0):
         brush.InterpolationColors = blend
         g.FillRectangle(brush, rectangle)
         brush.Dispose()
+
+
+class MiniApollo:
+    """Mini Apollo: the overlay at rest, as a small dark bar hanging from the
+    top edge of the screen - home, chat and new on the left, settings and
+    sound on the right, and in the well under them Apollo himself: a soft
+    white face with two black eyes and two little hands, a warm glow behind
+    him. He blinks every few seconds, looks about, and leans in and brightens
+    with your voice; while he is working his eyes go to the side.
+
+    Everything is a filled path or an ellipse a frame - a few dozen calls -
+    so nothing here is cached."""
+
+    W = 300                 # the bar's width
+    H = 78                  # how much of it shows under the screen's edge
+    RADIUS = 20
+    WELL_INSET = 8
+    HEAD_ROW = 24           # the icon row above the well
+
+    INK = (14, 14, 17)
+    WELL = (24, 24, 29)
+    LINE = (255, 255, 255)
+    FACE = (250, 250, 247)
+    EYE = (16, 16, 18)
+    GLOW = (255, 186, 70)
+    ICON = (196, 196, 204)
+
+    def __init__(self, draw):
+        self.draw = draw
+        self.brushes = _Brushes(draw)
+
+    @staticmethod
+    def blink(t):
+        """0 open .. 1 shut: a quick blink every ~4.3 s, a double one now and then."""
+        phase = t % 4.3
+        shut = max(0.0, 1.0 - abs(phase - 0.12) / 0.12)
+        if int(t / 4.3) % 3 == 2:
+            shut = max(shut, max(0.0, 1.0 - abs(phase - 0.42) / 0.11))
+        return min(1.0, shut)
+
+    @staticmethod
+    def gaze(t, busy=False):
+        """Where the eyes look, as an (x, y) shift in eye-widths."""
+        if busy:
+            return (0.55 * math.sin(t * 2.4), -0.2)
+        return (0.35 * math.sin(t * 0.37) * math.sin(t * 0.11 + 1.0), 0.12 * math.sin(t * 0.29))
+
+    def _round(self, x, y, w, h, r):
+        return rounded_path(self.draw, x, y, w, h, r, top_radius=r)
+
+    def _poly(self, points):
+        """A closed path through `points` - lines, so no CLR array is needed."""
+        path = self.draw.Drawing2D.GraphicsPath()
+        for (x0, y0), (x1, y1) in zip(points, points[1:]):
+            path.AddLine(float(x0), float(y0), float(x1), float(y1))
+        path.CloseFigure()
+        return path
+
+    def draw_at(self, g, cx, top, t, level=0.0, fade=1.0, busy=False):
+        """The bar, centred on `cx`, its visible part starting at `top` (the
+        screen's edge, in window coordinates)."""
+        if fade <= 0.01:
+            return
+        b = self.brushes
+        a = 255 * min(1.0, fade)
+        x = cx - self.W / 2.0
+        y = top - self.RADIUS             # the top corners sit above the edge
+        h = self.H + self.RADIUS
+
+        # A soft shadow, then the bar, then a hairline round it.
+        for spread, share in ((10, 0.10), (5, 0.16)):
+            path = self._round(x - spread, y, self.W + spread * 2, h + spread, self.RADIUS + spread)
+            g.FillPath(b.brush((0, 0, 0), a * share), path)
+            path.Dispose()
+        bar = self._round(x, y, self.W, h, self.RADIUS)
+        g.FillPath(b.brush(self.INK, a * 0.94), bar)
+        g.DrawPath(b.pen(self.LINE, a * 0.07, 1.0), bar)
+        bar.Dispose()
+
+        # The icon row: home (lit, in a pill), chat, new; settings, sound.
+        row = top + 4 + self.HEAD_ROW / 2.0
+        pill = self._round(x + 12, row - 10, 34, 20, 10)
+        g.FillPath(b.brush(self.LINE, a * 0.10), pill)
+        pill.Dispose()
+        self._home(g, x + 29, row, a)
+        self._chat(g, x + 62, row, a * 0.75)
+        self._plus(g, x + 86, row, a * 0.75)
+        self._gear(g, x + self.W - 50, row, a * 0.75)
+        self._sound(g, x + self.W - 24, row, a * 0.75)
+        # A small sensor dot in the middle, like the reference.
+        g.FillEllipse(b.brush(self.LINE, a * 0.12), float(cx - 2.5), float(top + 4), 5.0, 5.0)
+
+        # The well Apollo sits in.
+        wx, wy = x + self.WELL_INSET, top + self.HEAD_ROW + 6
+        ww, wh = self.W - self.WELL_INSET * 2, self.H - self.HEAD_ROW - 6 - self.WELL_INSET
+        well = self._round(wx, wy, ww, wh, 14)
+        g.FillPath(b.brush(self.WELL, a), well)
+        # Apollo and his glow stay inside the well, as in the design.
+        g.SetClip(well)
+        try:
+            self._face(g, cx, wy + wh / 2.0 + 1, t, level, a, busy)
+        finally:
+            g.ResetClip()
+            well.Dispose()
+
+    def _face(self, g, cx, cy, t, level, a, busy):
+        b = self.brushes
+        bob = math.sin(t * 1.6) * 1.2 - level * 2.0
+        grow = 1.0 + 0.10 * level
+        fw, fh = 36.0 * grow, 27.0 * grow
+        cy += bob
+        # The glow behind him, warmer and wider as you speak.
+        for reach, share in ((2.6, 0.06 + 0.10 * level), (1.9, 0.10 + 0.12 * level), (1.35, 0.16)):
+            gw, gh = fw * reach, fh * reach
+            g.FillEllipse(b.brush(self.GLOW, a * share), float(cx - gw / 2), float(cy - gh / 2),
+                          float(gw), float(gh))
+        # Two little hands either side, one waving a touch.
+        wave = math.sin(t * 2.2) * 2.0
+        g.FillEllipse(b.brush(self.FACE, a), float(cx - fw / 2 - 11), float(cy + 4), 8.0, 8.0)
+        g.FillEllipse(b.brush(self.FACE, a), float(cx + fw / 2 + 3), float(cy - 5 + wave), 8.0, 8.0)
+        # The head: a soft rounded block.
+        head = self._round(cx - fw / 2, cy - fh / 2, fw, fh, 10 * grow)
+        g.FillPath(b.brush(self.FACE, a), head)
+        head.Dispose()
+        # The eyes: solid black ovals that blink and look about.
+        shut = self.blink(t)
+        gx, gy = self.gaze(t, busy)
+        ew, eh = 4.6 * grow, 8.0 * grow * (1.0 - 0.85 * shut)
+        for side in (-1, 1):
+            ex = cx + side * 6.5 * grow + gx * ew
+            ey = cy - 1.0 + gy * eh
+            g.FillEllipse(b.brush(self.EYE, a), float(ex - ew / 2), float(ey - eh / 2),
+                          float(ew), float(max(1.2, eh)))
+
+    # -- the icons, drawn small ------------------------------------------------
+
+    def _home(self, g, cx, cy, a):
+        path = self._poly([(cx - 6, cy), (cx, cy - 6), (cx + 6, cy), (cx + 4.5, cy),
+                           (cx + 4.5, cy + 5.5), (cx - 4.5, cy + 5.5), (cx - 4.5, cy)])
+        g.FillPath(self.brushes.brush(self.LINE, a), path)
+        path.Dispose()
+
+    def _chat(self, g, cx, cy, a):
+        bubble = self._round(cx - 7, cy - 5, 14, 9, 4)
+        g.FillPath(self.brushes.brush(self.ICON, a), bubble)
+        bubble.Dispose()
+        g.FillEllipse(self.brushes.brush(self.ICON, a), float(cx - 6), float(cy + 2), 4.0, 4.0)
+
+    def _plus(self, g, cx, cy, a):
+        pen = self.brushes.pen(self.ICON, a, 1.6)
+        g.DrawLine(pen, float(cx - 6), float(cy), float(cx + 6), float(cy))
+        g.DrawLine(pen, float(cx), float(cy - 6), float(cx), float(cy + 6))
+
+    def _gear(self, g, cx, cy, a):
+        pen = self.brushes.pen(self.ICON, a, 1.4)
+        g.DrawEllipse(pen, float(cx - 4), float(cy - 4), 8.0, 8.0)
+        for i in range(8):
+            ang = i * math.pi / 4
+            g.DrawLine(pen, float(cx + math.cos(ang) * 5), float(cy + math.sin(ang) * 5),
+                       float(cx + math.cos(ang) * 7), float(cy + math.sin(ang) * 7))
+
+    def _sound(self, g, cx, cy, a):
+        b = self.brushes
+        path = self._poly([(cx - 7, cy - 2.5), (cx - 4, cy - 2.5), (cx, cy - 6), (cx, cy + 6),
+                           (cx - 4, cy + 2.5), (cx - 7, cy + 2.5)])
+        g.FillPath(b.brush(self.ICON, a), path)
+        path.Dispose()
+        pen = b.pen(self.ICON, a, 1.3)
+        g.DrawArc(pen, float(cx - 2), float(cy - 4), 6.0, 8.0, -60, 120)
+        g.DrawArc(pen, float(cx - 2), float(cy - 7), 10.0, 14.0, -55, 110)
