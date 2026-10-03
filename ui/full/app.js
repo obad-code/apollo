@@ -4725,7 +4725,10 @@ window.apollo = {
   },
   data(snapshot) { render(snapshot); },
   // "Show my projects": one tab of the side panel.
-  tab(name) { showTab(String(name || '')); },
+  tab(name) {
+    const key = String(name || '');
+    if (!ultraOn() && TABS.includes(key)) rollNav(true, key); else showTab(key);
+  },
   // Trades from the stream, {symbol: {price, time}}, about once a second.
   live(batch) { applyLive(batch); },
   activity(text) {

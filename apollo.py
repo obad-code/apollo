@@ -1414,6 +1414,15 @@ class Apollo:
         self.orb = orb_module.Orb(size=w, position=(x, y),
                                   overhang=self.overlay.orb_overhang())
         self.orb.start_on(self.window.native)
+        # Mini Apollo's icons: chat opens your last conversation on the
+        # display; + lets you hand him a file to check.
+        self.orb.on_click = self.on_mini_click
+
+    def on_mini_click(self, name):
+        if name == "chat" and getattr(self, "ui", None) is not None:
+            threading.Thread(target=self.ui.tab, args=("talks",), daemon=True).start()
+        elif name == "plus":
+            threading.Thread(target=self.choose_and_scan, daemon=True).start()
 
     def start_watcher(self):
         """Start the chord/presence watcher once, from whichever event got here

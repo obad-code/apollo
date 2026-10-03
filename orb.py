@@ -544,8 +544,8 @@ class Orb:
 
     # -- Mini Apollo's bar: eyes at rest, Apollo while you talk, words in it --
 
-    ISLAND_REST = (300, 34)        # the row alone: Apollo left, his eyes right
-    ISLAND_ON = (300, 34)
+    ISLAND_REST = (64, 34)         # just Apollo's mark
+    ISLAND_ON = (120, 34)          # his mark, chat and +
     ISLAND_TEXT_W = 540            # the bar, with what is said in its well
     ISLAND_LINES = 4
     ISLAND_LH = 22
@@ -554,6 +554,11 @@ class Orb:
         return self._said or self._heard
 
     def _island_active(self):
+        # The icons stay a little after you stop, so they can be reached.
+        return (bool(self._island_words()) or self.view.state != overlay_state.REST
+                or time.monotonic() - getattr(self, "_last_active", 0) < 8.0)
+
+    def _island_active_now(self):
         return bool(self._island_words()) or self.view.state != overlay_state.REST
 
     def _island_lines(self):
@@ -607,6 +612,9 @@ class Orb:
         return self._weather_mood
 
     def _advance_island(self, dt):
+        if bool(self._island_words()) or self.view.state != overlay_state.REST:
+            self._last_active = time.monotonic()
+        self._poll_clicks()
         tw, th = self._island_target()
         words = bool(self._island_words())
         active = self._island_active()
@@ -620,20 +628,28 @@ class Orb:
             spring.step(dt)
 
     def _draw_island(self, g, cx, t, fade):
-        """Mini Apollo's bar: Apollo in the pill on the left, his eyes on
-        the right watching the pointer, and what is said in the well."""
+        """Mini Apollo's bar: Apollo's mark on the left; while you talk to
+        him, chat (your last conversation) and + (hand him a file) appear
+        beside it; what is said opens under them, in the well."""
         a = 255 * fade
         w, h = self._isl_w.value, self._isl_h.value
-        well_box, well = self.mini.shell(g, cx, self.overhang, w, h, a, 1.0)
-        slots = self.mini.slots
-        # Apollo: always there, spinning up while he works, brighter with your voice.
-        ax, ay = slots["apollo"]
+        icons = max(0.0, min(1.0, self._isl_icons.value))
+        well_box, well = self.mini.shell(g, cx, self.overhang, w, h, a, 0.0)
+        x0 = cx - w / 2.0
+        row = self.overhang + 4 + overlay_paint.MiniApollo.HEAD_ROW / 2.0
         spin = 5.0 if self.view.state == overlay_state.SEARCHING else 1.0
-        self.mark.draw_at(g, ax, ay, 8.5 + 1.5 * self._level, t * spin, level=self._level, fade=fade)
-        # His eyes, following the pointer.
-        ex, ey = slots["eyes"]
-        since = (time.monotonic() - self._startled) if self._startled else None
-        self.mini.eyes(g, ex, ey, t, a, size=0.8, mood=self._mood(), since_startle=since)
+        self.mark.draw_at(g, x0 + 24, row, 8.5 + 1.5 * self._level, t * spin, level=self._level, fade=fade)
+        self._hits = {}
+        if icons > 0.02:
+            ia = a * icons
+            hover = getattr(self, "_hover", None)
+            for name, ix in (("chat", x0 + 54), ("plus", x0 + 80)):
+                if hover == name:
+                    pill = self.mini._round(ix - 11, row - 10, 22, 20, 10)
+                    g.FillPath(self.mini.brushes.brush(self.mini.LINE, ia * 0.14), pill)
+                    pill.Dispose()
+                (self.mini._chat if name == "chat" else self.mini._plus)(g, ix, row, ia * (1.0 if hover == name else 0.75))
+                self._hits[name] = (ix - 12, row - 12, ix + 12, row + 12)
         if well is None:
             return
         wx, wy, ww, wh = well_box
@@ -657,6 +673,43 @@ class Orb:
         finally:
             g.ResetClip()
             well.Dispose()
+
+    # -- clicks on the bar's icons ------------------------------------------
+    # The window lets clicks through to whatever is under it, except while
+    # the pointer is over one of the icons: then it takes the click itself,
+    # and `on_click(name)` hears which one.
+
+    on_click = None
+    _hits = {}
+    _hover = None
+    _was_down = False
+    _catching = False
+
+    def _poll_clicks(self):
+        if not self.hwnd:
+            return
+        try:
+            pt = POINT()
+            _user32.GetCursorPos(ctypes.byref(pt))
+        except Exception:  # noqa: BLE001
+            return
+        lx, ly = pt.x - self.rect[0], pt.y - self.rect[1]
+        hover = next((n for n, (x1, y1, x2, y2) in self._hits.items()
+                      if x1 <= lx <= x2 and y1 <= ly <= y2), None)
+        self._hover = hover
+        catch = hover is not None
+        if catch != self._catching:
+            self._catching = catch
+            style = _user32.GetWindowLongW(self.hwnd, -20)
+            style = (style & ~WS_EX_TRANSPARENT) if catch else (style | WS_EX_TRANSPARENT)
+            _user32.SetWindowLongW(self.hwnd, -20, style)
+        down = bool(_user32.GetAsyncKeyState(0x01) & 0x8000)
+        if down and not self._was_down and hover and self.on_click:
+            try:
+                self.on_click(hover)
+            except Exception:  # noqa: BLE001 - a click never stops the overlay
+                pass
+        self._was_down = down
 
     def _advance(self, dt):
         self.view.step(dt)
