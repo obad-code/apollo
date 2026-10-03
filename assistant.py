@@ -2215,13 +2215,7 @@ def main():
     youtube.DOWNLOADS.configure(report=lambda job: report_download(ui, voice, job),
                                 gate=TURN_GATE, tell=getattr(ui, "agent", None))
 
-    if os.environ.get("APOLLO_REPLAY_BUFFER", "0").strip() in ("1", "true", "yes"):
-        import clips
-        buffer = clips.ReplayBuffer().start()
-        tools.set_clip_buffer(buffer)
-        print(f"Replay buffer: last {clips.SECONDS}s of the screen, in memory.")
-    else:
-        print(f"Clips: {tools.clip_recorder()}")
+    print(f"Clips: {tools.clip_recorder()}")
 
     print(f"\nReady. Hold [{HOTKEY.upper()}] and speak. Release to send.")
     print(f"[{LISTEN_TOGGLE.upper()}] toggles always-listening. ESC quits.\n")

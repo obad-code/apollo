@@ -1400,7 +1400,7 @@ class Apollo:
         start and Apollo is a process with nothing on screen. Everything to do
         with this window therefore waits for `on_loaded`.
         """
-        self.tray = Tray(on_quit=self.quit, on_toggle_clips=self.toggle_clips)
+        self.tray = Tray(on_quit=self.quit)
 
     def start_orb(self):
         """Bring up the native orb, positioned where `Overlay.rect_for` puts it.
@@ -2309,22 +2309,11 @@ class Apollo:
                         "status": "ok" if self.voice.ready else "fail",
                         "detail": gemini_live_model(self.voice) or "would not open"}, keep=False)
 
-        # The replay buffer: the last minute of the screen, in memory only, so
-        # "clip that" has something to save. Nothing reaches the disk until
-        # you ask. A machine that cannot record says so once and Apollo
-        # carries on without clips.
-        # Off by default: recording the whole screen itself cost frames in
-        # games. Clips go to NVIDIA Instant Replay or the Xbox Game Bar instead
-        # (tools.save_clip). APOLLO_REPLAY_BUFFER=1 brings Apollo's own back.
-        if os.environ.get("APOLLO_REPLAY_BUFFER", "0").strip() in ("1", "true", "yes"):
-            self.clips = clips.ReplayBuffer().start()
-            tools.set_clip_buffer(self.clips)
-            self.boot_step({"id": "clips", "label": "REPLAY BUFFER", "status": "ok",
-                            "detail": "recording"}, keep=False)
-        else:
-            self.clips = None
-            self.boot_step({"id": "clips", "label": "CLIPS", "status": "ok",
-                            "detail": tools.clip_recorder()}, keep=False)
+        # No replay buffer: recording the screen cost frames. Clips are saved
+        # by NVIDIA Instant Replay or the Xbox Game Bar (tools.save_clip).
+        self.clips = None
+        self.boot_step({"id": "clips", "label": "CLIPS", "status": "ok",
+                        "detail": tools.clip_recorder()}, keep=False)
 
         # Everything the display and the briefing read - prices, headlines,
         # posts, weather, the machine - refreshed on a timer rather than
