@@ -2214,7 +2214,9 @@ function projectCard(item, open = false) {
   </article>`;
 }
 
-let projWheel = null;
+/* Projects as a deck of cards fanned back into the screen, like folders on
+ * a desk: the newest in front, the rest stepping away up and to the right.
+ * Hover one and it lifts out; click it and it opens across the pane. */
 function renderProjects(p) {
   state.projects = p;
   const items = projectList(p);
@@ -2222,25 +2224,25 @@ function renderProjects(p) {
   const pane = $('pane-projects');
   if (!pane.querySelector('.proj')) {
     pane.innerHTML = `<div class="proj">
-      <div class="proj-wheel"><div id="proj-wheel"></div></div>
-      <div class="proj-side"></div>
+      <div class="proj-deck"></div>
       <div class="proj-open" hidden><button class="proj-back" type="button" data-sfx="none">‹ All projects</button><div class="proj-body"></div></div>
     </div>`;
-    projWheel = null;
   }
-  const names = items.map((item) => `<i class="ow-dot k-${item.kind}"></i>${esc(item.name)}`);
-  // Read through state, so a wheel made with an earlier list shows this one.
-  const choose = (i) => { pane.querySelector('.proj-side').innerHTML = projectCard((state.projectItems || [])[i]); };
-  if (!projWheel) {
-    projWheel = new OptionWheel($('proj-wheel'), {
-      items: names, onChange: choose, onOpen: openProject, sound: (name) => sfx.play(name),
-      fontSize: 1.0, spacing: 2.1, tilt: 3, blur: 0.7, fade: 0.15, inset: 8,
-    });
-  } else {
-    projWheel.setItems(names, projWheel.selected);
-  }
-  choose(projWheel.selected);
+  const deck = pane.querySelector('.proj-deck');
+  const shown = items.slice(0, 12);
+  deck.innerHTML = shown.length ? shown.map((item, i) => `
+    <button type="button" class="deck-card k-${item.kind}" data-i="${i}" style="--i:${i};--n:${shown.length}">
+      <span class="deck-bar"><i></i><i></i><i></i><em>${esc(KIND_NAMES[item.kind])}</em></span>
+      <span class="deck-body"><b>${esc(item.name)}</b>${item.sub ? `<small>${esc(item.sub)}</small>` : ''}
+        ${item.lines.filter(Boolean).slice(0, 2).map((line) => `<span class="deck-line">${esc(line)}</span>`).join('')}
+        <span class="deck-when">${esc(ago(item.when))}</span></span>
+    </button>`).join('') : '<p class="quiet">No projects found yet.</p>';
 }
+
+$('pane-projects').addEventListener('click', (event) => {
+  const card = event.target.closest('.deck-card');
+  if (card) openProject(Number(card.dataset.i));
+});
 
 function openProject(i) {
   const item = (state.projectItems || [])[i];
@@ -2262,8 +2264,6 @@ function closeProject() {
 
 $('pane-projects').addEventListener('click', (event) => {
   if (event.target.closest('.proj-back')) { closeProject(); return; }
-  const card = event.target.closest('.proj-side .proj-card');
-  if (card && projWheel) { openProject(projWheel.selected); return; }
   const row = event.target.closest('.link');
   const p = state.projects || {};
   const api = window.pywebview && window.pywebview.api;

@@ -2971,3 +2971,32 @@ body:not(.ultra) #feed-wheel { display: block; position: relative; flex: 1; min-
 .fw-tile.t-markets { --topic: 62, 224, 143; }
 .fw-tile.t-posts { --topic: 111, 140, 255; }
 .fw-tile.t-private-eye { --topic: 127, 227, 255; }
+
+/* ---- Projects as a fanned deck of cards ---- */
+.proj-deck { position: relative; height: 300px; perspective: 1400px; perspective-origin: 20% 60%; }
+.deck-card { position: absolute; left: 0; bottom: 0; width: 62%; height: 150px; padding: 0; border: 1px solid rgba(255,255,255,.14);
+  border-radius: 14px; overflow: hidden; text-align: left; color: #f2ead9; cursor: pointer;
+  background: linear-gradient(160deg, #24222a, #141318); box-shadow: -10px 14px 30px rgba(0,0,0,.55);
+  transform-origin: left bottom; z-index: calc(var(--n) - var(--i));
+  transform: translate3d(calc(var(--i) * 28px), calc(var(--i) * -12px), calc(var(--i) * -70px)) rotateY(-22deg);
+  filter: brightness(calc(1 - var(--i) * .06));
+  transition: transform .45s cubic-bezier(.32,.72,0,1), filter .3s, box-shadow .3s; }
+.deck-card:hover { transform: translate3d(calc(var(--i) * 28px), calc(var(--i) * -12px - 26px), calc(var(--i) * -70px + 40px)) rotateY(-10deg);
+  filter: brightness(1.12); box-shadow: -14px 22px 40px rgba(0,0,0,.7), 0 0 0 1px rgba(255,193,94,.45); z-index: 99; }
+.deck-bar { display: flex; align-items: center; gap: 5px; padding: 7px 10px; background: rgba(255,255,255,.06); border-bottom: 1px solid rgba(255,255,255,.07); }
+.deck-bar i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.2); }
+.deck-bar em { margin-left: auto; font-style: normal; font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; }
+.deck-card.k-claude .deck-bar { background: rgba(217,119,87,.22); } .deck-card.k-pc .deck-bar { background: rgba(255,193,94,.18); }
+.deck-card.k-github .deck-bar { background: rgba(140,150,255,.2); }
+.deck-body { display: grid; gap: 4px; padding: 12px 14px; }
+.deck-body b { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deck-body small { font-size: 11px; opacity: .6; }
+.deck-line { font-size: 11.5px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deck-when { font-size: 10px; opacity: .45; }
+.proj.opened .proj-deck { opacity: 0; pointer-events: none; }
+.proj-deck { grid-column: 1 / -1; align-self: center; margin-left: 10px; }
+.proj-deck { height: 100%; min-height: 330px; }
+.deck-card { width: 44%; height: 140px; bottom: 16px;
+  transform: translate3d(calc(var(--i) * 46px), calc(var(--i) * -22px), calc(var(--i) * -60px)) rotateY(-18deg); }
+.deck-card:hover { transform: translate3d(calc(var(--i) * 46px), calc(var(--i) * -22px - 24px), calc(var(--i) * -60px + 50px)) rotateY(-8deg); }
+.deck-card { bottom: 64px; }
