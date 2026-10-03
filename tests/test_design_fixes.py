@@ -43,8 +43,8 @@ def test_the_desks_footnote_is_a_sentence_not_capitals():
     assert int(re.search(r"(\d+)px\s+var", foot).group(1)) >= 12
 
 
-def test_the_pick_line_is_not_spaced_like_a_label():
-    assert "letter-spacing" not in rule("#agent-pick")
+def test_the_crews_hint_line_is_not_spaced_like_a_label():
+    assert ".18em" not in rule(".crew-top em") and ".3em" not in rule(".crew-top em")
 
 
 def test_no_dot_pulses_without_something_live():

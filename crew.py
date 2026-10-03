@@ -255,3 +255,58 @@ def status():
                      "reports": one.reports[:8]}
     return out
 
+
+
+# -- the crew's board: what agents mode shows behind the agents ------------------
+
+def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=None):
+    """Everything agents mode's dashboard draws, from what Apollo actually
+    knows: each agent's state, today's jobs by hour, the latest jobs, the
+    day's spend by model, the tools used, issues and alerts. The readers are
+    arguments so tests can hand in their own."""
+    import datetime as dt
+    now = now or dt.datetime.now()
+    start = dt.datetime.combine(now.date(), dt.time()).timestamp()
+    agents, jobs = {}, []
+    hours = {name: [0] * 24 for name in NAMES}
+    failed = 0
+    for name, one in DESKS.items():
+        working = one.current
+        agents[name] = {"role": ROLES[name], "waiting": one.waiting,
+                        "working": working["task"] if working else "",
+                        "done_today": 0}
+        for report in one.reports:
+            done = float(report.get("done") or 0)
+            jobs.append({"agent": name, "task": report.get("task", ""),
+                         "summary": report.get("summary", ""), "took": report.get("took", 0),
+                         "brain": report.get("brain", ""), "done": done})
+            if done >= start:
+                agents[name]["done_today"] += 1
+                hours[name][dt.datetime.fromtimestamp(done).hour] += 1
+    jobs.sort(key=lambda j: -j["done"])
+
+    if journal_day is None:
+        import journal
+        journal_day = journal.day(now.date())
+    tools_used = {}
+    for entry in journal_day:
+        if entry.get("kind") == "tool" and entry.get("name"):
+            tools_used[entry["name"]] = tools_used.get(entry["name"], 0) + 1
+    if spend is None:
+        import usage
+        spend = usage.today()
+    if problems is None:
+        import issues
+        problems = issues.current()
+    if alerts_state is None:
+        import alerts
+        watcher = alerts.WATCHER
+        alerts_state = {"watching": watcher is not None,
+                        "sent_hour": len(watcher.sent) if watcher else 0}
+    for issue in problems:
+        failed += 1 if issue.get("level") == "fail" else 0
+    return {"agents": agents, "hours": hours, "jobs": jobs[:8],
+            "tools": sorted(tools_used.items(), key=lambda t: -t[1])[:6],
+            "spend": spend, "issues": {"count": len(problems), "failing": failed,
+                                       "top": [i.get("title", "") for i in problems[:3]]},
+            "alerts": alerts_state, "now": now.timestamp()}

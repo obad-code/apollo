@@ -133,3 +133,23 @@ def test_a_download_is_reported_once_done(tmp_path, monkeypatch):
 def test_every_agent_has_a_desk_and_a_role():
     assert set(crew.DESKS) == set(crew.NAMES) == set(agents.NAMES)
     assert all(crew.ROLES[n] for n in crew.NAMES)
+
+
+def test_the_board_counts_todays_jobs_by_agent_and_hour(tmp_path):
+    import datetime as dt
+    now = dt.datetime(2026, 10, 3, 15, 0)
+    desk = crew.DESKS["THEIA"]
+    kept = desk.reports
+    desk.reports = [{"task": "plan", "summary": "ok", "done": dt.datetime(2026, 10, 3, 9, 30).timestamp()},
+                    {"task": "old", "summary": "x", "done": dt.datetime(2026, 10, 1, 9, 0).timestamp()}]
+    try:
+        got = crew.board(now, journal_day=[{"kind": "tool", "name": "ask_theia"},
+                                           {"kind": "tool", "name": "ask_theia"},
+                                           {"kind": "you", "text": "hi"}],
+                         spend={"cost": 0.4}, problems=[{"title": "MIC", "level": "fail"}],
+                         alerts_state={"watching": True, "sent_hour": 1})
+    finally:
+        desk.reports = kept
+    assert got["agents"]["THEIA"]["done_today"] == 1 and got["hours"]["THEIA"][9] == 1
+    assert got["jobs"][0]["task"] == "plan" and got["tools"] == [("ask_theia", 2)]
+    assert got["issues"] == {"count": 1, "failing": 1, "top": ["MIC"]}

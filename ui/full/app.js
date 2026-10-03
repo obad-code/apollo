@@ -24,6 +24,9 @@ import * as Modes from './modes.js';
 import * as Hud from './hud.js';
 import * as Lights from './consolelights.js';
 import * as Explain from './explain.js';
+import * as CrewView from './crewview.js';
+import { Wheel } from './wheel.js';
+import { WidgetGrid } from './widgetgrid.js';
 
 const Motion = window.Motion || {};
 // Motion is vendored beside this page. If it ever fails to load, the page must
@@ -148,7 +151,6 @@ const state = {
   lylaReports: [],        // what LYLA found, newest first (apollo.py keeps them)
   feedSeen: null,         // the stories the feed last drew, so a new one can arrive
   reportOpen: -1,         // the report of hers opened out, if any
-  agentOpen: null,        // the agent whose process agents mode is showing, if any
   hud: Hud.emptyHud(),    // the normal display as arranged by hand (hud.js), kept by apollo.py
   hudEdit: false,         // the HUD editor is up
   hudSnap: true,          // edges pull onto the grid and each other while it is
@@ -389,10 +391,10 @@ const agent = new LylaAgent($('lyla-agent'), { sound: (name) => sfx.play(name) }
 // ...and the same card in agents mode, which has its own sound for arriving.
 const agentsCard = new LylaAgent($('agent-lyla'));
 
-/* Agents mode: each agent by its mark down the left - LYLA, THEIA,
- * MONEYPENNY and Q, Apollo's crew (crew.py) - and a click on one opens its
- * process (its pipeline card) beside the marks; a click on it again puts it
- * away. LYLA's reports go with hers. */
+/* Agents mode: Apollo's crew (crewview.js) - the wheel of agents, the
+ * dashboard under it, an agent brought forward with its live pipeline card,
+ * and the whole crew as a workflow map. The pipeline cards are the ones each
+ * agent's events go live on. */
 const AGENTS = ['LYLA', 'THEIA', 'MONEYPENNY', 'Q'];
 const crewDoing = {};          // agent -> what it is on, while it is
 const agentCards = {
@@ -400,47 +402,141 @@ const agentCards = {
   ...Object.fromEntries(AGENTS.slice(1).map((key) =>
     [key, new LylaAgent($(`agent-${key.toLowerCase()}`), { look: LOOKS[key] })])),
 };
-function agentState(key) {
-  if (key !== 'LYLA') {
-    if (crewDoing[key]) return ['ON A JOB', 'working'];
-    return agentCards[key].isLive ? ['LIVE', 'live'] : ['READY', 'ready'];
+const crew = { board: {}, focus: null, timer: null, wheel: null, grid: null, poll: null };
+
+function crewAgents() {
+  // The board's own state, with what the cards have heard since layered on.
+  const agents = JSON.parse(JSON.stringify(crew.board.agents || {}));
+  for (const key of AGENTS) {
+    agents[key] = agents[key] || {};
+    if (crewDoing[key]) agents[key].working = agents[key].working || crewDoing[key];
+    else if (crewDoing[key] === false) agents[key].working = '';
   }
-  if (lylaDoing.job) return ['ON A JOB', 'working'];
-  return agentsCard.isLive ? ['LIVE', 'live'] : ['READY', 'ready'];
+  return agents;
 }
-function renderMarks() {
-  $('agent-marks').innerHTML = AGENTS.map((key) => {
-    const look = LOOKS[key];
-    const [said, kind] = agentState(key);
-    const picked = state.agentOpen === key;
-    return `<button type="button" class="agent-mark${picked ? ' chosen' : ''}" data-agent="${key}"
-        data-sfx="none" aria-pressed="${picked ? 'true' : 'false'}" style="--agent-rgb:${look.rgb};--agent-mark:${look.mark || look.hex}">
-      <span class="mark-emblem">${emblem(key, 40)}</span>
-      <span class="mark-name"><b>${key}</b><small>${look.role}</small></span>
-      <em class="mark-state ${kind}">${said}</em>
-    </button>`;
-  }).join('');
+
+function ensureCrew() {
+  if (crew.wheel) return;
+  // Twice round, so the drum is full: eight orbs, four agents.
+  const orbs = [...AGENTS, ...AGENTS].map((key) => CrewView.orb(key));
+  crew.wheel = new Wheel($('crew-wheel'), {
+    items: orbs, size: 150, visible: 5, minScale: 0.46,
+    onPick: (i) => focusAgent(AGENTS[i % AGENTS.length]),
+    onFront: () => sfx.play('tick'),
+  });
+  crew.grid = new WidgetGrid($('crew-board'), {
+    items: CrewView.WIDGETS, label: "The crew's dashboard", maxColumns: 4, cellSize: 260, gap: 14,
+    render: (item) => CrewView.widget(item.id, { ...crew.board, agents: crewAgents() }),
+    onChange: (items) => {
+      try { localStorage.setItem('crew-board', JSON.stringify(items.map((i) => i.id))); } catch { /* private */ }
+    },
+  });
+  try { crew.grid.restore(JSON.parse(localStorage.getItem('crew-board') || 'null')); } catch { /* none kept */ }
 }
-function openAgent(key) {
-  const was = state.agentOpen;
-  state.agentOpen = was === key ? null : key;
-  for (const name of AGENTS) {
-    if (name !== state.agentOpen) agentCards[name].hide();
+
+async function loadCrew() {
+  const api = bridge();
+  if (!api || !api.crew_board) { refreshCrew(); return; }
+  try { crew.board = (await api.crew_board()) || {}; } catch { /* keep the last */ }
+  refreshCrew();
+}
+
+function refreshCrew() {
+  if (crew.grid) crew.grid.refresh();
+  const agents = crewAgents();
+  if (crew.wheel) {
+    crew.wheel.balls.forEach((ball, i) => {
+      ball.classList.toggle('busy', Boolean(agents[AGENTS[i % AGENTS.length]].working));
+    });
   }
-  if (state.agentOpen) agentCards[state.agentOpen].show();
-  sfx.play(state.agentOpen ? 'hud' : 'down');
-  showAgentStage();
+  if (!$('crew-map').hidden) $('crew-map').querySelector('.map-holder').innerHTML = CrewView.mapMarkup(agents, crew.focus);
+  if (!$('crew-focus').hidden && crew.focus) drawFocus(crew.focus);
 }
-function showAgentStage() {
-  const open = state.agentOpen;
-  $('agent-pick').hidden = Boolean(open);
-  $('lyla-reports').hidden = open !== 'LYLA';
-  renderMarks();
+
+function drawFocus(key) {
+  const agents = crewAgents();
+  const last = (crew.board.jobs || []).find((j) => j.agent === key);
+  const focus = $('crew-focus');
+  focus.querySelector('.focus-main').innerHTML = CrewView.focusMarkup(key, agents[key], last);
+  focus.style.setProperty('--rgb', LOOKS[key].rgb);
 }
-$('agent-marks').addEventListener('click', (event) => {
-  const mark = event.target.closest('[data-agent]');
-  if (mark) openAgent(mark.dataset.agent);
+
+/* An agent brought forward: who it is, what it is doing, its live card -
+ * and after a few seconds, the whole crew as a map with it lit. */
+function focusAgent(key) {
+  clearTimeout(crew.timer);
+  crew.focus = key;
+  for (const name of AGENTS) agentCards[name].hide();
+  agentCards[key].show();
+  $('lyla-reports').hidden = key !== 'LYLA';
+  drawFocus(key);
+  $('crew-map').hidden = true;
+  const focus = $('crew-focus');
+  focus.hidden = false;
+  focus.classList.remove('leaving');
+  void focus.offsetWidth;
+  focus.classList.add('arriving');
+  sfx.play('hud');
+  if (crew.wheel) crew.wheel.paused = true;
+  crew.timer = setTimeout(() => openMap(key), CrewView.FOCUS_MS);
+}
+
+function openMap(key = null) {
+  clearTimeout(crew.timer);
+  crew.focus = key;
+  const focus = $('crew-focus');
+  if (!focus.hidden) {
+    focus.classList.add('leaving');
+    setTimeout(() => { focus.hidden = true; focus.classList.remove('leaving', 'arriving'); }, 420);
+  }
+  const map = $('crew-map');
+  map.querySelector('.map-holder').innerHTML = CrewView.mapMarkup(crewAgents(), key);
+  map.hidden = false;
+  map.classList.remove('arriving');
+  void map.offsetWidth;
+  map.classList.add('arriving');
+  if (crew.wheel) crew.wheel.paused = true;
+}
+
+function closeCrewLayers() {
+  clearTimeout(crew.timer);
+  crew.focus = null;
+  for (const name of AGENTS) agentCards[name].hide();
+  for (const id of ['crew-focus', 'crew-map']) {
+    $(id).hidden = true;
+    $(id).classList.remove('arriving', 'leaving');
+  }
+  if (crew.wheel) crew.wheel.paused = false;
+  sfx.play('down');
+}
+
+for (const button of document.querySelectorAll('#agents .crew-close')) {
+  button.addEventListener('click', closeCrewLayers);
+}
+$('crew-map-open').addEventListener('click', () => openMap(null));
+$('crew-map').addEventListener('click', (event) => {
+  const node = event.target.closest('.map-agent');
+  if (!node) return;
+  const name = node.querySelector('.map-name');
+  if (name) focusAgent(name.textContent);
 });
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && state.view === 'agents' && (!$('crew-focus').hidden || !$('crew-map').hidden)) {
+    closeCrewLayers();
+  }
+});
+
+function showAgents() {
+  ensureCrew();
+  loadCrew();
+  clearInterval(crew.poll);
+  crew.poll = setInterval(() => { if (state.view === 'agents') loadCrew(); }, 15000);
+}
+function leaveAgents() {
+  clearInterval(crew.poll);
+  closeCrewLayers();
+}
+
 function toggleAgent() {
   agent.toggle();
   $('lyla-agent-toggle').setAttribute('aria-expanded', agent.open ? 'true' : 'false');
@@ -2350,7 +2446,7 @@ async function loadReports() {
     lylaDoing.show();
   } catch (e) { /* the list stays as it was */ }
   renderReports();
-  if (state.view === 'agents') renderMarks();
+  if (state.view === 'agents') refreshCrew();
 }
 $('lyla-reports')?.addEventListener('click', (event) => {
   const item = event.target.closest('[data-report]');
@@ -2780,14 +2876,13 @@ function setView(view) {
   unlightRow();
   if (agent.open) toggleAgent();
   if (view === 'trading') wantTrading();
-  if (was === 'agents') for (const key of AGENTS) agentCards[key].hide();
+  if (was === 'agents') leaveAgents();
   renderModes();
   channelChange(() => {
     for (const name of ['clear', 'trading', 'agents']) document.body.classList.toggle(name, view === name);
     document.body.classList.toggle('viewing', view !== 'normal');
     if (view === 'agents') {
-      if (state.agentOpen) agentCards[state.agentOpen].show();
-      showAgentStage();
+      showAgents();
       loadReports();
     }
     applyRoom({ quiet: true });
@@ -4405,8 +4500,9 @@ window.apollo = {
       const card = agentCards[step.agent];
       if (!card) return;
       card.live(step);
-      crewDoing[step.agent] = step.stage !== 'done' && step.stage !== 'error';
-      if (state.view === 'agents') renderMarks();
+      const on = step.stage !== 'done' && step.stage !== 'error';
+      crewDoing[step.agent] = on ? (step.task || 'a job') : false;
+      if (state.view === 'agents') { if (!on) loadCrew(); else refreshCrew(); }
       return;
     }
     agent.live(step);
@@ -4418,7 +4514,8 @@ window.apollo = {
       lylaDoing.job = on ? `ON A JOB${step.symbol ? ` · ${step.symbol}` : ''}` : '';
       lylaDoing.show();
     }
-    if (state.view === 'agents') renderMarks();
+    crewDoing.LYLA = step.job && step.stage !== 'done' && step.stage !== 'error' ? (step.task || 'a job') : false;
+    if (state.view === 'agents') refreshCrew();
     if (step.stage === 'done' && step.report) {
       state.lylaReports.unshift({ task: step.task, symbol: step.symbol, summary: step.text,
                                   report: step.report, brain: step.brain, done: Date.now() / 1000 });

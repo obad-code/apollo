@@ -1215,6 +1215,15 @@ class Api:
         """Every agent: its role, what it is on, what waits, its reports."""
         return crew.status()
 
+    def crew_board(self):
+        """Agents mode's dashboard: the crew, today's jobs, spend, tools,
+        issues and alerts (crew.board)."""
+        try:
+            return crew.board()
+        except Exception:  # noqa: BLE001 - a board that cannot be read is empty
+            log.warning("crew board failed", exc_info=True)
+            return {}
+
     def set_panel(self, name, shown):
         """A panel shown or hidden from the display itself - LYLA's room, by
         the button along the bottom - and kept that way, as if it had been

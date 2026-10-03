@@ -259,25 +259,36 @@
     <footer class="desk-foot">A read of the crowd and the filings - not advice.</footer>
   </section>
 
-  <!-- Agents mode: every agent as its pipeline. LYLA, for now - live while
-       you command her. -->
+  <!-- Agents mode: Apollo's crew (crewview.js). The wheel of agents at the
+       top, the dashboard of what they are doing under it; a click on an
+       agent brings it forward with its live pipeline, then the whole crew as
+       one workflow map. -->
   <section id="agents" aria-label="Agents">
-    <!-- The agents, each by its mark down the left (lylaagent.js draws them,
-         app.js lists them): a click opens that agent's process beside it. -->
-    <nav id="agent-rail" aria-label="The agents">
-      <header class="agents-head"><b>AGENTS</b><em>Pick one to see its process</em></header>
-      <div id="agent-marks"></div>
-      <p class="agents-foot">Ask Apollo for research - he hands it to LYLA and you carry on.</p>
-    </nav>
-    <div id="agent-stage">
-      <p id="agent-pick">Pick an agent on the left to see its process.</p>
-      <div id="agent-lyla" class="agent-card"></div>
-      <div id="agent-theia" class="agent-card"></div>
-      <div id="agent-moneypenny" class="agent-card"></div>
-      <div id="agent-q" class="agent-card"></div>
-      <!-- What LYLA found, newest first: the job, her two lines, and the
-           whole report under them. -->
-      <ol id="lyla-reports" aria-label="LYLA's reports"></ol>
+    <header class="crew-top">
+      <div><b>THE CREW</b><em>Drag the wheel or click an agent · drag the widgets to arrange them</em></div>
+      <button id="crew-map-open" class="hud-button" type="button" data-sfx="none"><i class="led"></i>Workflow map</button>
+    </header>
+    <div id="crew-wheel" aria-label="The agents"></div>
+    <div id="crew-board"></div>
+    <div id="crew-focus" class="crew-layer" hidden>
+      <div class="focus-main"></div>
+      <div class="focus-side">
+        <div id="agent-stage">
+          <div id="agent-lyla" class="agent-card"></div>
+          <div id="agent-theia" class="agent-card"></div>
+          <div id="agent-moneypenny" class="agent-card"></div>
+          <div id="agent-q" class="agent-card"></div>
+          <!-- What LYLA found, newest first: the job, her two lines, and the
+               whole report under them. -->
+          <ol id="lyla-reports" aria-label="LYLA's reports" hidden></ol>
+        </div>
+      </div>
+      <div class="focus-timer" aria-hidden="true"><i></i></div>
+      <button class="crew-close" type="button" data-sfx="none" aria-label="Back to the crew">✕</button>
+    </div>
+    <div id="crew-map" class="crew-layer" hidden>
+      <div class="map-holder"></div>
+      <button class="crew-close" type="button" data-sfx="none" aria-label="Back to the crew">✕</button>
     </div>
   </section>
 </main>
