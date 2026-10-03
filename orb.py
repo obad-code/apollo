@@ -589,6 +589,23 @@ class Orb:
         dy = pt.y - (self.rect[1] + ey)
         return (max(-1.0, min(1.0, dx / 500.0)), max(-1.0, min(1.0, dy / 300.0)))
 
+    _startled = 0.0
+    _weather_mood = ""
+
+    def startle(self):
+        """Big news: the eyes jolt wide before Apollo says it. Any thread."""
+        self._startled = time.monotonic()
+
+    def set_weather(self, mood):
+        """"hot", "rain" or "" - the eyes squint in the heat. Any thread."""
+        self._weather_mood = mood or ""
+
+    def _mood(self):
+        hour = time.localtime().tm_hour
+        if 0 <= hour < 5:
+            return "sleepy"
+        return self._weather_mood
+
     def _advance_island(self, dt):
         tw, th = self._island_target()
         words = bool(self._island_words())
@@ -615,7 +632,8 @@ class Orb:
         self.mark.draw_at(g, ax, ay, 8.5 + 1.5 * self._level, t * spin, level=self._level, fade=fade)
         # His eyes, following the pointer.
         ex, ey = slots["eyes"]
-        self.mini.eyes(g, ex, ey, t, a, self._cursor_look(ex, ey), size=0.62)
+        since = (time.monotonic() - self._startled) if self._startled else None
+        self.mini.eyes(g, ex, ey, t, a, size=0.8, mood=self._mood(), since_startle=since)
         if well is None:
             return
         wx, wy, ww, wh = well_box

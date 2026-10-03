@@ -728,23 +728,59 @@ class MiniApollo:
         g.FillPath(b.brush(self.WELL, a), well)
         return (wx, wy, ww, wh), well
 
-    EYE_LIT = (255, 244, 220)
+    EYE_LIT = (255, 246, 228)
 
-    def eyes(self, g, cx, cy, t, a, look=(0.0, 0.0), size=1.0):
-        """Apollo's eyes alone: two warm white ovals on the dark, blinking,
-        turned toward `look` (each from -1 to 1)."""
+    @staticmethod
+    def eye_shape(mood, t, since_startle=None):
+        """How open the eyes are and where they sit, from the mood:
+        (openness 0..1.4, lift in px, blink 0..1). Pure, so it is tested."""
+        if since_startle is not None and since_startle < 2.4:
+            # A jolt: wide open, a little jump, then settling.
+            k = since_startle / 2.4
+            return 1.35 - 0.35 * k, -3.5 * math.sin(min(1.0, since_startle * 3.0) * math.pi) * (1 - k), 0.0
+        if mood == "sleepy":
+            # Heavy lids, a slow nod, long slow blinks.
+            phase = t % 6.0
+            shut = max(0.0, 1.0 - abs(phase - 0.6) / 0.6)
+            return 0.38 + 0.08 * math.sin(t * 0.7), 1.0 + 0.8 * math.sin(t * 0.5), shut
+        if mood == "hot":
+            return 0.55, 0.0, MiniApollo.blink(t)
+        if mood == "rain":
+            return 0.9, -0.6, MiniApollo.blink(t * 1.6)
+        return 1.0, 0.0, MiniApollo.blink(t)
+
+    def eyes(self, g, cx, cy, t, a, look=(0.0, 0.0), size=1.0, mood="", since_startle=None):
+        """Apollo's eyes: two sharp, hooded hunter's eyes in warm white,
+        a little cute (a glint each), still - no following. They blink,
+        go heavy at night, squint in the heat, and jolt wide at big news."""
         b = self.brushes
-        shut = self.blink(t)
-        ew, eh = 7.0 * size, 12.0 * size * (1.0 - 0.88 * shut)
-        lx, ly = look
+        openness, lift, shut = self.eye_shape(mood, t, since_startle)
+        openness *= (1.0 - 0.9 * shut)
+        w, top_h, low_h = 15.0 * size, 5.0 * size * openness, 2.0 * size * openness
+        cy += lift
         for side in (-1, 1):
-            ex = cx + side * 11.0 * size + lx * 5.0 * size
-            ey = cy + ly * 3.5 * size
-            for reach, share in ((2.4, 0.08), (1.6, 0.16)):
-                g.FillEllipse(b.brush(self.GLOW, a * share), float(ex - ew * reach / 2),
-                              float(ey - eh * reach / 2), float(ew * reach), float(max(2.0, eh * reach)))
-            g.FillEllipse(b.brush(self.EYE_LIT, a), float(ex - ew / 2), float(ey - eh / 2),
-                          float(ew), float(max(1.4, eh)))
+            ex = cx + side * 10.5 * size
+            outer, inner = ex + side * w / 2, ex - side * w / 2
+            pts_top, pts_low = [], []
+            for i in range(11):
+                u = i / 10.0                     # 0 at the outer corner
+                x = outer + (inner - outer) * u
+                # The upper lid peaks toward the outside and slants down to
+                # the inner corner: the hooded, sharp look.
+                up = math.sin(math.pi * u ** 0.8) ** 0.6 * (1.0 - 0.45 * u)
+                pts_top.append((x, cy - 1.6 * size + 2.4 * size * u - top_h * up))
+                pts_low.append((x, cy - 1.6 * size + 2.4 * size * u + low_h * math.sin(math.pi * u) ** 1.4))
+            if top_h + low_h < 0.8:
+                g.DrawLine(b.pen(self.EYE_LIT, a, 1.4), float(outer), float(cy), float(inner), float(cy + 1.4 * size))
+                continue
+            path = self._poly(pts_top + pts_low[::-1])
+            g.FillPath(b.brush(self.EYE_LIT, a), path)
+            path.Dispose()
+            if openness > 0.45:
+                # A glint, for the cute: a dark nick near the top.
+                gx = ex - side * 1.0 * size
+                g.FillEllipse(b.brush(self.INK, a * 0.9), float(gx - 1.0 * size), float(cy - top_h * 0.45),
+                              float(2.0 * size), float(2.0 * size))
 
     def _face(self, g, cx, cy, t, level, a, busy):
         b = self.brushes

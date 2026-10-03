@@ -47,13 +47,13 @@ const look = (key) => LOOKS[key] || LOOKS.LYLA;
  * black eyes that blink and look about, bouncing while it works. LYLA keeps
  * her own look: the little amber robot from her room. */
 const CREATURES = {
-  THEIA: { eye: '#000', at: [[37, 50], [63, 50]], mouth: [50, 66],
+  THEIA: { eye: '#000', at: [[36, 52], [64, 52]], mouth: [50, 66],
     body: '<circle cx="50" cy="52" r="40" fill="#fff"/>' },
-  MONEYPENNY: { eye: '#fff', at: [[37, 50], [63, 50]], mouth: [50, 66],
+  MONEYPENNY: { eye: '#fff', at: [[36, 52], [64, 52]], mouth: [50, 66],
     body: '<rect x="12" y="13" width="76" height="76" rx="24" fill="#09090b" stroke="rgba(255,255,255,.22)" stroke-width="1.5"/>' },
-  Q: { eye: '#000', at: [[40, 62], [60, 62]], mouth: [50, 75],
+  Q: { eye: '#000', at: [[39, 64], [61, 64]], mouth: [50, 75],
     body: '<path d="M50 12Q55 12 58 17L92 79Q96 88 86 88H14Q4 88 8 79L42 17Q45 12 50 12Z" fill="#fff"/>' },
-  LYLA: { eye: '#120c02', at: [[39, 50], [61, 50]], mouth: [50, 66], square: true,
+  LYLA: { eye: '#120c02', at: [[37, 52], [63, 52]], mouth: [50, 66], square: true,
     body: '<rect x="47.5" y="3" width="5" height="13" rx="2" fill="#FFB000"/><circle cx="50" cy="5" r="5" fill="#ff7a00"/>'
       + '<rect x="12" y="16" width="76" height="72" rx="22" fill="#FFB000"/>'
       + '<circle cx="27" cy="64" r="5" fill="#ff7a00" opacity=".55"/><circle cx="73" cy="64" r="5" fill="#ff7a00" opacity=".55"/>' },
@@ -61,13 +61,12 @@ const CREATURES = {
 
 export function creature(key, size = 100) {
   const c = CREATURES[key] || CREATURES.THEIA;
+  // Big eyes, no mouth: all the feeling is in them.
   const eyes = c.at.map(([x, y]) => (c.square
-    ? `<rect class="cr-eye" x="${x - 5}" y="${y - 7}" width="10" height="14" rx="3" fill="${c.eye}"/>`
-    : `<ellipse class="cr-eye" cx="${x}" cy="${y}" rx="5.5" ry="7.5" fill="${c.eye}"/>`)).join('');
-  const [mx, my] = c.mouth;
+    ? `<rect class="cr-eye" x="${x - 7.5}" y="${y - 10}" width="15" height="20" rx="5" fill="${c.eye}"/>`
+    : `<ellipse class="cr-eye" cx="${x}" cy="${y}" rx="8.5" ry="11.5" fill="${c.eye}"/>`)).join('');
   return `<svg class="cr-svg" width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true">
-    <g class="cr-body">${c.body}<g class="cr-look"><g class="cr-eyes">${eyes}</g>
-    <path d="M${mx - 6} ${my}q6 5 12 0" stroke="${c.eye}" stroke-width="3" fill="none" stroke-linecap="round"/></g></g></svg>`;
+    <g class="cr-body">${c.body}<g class="cr-look"><g class="cr-eyes">${eyes}</g></g></g></svg>`;
 }
 
 export function orb(key) {

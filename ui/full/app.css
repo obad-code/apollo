@@ -2761,3 +2761,16 @@ body:not(.ultra) #status-block:not(:hover) :is(#gauges, #system-line) { display:
 #crew-focus.settled .work-steps li, #crew-focus.settled .work-steps li::before,
 #crew-focus.settled .focus-orb { animation: none; opacity: 1; }
 #crew-focus.settled .focus-orb.busy .cr-body { animation: cr-hop .9s cubic-bezier(.3,.7,.4,1) infinite; }
+
+/* The agents, livelier: they breathe, glance, tilt, and squash when they
+   blink; a working one hops (above). */
+.orb.creature .cr-body { animation: cr-breathe 3.4s ease-in-out infinite; }
+.cr-theia .cr-body { animation-delay: -.8s; } .cr-moneypenny .cr-body { animation-delay: -1.9s; }
+.cr-q .cr-body { animation-delay: -2.6s; }
+@keyframes cr-breathe { 0%, 100% { transform: scale(1, 1) rotate(0deg); } 30% { transform: scale(1.03, .97) rotate(-2deg); }
+                        60% { transform: scale(.98, 1.03) rotate(2deg); } }
+@keyframes cr-blink { 0%, 90%, 100% { transform: scaleY(1); } 93% { transform: scaleY(.06); } 96% { transform: scaleY(1.08); } }
+@keyframes cr-look { 0%, 15%, 100% { transform: translate(0, 0); } 25%, 38% { transform: translate(-5px, 1px); }
+                     50%, 62% { transform: translate(5px, -2px); } 75%, 85% { transform: translate(0, 3px); } }
+.wheel-ball:hover .cr-body { animation: cr-wiggle .5s ease-in-out; }
+@keyframes cr-wiggle { 25% { transform: rotate(-8deg) scale(1.05); } 75% { transform: rotate(8deg) scale(1.05); } }

@@ -42,10 +42,11 @@ log = logging.getLogger("apollo.alerts")
 
 CHECK_EVERY = int(os.environ.get("APOLLO_ALERT_EVERY") or 60)
 THRESHOLD = int(os.environ.get("APOLLO_ALERT_THRESHOLD") or 10)
-MOST_PER_HOUR = 1
-# Only the big ones: a few a week at most, and only what the desk calls a
-# major, near-certain move (MAJOR: yes, CONFIDENCE: high, BUY or SELL).
-MOST_PER_WEEK = int(os.environ.get("APOLLO_ALERTS_PER_WEEK") or 3)
+MOST_PER_HOUR = 2          # a flood guard, nothing more
+# You are told when something CHANGES: a stock's call moves (HOLD to STRONG
+# BUY, BUY to SELL...), or news is shocking (MAJOR: yes, CONFIDENCE: high).
+# The same call again is never sent twice.
+VERDICT_EVERY = 2 * 3600   # how often the watchlist's calls are re-counted
 FRESH_MINUTES = 90          # a story older than this is not breaking
 MOVE_PCT = 8.0
 MOVE_WINDOW = 15 * 60
@@ -294,7 +295,8 @@ class Watcher:
     def _save(self):
         now = self.clock()
         self.seen = {k: v for k, v in self.seen.items()
-                     if v >= now - (8 if k.startswith("sent:") else 3) * 86400}
+                     if v >= now - (30 if k.startswith(("call:", "verdict:")) else
+                                    8 if k.startswith("sent:") else 3) * 86400}
         try:
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
             with open(self.path, "w", encoding="utf-8") as handle:
@@ -318,6 +320,7 @@ class Watcher:
         while not self._stop.is_set() and not (stopping and stopping()):
             try:
                 self.check(quiet=first)
+                self.check_verdicts()
             except Exception:  # noqa: BLE001 - the watcher outlives a bad round
                 log.warning("alert round failed", exc_info=True)
             first = False
@@ -325,9 +328,28 @@ class Watcher:
 
     def _room(self):
         now = self.clock()
-        week = [t for t in self.sent if now - t < 7 * 86400]
-        hour = [t for t in week if now - t < 3600]
-        return len(hour) < MOST_PER_HOUR and len(week) < MOST_PER_WEEK
+        return len([t for t in self.sent if now - t < 3600]) < MOST_PER_HOUR
+
+    def last_call(self, ticker):
+        """The last call told or seen for `ticker`, kept in `seen` as
+        "call:TICKER:ACTION" -> when."""
+        best, when = None, -1.0
+        prefix = f"call:{ticker}:"
+        for key, at in self.seen.items():
+            if key.startswith(prefix) and at > when:
+                best, when = key[len(prefix):], at
+        return best
+
+    def note_call(self, ticker, action, now):
+        for key in [k for k in self.seen if k.startswith(f"call:{ticker}:")]:
+            del self.seen[key]
+        self.seen[f"call:{ticker}:{action}"] = now
+
+    def changed(self, ticker, action):
+        """True when `ticker` had a different call before (a first call is
+        only learned, never told)."""
+        before = self.last_call(ticker) if ticker else None
+        return before is not None and before != action
 
     def check(self, quiet=False):
         """One round. `quiet` (the first) only learns what is already out, so
@@ -365,7 +387,14 @@ class Watcher:
             # Only news worth acting on is told: the desk's IGNORE is not, and
             # nor is a HOLD on a stock you do not watch - that was the spam.
             call = alert["call"]
-            if not major(call):
+            ticker = call.get("ticker") or (alert["tickers"][0] if alert["tickers"] else "")
+            before = self.last_call(ticker) if ticker else None
+            moved = (call.get("action") in ("BUY", "SELL", "HOLD") and call.get("confidence") == "high"
+                     and self.changed(ticker, call["action"]))
+            if ticker and call.get("action") in ("BUY", "SELL", "HOLD"):
+                self.note_call(ticker, call["action"], now)
+            alert["changed_from"] = before if moved else None
+            if not (major(call) or moved):
                 log.info("alert not told (%s): %s", alert["call"]["action"], alert["story"]["title"])
                 continue
             self.sent.append(now)
@@ -373,6 +402,38 @@ class Watcher:
             self._save()
             self._tell(alert)
             told.append(alert)
+        return told
+
+    def check_verdicts(self, verdicts=None):
+        """Re-count each watched stock's call (analysis.py) every couple of
+        hours; a call that changed - HOLD to STRONG BUY, BUY to AVOID - is
+        told. Returns what was told."""
+        now = self.clock()
+        if now - self.seen.get("verdicts:at", 0) < VERDICT_EVERY:
+            return []
+        self.seen["verdicts:at"] = now
+        told = []
+        for symbol, verdict, why in (verdicts or _verdicts)(tuple(self.watch())):
+            key = f"verdict:{symbol}:"
+            before = next((k[len(key):] for k in self.seen if k.startswith(key)), None)
+            for k in [k for k in self.seen if k.startswith(key)]:
+                del self.seen[k]
+            self.seen[key + verdict] = now
+            if before is None or before == verdict or not self._room():
+                continue
+            story = {"title": f"{symbol}: {before} → {verdict}", "summary": why,
+                     "source": "Apollo's count", "link": "", "when": now}
+            tone = "SELL" if verdict == "AVOID" else "BUY" if "BUY" in verdict else "HOLD"
+            alert = {"kind": "verdict", "story": story, "score": THRESHOLD, "why": [why],
+                     "tickers": [symbol], "explained": f"ACTION: {tone} {symbol}\nSUMMARY: {why}",
+                     "call": {"action": tone, "ticker": symbol, "summary": f"{before} → {verdict}. {why}",
+                              "why": [], "confidence": "high", "major": False},
+                     "changed_from": before}
+            self.sent.append(now)
+            self.seen[f"sent:{now}"] = now
+            self._tell(alert)
+            told.append(alert)
+        self._save()
         return told
 
     def _tell(self, alert):
@@ -394,6 +455,8 @@ class Watcher:
         ticker = call["ticker"] or ", ".join(alert.get("tickers", [])[:2])
         verb = {"BUY": "BUY", "SELL": "SELL - TAKE YOUR MONEY OUT", "HOLD": "HOLD"}.get(call["action"], call["action"])
         head = f"{verb} {ticker}".strip()
+        if alert.get("changed_from"):
+            head += f" (was {alert['changed_from']})"
         lines = [call["summary"] or story.get("summary", ""),
                  *[f"• {reason}" for reason in call["why"]],
                  f"Confidence: {call['confidence'] or 'not given'} · Source: {story.get('source', '')}"]
@@ -401,6 +464,21 @@ class Watcher:
                      "\n".join([head, ""] + lines + ["", story.get("link", "")]),
                      rich=emailer.card(story["title"], lines, story.get("link", ""), action=head,
                                        tone=call["action"]))
+
+
+def _verdicts(watch):
+    """(symbol, verdict, the deciding reason) for each watched stock."""
+    import analysis
+    out = []
+    for symbol in watch:
+        try:
+            a = analysis.analyse(symbol)
+        except Exception:  # noqa: BLE001
+            continue
+        if a.get("ok"):
+            reasons = (a.get("green") if "BUY" in a["verdict"] else a.get("red")) or a.get("green") or [""]
+            out.append((a["symbol"], a["verdict"], reasons[0]))
+    return out
 
 
 def _watchlist():

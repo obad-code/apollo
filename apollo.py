@@ -2367,8 +2367,26 @@ class Apollo:
 
         # Big market news: emailed to you, and said out loud while Apollo
         # is up - after any turn in progress (alerts.py).
-        alerts.start(speak=lambda alert: assistant.fire_alert(ui, self.voice, alert),
-                     stopping=self.stopping.is_set)
+        def told(alert):
+            if self.orb is not None:
+                self.orb.startle()
+            assistant.fire_alert(ui, self.voice, alert)
+        alerts.start(speak=told, stopping=self.stopping.is_set)
+
+        # The weather, for Mini Apollo's eyes: they squint in the heat.
+        def weather_eyes():
+            import weather
+            while not self.stopping.wait(1800 if self.orb else 60):
+                try:
+                    now = weather.now()
+                    code = now.get("code") or 0
+                    mood = ("hot" if (now.get("temp") or 0) >= 42 else
+                            "rain" if 51 <= code <= 99 else "")
+                    if self.orb is not None:
+                        self.orb.set_weather(mood)
+                except Exception:  # noqa: BLE001 - a nicety
+                    pass
+        threading.Thread(target=weather_eyes, daemon=True, name="weather-eyes").start()
 
         # Say hello, so you know the mic is live before you ever press a key.
         assistant.greet(ui)

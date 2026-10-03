@@ -142,17 +142,31 @@ def test_only_major_sure_calls_interrupt_you():
     assert not alerts.major({"action": "BUY", "confidence": "high", "major": False})
 
 
-def test_no_more_than_a_few_a_week_even_across_restarts(tmp_path):
+def test_a_change_of_call_is_told_and_the_same_call_is_not(tmp_path):
     stories = []
     w, told = watcher(tmp_path, stories)
+    w.explain = lambda s, t: "ACTION: HOLD NVDA\nSUMMARY: steady\nCONFIDENCE: high\nMAJOR: no"
     w.check(quiet=True)
-    for day, word in enumerate(("misses", "botches", "fumbles", "blows", "flubs", "sinks")):
-        w.clock = lambda d=day: NOW + d * 86400
-        stories.append(story(f"Nvidia {word} earnings, stock plunges", minutes=-day * 1440 + 3))
-        w.check()
-    assert len(told["email"]) == alerts.MOST_PER_WEEK
-    again, _ = watcher(tmp_path, [])
-    assert len(again.sent) == alerts.MOST_PER_WEEK
+    stories.append(story("Nvidia beats earnings, shares surge"))
+    assert w.check() == []                                   # first call: learned
+    w.explain = lambda s, t: "ACTION: HOLD NVDA\nSUMMARY: steady\nCONFIDENCE: high\nMAJOR: no"
+    stories.append(story("Nvidia guidance surges again"))
+    assert w.check() == []                                   # same call: quiet
+    w.explain = lambda s, t: "ACTION: BUY NVDA\nSUMMARY: turned\nCONFIDENCE: high\nMAJOR: no"
+    stories.append(story("Nvidia soars on record revenue"))
+    got = w.check()
+    assert len(got) == 1 and got[0]["changed_from"] == "HOLD"
+
+
+def test_a_watchlist_verdict_that_changes_is_told(tmp_path):
+    w, told = watcher(tmp_path, [])
+    calls = [[("NVDA", "HOLD", "steady")], [("NVDA", "HOLD", "steady")], [("NVDA", "STRONG BUY", "sales +40%")]]
+    results = []
+    for i, c in enumerate(calls):
+        w.clock = lambda i=i: NOW + i * alerts.VERDICT_EVERY
+        results.append(w.check_verdicts(lambda watch, c=c: c))
+    assert results[0] == [] and results[1] == []
+    assert len(results[2]) == 1 and results[2][0]["changed_from"] == "HOLD"
 
 
 def test_ignored_news_is_not_sent(tmp_path):
