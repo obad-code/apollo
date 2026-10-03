@@ -5042,11 +5042,11 @@ async function drawCrewMini() {
     const hp = done + failed ? Math.round((done / (done + failed)) * 100) : 100;
     const pct = h.state === 'failing' ? Math.min(hp, 30) : hp;
     return `<button type="button" class="cm-card cm-${h.state}" data-key="${key}" title="${esc(key)} · ${esc(h.text)}">
-      <span class="cm-face">${CrewView.creature(key, 30)}</span>
+      <span class="cm-face">${CrewView.creature(key, 34)}</span>
       <span class="cm-hp-box">
-        <span class="cm-head"><b>${key === 'MONEYPENNY' ? 'M.PENNY' : key}</b><em>${pct}%</em></span>
+        <span class="hp-head"><b>${key}</b><span class="hp-tag">HP</span><em class="cm-pct">${pct}%</em></span>
         <span class="cm-battery"><i style="transform:scaleX(${pct / 100})"></i></span>
-        <small>${esc(h.state === 'working' ? 'ON A JOB' : h.state === 'idle' ? `${done} DONE TODAY` : h.state.toUpperCase())}</small>
+        <small class="caption">${esc(h.state === 'working' ? `ON A JOB · ${String(a.working || '').slice(0, 40)}` : h.state === 'idle' ? `STANDING BY · ${done} DONE TODAY` : h.text)}</small>
       </span>
     </button>`;
   }).join('');

@@ -3370,3 +3370,23 @@ body.room-crew:not(.roomless):not(.viewing):not(.asleep):not(.ultra) #room-crew 
 .rc-walker.busy .rc-body .cr-body { animation: cr-hop .9s cubic-bezier(.3,.7,.4,1) infinite; }
 .rc-walker em { font: 700 7px Orbitron; letter-spacing: .12em; font-style: normal; color: rgba(255,255,255,.55); margin-top: 2px; }
 #crew-toggle[aria-pressed="false"] .led { opacity: .3; }
+
+/* ---- The crew's health, bottom left, each exactly like LYLA's HP block;
+   her old block top right is gone from the normal display ---- */
+body:not(.ultra) #lyla-block { display: none !important; }
+body:not(.ultra) #stage:has(#lyla-block:not(.away)) #headlines { margin-top: 0; }
+body:not(.ultra):not(.viewing) #crew-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cm-card { gap: 12px; height: var(--hp-h); padding: 10px 16px 10px 12px; border-radius: 16px; background: var(--panel);
+  border: 1px solid rgba(255,255,255,.08); }
+.cm-face .cr-svg { width: 34px; height: 34px; }
+.cm-hp-box { gap: 5px; }
+.cm-card .hp-head { font-size: 11px; letter-spacing: .18em; }
+.cm-card .hp-head b { color: var(--amber-bright); }
+.cm-pct { margin-left: auto; font: 800 11px var(--hud); font-style: normal; letter-spacing: .06em; color: #ececef; }
+.cm-battery { height: 10px; border: 1px solid rgba(255, 214, 150, .2); }
+.cm-battery i { background: var(--amber); }
+.cm-battery::after { background: repeating-linear-gradient(90deg, transparent 0 9px, rgba(8,7,6,.9) 9px 11px); }
+.cm-working .cm-battery i { background: #3ddc84; }
+.cm-card small.caption { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; opacity: .7; }
+body:not(.ultra):not(.viewing) #markets.rolled #nav-roll { align-items: flex-start; max-height: calc(100% - 150px); }
+body:not(.ultra):not(.viewing) #markets.rolled #nav-roll { flex: none; height: 180px; min-height: 0; } body:not(.ultra):not(.viewing) #markets.rolled #nav-roller { min-height: 0; height: 180px; } body:not(.ultra):not(.viewing) #markets.rolled { align-self: start; }
