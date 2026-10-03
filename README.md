@@ -13,18 +13,20 @@ streams to Gemini Live and Apollo answers out loud in Puck's voice.
                                  |   (tools.py: apps, sites, keys, media,
                                  |    volume, windows, reminders, markets)
                                  |
-                  its transcript of you  ->  was an agent called by name?
-                                                          |
-                                             LYLA / ATLAS / ECHO / NOVA /
-                                             THE WORKSHOP / OPTIMO / HERMES
-                                                          |
-                                     Claude API (same tools)  ->  Fish Audio
+                                 |
+                       Apollo decides who does what - your word wins
+                                 |
+          LYLA (research, your accounts, downloads) · THEIA (any idea: analysis,
+          critique, best way) · MONEYPENNY (stocks: verdicts, red flags) ·
+          Q (files a GitHub ticket for Claude to build)
+                                 |
+                  each reports back - and Apollo says it, in his voice
 ```
 
-**One assistant, one voice.** Everything you say — chat, a quick command, a
-question about your own code — is answered by Gemini in Puck's voice. Claude
-still has the tools, but it belongs to the seven agents now and answers only
-when you call one by name. See [One voice, and the door Claude is behind](#one-voice-and-the-door-claude-is-behind).
+**One assistant, one voice.** Everything you say is answered by Apollo, in
+one voice. His crew - LYLA, THEIA, MONEYPENNY and Q - work in the background
+and never speak; when one is done, Apollo tells you. See
+[Apollo's crew](#apollos-crew) and [Setting up the new parts](#setting-up-the-new-parts).
 
 Your *audio* goes to Google while you speak, and an agent's reply text goes to
 Anthropic and to Fish Audio. A local Whisper is kept only as a backup
@@ -34,6 +36,45 @@ It does more than answer questions, and it does it in the same voice: ask it
 to open Chrome and it opens Chrome; ask how Nvidia did this week and it draws
 the chart; ask what's new with GTA 6 and it searches. Speak Arabic and it
 answers in Arabic. See [What it can do](#what-it-can-do).
+
+---
+
+## Setting up the new parts
+
+Everything below is optional: each part switches itself on when its key is
+there, and says so plainly when it is not. In PowerShell, then open a new
+terminal (`setx` only reaches terminals opened after it):
+
+| For | Set | Where it comes from |
+|---|---|---|
+| Market alerts by **email**, and "send an email" | `setx APOLLO_SMTP_USER "you@gmail.com"` and `setx APOLLO_SMTP_PASSWORD "xxxx xxxx xxxx xxxx"` | A Gmail **app password**: turn on 2-Step Verification, then <https://myaccount.google.com/apppasswords>. Optional: `APOLLO_ALERT_TO` (another address for alerts). |
+| Market alerts' **news** | `FINNHUB_API_KEY` (the live prices already use it) | <https://finnhub.io> - free. Google News is used too, with no key. |
+| **Q** filing requests for Claude | `setx GITHUB_TOKEN "github_pat_..."` | GitHub → Settings → Developer settings → Fine-grained token, repository `obad-code/apollo`, **Issues: Read and write**. Install the Claude GitHub app on the repo and Claude picks the ticket up by itself. |
+| **LYLA's downloads** | `.venv\Scripts\pip install yt-dlp`, and ffmpeg on PATH (`winget install ffmpeg`) | Without ffmpeg it still works, at a single-file quality. |
+| **LYLA's connectors** (email, messages, calendar…) | `%LOCALAPPDATA%\Apollo\connectors.json` listing remote MCP servers, and each server's token in its own variable | See `connectors.py`. Uses Claude (`ANTHROPIC_API_KEY`). |
+| **THEIA's deep analysis** | `ANTHROPIC_API_KEY` (already set up above) | Without it, deep runs on Gemini Pro. Everyday analysis is Gemini Flash either way - the cheap one. |
+| Pictures and screen reading | `GEMINI_API_KEY` (Apollo already has it) | - |
+| The voice | `APOLLO_VOICE` (a Gemini voice name; Puck by default), `APOLLO_EXPRESSIVE=0` to turn off the expressive voice, `APOLLO_BARGE_IN` (0..1, how loud you must be to talk over him in hands-free; 0 with headphones) | - |
+
+### Apollo's crew
+
+| Agent | Does | Ask like |
+|---|---|---|
+| **LYLA** | Research, sources, your connected accounts, YouTube downloads | "ليلى نزلي هالمقطع", "LYLA, any new mail from Ahmed?" |
+| **THEIA** | The professor: any idea, in three passes - analysis, a hard critique, the best way - with a verdict | "THEIA, حللي هالفكرة", "deep analysis of this plan" |
+| **MONEYPENNY** | Markets: a stock's verdict (strong buy … sell), the reasons, the red flags; or the whole watchlist and what to pull money out of first | "Moneypenny, how's Nvidia", "وش اسحب من اسهمي" |
+| **Q** | Files what you want added or fixed as a GitHub issue for Claude to build | "قل لكلاود يضيف…", "Q, add a button for…" |
+
+Apollo decides who does what, and your word wins: "انت حلل" means he does it
+himself. Every job shows on the display's **Agents** mode - the crew's wheel,
+each agent's live pipeline, a workflow map of all of them, and a dashboard you
+arrange by dragging - and Apollo says what came back.
+
+Other things he does now: remembers what you tell him to (and the day's talk,
+across reconnects); writes files and a problem log in `Documents\Apollo`;
+looks at your screen when you ask; draws pictures and lays out explanations in
+the box in the middle of the display while he talks, small in the corner;
+emails you and tells you out loud when big market news breaks.
 
 ---
 
@@ -932,7 +973,17 @@ The only thing left is your API key.
 | `assistant.py` | The engine: hotkey, mic, Whisper, routing, Claude, tools, TTS. Runs standalone in the console. |
 | `gemini_live.py` | Apollo's voice. Owns the only microphone Apollo opens and streams it to Gemini's native-audio model, which answers in the Puck voice as audio rather than as text to be synthesised. Holds both listening modes. |
 | `router.py` | Which backend answers this turn. One question: was an agent called by name? Everything else is conversation. |
-| `agents.py` | The seven agents, and the only module that touches `ask_claude`. Placeholders for now — the boundary exists before they do, on purpose. |
+| `agents.py` | The crew's names as you say them, in Arabic and English. A name says who should do the work; it never changes who speaks. |
+| `crew.py` | THEIA, MONEYPENNY and Q, each a desk like LYLA's, and the board agents mode draws (`tests/test_crew.py`). |
+| `alerts.py` / `emailer.py` | Market alerts: the news and price moves watched, scored, explained and told by email and voice (`tests/test_alerts.py`). |
+| `connectors.py` | LYLA's reach into your own accounts, through remote MCP servers and Claude's MCP connector. |
+| `github_requests.py` | Q's outbox: a request filed as a GitHub issue for Claude. |
+| `youtube.py` | LYLA's downloads, through yt-dlp. |
+| `memory.py` / `files.py` | What Apollo was told to remember and the day's talk; his own folder and the problem log. |
+| `images.py` / `screen.py` | Pictures he draws; one screenshot, read when you ask about your screen. |
+| `ui/full/explain.js` | The explanation box, and Apollo going small into the corner while he talks. |
+| `ui/full/crewview.js`, `wheel.js`, `widgetgrid.js`, `tiler.js` | Agents mode: the crew's wheel, focus and workflow map; the draggable dashboard and its tiler (`tests/test_crew_board.py`). |
+| `ui/full/optionwheel.js` | The Projects tab's wheel. |
 | `tools.py` | Every tool Apollo has, declared once for both Gemini and Claude, and the only place tool errors are caught. Also the confirmation rule for power actions. |
 | `pc_control.py` | The Windows side of the tools: apps, sites, files, keyboard, media, volume, windows, power. Talks to Windows, never to a model. |
 | `market.py` | Live prices, history, NYSE hours and TradingView links, from Yahoo Finance's public feed. |
