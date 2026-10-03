@@ -74,7 +74,107 @@ function totals(board) {
   };
 }
 
-export function render(root, board = {}, { look = 'minimal', open = null } = {}) {
+/* CARDS: Apollo above, a dotted line down to each of four cards; each card
+ * the agent in its corner, what it is for, and below the fold what it is on
+ * now. A corner of each lights in its colour - steady at rest, sweeping
+ * while it works. Click a card for its live steps and results. */
+const GLOW = { LYLA: '255,176,0', THEIA: '150,110,255', MONEYPENNY: '58,196,170', Q: '220,70,200' };
+const CORNER = { LYLA: 'tl', THEIA: 'tr', MONEYPENNY: 'br', Q: 'bl' };
+const ABOUT = {
+  LYLA: 'Finds things out: research with sources, your connected accounts, videos.',
+  THEIA: 'Thinks ideas through: what it is, a hard critique, the best way to do it.',
+  MONEYPENNY: 'Reads stocks: buy more, hold or pull money out - with reasons and red flags.',
+  Q: 'Turns "tell Claude to add..." into a GitHub ticket Claude builds from.',
+};
+
+function card(key, a, open, now) {
+  const at = stageOf(a);
+  const h = health(a, now);
+  const last = (a.results || [])[0];
+  const lower = a.working
+    ? `<p class="cc-now"><i class="cc-dot s-${h.state}"></i>${esc(short(a.working, 70))}</p>
+       <div class="cc-steps">${STAGES.map((s, j) => `<i class="${j < at ? 'done' : j === at ? 'now' : ''}" title="${s}"></i>`).join('')}</div>
+       <small>${esc(STAGES[Math.max(0, at)])} · ${esc(h.text)}</small>`
+    : h.state === 'failing'
+      ? `<p class="cc-now"><i class="cc-dot s-failing"></i>Last job failed</p><small>${esc(short((a.error || {}).why, 80))}</small>`
+      : last
+        ? `<p class="cc-now"><i class="cc-dot s-idle"></i>${esc(short(last.summary || last.task, 70))}</p>
+           <button type="button" class="cp-open" data-file="${esc(last.file || '')}" data-link="${esc(last.link || '')}">${last.link ? 'Open on GitHub ›' : 'Open report ›'}</button>`
+        : '<p class="cc-now"><i class="cc-dot s-idle"></i>Ready · nothing yet</p>';
+  const steps = a.working ? (a.steps || []) : [];
+  const results = (a.results || []).slice(0, 6);
+  return `<article class="cc-card cc-${CORNER[key]}${a.working ? ' busy' : ''}${open ? ' open' : ''}" data-key="${key}" style="--g:${GLOW[key]}">
+    <div class="cc-top">
+      <span class="cc-badge">${creature(key, 34)}</span>
+      <h3>${key}</h3><em>${ROLE[key]}</em>
+      <p>${esc(ABOUT[key])}</p>
+    </div>
+    <div class="cc-bottom">${lower}</div>
+    ${open ? `<div class="cc-more">
+      <h4>${a.working ? 'LIVE' : 'RESULTS'}</h4>
+      ${a.working ? `<ul>${steps.map((x) => `<li>· ${esc(short(x.text || x.stage, 70))}</li>`).join('') || '<li>Starting…</li>'}</ul>`
+        : results.length ? `<ul>${results.map((r) => `<li><button type="button" class="cp-open" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}">${esc(short(r.summary || r.task, 60))} ›</button></li>`).join('')}</ul>`
+          : '<p>No results yet.</p>'}
+      <h4>TAKES</h4><p>${esc(IO[key][0])}</p><h4>GIVES</h4><p>${esc(IO[key][1])}</p>
+    </div>` : ''}
+  </article>`;
+}
+
+function renderCards(root, board, t, look, open, now) {
+  const agents = board.agents || {};
+  root.innerHTML = `
+    <header class="cp-top">
+      <h1>THE CREW</h1>
+      <div class="cp-meta"><span><i class="cp-led${t.working ? ' lit' : ''}"></i><b>${t.working}</b> working</span>
+        <span><i class="cp-led amb"></i><b>${t.runs}</b> jobs today</span>
+        <span><i class="cp-led${t.errors ? ' bad' : ''}"></i><b>${t.errors}</b> errors</span></div>
+      ${looks(look)}
+    </header>
+    <div class="cc-hub"><span class="cp-node apollo">APOLLO</span></div>
+    <svg class="cc-wires" aria-hidden="true"></svg>
+    <div class="cc-row">${KEYS.map((key) => card(key, agents[key] || {}, open === key, now)).join('')}</div>
+    <footer class="cp-foot">
+      <div class="cp-g"><b>${t.runs}</b><span>RUNS TODAY</span></div>
+      <div class="cp-g"><b>${t.success}</b><span>SUCCESS</span></div>
+      <div class="cp-g"><b>${t.avg}</b><span>AVG JOB</span></div>
+      <div class="cp-g"><b>${t.errors}</b><span>ERRORS</span></div>
+      <div class="cp-g"><b>${t.cost}</b><span>COST TODAY</span></div>
+    </footer>`;
+  requestAnimationFrame(() => cardWires(root, agents));
+}
+
+/* Dotted lines from Apollo down to each card, with light running on the
+ * ones whose agent is at work. */
+function cardWires(root, agents) {
+  const svg = root.querySelector('.cc-wires');
+  const hub = root.querySelector('.cc-hub .cp-node');
+  if (!svg || !hub) return;
+  const base = root.getBoundingClientRect();
+  const top = svg.getBoundingClientRect();
+  const h = hub.getBoundingClientRect();
+  svg.setAttribute('viewBox', `0 0 ${top.width} ${top.height}`);
+  const x0 = h.left + h.width / 2 - top.left;
+  svg.innerHTML = [...root.querySelectorAll('.cc-card')].map((el) => {
+    const b = el.getBoundingClientRect();
+    const x = b.left + b.width / 2 - top.left;
+    const busy = Boolean((agents[el.dataset.key] || {}).working);
+    const d = `M${x0},0 C${x0},${top.height * 0.6} ${x},${top.height * 0.4} ${x},${top.height}`;
+    return `<path class="cc-wire${busy ? ' busy' : ''}" d="${d}" style="--g:${GLOW[el.dataset.key]}"/>${busy
+      ? `<circle r="3" class="cc-spark" style="--g:${GLOW[el.dataset.key]}"><animateMotion dur="1.6s" repeatCount="indefinite" path="${d}"/></circle>` : ''}`;
+  }).join('');
+  void base;
+}
+
+const looks = (look) => `<div class="cp-looks" role="group" aria-label="Look">
+  ${['cards', 'minimal', 'console'].map((l) => `<button type="button" data-look="${l}" class="${look === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}
+</div>`;
+
+export function render(root, board = {}, { look = 'cards', open = null } = {}) {
+  if (look === 'cards') {
+    root.className = 'cp look-cards';
+    renderCards(root, board, totals(board), look, open, board.now || Date.now() / 1000);
+    return;
+  }
   const t = totals(board);
   const now = board.now || Date.now() / 1000;
   const agents = board.agents || {};
@@ -86,10 +186,7 @@ export function render(root, board = {}, { look = 'minimal', open = null } = {})
       <div class="cp-meta"><span><i class="cp-led${t.working ? ' lit' : ''}"></i><b>${t.working}</b> working</span>
         <span><i class="cp-led amb"></i><b>${t.runs}</b> jobs today</span>
         <span><i class="cp-led${t.errors ? ' bad' : ''}"></i><b>${t.errors}</b> errors</span></div>
-      <div class="cp-looks" role="group" aria-label="Look">
-        <button type="button" data-look="minimal" class="${look === 'minimal' ? 'on' : ''}">MINIMAL</button>
-        <button type="button" data-look="console" class="${look === 'console' ? 'on' : ''}">CONSOLE</button>
-      </div>
+      ${looks(look)}
       <div class="cp-knobs"><label><i class="cp-knob"></i>VOICE</label><label><i class="cp-knob v2"></i>ROUTINES</label></div>
     </header>
     <div class="cp-flow">
@@ -130,6 +227,23 @@ function wires(root, agents) {
 /* A job handed over: a bright pulse runs down the wire from Apollo to
  * `key`'s lane, and the lane lights as it arrives. */
 export function sendTo(root, key) {
+  if (root && root.classList.contains('look-cards')) {
+    const el = root.querySelector(`.cc-card[data-key="${key}"]`);
+    const wire = [...root.querySelectorAll('.cc-wire')][[...root.querySelectorAll('.cc-card')].indexOf(el)];
+    if (!el || !wire) return;
+    const ns = 'http://www.w3.org/2000/svg';
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('r', '5'); dot.setAttribute('class', 'cp-send');
+    const move = document.createElementNS(ns, 'animateMotion');
+    move.setAttribute('dur', '0.8s'); move.setAttribute('fill', 'freeze');
+    move.setAttribute('path', wire.getAttribute('d')); move.setAttribute('begin', 'indefinite');
+    dot.appendChild(move); wire.parentNode.appendChild(dot);
+    root.querySelector('.cc-hub .cp-node')?.classList.add('sending');
+    move.beginElement();
+    setTimeout(() => { dot.remove(); el.classList.add('incoming'); root.querySelector('.cc-hub .cp-node')?.classList.remove('sending'); }, 800);
+    setTimeout(() => el.classList.remove('incoming'), 2000);
+    return;
+  }
   const svg = root && root.querySelector('.cp-wires');
   const lanes = root ? [...root.querySelectorAll('.cp-lane')] : [];
   const i = lanes.findIndex((el) => el.dataset.key === key);

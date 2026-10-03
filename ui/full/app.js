@@ -445,7 +445,7 @@ async function loadCrew() {
 }
 
 /* The crew page: its look kept per viewer, one lane open at a time. */
-const page = { open: null, look: (() => { try { return localStorage.getItem('crew-look') || 'minimal'; } catch { return 'minimal'; } })() };
+const page = { open: null, look: (() => { try { return localStorage.getItem('crew-look') || 'cards'; } catch { return 'cards'; } })() };
 function drawCrewPage() {
   CrewPage.render($('crew-page'), { ...crew.board, agents: crewAgents() }, page);
 }
@@ -465,8 +465,8 @@ $('crew-page').addEventListener('click', (event) => {
     else if (api && open.dataset.file && api.open_crew_file) api.open_crew_file(open.dataset.file);
     return;
   }
-  const lane = event.target.closest('.cp-lane');
-  if (lane && !event.target.closest('.cp-detail')) {
+  const lane = event.target.closest('.cp-lane, .cc-card');
+  if (lane && !event.target.closest('.cp-detail, .cc-more')) {
     page.open = page.open === lane.dataset.key ? null : lane.dataset.key;
     sfx.play(page.open ? 'expand' : 'collapse');
     drawCrewPage();
