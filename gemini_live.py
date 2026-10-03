@@ -97,7 +97,12 @@ MODELS = tuple(filter(None, (os.environ.get("APOLLO_GEMINI_MODEL"),
                              "gemini-2.5-flash-native-audio-latest",
                              "gemini-2.5-flash-native-audio-preview-09-2025")))
 MODEL = MODELS[0]
-VOICE = "Puck"
+VOICE = os.environ.get("APOLLO_VOICE") or "Puck"
+# Affective dialog: the native-audio model hears how you say things and
+# answers in a tone to match - warmer, livelier, quieter when you are. It is
+# asked for first, and where the key or model does not offer it the session
+# falls back to the plain voice it has always had. APOLLO_EXPRESSIVE=0 skips it.
+EXPRESSIVE = (os.environ.get("APOLLO_EXPRESSIVE") or "1").strip() not in ("0", "false", "no")
 INPUT_RATE = 16000       # what we send
 OUTPUT_RATE = 24000      # what Gemini sends back
 BLOCK = 1600             # 100 ms of input per callback
@@ -132,6 +137,9 @@ SYSTEM_INSTRUCTION = (
     "Character: optimistic, game for a challenge, firm - lead with the move, "
     "answer straight, skip the hedging. Not cheerful filler, not bluster, not "
     "curt, and never longer.\n\n"
+    "Voice: sound like a person, not a reader - natural pace, real warmth, "
+    "energy when the news is good, calm when it is serious, a smile in it when "
+    "they joke. Never flat, never sing-song.\n\n"
     "Doing things: you control this PC through your tools. When the user asks "
     "you to do something - open or close an app or website, play or skip music, "
     "change the volume, move or switch windows, type text, press keys, set a "
@@ -222,7 +230,7 @@ def _remembered(now):
     return "\n\n" + kept if kept else ""
 
 
-def _config(auto_vad=False, tools=None, instruction=None):
+def _config(auto_vad=False, tools=None, instruction=None, expressive=False):
     """The session settings. `auto_vad` picks which of the two modes this is.
 
     Push-to-talk (`auto_vad=False`, the default) tells the model when you are
@@ -284,6 +292,7 @@ def _config(auto_vad=False, tools=None, instruction=None):
         # instead, so a long conversation keeps going and keeps its thread.
         context_window_compression=types.ContextWindowCompressionConfig(
             sliding_window=types.SlidingWindow()),
+        **({"enable_affective_dialog": True} if expressive else {}),
     )
 
 
@@ -724,22 +733,30 @@ class LiveSession:
         self._stop = asyncio.Event()
         self._turn_over = asyncio.Event()
 
-        client = genai.Client(api_key=self._api_key)
         last_error = None
+        # The expressive voice first (it lives on the v1alpha API), then the
+        # plain one, for each model in turn.
+        tries = ([(True, genai.Client(api_key=self._api_key,
+                                      http_options={"api_version": "v1alpha"}))] if EXPRESSIVE else [])
+        tries.append((False, genai.Client(api_key=self._api_key)))
         for model in self._models:
-            connected = False
-            try:
-                async with client.aio.live.connect(
-                        model=model, config=_config(self.auto_vad, self._tools)) as session:
-                    connected = True
-                    self.model = model
-                    await self._serve(session)
-                return
-            except Exception as e:  # noqa: BLE001
-                if connected:
-                    raise
-                last_error = e
-                log.warning("model %s unavailable: %s", model, e)
+            for expressive, client in tries:
+                connected = False
+                try:
+                    async with client.aio.live.connect(
+                            model=model, config=_config(self.auto_vad, self._tools,
+                                                        expressive=expressive)) as session:
+                        connected = True
+                        self.model = model
+                        self.expressive = expressive
+                        await self._serve(session)
+                    return
+                except Exception as e:  # noqa: BLE001
+                    if connected:
+                        raise
+                    last_error = e
+                    log.warning("model %s%s unavailable: %s", model,
+                                " (expressive)" if expressive else "", e)
         raise last_error or RuntimeError("no Gemini Live model is available")
 
     async def _serve(self, session):
