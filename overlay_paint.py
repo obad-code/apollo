@@ -690,7 +690,7 @@ class MiniApollo:
             g.ResetClip()
             well.Dispose()
 
-    def shell(self, g, cx, top, w, h, a, icons=1.0):
+    def shell(self, g, cx, top, w, h, a, icons=1.0, draw_icons=True):
         """The bar at any size - `w` wide, `h` showing under the screen's
         edge at `top` - with the icon row faded by `icons`. Returns the
         well's (x, y, w, h) and its path; the caller disposes the path."""
@@ -707,7 +707,7 @@ class MiniApollo:
         g.DrawPath(b.pen(self.LINE, a * 0.07, 1.0), bar)
         bar.Dispose()
         row_h = self.HEAD_ROW * icons
-        if icons > 0.02:
+        if icons > 0.02 and draw_icons:
             ia = a * icons
             row = top + 4 + self.HEAD_ROW / 2.0
             pill = self._round(x + 12, row - 10, 34, 20, 10)

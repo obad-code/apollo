@@ -607,6 +607,43 @@ const core = { env: 0, talk: 0, listen: 0, spin: 1, turn: 0 };
 let lastFrame = performance.now();
 let ringFrame = null;
 
+function drawCrewApollo(t, env, w, px) {
+  const cv = document.querySelector('#crew-page .cc-apollo');
+  if (!cv) return;
+  const W = Math.round(cv.clientWidth * px), H = Math.round(cv.clientHeight * px);
+  if (!W || !H) return;
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const c = cv.getContext('2d');
+  c.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+  const A = Math.min(W * 0.45, (H * 0.42) / Globe.ASPECT) * (1 + 0.05 * state.levelSmooth);
+  const B = A * Globe.ASPECT;
+  const listening = core.listen > 0.3;
+  c.globalCompositeOperation = 'lighter';
+  c.lineCap = 'round';
+  c.shadowBlur = 10 * px; c.shadowColor = 'rgba(255,240,210,.6)';
+  c.strokeStyle = listening ? 'rgba(127,227,255,.9)' : 'rgba(255,244,222,.85)';
+  c.lineWidth = 1.2 * px;
+  for (const h of Globe.meridians(core.turn)) {
+    c.globalAlpha = 0.3 + 0.35 * (h.near + 1);
+    c.beginPath(); c.ellipse(cx, cy, Math.max(0.01, Math.abs(h.w) * A), B, 0, -Math.PI / 2, Math.PI / 2, h.w < 0); c.stroke();
+  }
+  c.globalAlpha = 0.7;
+  for (const p of Globe.parallels()) { c.beginPath(); c.moveTo(cx - p.half * A, cy + p.y * A); c.lineTo(cx + p.half * A, cy + p.y * A); c.stroke(); }
+  c.globalAlpha = 1; c.lineWidth = 1.5 * px;
+  c.beginPath(); c.ellipse(cx, cy, A, B, 0, 0, Math.PI * 2); c.stroke();
+  const sr = A * (0.2 + 0.08 * state.levelSmooth + 0.08 * w) * (1 + 0.06 * Math.sin(t * 0.002 * core.spin));
+  const halo = c.createRadialGradient(cx, cy, 0, cx, cy, sr * 2.2);
+  halo.addColorStop(0, 'rgba(255,255,255,.6)'); halo.addColorStop(1, 'rgba(255,200,120,0)');
+  c.shadowBlur = 0; c.fillStyle = halo; c.beginPath(); c.arc(cx, cy, sr * 2.2, 0, Math.PI * 2); c.fill();
+  const arms = Globe.star(sr);
+  c.shadowBlur = 18 * px; c.shadowColor = '#fff'; c.fillStyle = '#fff';
+  c.beginPath(); c.moveTo(cx + arms[0].tip[0], cy + arms[0].tip[1]);
+  arms.forEach((arm, i) => { const nx = arms[(i + 1) % arms.length].tip; c.quadraticCurveTo(cx + arm.pinch[0], cy + arm.pinch[1], cx + nx[0], cy + nx[1]); });
+  c.fill();
+  c.globalCompositeOperation = 'source-over'; c.shadowBlur = 0;
+}
+
 function drawRing(now) {
   const dt = Math.min(0.05, (now - lastFrame) / 1000);
   lastFrame = now;
@@ -754,6 +791,8 @@ function drawRing(now) {
     ring.shadowBlur = 0;
   }
   ring.globalCompositeOperation = 'source-over';
+  // Agents mode has Apollo himself above the crew: his globe, drawn small.
+  if (state.view === 'agents') drawCrewApollo(t, env, w, px);
   ringFrame = requestAnimationFrame(drawRing);
 }
 
@@ -1229,26 +1268,54 @@ function renderFeed(snapshot) {
 /* The stories as a drum of pictures, turning slowly - each with its topic's
  * mark when it came without one. Hover: what it is, from where, and whether
  * Private Eye found it. Click: it opens like a row does. */
-function drawFeedWheel(items) {
-  const ring = document.querySelector('#feed-wheel .fw-ring');
-  if (!ring) return;
-  const list = items.slice(0, 12);
-  const n = Math.max(list.length, 6);
-  const tileH = 150;
-  const radius = Math.round((tileH / 2) / Math.tan(Math.PI / n) + 18);
-  ring.style.setProperty('--r', `${radius}px`);
-  ring.innerHTML = list.map((item, i) => {
-    const img = safeImage(item.image);
-    const tag = item.eye ? 'Private Eye' : Feed.topicTag(item.topic, 'all') || item.topic;
-    return `<button type="button" class="fw-tile ${topicClass(item.topic)}${img ? '' : ' bare'}" data-i="${i}"
-        style="--a:${(360 / n) * i}deg">
-      ${img ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('bare');this.remove()">` : ''}
-      <span class="fw-mark">${glyph(item.topic)}</span>
-      <span class="fw-info"><em class="${item.eye ? 'eye' : ''}">${esc(tag)}</em><b>${esc(String(item.title).slice(0, 110))}</b>
-        <small>${esc(item.source)} · ${esc(item.age)}${item.moving ? ' · market-moving' : ''}</small></span>
-    </button>`;
-  }).join('');
+/* The normal display's news as pictures, the way a phone shows stories:
+ * the lead story large, its picture filling the panel, with a row of thin
+ * bars along the top that fill as the stories take turns (every 7s, paused
+ * under the pointer); under it a grid of the rest as small picture tiles.
+ * Hover a tile for what it is; click anything to open it. */
+const feedShow = { at: 0, timer: null, items: [] };
+function feedTile(item, i, big) {
+  const img = safeImage(item.image);
+  const tag = item.eye ? 'Private Eye' : Feed.topicTag(item.topic, 'all') || item.topic;
+  return `<button type="button" class="fw-tile ${topicClass(item.topic)}${img ? '' : ' bare'}${big ? ' big' : ''}" data-i="${i}">
+    ${img ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('bare');this.remove()">` : ''}
+    <span class="fw-mark">${glyph(item.topic)}</span>
+    <span class="fw-info"><em class="${item.eye ? 'eye' : ''}">${esc(tag)}${item.moving ? ' · market-moving' : ''}</em>
+      <b dir="auto">${esc(String(item.title).slice(0, 140))}</b><small>${esc(item.source)} · ${esc(item.age)}</small></span>
+  </button>`;
 }
+function drawFeedWheel(items) {
+  const box = $('feed-wheel');
+  if (!box) return;
+  feedShow.items = items.slice(0, 6);
+  feedShow.at = Math.min(feedShow.at, Math.max(0, feedShow.items.length - 1));
+  const list = feedShow.items;
+  box.innerHTML = list.length ? `
+    <div class="fw-lead">${list.map((it, i) => feedTile(it, i, true)).join('')}
+      <div class="fw-bars">${list.map((_, i) => `<i data-b="${i}"><b></b></i>`).join('')}</div></div>
+    <div class="fw-grid">${list.map((it, i) => feedTile(it, i, false)).join('')}</div>`
+    : '<p class="quiet">Nothing has come in yet.</p>';
+  showFeedLead(feedShow.at);
+  clearInterval(feedShow.timer);
+  feedShow.timer = setInterval(() => {
+    if (box.matches(':hover') || !feedShow.items.length) return;
+    showFeedLead((feedShow.at + 1) % feedShow.items.length);
+  }, 7000);
+}
+function showFeedLead(i) {
+  feedShow.at = i;
+  const box = $('feed-wheel');
+  box.querySelectorAll('.fw-lead .fw-tile').forEach((t, k) => t.classList.toggle('on', k === i));
+  box.querySelectorAll('.fw-grid .fw-tile').forEach((t, k) => t.classList.toggle('on', k === i));
+  box.querySelectorAll('.fw-bars i').forEach((b, k) => {
+    b.className = k < i ? 'done' : '';
+    if (k === i) { void b.offsetWidth; b.className = 'now'; }
+  });
+}
+$('feed-wheel').addEventListener('mouseover', (event) => {
+  const tile = event.target.closest('.fw-grid .fw-tile');
+  if (tile && Number(tile.dataset.i) !== feedShow.at) showFeedLead(Number(tile.dataset.i));
+});
 
 $('feed-wheel').addEventListener('click', (event) => {
   const tile = event.target.closest('.fw-tile');

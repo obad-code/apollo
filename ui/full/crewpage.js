@@ -87,6 +87,24 @@ const ABOUT = {
   Q: 'Turns "tell Claude to add..." into a GitHub ticket Claude builds from.',
 };
 
+/* How each one works, step by step - shown, animated, when its card opens. */
+export const FLOW = {
+  LYLA: [['Your question', 'a topic, a link, or a job for your accounts'], ['Searches', 'the web, the news, your connected accounts'],
+         ['Writes it up', 'Gemini (or Claude) reads it all and writes it short'], ['Report', 'two lines said aloud, the rest kept in Crew\\LYLA']],
+  THEIA: [['Your idea', 'a plan, a decision, anything to think through'], ['Analyses', 'what it really is and what it needs'],
+          ['Critiques itself', 'turns on its own analysis, hard'], ['Plan + verdict', 'the best way to do it, and whether to']],
+  MONEYPENNY: [['A stock', 'or your whole watchlist'], ['Reads the numbers', 'price, growth, margins, debt, news'],
+               ['Weighs the flags', 'green flags against red'], ['The call', 'BUY MORE · HOLD · PULL MONEY OUT, emailed']],
+  Q: [['"Tell Claude…"', 'a feature or a fix, in your words'], ['Writes a ticket', 'clear title, what and why'],
+      ['Files it', 'an issue on GitHub, obad-code/apollo'], ['Claude builds it', 'and the change comes back to you']],
+};
+
+function flowMarkup(key, at) {
+  return `<div class="cc-flow" style="--n:${FLOW[key].length}">${FLOW[key].map(([title, line], i) => `
+    <div class="cf-step${at === i ? ' live' : ''}" style="--i:${i}"><i class="cf-dot"></i>
+      <b>${esc(title)}</b><span>${esc(line)}</span></div>`).join('')}<i class="cf-runner"></i></div>`;
+}
+
 function card(key, a, open, now) {
   const at = stageOf(a);
   const h = health(a, now);
@@ -111,11 +129,11 @@ function card(key, a, open, now) {
     </div>
     <div class="cc-bottom">${lower}</div>
     ${open ? `<div class="cc-more">
+      <h4>HOW IT WORKS</h4>${flowMarkup(key, a.working ? Math.min(stageOf(a), 3) : -1)}
       <h4>${a.working ? 'LIVE' : 'RESULTS'}</h4>
       ${a.working ? `<ul>${steps.map((x) => `<li>· ${esc(short(x.text || x.stage, 70))}</li>`).join('') || '<li>Starting…</li>'}</ul>`
         : results.length ? `<ul>${results.map((r) => `<li><button type="button" class="cp-open" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}">${esc(short(r.summary || r.task, 60))} ›</button></li>`).join('')}</ul>`
           : '<p>No results yet.</p>'}
-      <h4>TAKES</h4><p>${esc(IO[key][0])}</p><h4>GIVES</h4><p>${esc(IO[key][1])}</p>
     </div>` : ''}
   </article>`;
 }
@@ -130,7 +148,7 @@ function renderCards(root, board, t, look, open, now) {
         <span><i class="cp-led${t.errors ? ' bad' : ''}"></i><b>${t.errors}</b> errors</span></div>
       ${looks(look)}
     </header>
-    <div class="cc-hub"><span class="cp-node apollo">APOLLO</span></div>
+    <div class="cc-hub"><canvas class="cc-apollo" width="320" height="200" aria-label="Apollo"></canvas><span class="cp-node apollo">APOLLO</span></div>
     <svg class="cc-wires" aria-hidden="true"></svg>
     <div class="cc-row">${KEYS.map((key) => card(key, agents[key] || {}, open === key, now)).join('')}</div>
     <footer class="cp-foot">
@@ -167,15 +185,19 @@ function cardWires(root, agents) {
 }
 
 export const LOOKS = ['minimal', 'console', 'y2k'];
-const looks = (look) => `<div class="cp-looks" role="group" aria-label="Look">
+const looks = () => '';  // one look for now; the others are kept below
+const looksSwitch = (look) => `<div class="cp-looks" role="group" aria-label="Look">
   ${LOOKS.map((l) => `<button type="button" data-look="${l}" class="${look === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}
 </div>`;
 
 export function render(root, board = {}, { look = 'cards', open = null } = {}) {
   // Every look is the cards; the looks only dress them differently.
-  look = LOOKS.includes(look) ? look : 'minimal';
+  look = 'minimal';
   {
-    root.className = `cp look-cards look-${look}`;
+    // Entrances play once; the 4-second refreshes redraw without replaying them.
+    const settled = root.dataset.drawn === look + ':' + (open || '');
+    root.dataset.drawn = look + ':' + (open || '');
+    root.className = `cp look-cards look-${look}${settled ? ' settled' : ''}`;
     renderCards(root, board, totals(board), look, open, board.now || Date.now() / 1000);
     return;
   }
