@@ -1699,7 +1699,8 @@ def tool_runner(ui):
                             tab_hook=getattr(ui, "tab", None),
                             away_hook=getattr(ui, "going_out", None),
                             osiris_hook=getattr(ui, "ask_osiris", None),
-                            display_hook=getattr(ui, "ask_display", None))
+                            display_hook=getattr(ui, "ask_display", None),
+                            explain_hook=getattr(ui, "explain", None))
         return tools.run(name, args, ctx)
     return run
 

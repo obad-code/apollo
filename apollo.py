@@ -859,9 +859,21 @@ class WebReporter:
         self.on_partial(text)
 
     def visual(self, visual):
-        """A chart or cards from a tool. Native overlay only, like `partial`."""
+        """A chart or cards from a tool: on the overlay, and in the full
+        display's explanation box (a tool's thread, so the page call is fine)."""
         if self.on_visual is not None and visual:
             self.on_visual(visual)
+        if visual:
+            self._call("visual", visual)
+
+    def explain(self, payload):
+        """A picture, steps or text for the display's explanation box. True if
+        the display is up to show it."""
+        if not payload or not self.alive:
+            return False
+        self._call("explain", payload)
+        app = self._app
+        return app is None or app.desired_mode() == Overlay.FULL
 
     def activity(self, text):
         """What Apollo is doing right now, in a few words ("fetching NVDA").

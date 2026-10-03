@@ -71,7 +71,8 @@ class Context:
 
     def __init__(self, show=None, activity=None, turn=None, refresh=None,
                  panels_hook=None, story_hook=None, stock_hook=None, idle_hook=None,
-                 tab_hook=None, away_hook=None, osiris_hook=None, display_hook=None):
+                 tab_hook=None, away_hook=None, osiris_hook=None, display_hook=None,
+                 explain_hook=None):
         self.show = show or (lambda visual: None)
         self.activity = activity or (lambda text: None)
         # False by default, so a tool that changes the display can tell the
@@ -85,6 +86,8 @@ class Context:
         self.away = away_hook or (lambda: False)
         self.osiris = osiris_hook or (lambda on: False)
         self.display = display_hook or (lambda request: False)
+        # A picture, steps or text put in the display's explanation box.
+        self.explain = explain_hook or (lambda payload: False)
         self.turn = current_turn() if turn is None else turn
 
 
@@ -1367,3 +1370,50 @@ def _use_connectors(ctx, task):
     if not connectors.load():
         return {"ok": False, "error": "No connectors are set up yet - see the README, Connectors."}
     return _handed("LYLA", lyla.DESK.take(task, connectors=True))
+
+
+# --- showing things -------------------------------------------------------------
+
+import images  # noqa: E402
+
+
+@_tool("show_image", "drawing it",
+       "Draw a picture and show it to the user in the explanation box on the "
+       "display: a diagram, an illustration, a poster, \"what does X look like\", "
+       "\"ارسم لي\", \"وريني صورة\". Describe the picture in detail in English. It "
+       "is also saved to Pictures\\Apollo. Then say one short sentence about it.",
+       _obj({"prompt": _str("What to draw, described in detail"),
+             "caption": _str("A short caption, in the user's language")}, ("prompt",)))
+def _show_image(ctx, prompt, caption=""):
+    ctx.activity("drawing it")
+    made = images.make(prompt)
+    shown = ctx.explain({"image": {"src": made["src"], "caption": caption}})
+    return {"ok": True, "result": "Shown on the display." if shown else
+            ("Drawn and saved, but the display is not up. Offer to bring it up "
+             "(focus_display) to see it."), "saved": made["path"]}
+
+
+@_tool("explain_visually", "laying it out",
+       "Explain something as a picture on the display: a title and two to six "
+       "steps or parts, each a short title and one line - how something works, the "
+       "steps of a process, the parts of an idea. Use it whenever a visual would "
+       "teach better than words: \"how does X work\", \"اشرح لي بالرسم\", "
+       "\"what are the steps\". Speak a short version while it is on screen. Add "
+       "figures (label and value) when there are numbers worth showing.",
+       _obj({"title": _str("What is being explained"),
+             "steps": {"type": "array", "description": "2-6 steps or parts, in order",
+                       "items": {"type": "object", "properties": {
+                           "title": {"type": "string"}, "text": {"type": "string"}}}},
+             "figures": {"type": "array", "description": "Optional numbers worth showing",
+                         "items": {"type": "object", "properties": {
+                             "label": {"type": "string"}, "value": {"type": "string"}}}}},
+            ("title", "steps")))
+def _explain_visually(ctx, title, steps, figures=None):
+    clean = [{"title": str(s.get("title", ""))[:80], "text": str(s.get("text", ""))[:200]}
+             for s in steps if isinstance(s, dict) and (s.get("title") or s.get("text"))][:6]
+    if len(clean) < 2:
+        return {"ok": False, "error": "Give at least two steps."}
+    cards = [{"label": str(f.get("label", ""))[:24].upper(), "value": str(f.get("value", ""))[:16]}
+             for f in (figures or []) if isinstance(f, dict) and f.get("label") and f.get("value")][:6]
+    shown = ctx.explain({"title": str(title)[:90], "steps": clean, "cards": cards})
+    return {"ok": True, "result": "On the display." if shown else "The display is not up."}
