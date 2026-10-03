@@ -13,13 +13,13 @@
  * corner, and the box a scaled panel needs. app.js does the hands and the
  * motion. */
 
-export const PANELS = ['today', 'markets', 'system', 'core', 'lyla', 'feed', 'scan',
+export const PANELS = ['today', 'markets', 'system', 'core', 'lyla', 'feed', 'scan', 'crew',
   'console-left', 'console-right'];
 
 // The element each one is on the page.
 export const ELEMENT = {
   today: 'clock-block', markets: 'markets', system: 'status-block', core: 'core',
-  lyla: 'lyla-block', feed: 'headlines', scan: 'scan-block',
+  lyla: 'lyla-block', feed: 'headlines', scan: 'scan-block', crew: 'crew-mini',
   'console-left': 'console-left', 'console-right': 'console-right',
 };
 

@@ -544,8 +544,8 @@ class Orb:
 
     # -- Mini Apollo's bar: eyes at rest, Apollo while you talk, words in it --
 
-    ISLAND_REST = (96, 34)         # short, like a camera notch: Apollo in the middle
-    ISLAND_ON = (156, 34)          # chat and + either side of him
+    ISLAND_REST = (66, 26)         # small, like a camera notch: Apollo in the middle
+    ISLAND_ON = (150, 30)          # talking: Apollo to the left, chat and + to the right
     ISLAND_TEXT_W = 540            # the bar, with what is said in its well
     ISLAND_LINES = 4
     ISLAND_LH = 22
@@ -636,14 +636,21 @@ class Orb:
         icons = max(0.0, min(1.0, self._isl_icons.value))
         well_box, well = self.mini.shell(g, cx, self.overhang, w, h, a, 1.0, draw_icons=False)
         x0 = cx - w / 2.0
-        row = self.overhang + 4 + overlay_paint.MiniApollo.HEAD_ROW / 2.0
-        spin = 5.0 if self.view.state == overlay_state.SEARCHING else 1.0
-        self.mark.draw_at(g, cx, row, 8.5 + 1.5 * self._level, t * spin, level=self._level, fade=fade)
+        row = self.overhang + min(h, 30) / 2.0
+        icons = max(0.0, min(1.0, self._isl_icons.value))
+        # Apollo slides from the middle to the left as the icons come in, and
+        # reacts while you talk: bigger with your voice, a quick pulse, faster.
+        listening = self.view.state == overlay_state.LISTENING
+        spin = 5.0 if self.view.state == overlay_state.SEARCHING else (2.5 if listening else 1.0)
+        ax = cx * (1 - icons) + (x0 + 20) * icons
+        pulse = (0.9 + 0.25 * abs(math.sin(t * 6.0))) if listening else 1.0
+        r = (7.5 + 4.0 * self._level) * pulse
+        self.mark.draw_at(g, ax, row, r, t * spin, level=max(self._level, 0.6 if listening else 0.0), fade=fade)
         self._hits = {}
         if icons > 0.02:
             ia = a * icons
             hover = getattr(self, "_hover", None)
-            for name, ix in (("chat", cx - 46), ("plus", cx + 46)):
+            for name, ix in (("chat", x0 + w - 48), ("plus", x0 + w - 22)):
                 if hover == name:
                     pill = self.mini._round(ix - 11, row - 10, 22, 20, 10)
                     g.FillPath(self.mini.brushes.brush(self.mini.LINE, ia * 0.14), pill)
