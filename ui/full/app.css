@@ -2932,3 +2932,8 @@ body:not(.ultra) #status-block:not(:hover) :is(#gauges, #system-line) { display:
 .look-console .cp-g span { margin-top: 4px; font-size: 9.5px; letter-spacing: .2em; color: #9693a5; }
 @media (prefers-reduced-motion: reduce) { .cp-run, .look-console .cp-g::before, .look-console .cp-step.now i { animation: none; } }
 .look-console .cp-foot { margin-top: auto; } .look-console .cp-flow { margin-bottom: 22px; }
+/* An open stock scrolls: the verdict and its flags sit under the chart. */
+#stock { overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+#stock > * { flex: none; }
+#stock::before { position: fixed; }
+#stock .stock-hint { margin-top: 10px; font-size: 10.5px; letter-spacing: .08em; opacity: .4; text-align: center; }

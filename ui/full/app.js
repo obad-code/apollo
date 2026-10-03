@@ -1629,7 +1629,8 @@ function stockMarkup(quote) {
     <div class="actions">
       <button class="drop" data-act="drop">Remove from watchlist</button>
       <button class="back" data-act="back">Back to the list</button>
-    </div>`;
+    </div>
+    <p class="stock-hint">Right-click or Esc to go back</p>`;
 }
 
 /* The chart across the open stock, drawn in again for every span - and, while
@@ -1934,6 +1935,16 @@ $('watchlist').addEventListener('click', (event) => {
   else if (row.classList.contains('rest')) setFolded(false);
   else if (row.dataset.symbol && !row.classList.contains('pending')) openStock(row.dataset.symbol);
 });
+// A right-click anywhere on an open stock takes you back to the list.
+$('stock').addEventListener('contextmenu', (event) => {
+  if (!state.stock) return;
+  event.preventDefault();
+  closeStock();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && state.stock) closeStock();
+});
+
 $('stock').addEventListener('click', (event) => {
   const span = event.target.closest('[data-span]');
   if (span) { loadSpan(span.dataset.span); return; }
