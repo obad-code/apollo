@@ -198,7 +198,7 @@ def test_it_says_where_it_went_and_how_long_it_took(tmp_path):
         agent.live({ stage: 'done', text: 'Your notes are sorted.', ms: 1840 });
         clock.advance(300);
         return [asking, line(), latency()];""")
-    assert "Claude" in lines[0]
+    assert lines[0] == "LYLA is thinking it through…"
     assert "1840 ms" in lines[1] and "Your notes are sorted." in lines[1]
     assert lines[2] == "1840 ms"
 
@@ -259,20 +259,19 @@ def test_a_job_from_apollo_shows_each_step_and_her_brain(tmp_path):
     assert lines[4] == "Gemini · lyla.py"
 
 
-# --- the other agents, as previews, and every agent's mark ---------------------------------
+# --- the crew, and every agent's mark ----------------------------------------------
 
 def test_four_agents_each_in_a_colour_of_its_own(tmp_path):
     looks = run(tmp_path, "return Object.values(A.LOOKS).map((l) => [l.key, l.hex, Boolean(l.preview)]);")
-    assert [l[0] for l in looks] == ["LYLA", "ATLAS", "NOVA", "ECHO"]
+    assert [l[0] for l in looks] == ["LYLA", "THEIA", "MONEYPENNY", "Q"]
     assert len({l[1] for l in looks}) == 4
-    assert [l[2] for l in looks] == [False, True, True, True]     # only LYLA is real
+    assert [l[2] for l in looks] == [False, False, False, False]     # all of them are real now
 
 
-def test_a_preview_agent_s_card_is_in_its_colours_and_says_what_it_is(tmp_path):
-    html = run(tmp_path, "return A.markup(A.LOOKS.ATLAS);")
-    assert "#FF7A1A" in html and "#0052FF" not in html and "0,82,255" not in html
-    assert "ATLAS · AGENT PIPELINE · PREVIEW" in html and "not built yet" in html
-    assert "The plan" in html and 'id="atlas-arrow"' in html
+def test_a_crew_card_is_in_its_colours_and_says_what_it_is(tmp_path):
+    html = run(tmp_path, "return A.markup(A.LOOKS.THEIA);")
+    assert "#A855F7" in html and "#0052FF" not in html and "0,82,255" not in html
+    assert "THEIA · AGENT PIPELINE" in html and "Critique" in html and 'id="theia-arrow"' in html
 
 
 def test_lylas_card_is_hers_unless_told(tmp_path):
@@ -281,20 +280,19 @@ def test_lylas_card_is_hers_unless_told(tmp_path):
 
 
 def test_each_mark_is_its_own_shape(tmp_path):
-    marks = run(tmp_path, "return ['LYLA', 'ATLAS', 'NOVA', 'ECHO'].map((k) => A.emblem(k, 40));")
+    marks = run(tmp_path, "return ['LYLA', 'THEIA', 'MONEYPENNY', 'Q'].map((k) => A.emblem(k, 40));")
     assert len(set(marks)) == 4
-    for mark, colour in zip(marks, ("#5B8CFF", "#FF7A1A", "#E83EFF", "#18E0C2")):
+    for mark, colour in zip(marks, ("#5B8CFF", "#C084FC", "#34D399", "#FF9A4D")):
         assert mark.startswith("<svg") and colour in mark and 'width="40"' in mark
 
 
-def test_a_preview_never_goes_live_and_runs_its_own_lines(tmp_path):
-    live, first, next_line = run(tmp_path, """
+def test_a_crew_card_goes_live_on_its_first_job(tmp_path):
+    live, line = run(tmp_path, """
         const root = new El(), clock = new Clock();
-        const card = new A.LylaAgent(root, { timers: clock, look: A.LOOKS.ECHO });
-        const first = root.querySelector('.agent-line').textContent;
+        const card = new A.LylaAgent(root, { timers: clock, look: A.LOOKS.MONEYPENNY });
         card.show();
-        card.live({ stage: 'received', text: 'hey' });
-        clock.advance(A.MESSAGE_EVERY + 300);
-        return [card.isLive, first, root.querySelector('.agent-line').textContent];""")
-    assert live is False
-    assert first.startswith("Asked:") and next_line.startswith("Searching")
+        card.live({ stage: 'received', text: 'review my watchlist', by: 'Apollo' });
+        clock.advance(400);
+        return [card.isLive, root.querySelector('.agent-line').textContent];""")
+    assert live is True
+    assert line == 'From Apollo: "review my watchlist"'

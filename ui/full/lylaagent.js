@@ -19,8 +19,8 @@
  *
  * The same card serves every agent, each in its own look (LOOKS): its
  * colour, what goes in and what comes out, its lines. LYLA's is the real
- * one; ATLAS, NOVA and ECHO are previews of agents not built yet, to see
- * how they will look - they never go live. Each has a mark of its own too
+ * one, and THEIA, MONEYPENNY and Q go live the same way the first time
+ * Apollo hands one of them a job (crew.py). Each has a mark of its own too
  * (`emblem`), the shape agents mode lists them by. */
 
 export const MESSAGES = [
@@ -75,56 +75,57 @@ export const LOOKS = {
     stack: ['Claude · Pinecone', 'Gemini · lyla.py'],
     meta: '3 agents · 0 errors', workflows: FIRST_WORKFLOWS, messages: MESSAGES,
   },
-  ATLAS: {
-    key: 'ATLAS', role: 'Planner', rgb: '255,122,26', hex: '#FF7A1A', light: '255,164,96', deep: '#1A0B02',
-    preview: true,
-    trigger: 'Your goal', read: ['MAPPING', 'Calendar · projects', 'atlas.py'], brain: 'route planner',
-    outputs: [['The plan', '#22c55e'], ['Reminders', '#f59e0b'], ['Calendar', '#f59e0b']],
-    stack: 'Planner · calendar', meta: 'not built yet', workflows: 318,
+  THEIA: {
+    key: 'THEIA', role: 'Professor', rgb: '168,85,247', hex: '#A855F7', light: '205,160,255', deep: '#12061C',
+    mark: '#C084FC', file: 'crew.py',
+    trigger: [['TRIGGER', 'TRIGGER'], ['An idea', 'A job'], ['node-theia', 'Apollo · you']],
+    read: [['THINKING', 'THINKING'], ['Analyse · critique', 'Analyse · critique'], ['3 passes', 'crew.py']],
+    brain: ['gemini', 'gemini · claude'],
+    outputs: [[['Analysis', 'Analysis'], '#22c55e'], [['Critique', 'Critique'], '#f59e0b'],
+              [['Best way', 'Best way'], '#f59e0b']],
+    stack: ['Gemini · Claude', 'Gemini · crew.py'], meta: 'professor · ready', workflows: 0,
     messages: [
-      'Goal received: "Ship the Apollo update by Friday"',
-      'Mapping the week: 14 free hours across 4 days',
-      'Breaking the goal down → 6 steps, 2 depend on others',
-      'Route found: critical path is 3 steps, 9h of work',
-      'Placing steps round prayer times and your usual breaks',
-      'Reminder set: "Start the trading tests" - Wed 16:00',
-      'Calendar: 3 blocks added, 1 moved to make room',
-      'Plan ready: on track for Thursday night, a day spare',
-      'Idle. Waiting for the next goal...',
+      'Idea received: "Should Apollo get a phone app?"',
+      'Pass 1 - analysis: what it needs, what it costs, who it serves',
+      'Pass 2 - critique: battery, a second login, a store review',
+      'Pass 3 - the best way: a web page first, the app after',
+      'Verdict: worth it, staged - confidence medium',
+      'Idle. Waiting for the next idea...',
     ],
   },
-  NOVA: {
-    key: 'NOVA', role: 'Creator', rgb: '232,62,255', hex: '#E83EFF', light: '240,140,255', deep: '#15041A',
-    preview: true,
-    trigger: 'An idea', read: ['MOODBOARD', 'Your ideas · refs', 'nova.py'], brain: 'drafting',
-    outputs: [['Draft', '#22c55e'], ['Visuals', '#f59e0b'], ['Post', '#f59e0b']],
-    stack: 'Writer · image model', meta: 'not built yet', workflows: 96,
+  MONEYPENNY: {
+    key: 'MONEYPENNY', role: 'Markets', rgb: '16,185,129', hex: '#10B981', light: '110,231,183', deep: '#02140D',
+    mark: '#34D399', file: 'crew.py',
+    trigger: [['TRIGGER', 'TRIGGER'], ['A stock', 'A job'], ['node-moneypenny', 'Apollo · you']],
+    read: [['READING', 'READING'], ['Price · desk · insiders', 'Price · desk · insiders'], ['market.py', 'crew.py']],
+    brain: ['gemini', 'gemini'],
+    outputs: [[['Verdict', 'Verdict'], '#22c55e'], [['Red flags', 'Red flags'], '#f59e0b'],
+              [['Ranking', 'Ranking'], '#f59e0b']],
+    stack: ['Gemini · market data', 'Gemini · crew.py'], meta: 'markets desk · ready', workflows: 0,
     messages: [
-      'Idea received: "A teaser for Apollo\'s trading desk"',
-      'Pulling your saved ideas → 3 match, tone: bold, short',
-      'Moodboard: green on ink, terminal type, a live dot',
-      'Drafting 3 hooks, keeping the best under 12 words',
-      'Visual: 1600×900 frame of the desk, verdict in the head',
-      'Draft ready: 58 words, 2 variants for you to pick',
-      'Post queued as a draft - nothing goes out without you',
-      'Idle. Waiting for the next spark...',
+      'Job: "Review my watchlist - what should I sell?"',
+      'Reading NVDA: price, valuation, the desk, insiders',
+      'Reading TSLA: 3 insiders sold this month',
+      'Verdicts: NVDA buy · AMD hold · TSLA trim',
+      'Red flag on TSLA: margins down 4 quarters running',
+      'Ranking ready: pull from TSLA first',
+      'Idle. Watching the tape...',
     ],
   },
-  ECHO: {
-    key: 'ECHO', role: 'Memory', rgb: '24,224,194', hex: '#18E0C2', light: '110,240,222', deep: '#021614',
-    preview: true,
-    trigger: 'A question', read: ['RECALL', 'Journal · talks', 'echo.py'], brain: 'remembering',
-    outputs: [['The answer', '#22c55e'], ['Notes', '#f59e0b'], ['Journal', '#f59e0b']],
-    stack: 'Journal · embeddings', meta: 'not built yet', workflows: 2041,
+  Q: {
+    key: 'Q', role: 'Quartermaster', rgb: '255,122,26', hex: '#FF7A1A', light: '255,164,96', deep: '#1A0B02',
+    mark: '#FF9A4D', file: 'crew.py',
+    trigger: [['TRIGGER', 'TRIGGER'], ['A request', 'A request'], ['node-q', 'Apollo · you']],
+    read: [['WRITING', 'WRITING'], ['The ticket', 'The ticket'], ['github', 'github']],
+    brain: ['gemini', 'gemini'],
+    outputs: [[['Issue', 'Issue'], '#22c55e'], [['@claude', '@claude'], '#f59e0b'],
+              [['Journal', 'Journal'], '#f59e0b']],
+    stack: ['Gemini · GitHub', 'Gemini · GitHub'], meta: 'quartermaster · ready', workflows: 0,
     messages: [
-      'Asked: "What did I decide about the X token last week?"',
-      'Searching 6 days of the journal → 41 moments',
-      'Recall: 3 talks mention X, the latest on Tuesday',
-      'Found it: "keep X off until the desk proves itself"',
-      'Linking: the trading desk went live the same day',
-      'Answer ready, with the two talks it came from',
-      'Note filed under Trading → decisions',
-      'Idle. Listening, remembering...',
+      'Request: "Tell Claude to add a clock to the HUD"',
+      'Writing the ticket: what, why, how to tell it works',
+      'Filed: issue #42 on obad-code/apollo, @claude asked',
+      'Idle. Waiting for the next request...',
     ],
   },
 };
@@ -132,8 +133,8 @@ export const LOOKS = {
 /* Two ways of saying a label: [preview, live] or the same for both. */
 const both = (label) => (Array.isArray(label) ? label : [label, label]);
 
-/* Each agent's mark, the shape agents mode lists it by: LYLA's lens, ATLAS's
- * compass, NOVA's burst and ECHO's waves, each in its own colour. */
+/* Each agent's mark, the shape agents mode lists it by: LYLA's lens,
+ * THEIA's eye, MONEYPENNY's candles and Q's gear, each in its own colour. */
 export function emblem(key, size = 44) {
   const look = LOOKS[key] || LOOKS.LYLA;
   const c = look.mark || look.hex, soft = `rgba(${look.rgb},0.35)`;
@@ -145,22 +146,24 @@ export function emblem(key, size = 44) {
     }).join('')}Z" fill="none" stroke="${c}" stroke-width="2.4"/>
       <circle cx="32" cy="32" r="11" fill="none" stroke="${c}" stroke-width="2.4"/>
       <circle cx="32" cy="32" r="4" fill="${c}"/>`,
-    // A compass: a ring, its four ticks, the needle - north filled.
-    ATLAS: `<circle cx="32" cy="32" r="25" fill="none" stroke="${soft}" stroke-width="2"/>
-      <path d="M32 3v8M32 53v8M3 32h8M53 32h8" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>
-      <path d="M32 12L39 32H25Z" fill="${c}"/>
-      <path d="M32 52L39 32H25Z" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>`,
-    // A burst of eight points: something new.
-    NOVA: `<path d="${[...Array(16)].map((_, i) => {
-      const a = -Math.PI / 2 + i * Math.PI / 8, r = i % 2 ? 9 : (i % 4 ? 20 : 28);
+    // An eye inside a laurel of arcs: she sees through things.
+    THEIA: `<path d="M8 32C16 19 24 14 32 14s16 5 24 18c-8 13-16 18-24 18S16 45 8 32Z" fill="none" stroke="${c}" stroke-width="2.4" stroke-linejoin="round"/>
+      <circle cx="32" cy="32" r="8" fill="${soft}" stroke="${c}" stroke-width="2.2"/>
+      <circle cx="32" cy="32" r="3.2" fill="${c}"/>
+      <path d="M32 4v5M32 55v5M10 10l4 4M50 50l4 4M54 10l-4 4M14 50l-4 4" stroke="${soft}" stroke-width="2" stroke-linecap="round"/>`,
+    // Three candles climbing: the markets.
+    MONEYPENNY: `<path d="M16 22v26M32 14v30M48 8v26" stroke="${soft}" stroke-width="2" stroke-linecap="round"/>
+      <rect x="11" y="28" width="10" height="14" rx="2" fill="${soft}" stroke="${c}" stroke-width="2"/>
+      <rect x="27" y="20" width="10" height="16" rx="2" fill="${soft}" stroke="${c}" stroke-width="2"/>
+      <rect x="43" y="12" width="10" height="16" rx="2" fill="${c}"/>
+      <path d="M8 56h48" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>`,
+    // A gear with a Q's tail: the workshop.
+    Q: `<path d="${[...Array(16)].map((_, i) => {
+      const a = i * Math.PI / 8, r = i % 2 ? 22 : 27;
       return `${i ? 'L' : 'M'}${(32 + r * Math.cos(a)).toFixed(1)},${(32 + r * Math.sin(a)).toFixed(1)}`;
-    }).join('')}Z" fill="${soft}" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>
-      <circle cx="32" cy="32" r="4.5" fill="${c}"/>`,
-    // Waves going out from a point, and coming back.
-    ECHO: `<circle cx="32" cy="32" r="4.5" fill="${c}"/>
-      <path d="M22 22a14 14 0 0 0 0 20M42 22a14 14 0 0 1 0 20" fill="none" stroke="${c}" stroke-width="2.6" stroke-linecap="round"/>
-      <path d="M15 15a24 24 0 0 0 0 34M49 15a24 24 0 0 1 0 34" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" opacity=".6"/>
-      <path d="M8 9a33 33 0 0 0 0 46M56 9a33 33 0 0 1 0 46" fill="none" stroke="${soft}" stroke-width="2" stroke-linecap="round"/>`,
+    }).join('')}Z" fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round"/>
+      <circle cx="32" cy="32" r="10" fill="${soft}" stroke="${c}" stroke-width="2.4"/>
+      <path d="M37 37l9 9" stroke="${c}" stroke-width="3" stroke-linecap="round"/>`,
   };
   return `<svg class="emblem emblem-${look.key.toLowerCase()}" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">${shapes[look.key]}</svg>`;
 }
@@ -324,10 +327,10 @@ export class LylaAgent {
     } else if (stage === 'step') {
       this.say(`${short(text, 70)}…`);
     } else if (stage === 'asking') {
-      this.say(text ? `${short(text, 60)}…` : 'Routed to LYLA - called by name. Asking Claude…');
+      this.say(text ? `${short(text, 60)}…` : `${this.look.key} is thinking it through…`);
     } else if (stage === 'done') {
       if (brain) {
-        this.stack.textContent = `${brain} · lyla.py`;
+        this.stack.textContent = `${brain} · ${this.look.file || 'lyla.py'}`;
         this.brain.textContent = brain.toLowerCase();
       }
       const took = Math.round(Number(ms) || 0);

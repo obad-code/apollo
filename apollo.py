@@ -123,6 +123,8 @@ import journal  # noqa: E402
 import hud  # noqa: E402
 import live  # noqa: E402
 import lyla  # noqa: E402
+import crew  # noqa: E402
+import youtube  # noqa: E402
 import private_eye  # noqa: E402
 import scanner  # noqa: E402
 import projects  # noqa: E402
@@ -1195,6 +1197,10 @@ class Api:
         working = lyla.DESK.current
         return {"reports": lyla.DESK.reports[:8],
                 "working": {"task": working["task"], "symbol": working["symbol"]} if working else None}
+
+    def crew_status(self):
+        """Every agent: its role, what it is on, what waits, its reports."""
+        return crew.status()
 
     def set_panel(self, name, shown):
         """A panel shown or hidden from the display itself - LYLA's room, by
@@ -2294,10 +2300,13 @@ class Apollo:
         # LYLA's desk: the research Apollo hands her runs on her own thread,
         # her card shows each step, and when she is done Apollo says what she
         # found - after any turn in progress, like a reminder (lyla.py).
-        lyla.DESK.configure(
+        crew.configure(
             tell=ui.agent,
-            report=lambda job: assistant.report_lyla(ui, self.voice, job),
+            report=lambda job: assistant.report_agent(ui, self.voice, job),
             gate=assistant.TURN_GATE)
+        youtube.DOWNLOADS.configure(
+            report=lambda job: assistant.report_download(ui, self.voice, job),
+            gate=assistant.TURN_GATE, tell=ui.agent)
 
         # Say hello, so you know the mic is live before you ever press a key.
         assistant.greet(ui)

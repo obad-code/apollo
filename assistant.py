@@ -761,12 +761,12 @@ def _note_usage(response):
         pass
 
 
-def ask_once(system, prompt, max_tokens=2000):
+def ask_once(system, prompt, max_tokens=2000, model=None):
     """One plain question to Claude - no tools, no chat history - and the
     text of its answer. For Apollo's own background work (see `interests`),
     not for anything you say to it."""
-    response = _send(dict(model=CLAUDE_MODEL, max_tokens=max_tokens, system=system,
-                          messages=[{"role": "user", "content": prompt}]))
+    response = _send(dict(model=model or CLAUDE_MODEL, max_tokens=max_tokens, system=system,
+                          messages=[{"role": "user", "content": prompt}]), stream=True)
     return _text_of(response)
 
 
@@ -1760,27 +1760,48 @@ def fire_prayer(ui, voice, name, when, lead_minutes):
              f"{name} at {when.strftime('%H:%M')}")
 
 
-def report_lyla(ui, voice, job):
-    """LYLA is done with a job Apollo handed her: Apollo says what she found,
-    in his voice and your language, and her card has the rest. Runs holding
-    TURN_GATE (lyla.Desk), so it waits for any turn in progress to end."""
+def report_agent(ui, voice, job):
+    """An agent is done with a job Apollo handed it: Apollo says what it
+    found, in his voice and your language, and its card has the rest. Runs
+    holding TURN_GATE (see lyla.Desk), so it waits for any turn in progress."""
+    who = job.get("agent") or agents.LYLA
     task = job.get("task", "")
     if job.get("ok"):
-        journal.answered(job["summary"] + "\n\n" + job["report"], who=agents.LYLA)
+        journal.answered(job["summary"] + "\n\n" + job["report"], who=who)
         instruction = (
-            f"LYLA, your research agent, has finished the job you handed her: "
-            f"\"{task}\". Her summary: {job['summary']} Tell the user in two or "
-            f"three short sentences, starting with that LYLA is done, in the "
+            f"{who}, one of your agents, has finished the job you handed it: "
+            f"\"{task}\". Its summary: {job['summary']} Tell the user in two or "
+            f"three short sentences, starting with that {who} is done, in the "
             f"language they last spoke - their dialect if it was Arabic. If it is "
-            f"about a stock, say it is a read, not advice. Her full report is "
-            f"there if they ask for more (lyla_findings).")
-        fallback = f"LYLA is done: {job['summary']}"
+            f"about a stock, say it is a read, not advice. The full report is "
+            f"there if they ask for more (crew_findings).")
+        fallback = f"{who} is done: {job['summary']}"
     else:
         instruction = (
-            f"LYLA, your research agent, could not finish the job you handed her: "
+            f"{who}, one of your agents, could not finish the job you handed it: "
             f"\"{task}\" ({job.get('error', 'no reason given')}). Tell the user in "
             f"one short sentence, in the language they last spoke.")
-        fallback = f"LYLA couldn't finish that: {job.get('error', '')}"
+        fallback = f"{who} couldn't finish that: {job.get('error', '')}"
+    announce(ui, voice, instruction, fallback)
+
+
+report_lyla = report_agent      # the name the desk was first wired with
+
+
+def report_download(ui, voice, job):
+    """LYLA's download is saved, or it is not."""
+    if job.get("ok"):
+        journal.answered(f"Downloaded {job.get('title', '')} to {job.get('path', '')}",
+                         who=agents.LYLA)
+        instruction = (f"LYLA has finished downloading \"{job.get('title') or job['what']}\" "
+                       f"to the user's {'Music' if job.get('audio') else 'Videos'}\\Apollo "
+                       f"folder. Tell them in one short sentence, in the language they "
+                       f"last spoke.")
+        fallback = f"LYLA saved {job.get('title', 'it')}."
+    else:
+        instruction = (f"LYLA could not download \"{job['what']}\" ({job.get('error', '')}). "
+                       f"Tell the user in one short sentence, in the language they last spoke.")
+        fallback = f"LYLA couldn't download that: {job.get('error', '')}"
     announce(ui, voice, instruction, fallback)
 
 
@@ -1849,11 +1870,9 @@ def agent_interrupt(ui):
     an empty answer for the loop to hand to the agent.
     """
     def heard(said):
-        name = agents.detect(said)
-        if name is None:
-            return False
-        ui.note(f"{name} summoned - standing Gemini down.")
-        return True
+        # A name no longer stands Gemini down: Apollo answers, in his one
+        # voice, and hands the job to the agent himself (see `agents`).
+        return False
 
     return heard
 
@@ -2147,9 +2166,12 @@ def main():
     reminders.start_watcher(lambda r, late: fire_reminder(ui, voice, r, late),
                             TURN_GATE, lambda: False)
 
-    import lyla
-    lyla.DESK.configure(tell=getattr(ui, "agent", None),
-                        report=lambda job: report_lyla(ui, voice, job), gate=TURN_GATE)
+    import crew
+    import youtube
+    crew.configure(tell=getattr(ui, "agent", None),
+                   report=lambda job: report_agent(ui, voice, job), gate=TURN_GATE)
+    youtube.DOWNLOADS.configure(report=lambda job: report_download(ui, voice, job),
+                                gate=TURN_GATE, tell=getattr(ui, "agent", None))
 
     import clips
     buffer = clips.ReplayBuffer().start()

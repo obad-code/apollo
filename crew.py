@@ -1,0 +1,227 @@
+"""Apollo's crew: the four agents he hands work to.
+
+    LYLA        research and media - finds things out, gathers sources,
+                downloads videos (lyla.py, youtube.py)
+    THEIA       the professor - takes any idea and analyses it: what it is,
+                what is wrong with it, and the best way to do it
+    MONEYPENNY  the markets desk - one stock or the whole watchlist: a
+                verdict from Strong Buy to Sell, the reasons and the red flags
+    Q           the quartermaster - turns a request for a new feature or a
+                fix into a ticket for Claude to build (github_requests.py)
+
+Each one is a `lyla.Desk`: a queue of jobs on a thread of its own, a card on
+the display that shows each step, and a report Apollo passes on in his own
+voice when the job is done. There is one voice: an agent never speaks, it
+writes, and Apollo tells you.
+
+Cost. THEIA does in one call what a team of three would do in three: she
+analyses, then turns on her own analysis as a critic, then writes the plan
+that survives it. That is most of a team's quality for the price of one
+agent. `deep=True` (the user said "تحليل عميق" / "deep analysis") puts a
+stronger model on it - Claude, if ANTHROPIC_API_KEY is set - and only then.
+"""
+
+import logging
+import os
+
+import lyla
+
+log = logging.getLogger("apollo.crew")
+
+LYLA = lyla.NAME
+THEIA = "THEIA"
+MONEYPENNY = "MONEYPENNY"
+Q = "Q"
+NAMES = (LYLA, THEIA, MONEYPENNY, Q)
+
+ROLES = {
+    LYLA: "Research & media",
+    THEIA: "Professor · analyst",
+    MONEYPENNY: "Markets desk",
+    Q: "Quartermaster · builds",
+}
+
+_HERE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "Apollo")
+
+# The cheap brain first, for every everyday job.
+FAST_MODELS = tuple(filter(None, (os.environ.get("CREW_MODEL"),
+                                  "gemini-flash-latest", "gemini-2.5-flash")))
+DEEP_GEMINI = tuple(filter(None, (os.environ.get("CREW_DEEP_MODEL"),
+                                  "gemini-pro-latest", "gemini-2.5-pro"))) + FAST_MODELS
+DEEP_CLAUDE = os.environ.get("THEIA_CLAUDE_MODEL") or "claude-opus-5-5"
+
+SUMMARY_RULE = (
+    "Answer in exactly this shape. The first line is `SUMMARY:` and two short "
+    "sentences Apollo can say out loud, in the language the job was given in "
+    "(Saudi dialect if it was Arabic). Then a blank line, then the report: short "
+    "sections under plain headings.")
+
+THEIA_SYSTEM = (
+    "You are THEIA, the professor of Apollo's crew - an analyst who can take any "
+    "idea, plan, product, claim, decision or question and think it through "
+    "properly. You work in three passes and show all three:\n"
+    "1. ANALYSIS - what it really is, how it works, the facts and numbers that "
+    "matter, what it depends on.\n"
+    "2. CRITIQUE - now argue against your own analysis as a sharp critic would: "
+    "the weak assumptions, the risks, what is missing, what would make it fail, "
+    "the strongest case against it.\n"
+    "3. THE BEST WAY - what survives the critique: the best approach or "
+    "decision, concrete steps in order, and what to watch.\n"
+    "End with a VERDICT line and a CONFIDENCE of low, medium or high, with the "
+    "reason. Be concrete, use the sources you were given and search for the "
+    "rest, and say where facts came from. Under 500 words.\n\n" + SUMMARY_RULE)
+
+MONEYPENNY_SYSTEM = (
+    "You are MONEYPENNY, the markets desk of Apollo's crew. You read stocks for "
+    "the user and give a straight verdict. For each stock you are given, cover: "
+    "what the company does; how the price has moved; valuation; what insiders, "
+    "members of Congress and traders are doing with it; the news and the "
+    "catalysts coming up.\n"
+    "Then, for each stock:\n"
+    "- VERDICT: one of STRONG BUY, BUY, HOLD, TRIM, SELL - and CONFIDENCE: low, "
+    "medium or high.\n"
+    "- WHY BUY: the reasons for it.\n"
+    "- RED FLAGS: the reasons not to buy, or to take money out - debt, falling "
+    "revenue, insiders selling, lawsuits, dilution, a crowded trade, anything.\n"
+    "When asked about several stocks or the watchlist, end with a ranking: which "
+    "are strongest, and which the user should consider pulling money out of "
+    "first, and why.\n"
+    "Be concrete - numbers, dates, names - and say where each fact came from. "
+    "This is a read, not financial advice: say so once, at the end. Under 450 "
+    "words.\n\n" + SUMMARY_RULE)
+
+Q_SYSTEM = (
+    "You are Q, the quartermaster of Apollo's crew. The user asked for something "
+    "to be added to Apollo or fixed in him. Write it up as a clear ticket for "
+    "the engineer (Claude) who will build it: a short title, what the user "
+    "wants in their words, what it should do, how to tell it works, and any "
+    "detail they gave. Do not invent requirements they did not ask for.\n\n"
+    "Answer in exactly this shape. The first line is `SUMMARY:` and one short "
+    "sentence Apollo can say out loud, in the user's language. The second line "
+    "is `TITLE:` and the ticket's title in English, under 70 characters. Then a "
+    "blank line, then the ticket body in Markdown.")
+
+
+# -- what each one reads ---------------------------------------------------------
+
+def watchlist_symbols(most=8):
+    try:
+        import watchlist
+        return [s for s in watchlist.current() if isinstance(s, str)][:most]
+    except Exception:  # noqa: BLE001 - no watchlist is no stocks to read
+        log.debug("watchlist unreadable", exc_info=True)
+        return []
+
+
+def moneypenny_facts(job, step):
+    """One stock, or every stock on the watchlist when the job is about it."""
+    if job.get("symbol"):
+        return lyla.stock_facts(job["symbol"], step)
+    symbols = job.get("symbols") or []
+    if not symbols:
+        return lyla.general_facts(job["task"], step)
+    facts = {"stocks": {}, "sources": {}}
+    for symbol in symbols:
+        read = lyla.stock_facts(symbol, step)
+        facts["sources"].update({f"{symbol}:{k}": v for k, v in read.pop("sources", {}).items()})
+        facts["stocks"][symbol] = read
+    return facts
+
+
+def theia_facts(job, step):
+    return lyla.general_facts(job["task"], step)
+
+
+def q_facts(job, step):
+    step("Writing the ticket")
+    return {"sources": {}}
+
+
+# -- how each one thinks -----------------------------------------------------------
+
+def _claude(prompt, system):
+    import assistant
+    return assistant.ask_once(system, prompt, max_tokens=4000, model=DEEP_CLAUDE)
+
+
+def thinker(system, deep_capable=False):
+    """`think(prompt)` for a desk. A deep job (prompt marked by `deep_prompt`)
+    goes to Claude when there is a key for it, else to Gemini's pro model."""
+    def think(prompt):
+        if deep_capable and prompt.startswith(DEEP_MARK):
+            prompt = prompt[len(DEEP_MARK):]
+            if os.environ.get("ANTHROPIC_API_KEY"):
+                try:
+                    return _claude(prompt, system), "Claude"
+                except Exception as e:  # noqa: BLE001 - Gemini is still there
+                    log.info("THEIA: Claude did not answer (%s); asking Gemini", e)
+            return lyla.ask_gemini(prompt, system, DEEP_GEMINI), "Gemini Pro"
+        return lyla.think(prompt, system, FAST_MODELS)
+    return think
+
+
+DEEP_MARK = "[[deep]]\n"
+
+
+def prompt_for(job, facts):
+    text = lyla.prompt_for(job, facts)
+    return (DEEP_MARK + text) if job.get("deep") else text
+
+
+class CrewDesk(lyla.Desk):
+    """A desk whose prompt can carry the deep flag."""
+
+    def prompt_for(self, job, facts):
+        return prompt_for(job, facts)
+
+
+def q_think(prompt):
+    """Q writes the ticket, then files it: what Apollo says is the ticket's
+    number, and the report is the ticket itself with its link."""
+    import github_requests
+    text, brain = lyla.think(prompt, Q_SYSTEM, FAST_MODELS)
+    summary, rest = lyla.split(text)
+    title = ""
+    lines = rest.splitlines()
+    if lines and lines[0].upper().startswith("TITLE:"):
+        title, rest = lines[0][6:].strip(), "\n".join(lines[1:]).strip()
+    made = github_requests.file_issue(title or summary, rest)
+    return (f"SUMMARY: {summary} Ticket #{made['number']} is filed for Claude.\n\n"
+            f"{rest}\n\n{made['url']}"), brain
+
+
+def _desk(name, system, facts, deep=False, think=None):
+    return CrewDesk(think=think or thinker(system, deep), facts=facts, name=name,
+                    path=os.path.join(_HERE, f"{name.lower()}_reports.json"))
+
+
+THEIA_DESK = _desk(THEIA, THEIA_SYSTEM, theia_facts, deep=True)
+MONEYPENNY_DESK = _desk(MONEYPENNY, MONEYPENNY_SYSTEM, moneypenny_facts)
+Q_DESK = _desk(Q, Q_SYSTEM, q_facts, think=q_think)
+
+DESKS = {LYLA: lyla.DESK, THEIA: THEIA_DESK, MONEYPENNY: MONEYPENNY_DESK, Q: Q_DESK}
+
+
+def desk(name):
+    return DESKS.get(str(name or "").strip().upper())
+
+
+def configure(tell=None, report=None, gate=None):
+    """Wire every desk's card and Apollo's voice in. `report(job)` gets the
+    job, which carries `agent` - whose it was."""
+    for one in DESKS.values():
+        one.configure(tell=tell, report=report, gate=gate)
+
+
+def status():
+    """Each agent: what it is on, how many wait, its latest reports."""
+    out = {}
+    for name, one in DESKS.items():
+        working = one.current
+        out[name] = {"role": ROLES[name],
+                     "working": {"task": working["task"], "symbol": working.get("symbol", "")}
+                                if working else None,
+                     "waiting": one.waiting,
+                     "reports": one.reports[:8]}
+    return out
+

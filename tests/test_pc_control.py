@@ -6,6 +6,7 @@ import pc_control as pc
 @pytest.fixture
 def sent(monkeypatch):
     log = []
+    monkeypatch.setattr(pc, "wait_for_release", lambda *a, **k: True)
     monkeypatch.setattr(pc, "_send", lambda events: log.extend(
         (e.u.ki.wVk, e.u.ki.wScan, e.u.ki.dwFlags) for e in events) or len(events))
     return log

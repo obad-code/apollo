@@ -1220,3 +1220,100 @@ def _forget_memory(ctx, about):
     gone = memory.forget(about)
     return {"ok": bool(gone), "forgot": [m["text"] for m in gone],
             "result": None if gone else "Nothing matched that."}
+
+
+# --- the crew ------------------------------------------------------------------
+
+import crew  # noqa: E402
+import youtube  # noqa: E402
+
+
+def _handed(name, taken, extra=""):
+    ahead = taken["ahead"]
+    return {"ok": True, "job": taken["job"],
+            "result": (f"{name} is on it now." if not ahead else
+                       f"{name} has it; {ahead} job{'s' if ahead > 1 else ''} ahead of it.") + extra,
+            "note": "The agent reports back when done. Carry on with the user meanwhile."}
+
+
+@_tool("ask_theia", "handing it to THEIA",
+       "Hand an idea, plan, decision or question to THEIA, the professor of your "
+       "crew, who analyses it in the background: what it is, a hard critique of "
+       "it, and the best way to do it, with a verdict. Use it when the user wants "
+       "something thought through - \"حلل لي هالفكرة\", \"is this a good plan\", "
+       "\"THEIA, what do you think of...\". Set deep=true only when they ask for a "
+       "deep or serious analysis (\"تحليل عميق\") - it costs more. Not for stocks "
+       "(that is MONEYPENNY), and not when the user asked you to do it yourself.",
+       _obj({"task": _str("The idea or question, in the user's words"),
+             "deep": {"type": "boolean", "description": "A deeper, slower, costlier analysis"}},
+            ("task",)))
+def _ask_theia(ctx, task, deep=False):
+    return _handed("THEIA", crew.THEIA_DESK.take(task, deep=bool(deep)),
+                   " A deep one takes a few minutes." if deep else "")
+
+
+@_tool("ask_moneypenny", "handing it to MONEYPENNY",
+       "Hand a stock job to MONEYPENNY, your markets desk: a full read of one stock "
+       "with a verdict (strong buy, buy, hold, trim or sell), the reasons to buy "
+       "and the red flags; or, with watchlist=true, a review of every stock the "
+       "user watches and which to pull money out of first. Use it for \"حلل لي سهم "
+       "انفيديا\", \"should I sell Tesla\", \"وش اسحب من اسهمي\". It returns at once. "
+       "Not when the user asked you to analyse it yourself - then do it yourself "
+       "with your market tools.",
+       _obj({"task": _str("The job, in the user's words"),
+             "stock": _str("The company or ticker, when it is about one stock"),
+             "watchlist": {"type": "boolean", "description": "Review the whole watchlist"}},
+            ("task",)))
+def _ask_moneypenny(ctx, task, stock="", watchlist=False):
+    symbols = crew.watchlist_symbols() if watchlist and not stock else []
+    return _handed("MONEYPENNY", crew.MONEYPENNY_DESK.take(task, stock, symbols=symbols))
+
+
+@_tool("request_feature", "handing it to Q",
+       "Ask for something to be added to Apollo or fixed in him: Q writes it up and "
+       "files it as a ticket for Claude to build. Use it when the user says to tell "
+       "Claude to add or fix something - \"قل لكلاود يضيف...\", \"get Claude to fix "
+       "the voice\", \"Q, add a button for...\". Pass their request in full, in "
+       "their words.",
+       _obj({"request": _str("What the user wants added or fixed, in full")}, ("request",)))
+def _request_feature(ctx, request):
+    return _handed("Q", crew.Q_DESK.take(request))
+
+
+@_tool("download_video", "handing it to LYLA",
+       "LYLA downloads a YouTube video - or only its sound - to the user's PC: a "
+       "YouTube link, or what to search for (the top result is taken). Use it for "
+       "\"ليلى نزلي هالمقطع\", \"download the new trailer\", \"نزل الاغنية صوت بس\". "
+       "Videos go to Videos\\Apollo, sound to Music\\Apollo. It returns at once and "
+       "you are told when the file is saved.",
+       _obj({"what": _str("A YouTube link, or what to search for"),
+             "audio_only": {"type": "boolean", "description": "Only the sound, as an mp3"}},
+            ("what",)))
+def _download_video(ctx, what, audio_only=False):
+    taken = youtube.DOWNLOADS.take(what, bool(audio_only))
+    return {"ok": True, "result": "LYLA is downloading it" + (
+        f"; {taken['ahead']} ahead of it." if taken["ahead"] else "."),
+            "folder": taken["folder"]}
+
+
+@_tool("crew_findings", "reading the crew's reports",
+       "What one of your agents (LYLA, THEIA, MONEYPENNY or Q) found or did "
+       "lately: what it is working on, its recent jobs with their summaries, and "
+       "the full report for the one asked about (1 is the most recent). Use it "
+       "when the user asks what an agent found, or for more detail.",
+       _obj({"agent": _enum(crew.NAMES, "Which agent"),
+             "number": {"type": "integer", "description": "Which report, 1 the latest"}},
+            ("agent",)))
+def _crew_findings(ctx, agent, number=1):
+    desk = crew.desk(agent)
+    working = desk.current
+    reports = desk.reports
+    out = {"ok": True, "agent": agent,
+           "working_on": working["task"] if working else None, "waiting": desk.waiting,
+           "reports": [{"number": i + 1, "task": r["task"], "summary": r["summary"]}
+                       for i, r in enumerate(reports[:5])]}
+    if 1 <= number <= len(reports):
+        out["report"] = reports[number - 1]["report"]
+    elif not reports:
+        out["result"] = f"{agent} has not finished a job yet."
+    return out

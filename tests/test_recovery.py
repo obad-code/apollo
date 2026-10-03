@@ -74,6 +74,9 @@ class Live:
     def wait_until_quiet(self, timeout=60):
         return True
 
+    def spoke_since(self, moment):
+        return False
+
 
 class Voice:
     def __init__(self, live, replacement=None):
@@ -123,3 +126,17 @@ def test_a_second_failure_says_so_out_loud(monkeypatch):
     assistant.push_to_talk_turn(ui, None, voice)
     assert spoken and "again" in spoken[0].lower()
     assert ui.turns and ui.turns[-1][0] == "Apollo"
+
+
+def test_a_reply_that_was_heard_is_not_asked_again():
+    """The socket closed after Gemini had spoken, with no transcript: that was
+    still an answer, and asking again said it twice."""
+    class Spoke(Live):
+        def spoke_since(self, moment):
+            return True
+
+    dead = Spoke(alive=False)
+    fresh = Live(alive=True)
+    voice = Voice(dead, replacement=fresh)
+    assistant.push_to_talk_turn(UI(), None, voice)
+    assert voice.opened == 0 and fresh.prompts == []

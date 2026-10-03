@@ -63,7 +63,7 @@ def test_a_failed_run_shows_as_an_error(monkeypatch):
 def test_the_other_agents_are_left_as_they_were(monkeypatch):
     ui = UI()
     monkeypatch.setattr(assistant.agents, "handle", lambda name, text, ui, ask: "ok")
-    assistant.answer_with_agent("ATLAS", "atlas do it", ui)
+    assistant.answer_with_agent("THEIA", "theia do it", ui)
     assert ui.events == [] and ui.asked == []
 
 

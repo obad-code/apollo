@@ -46,8 +46,11 @@ def route_request(text):
     if not said:
         return Route(GEMINI, "nothing said", None)
 
+    # Naming an agent no longer takes the turn away from Apollo's voice: he
+    # heard it and hands the job over himself (see `agents`). The name is
+    # still logged, so you can see who it was for.
     if (name := agents.detect(said)) is not None:
-        return Route(AGENT, f"{name} summoned by name", name)
+        return Route(GEMINI, f"{name} named - Apollo hands it over", None)
 
     return Route(GEMINI, "conversation", None)
 

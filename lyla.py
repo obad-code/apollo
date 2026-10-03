@@ -180,38 +180,39 @@ def _post(url, payload, key, timeout):
         return json.loads(response.read())
 
 
-def ask_hermes(prompt, settings):
+def ask_hermes(prompt, settings, system=None):
     """Hermes, through the OpenAI-style chat endpoint of its API server. It
     runs its own tools - its searches, its skills - before it answers."""
     answer = _post(settings["url"] + "/v1/chat/completions",
                    {"model": settings["model"],
-                    "messages": [{"role": "system", "content": SYSTEM},
+                    "messages": [{"role": "system", "content": system or SYSTEM},
                                  {"role": "user", "content": prompt}]},
                    settings["key"], HERMES_TIMEOUT)
     return answer["choices"][0]["message"]["content"]
 
 
-def _generate(model, prompt, search):
+def _generate(model, prompt, search, system=None):
     """The one call to Gemini. Tests replace this."""
     from google import genai
     from google.genai import types
 
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     config = types.GenerateContentConfig(
-        system_instruction=SYSTEM, temperature=0.4,
+        system_instruction=system or SYSTEM, temperature=0.4,
         tools=[types.Tool(google_search=types.GoogleSearch())] if search else None)
     return client.models.generate_content(model=model, contents=prompt, config=config).text
 
 
-def ask_gemini(prompt):
+def ask_gemini(prompt, system=None, models=None):
     """Gemini with Google Search, on each model in turn; without the search
     as a last try, since the search is the part a free key can run out of."""
     if not os.environ.get("GEMINI_API_KEY"):
         raise RuntimeError("LYLA needs GEMINI_API_KEY (or Hermes) to think with.")
     last = None
-    for model, search in [*((m, True) for m in MODELS), (MODELS[0], False)]:
+    models = tuple(models or MODELS)
+    for model, search in [*((m, True) for m in models), (models[0], False)]:
         try:
-            text = _generate(model, prompt, search)
+            text = _generate(model, prompt, search, system) if system else _generate(model, prompt, search)
         except Exception as e:  # noqa: BLE001 - the next model may answer
             log.info("LYLA: %s%s failed: %s", model, " with search" if search else "", e)
             last = e
@@ -221,15 +222,18 @@ def ask_gemini(prompt):
     raise RuntimeError(f"Gemini did not answer: {last}")
 
 
-def think(prompt):
+def think(prompt, system=None, models=None):
     """Her answer, and which brain gave it: Hermes if it is set up and
-    answering, Gemini otherwise."""
+    answering, Gemini otherwise. Another agent passes its own `system`."""
     settings = hermes_settings()
     if settings is not None:
         try:
-            return ask_hermes(prompt, settings), "Hermes"
+            return (ask_hermes(prompt, settings, system) if system
+                    else ask_hermes(prompt, settings)), "Hermes"
         except Exception as e:  # noqa: BLE001 - Gemini is still there
-            log.info("LYLA: Hermes did not answer (%s); asking Gemini", e)
+            log.info("Hermes did not answer (%s); asking Gemini", e)
+    if system or models:
+        return ask_gemini(prompt, system, models), "Gemini"
     return ask_gemini(prompt), "Gemini"
 
 
@@ -270,7 +274,8 @@ class Desk:
     """
 
     def __init__(self, tell=None, report=None, gate=None, think=think, facts=None,
-                 resolve=None, path=None):
+                 resolve=None, path=None, name=NAME):
+        self.name = name
         self.tell_card = tell
         self.report = report
         self.gate = gate
@@ -294,16 +299,19 @@ class Desk:
     def waiting(self):
         return self.jobs.qsize()
 
-    def take(self, task, stock=""):
+    def take(self, task, stock="", **extra):
         """A job from Apollo - with the stock it is about, as it was said,
-        if it is about one. Returns at once with where it stands in line."""
+        if it is about one. Returns at once with where it stands in line.
+        `extra` rides along on the job for an agent's own reader."""
         job = {"id": next(self._ids), "task": " ".join(str(task).split()),
-               "stock": " ".join(str(stock or "").split()), "symbol": "", "asked": time.time()}
+               "stock": " ".join(str(stock or "").split()), "symbol": "", "asked": time.time(),
+               "agent": self.name, **extra}
         ahead = self.waiting + (self.current is not None)
         self.jobs.put(job)
         with self._lock:
             if self._thread is None:
-                self._thread = threading.Thread(target=self._work, daemon=True, name="lyla-desk")
+                self._thread = threading.Thread(target=self._work, daemon=True,
+                                                name=f"{self.name.lower()}-desk")
                 self._thread.start()
         return {"job": job["id"], "ahead": ahead}
 
@@ -311,10 +319,14 @@ class Desk:
         if self.tell_card is None:
             return
         try:
-            self.tell_card({"agent": NAME, "task": job["task"], "symbol": job["symbol"],
+            self.tell_card({"agent": self.name, "task": job["task"], "symbol": job["symbol"],
                             "job": job["id"], **event})
         except Exception:  # noqa: BLE001 - a card that cannot be told never costs the job
             log.debug("LYLA's card failed", exc_info=True)
+
+    def prompt_for(self, job, facts):
+        """The prompt for one job; another agent's desk can add to it."""
+        return prompt_for(job, facts)
 
     def _read(self, job, step):
         return stock_facts(job["symbol"], step) if job["symbol"] else general_facts(job["task"], step)
@@ -345,12 +357,12 @@ class Desk:
                 job["symbol"] = self.resolve(job["stock"])
             facts = self.facts(job, lambda text: self._tell(job, stage="step", text=text))
             self._tell(job, stage="asking", text="Writing it up")
-            answer, brain = self.think(prompt_for(job, facts))
+            answer, brain = self.think(self.prompt_for(job, facts))
             summary, report = split(answer)
             job.update(ok=True, summary=summary, report=report, brain=brain,
                        sources=facts.get("sources", {}))
         except Exception as e:  # noqa: BLE001 - a failed job is reported, not raised
-            log.warning("LYLA's job failed: %s", e)
+            log.warning("%s's job failed: %s", self.name, e)
             job.update(ok=False, summary="", report="", error=str(e) or type(e).__name__)
         job["took"] = int((time.monotonic() - started) * 1000)
         job["done"] = time.time()
@@ -375,7 +387,7 @@ class Desk:
                 with self.gate:
                     self.report(job)
         except Exception:  # noqa: BLE001 - her thread outlives a report that fails
-            log.warning("LYLA's report failed", exc_info=True)
+            log.warning("%s's report failed", self.name, exc_info=True)
 
 
 DESK = Desk()

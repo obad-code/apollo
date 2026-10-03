@@ -87,9 +87,12 @@ def test_whisper_is_the_backup_when_gemini_heard_nothing():
     assert ("You", "open chrome") in ui.turns
 
 
-def test_agent_name_discards_gemini_reply(monkeypatch):
+def test_an_agent_name_keeps_apollos_one_voice(monkeypatch):
+    """Naming an agent used to throw Gemini's answer away for Claude's, in a
+    second voice; the two raced and repeated each other. Apollo answers now,
+    and hands the job over with the agent's tool."""
     ui, live = UI(), Live("hey lyla open chrome")
     asked = []
     monkeypatch.setattr(assistant, "answer_with_agent", lambda name, said, ui: asked.append(name))
     assistant.push_to_talk_turn(ui, NoWhisper(), Voice(live))
-    assert live.discarded == 1 and live.allowed == 0 and asked == ["LYLA"]
+    assert live.discarded == 0 and live.allowed == 1 and asked == []

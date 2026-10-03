@@ -388,18 +388,22 @@ const agent = new LylaAgent($('lyla-agent'), { sound: (name) => sfx.play(name) }
 // ...and the same card in agents mode, which has its own sound for arriving.
 const agentsCard = new LylaAgent($('agent-lyla'));
 
-/* Agents mode: each agent by its mark down the left - LYLA, and ATLAS,
- * NOVA and ECHO as previews of the agents to come - and a click on one
- * opens its process (its pipeline card) beside the marks; a click on it
- * again puts it away. LYLA's reports go with hers. */
-const AGENTS = ['LYLA', 'ATLAS', 'NOVA', 'ECHO'];
+/* Agents mode: each agent by its mark down the left - LYLA, THEIA,
+ * MONEYPENNY and Q, Apollo's crew (crew.py) - and a click on one opens its
+ * process (its pipeline card) beside the marks; a click on it again puts it
+ * away. LYLA's reports go with hers. */
+const AGENTS = ['LYLA', 'THEIA', 'MONEYPENNY', 'Q'];
+const crewDoing = {};          // agent -> what it is on, while it is
 const agentCards = {
   LYLA: agentsCard,
   ...Object.fromEntries(AGENTS.slice(1).map((key) =>
     [key, new LylaAgent($(`agent-${key.toLowerCase()}`), { look: LOOKS[key] })])),
 };
 function agentState(key) {
-  if (key !== 'LYLA') return ['PREVIEW', 'preview'];
+  if (key !== 'LYLA') {
+    if (crewDoing[key]) return ['ON A JOB', 'working'];
+    return agentCards[key].isLive ? ['LIVE', 'live'] : ['READY', 'ready'];
+  }
   if (lylaDoing.job) return ['ON A JOB', 'working'];
   return agentsCard.isLive ? ['LIVE', 'live'] : ['READY', 'ready'];
 }
@@ -4352,10 +4356,18 @@ window.apollo = {
   panels(state) { setPanels(state); },
   briefing(payload) { if (payload) render(payload); },
   sleep(on) { setSleep(on); },
-  // A step of LYLA's run, as it happens - both of her cards go live.
+  // A step of an agent's run, as it happens. The crew's go to their own
+  // cards; LYLA's to both of hers.
   agent(event) {
     const step = event || {};
-    if (step.agent && step.agent !== 'LYLA') return;
+    if (step.agent && step.agent !== 'LYLA') {
+      const card = agentCards[step.agent];
+      if (!card) return;
+      card.live(step);
+      crewDoing[step.agent] = step.stage !== 'done' && step.stage !== 'error';
+      if (state.view === 'agents') renderMarks();
+      return;
+    }
     agent.live(step);
     agentsCard.live(step);
     // A job Apollo handed her shows under her bar while she is on it, and
