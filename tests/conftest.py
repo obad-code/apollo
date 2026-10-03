@@ -88,3 +88,15 @@ def no_world_fetch(monkeypatch):
     import world
     monkeypatch.setattr(world, "quakes", lambda limit=world.QUAKES: [])
     monkeypatch.setattr(world, "headlines", lambda limit=world.HEADLINES: [])
+
+
+@pytest.fixture(autouse=True)
+def private_memory(tmp_path, monkeypatch):
+    """...its own memories, and its own Apollo folder for files it writes."""
+    try:
+        import files
+        import memory
+    except ImportError:
+        return
+    monkeypatch.setattr(memory, "PATH", str(tmp_path / "memory.json"))
+    monkeypatch.setattr(files, "root", lambda: str(tmp_path / "Apollo"))

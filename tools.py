@@ -351,7 +351,9 @@ def _window(ctx, action, app=None):
 
 
 @_tool("type_text", "typing",
-       "Type text into the window the user is working in, exactly as given.",
+       "Type text into the window the user is working in, exactly as given - only "
+       "when they ask you to type into it. To make or save a file use write_file "
+       "instead; never open Notepad to type a file.",
        _obj({"text": _str("The text to type")}, ["text"]))
 def _type_text(ctx, text):
     return pc_control.type_text(text)
@@ -630,14 +632,12 @@ def _trading_read(ctx):
 
 @_tool("ask_lyla", "handing it to LYLA",
        "Hand a research job to LYLA, Apollo's research agent, who works on it in "
-       "the background while you and the user carry on. Use this whenever the "
-       "user asks for an analysis, a deep look or research that takes more than "
-       "a quick lookup - above all an analysis of a stock: \"حلل لي سهم انفيديا\", "
-       "\"ابي تحليل عن تسلا\", \"analyse AMD for me\", \"research the best "
-       "budget GPUs\". It returns at once. Tell the user in one short sentence "
-       "that LYLA is on it, and do not do the research yourself; you will be "
-       "told what she found when she is done, and pass it on then. Pass the "
-       "job in the user's words, and for a stock, the company or ticker.",
+       "the background while you and the user carry on. Good for research that "
+       "takes more than a quick lookup - \"research the best budget GPUs\", "
+       "\"دور لي عن...\". It returns at once: tell the user in one short "
+       "sentence that LYLA is on it; you will be told what she found. Do not use "
+       "it when the user has asked you to do the job yourself - then do it "
+       "yourself. Pass the job in the user's words.",
        _obj({"task": _str("The job, in the user's words"),
              "stock": _str("The company or ticker, when the job is about one stock")},
             ("task",)))
@@ -1133,3 +1133,90 @@ def _briefing_cards(payload):
     if posts:
         cards.append({"label": "Posts", "value": f"{len(posts)} new"})
     return cards
+
+
+# --- files and memory ----------------------------------------------------------
+
+import files  # noqa: E402
+import memory  # noqa: E402
+
+
+@_tool("write_file", "writing the file",
+       "Create or overwrite a text file in the user's Apollo folder "
+       "(Documents\\Apollo), or add to the end of one with append=true. Use this "
+       "whenever the user asks you to make, save or write a file, a note or a list "
+       "- \"سو لي ملف\", \"save this as notes\", \"اكتب هذا في ملف\". Never open "
+       "Notepad and type for this. The name is just a file name like "
+       "\"shopping.txt\" or \"projects/apollo.md\".",
+       _obj({"name": _str("File name, e.g. notes.md"),
+             "text": _str("What to write, in full"),
+             "append": {"type": "boolean", "description": "Add to the end instead of replacing"}},
+            ("name", "text")))
+def _write_file(ctx, name, text, append=False):
+    ctx.activity(f"writing {name}")
+    done = files.write(name, text, append=bool(append))
+    return {"ok": True, "result": ("Added to " if append else "Saved ") + done["path"],
+            "path": done["path"]}
+
+
+@_tool("read_file", "reading the file",
+       "Read a text file from the user's Apollo folder (Documents\\Apollo).",
+       _obj({"name": _str("File name")}, ("name",)))
+def _read_file(ctx, name):
+    try:
+        got = files.read(name)
+    except FileNotFoundError:
+        return {"ok": False, "error": f"There is no {name} in the Apollo folder.",
+                "files": [f[0] for f in files.listing()[:20]]}
+    return {"ok": True, **got}
+
+
+@_tool("list_files", "checking your files",
+       "List the files in the user's Apollo folder (Documents\\Apollo), newest first.",
+       _obj({}))
+def _list_files(ctx):
+    found = files.listing()
+    return {"ok": True, "folder": files.root(),
+            "files": [{"name": n, "bytes": s} for n, s, _ in found[:40]]}
+
+
+@_tool("log_problem", "writing that down",
+       "Write down a problem the user reports with Apollo itself - something that "
+       "broke, misbehaved or annoyed them: \"سجل هالمشكلة\", \"he keeps forgetting\", "
+       "\"note that the voice cut out\". It goes in the problem log file "
+       "(Documents\\Apollo\\Apollo problems.md) and on the System panel. Write the "
+       "problem in the user's own words, clearly enough to fix later.",
+       _obj({"problem": _str("The problem, described clearly")}, ("problem",)))
+def _log_problem(ctx, problem):
+    done = files.log_problem(problem)
+    key = "user:" + "".join(ch for ch in problem.lower() if ch.isalnum())[:40]
+    issues.record(key, "YOU REPORTED", problem, "warn")
+    return {"ok": True, "result": f"Written down in {done['path']}."}
+
+
+@_tool("remember", "remembering that",
+       "Keep a fact the user wants you to remember for good - \"تذكر ان...\", "
+       "\"remember that my car is a Tahoe\", a preference, a date, a name. It is "
+       "there in every conversation from now on, even after a restart.",
+       _obj({"fact": _str("The fact, as a full sentence")}, ("fact",)))
+def _remember(ctx, fact):
+    memory.remember(fact)
+    return {"ok": True, "result": "Remembered."}
+
+
+@_tool("recall", "checking what I remember",
+       "Look up what the user asked you to remember, by a word or topic (or all of it).",
+       _obj({"about": _str("A word or topic (optional)")}))
+def _recall(ctx, about=""):
+    found = memory.recall(about)
+    return {"ok": True, "memories": [m["text"] for m in found[-30:]],
+            "result": None if found else "Nothing kept about that."}
+
+
+@_tool("forget_memory", "forgetting that",
+       "Forget something the user asked you to remember, when they say to.",
+       _obj({"about": _str("Words in the memory to drop")}, ("about",)))
+def _forget_memory(ctx, about):
+    gone = memory.forget(about)
+    return {"ok": bool(gone), "forgot": [m["text"] for m in gone],
+            "result": None if gone else "Nothing matched that."}

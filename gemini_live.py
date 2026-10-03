@@ -57,12 +57,14 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
+import numpy as np
 import sounddevice as sd
 from google import genai
 from google.genai import types
 
 import agents
 import interests
+import memory
 
 log = logging.getLogger("apollo.gemini")
 
@@ -104,6 +106,15 @@ SLICE = 960              # 40 ms of reply per write - see `_write`
 CONNECT_TIMEOUT = 20     # seconds to wait for the websocket at startup
 REPLY_TIMEOUT = 60       # ...and for one spoken answer to finish
 
+# Always-listening hears the room, and while Apollo talks the room is Apollo:
+# his own voice out of the speakers, back into the microphone. Sent on, the
+# model hears itself - it cuts itself off, takes its own words for yours, or
+# answers itself, which is a repeated answer. So while he is talking, a block
+# is only sent if it is louder than his echo is likely to be (you talking
+# over him, close to the mic); everything quieter is left out. 0 turns the
+# gate off - headphones need none. APOLLO_BARGE_IN sets it (0..1 RMS).
+BARGE_IN = float(os.environ.get("APOLLO_BARGE_IN", "0.06") or 0)
+
 # Gemini is answering as Apollo, so it needs Apollo's character and Apollo's
 # length budget. Short, because this text is spoken: the whole point of this
 # path is that the reply starts almost immediately, and a model that opens
@@ -131,12 +142,16 @@ SYSTEM_INSTRUCTION = (
     "from memory. For a stock, index, crypto or commodity call show_stock_chart "
     "or stock_quote (they draw it on screen) and speak only the numbers they "
     "return. Open TradingView only when asked.\n\n"
-    "Research: LYLA is your research agent and works for you in the background. "
-    "When the user wants an analysis or research that takes more than a quick "
-    "lookup - an analysis of a stock above all - hand it to her with ask_lyla, "
-    "say in a few words that she is on it, and carry on with whatever they ask "
-    "next. Do not do her job yourself. When you are told she is done, pass on "
-    "what she found.\n\n"
+    "Your agents work for you in the background; you decide who does what. "
+    "For anything that takes more than a quick answer, think for a second about "
+    "which is better: doing it yourself now, or handing it to the right agent "
+    "and carrying on. The user's word always wins over that choice: if they say "
+    "\"you do it\", \"انت حلل\", \"لا تعطيها احد\", do it yourself, fully, and never "
+    "say it is someone else's job; if they name an agent, hand it to that agent. "
+    "Never refuse a task because of whose job it is.\n\n"
+    "Memory: when the user asks you to remember something, call remember. When "
+    "they report a problem with you, call log_problem. When they ask you to make "
+    "or save a file, call write_file - never type a file into Notepad.\n\n"
     "Safety: sleep, restart, shut down and sign out need the user's explicit yes. "
     "Ask first; call system_power with confirmed=true only after they say yes."
 )
@@ -163,6 +178,15 @@ def foreign(text):
     return ours * 2 < len(letters)
 
 
+def loud(data, threshold):
+    """True if a block of int16 PCM is louder (RMS, 0..1) than `threshold`."""
+    block = np.frombuffer(data, dtype=np.int16)
+    if not block.size:
+        return False
+    rms = float(np.sqrt(np.mean((block.astype(np.float32) / 32768.0) ** 2)))
+    return rms >= threshold
+
+
 def system_instruction(now=None):
     """The instruction, what Apollo knows about you, and the date and time -
     fixed when a session opens. What it knows comes from `interests`, which
@@ -171,7 +195,18 @@ def system_instruction(now=None):
     now = now or datetime.now()
     return (SYSTEM_INSTRUCTION
             + "\n\n" + interests.summary(interests.load())
+            + _remembered(now)
             + f"\n\nRight now it is {now:%A %d %B %Y, %H:%M} in Riyadh.")
+
+
+def _remembered(now):
+    """What he was told to remember, and the talk so far - see `memory`."""
+    try:
+        kept = memory.summary(now)
+    except Exception:  # noqa: BLE001 - a memory that cannot be read is no memory
+        log.debug("memory unavailable", exc_info=True)
+        return ""
+    return "\n\n" + kept if kept else ""
 
 
 def _config(auto_vad=False, tools=None, instruction=None):
@@ -230,6 +265,12 @@ def _config(auto_vad=False, tools=None, instruction=None):
         # a transcript line to draw, and without this the fast path would
         # answer out loud while the screen stayed blank.
         output_audio_transcription=types.AudioTranscriptionConfig(),
+        # An audio session is cut off once its context fills - about fifteen
+        # minutes of talk - and the reconnect that follows starts with no
+        # memory of what was said. A sliding window lets the oldest turns go
+        # instead, so a long conversation keeps going and keeps its thread.
+        context_window_compression=types.ContextWindowCompressionConfig(
+            sliding_window=types.SlidingWindow()),
     )
 
 
@@ -534,6 +575,11 @@ class LiveSession:
         queued = q is not None and not q.empty()
         return queued or (time.monotonic() - self._last_write) < self.PLAY_TAIL
 
+    def spoke_since(self, moment):
+        """True if any reply audio reached the speakers after `moment`
+        (a time.monotonic() reading)."""
+        return self._last_write >= moment
+
     def wait_until_quiet(self, timeout=REPLY_TIMEOUT):
         """Block until the reply has finished playing. True if it did.
 
@@ -781,6 +827,8 @@ class LiveSession:
 
         if not self._mic_open.is_set():
             return
+        if self.auto_vad and BARGE_IN > 0 and self.playing and not loud(data, BARGE_IN):
+            return            # his own voice coming back; see BARGE_IN
 
         loop = self._loop
         if loop is None or loop.is_closed():

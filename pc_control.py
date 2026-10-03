@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 import urllib.parse
 from ctypes import wintypes
 
@@ -338,8 +339,33 @@ def _utf16_units(ch):
     return [int.from_bytes(raw[i:i + 2], "little") for i in range(0, len(raw), 2)]
 
 
+HELD_KEYS = (0x10, 0x11, 0x12, 0x5B, 0x5C)    # shift, ctrl, alt, both windows keys
+RELEASE_WAIT = 3.0
+
+
+def wait_for_release(timeout=RELEASE_WAIT, down=None, sleep=time.sleep):
+    """Wait until no modifier is held. True if they were all let go in time.
+
+    The talk chord is Ctrl+Alt, and Apollo can be asked to type while you are
+    still holding it. Text injected under a held Ctrl or Alt is not text to
+    the window, it is a stream of shortcuts - one letter repeated, a page
+    bookmarked, a line deleted - which is what "dddddddd" was.
+    """
+    if down is None:
+        def down(vk):
+            return bool(ctypes.windll.user32.GetAsyncKeyState(vk) & 0x8000)
+    deadline = time.monotonic() + timeout
+    while any(down(vk) for vk in HELD_KEYS):
+        if time.monotonic() > deadline:
+            return False
+        sleep(0.05)
+    return True
+
+
 def type_text(text):
     """Type into the focused window. Unicode, so Arabic types as Arabic."""
+    if not wait_for_release():
+        return "Failed: let go of Ctrl, Alt and Shift first, then ask me to type again."
     text = (text or "")[:MAX_TYPE]
     events = []
     for ch in text:

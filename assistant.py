@@ -1159,8 +1159,15 @@ def _play_wav(data):
     if channels > 1:
         audio = audio.reshape(-1, channels)
 
+    _sounded.set()
     sd.play(audio, samplerate=rate)
     sd.wait()
+
+
+# Set the moment any engine starts making sound for the line `speak` is on.
+# Once it is set, a failure is a line cut short - not a line unsaid - and the
+# next engine down must not say it all again in a second voice.
+_sounded = threading.Event()
 
 
 def _speak_voicebox(text):
@@ -1291,8 +1298,11 @@ def speak(text):
     """Read the reply aloud: Fish, else VoiceBox, else Piper, else Windows.
 
     Blocks until the audio has finished playing, which the run loop relies on
-    to know when to drop back to idle.
+    to know when to drop back to idle. One line is said once: an engine that
+    fails after it started sounding is not followed by the next one saying the
+    whole thing again in a different voice.
     """
+    _sounded.clear()
     if _fish_ready:
         try:
             _speak_fish(text)
@@ -1302,7 +1312,9 @@ def speak(text):
             # dropped connection. Fall through to the local voices for this
             # line rather than answer with silence. Not sticky: Fish is
             # retried next turn, since a rate limit or a blip is transient.
-            pass
+            if _sounded.is_set():
+                log.warning("Fish failed mid-line; not repeating it in another voice")
+                return
 
     # If Fish answered at startup, VoiceBox was never looked at - so look now,
     # once. Without this a Fish line that fails drops straight past the good
@@ -1321,7 +1333,9 @@ def speak(text):
             # timeout: fall through to Piper for this line rather than answer
             # with silence. Not sticky - VoiceBox is retried next turn, since
             # the usual cause is transient.
-            pass
+            if _sounded.is_set():
+                log.warning("VoiceBox failed mid-line; not repeating it in another voice")
+                return
 
     voice = _load_piper()
     if voice is None:
@@ -1339,13 +1353,16 @@ def speak(text):
             return
 
         audio = np.concatenate([c.audio_float_array for c in chunks])
+        _sounded.set()
         sd.play(audio, samplerate=chunks[0].sample_rate)
         sd.wait()
     except Exception:
         # Anything at all - a bad model file, no output device, a text the
         # phonemiser chokes on - is better answered by the robot voice than by
-        # silence, since this is the only channel the user has.
-        _speak_sapi(text)
+        # silence, since this is the only channel the user has. Unless it had
+        # already started: then it has been said.
+        if not _sounded.is_set():
+            _speak_sapi(text)
 
 
 # --- Reporting -------------------------------------------------------------
@@ -1923,12 +1940,16 @@ def push_to_talk_turn(ui, whisper, voice):
         # Nothing to send: Gemini heard the audio live and is already
         # answering. All that happens here is that the answer is allowed out
         # of the speakers.
+        asked_at = time.monotonic()
         live.allow_reply()
         ui.status(SPEAKING)
         if not live.wait_for_reply():
             ui.note("Gemini Live didn't finish that reply in time.")
         spoken = live.reply_text()
-        if not spoken and not live.alive:
+        # Asked again only if nothing was heard at all. A reply that played
+        # but brought no transcript with it, on a socket that then closed,
+        # was still an answer - asking again said it twice.
+        if not spoken and not live.alive and not live.spoke_since(asked_at):
             spoken = retry_after_drop(ui, voice, said)
         if spoken:
             ui.turn("Apollo", spoken)
@@ -1966,6 +1987,11 @@ def always_listening_turn(ui, voice):
     router.log_route(route, said)
 
     if route.name == router.AGENT:
+        if reply:
+            # The name was only made out once the sentence was over, so
+            # Gemini has already started answering. Cut him off before the
+            # agent speaks, or the same answer comes out in two voices.
+            voice.live.hush()
         ui.status(THINKING)
         try:
             answer_with_agent(route.agent, said, ui)
