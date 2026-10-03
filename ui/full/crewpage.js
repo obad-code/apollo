@@ -74,6 +74,35 @@ function totals(board) {
   };
 }
 
+/* The five instruments under the lanes: a figure on a lit screen, and
+ * beside it the shape of the day - jobs by hour, a ring, a needle, a lamp,
+ * the split between the two brains. All from the board. */
+function instruments(board, t) {
+  const hours = board.hours || {};
+  const byHour = new Array(24).fill(0).map((_, h) => KEYS.reduce((n, k) => n + ((hours[k] || [])[h] || 0), 0));
+  const peak = Math.max(1, ...byHour);
+  const nowH = new Date((board.now || Date.now() / 1000) * 1000).getHours();
+  const bars = `<span class="cp-bars">${byHour.map((v, h) =>
+    `<i style="--h:${v ? 0.2 + 0.8 * (v / peak) : 0.06}"${h === nowH ? ' class="now"' : ''}></i>`).join('')}</span>`;
+  const rate = t.success === '—' ? 0 : parseInt(t.success, 10) / 100;
+  const ring = `<span class="cp-ring" style="--r:${rate}"></span>`;
+  const secs = parseInt(t.avg, 10) || 0;
+  const needle = `<span class="cp-dial"><i style="--a:${Math.min(1, secs / 120) * 180 - 90}deg"></i></span>`;
+  const lamp = `<span class="cp-bulb${t.errors ? ' on' : ''}"></span>`;
+  const sp = board.spend || {};
+  const gt = ((sp.gemini || {}).prompt || 0) + ((sp.gemini || {}).response || 0);
+  const ct = ((sp.claude || {}).prompt || 0) + ((sp.claude || {}).response || 0);
+  const split = `<span class="cp-split"><i style="flex:${gt || 1}"></i><i style="flex:${ct || 0.0001}"></i></span>`;
+  const k = (n) => (n >= 1000 ? `${(n / 1000).toFixed(0)}K` : String(n));
+  return [
+    { label: 'RUNS', value: t.runs, sub: 'by hour', viz: bars, lit: t.runs > 0 },
+    { label: 'SUCCESS', value: t.success, sub: 'finished well', viz: ring, lit: rate >= 0.8 },
+    { label: 'AVG JOB', value: t.avg, sub: 'per job', viz: needle, lit: secs > 0 },
+    { label: 'ERRORS', value: t.errors, sub: t.errors ? 'need a look' : 'all clear', viz: lamp, lit: !t.errors, alarm: Boolean(t.errors) },
+    { label: 'COST', value: t.cost, sub: `${k(t.tokens)} tokens`, viz: split, lit: true },
+  ];
+}
+
 export function render(root, board = {}, { look = 'minimal', open = null } = {}) {
   const t = totals(board);
   const now = board.now || Date.now() / 1000;
@@ -95,12 +124,11 @@ export function render(root, board = {}, { look = 'minimal', open = null } = {})
       <svg class="cp-wires" aria-hidden="true"></svg>
       <div class="cp-lanes">${KEYS.map((key) => lane(key, agents[key] || {}, open === key, now)).join('')}</div>
     </div>
-    <footer class="cp-foot">
-      <div><b>${t.runs}</b><span>RUNS TODAY</span></div>
-      <div><b>${t.success}</b><span>SUCCESS</span></div>
-      <div><b>${t.avg}</b><span>AVG JOB</span></div>
-      <div><b>${t.errors}</b><span>ERRORS</span></div>
-      <div><b>${t.cost}</b><span>COST · ${k(t.tokens)} TOKENS</span></div>
+    <footer class="cp-foot">${instruments(board, t).map((m) => `
+      <div class="cp-inst${m.alarm ? ' alarm' : ''}">
+        <header><i class="cp-led${m.lit ? ' lit' : ''}"></i><span>${m.label}</span></header>
+        <div class="cp-screen"><b>${m.value}</b><small>${m.sub}</small>${m.viz}</div>
+      </div>`).join('')}
     </footer>`;
   requestAnimationFrame(() => wires(root, agents));
 }
