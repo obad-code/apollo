@@ -1318,6 +1318,20 @@ def _download_video(ctx, what, audio_only=False):
             "folder": taken["folder"]}
 
 
+@_tool("make_short", "LYLA is making a Short",
+       "LYLA makes a YouTube Short: a stick-man animation with a voice, about 45 "
+       "seconds, vertical. kind 'fact' (one amazing fact) or 'story' (a gripping story "
+       "with a twist); a topic if the user gave one. Use it for \"ليلى سوي شورت عن...\", "
+       "\"make a short about octopuses\". It is saved to Documents\\Apollo\\Shorts with "
+       "its title, description and hashtags. Takes a few minutes; returns at once.",
+       _obj({"topic": _str("What it is about (optional)"),
+             "kind": _enum(["fact", "story"], "A fact or a story")}, ()))
+def _make_short(ctx, topic="", kind=None):
+    import shorts
+    shorts.make_in_background(kind or None, topic)
+    return {"ok": True, "result": "LYLA is making it - a few minutes. It lands in Documents\\Apollo\\Shorts."}
+
+
 @_tool("crew_findings", "reading the crew's reports",
        "What one of your agents (LYLA, THEIA, MONEYPENNY or Q) found or did "
        "lately: what it is working on, its recent jobs with their summaries, and "

@@ -29,6 +29,7 @@ ROUTINES = {
     "MONEYPENNY": (15, True),
     "THEIA": (20, False),
     "LYLA": (10, False),
+    "SHORTS": (int(os.environ.get("SHORTS_HOUR") or 13), False),   # a Short a day at the peak hour
 }
 
 
@@ -100,6 +101,10 @@ def start_job(agent):
                 " I have no ideas saved: suggest three that a solo developer with an AI "
                 "voice assistant project could earn from."))
         return crew.THEIA_DESK.take(task, routine=True)
+    if agent == "SHORTS":
+        import shorts
+        shorts.make_in_background()
+        return {"job": "short"}
     if agent == "LYLA":
         likes = _interests_text()
         return crew.desk("LYLA").take(

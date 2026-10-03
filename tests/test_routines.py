@@ -17,7 +17,7 @@ def test_each_routine_runs_once_a_day(tmp_path, monkeypatch):
     monkeypatch.setenv("APOLLO_ROUTINES", "1")
     path = str(tmp_path / "r.json")
     now = dt.datetime(2026, 10, 5, 21)
-    assert sorted(routines.tick(now, path)) == ["LYLA", "MONEYPENNY", "THEIA"]
+    assert sorted(routines.tick(now, path)) == ["LYLA", "MONEYPENNY", "SHORTS", "THEIA"]
     assert routines.tick(now, path) == []
 
 
