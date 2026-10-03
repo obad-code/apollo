@@ -1127,6 +1127,23 @@ class Api:
     def suggestions(self):
         return stockdesk.suggestions()
 
+    def open_crew_file(self, path):
+        """Open an agent's result file - only ever one inside Documents\\Apollo."""
+        import files
+        full = os.path.normpath(str(path or ""))
+        base = os.path.normpath(files.root())
+        if not full or os.path.commonpath([full, base]) != base or not os.path.isfile(full):
+            return False
+        os.startfile(full)  # noqa: S606 - a file Apollo wrote, in its own folder
+        return True
+
+    def open_crew_folder(self):
+        import files
+        folder = os.path.join(files.root(), "Crew")
+        os.makedirs(folder, exist_ok=True)
+        os.startfile(folder)  # noqa: S606
+        return True
+
     def crew_check(self):
         """Ping each brain the crew thinks with; what each said."""
         return crew.check()

@@ -285,7 +285,8 @@ def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=No
             done = float(report.get("done") or 0)
             jobs.append({"agent": name, "task": report.get("task", ""),
                          "summary": report.get("summary", ""), "took": report.get("took", 0),
-                         "brain": report.get("brain", ""), "done": done})
+                         "brain": report.get("brain", ""), "done": done,
+                         "file": report.get("file", ""), "link": report.get("link", "")})
             if done >= start:
                 agents[name]["done_today"] += 1
                 hours[name][dt.datetime.fromtimestamp(done).hour] += 1
@@ -311,6 +312,8 @@ def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=No
                         "sent_hour": len(watcher.sent) if watcher else 0}
     for issue in problems:
         failed += 1 if issue.get("level") == "fail" else 0
+    for name in agents:
+        agents[name]["results"] = [j for j in jobs if j["agent"] == name][:6]
     return {"agents": agents, "hours": hours, "jobs": jobs[:8],
             "tools": sorted(tools_used.items(), key=lambda t: -t[1])[:6],
             "spend": spend, "issues": {"count": len(problems), "failing": failed,

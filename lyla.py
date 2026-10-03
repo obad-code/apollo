@@ -383,8 +383,10 @@ class Desk:
         if job["ok"]:
             self._tell(job, stage="done", text=job["summary"], report=job["report"],
                        ms=job["took"], brain=job["brain"])
-            self.reports.insert(0, {k: job[k] for k in ("task", "symbol", "summary", "report",
-                                                         "brain", "asked", "done", "took")})
+            keep_file(job)
+            self.reports.insert(0, {k: job.get(k, "") for k in ("task", "symbol", "summary", "report",
+                                                                 "brain", "asked", "done", "took",
+                                                                 "file", "link")})
             del self.reports[KEEP:]
             _save_reports(self.reports, self.path)
         else:
@@ -404,6 +406,23 @@ class Desk:
                     self.report(job)
         except Exception:  # noqa: BLE001 - her thread outlives a report that fails
             log.warning("%s's report failed", self.name, exc_info=True)
+
+
+def keep_file(job):
+    """Every finished job as a file you can open: Documents\\Apollo\\Crew\\
+    <AGENT>\\<date> <task>.md - and its first link (Q's ticket) on the job."""
+    found = re.search(r"https?://\S+", job.get("report", "") or "")
+    job["link"] = found.group(0).rstrip(").,]") if found else ""
+    try:
+        import files
+        stamp = time.strftime("%Y-%m-%d %H-%M", time.localtime(job.get("done") or time.time()))
+        slug = re.sub(r"[^\w\s-]", "", job.get("task", ""))[:50].strip() or "job"
+        text = (f"# {job.get('agent', NAME)}: {job.get('task', '')}\n\n"
+                f"**{job.get('summary', '')}**\n\n{job.get('report', '')}\n")
+        job["file"] = files.write(f"Crew/{job.get('agent', NAME)}/{stamp} {slug}.md", text)["path"]
+    except Exception:  # noqa: BLE001 - the report is still kept in the app
+        job["file"] = ""
+        log.info("could not keep %s's report as a file", job.get("agent"), exc_info=True)
 
 
 DESK = Desk()      # crew.py puts LYLA's own desk here

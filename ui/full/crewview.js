@@ -28,6 +28,18 @@ export const ROLES = {
   Q: ['Quartermaster', 'Turns "tell Claude to add..." into a ticket on GitHub, and Claude builds it.'],
 };
 
+/* What each one takes, and what it hands back - and where to find it. */
+export const IO = {
+  LYLA: ['A question or topic, a video link, or a job for your connected accounts.',
+    'A short research report with its sources. Videos go to your Downloads.'],
+  THEIA: ['An idea, plan or decision ("analyse this idea"). Say "deep" for a deeper one.',
+    'An analysis: what it is, a hard critique, the best way to do it, and a verdict.'],
+  MONEYPENNY: ['A stock, or "my whole watchlist".',
+    'A call per stock - BUY MORE, HOLD or PULL MONEY OUT - with the reasons and red flags.'],
+  Q: ['"Tell Claude to add / fix ..." - a feature or a bug.',
+    'A ticket on GitHub (obad-code/apollo issues) that Claude builds from.'],
+};
+
 const OUTPUTS = {
   LYLA: ['Sources', 'Downloads'],
   THEIA: ['Analysis', 'Verdict'],
@@ -132,7 +144,13 @@ export function focusMarkup(key, agent = {}, last, now = Date.now() / 1000) {
         <div><b>${agent.avg_ms ? `${(agent.avg_ms / 1000).toFixed(0)}s` : '—'}</b><span>avg job</span></div>
         <div><b>${agent.waiting || 0}</b><span>waiting</span></div>
       </div>
-      ${last ? `<p class="focus-last"><small>LAST RESULT</small>${esc(short(last.summary || last.task, 160))}</p>` : ''}
+      <div class="work-io"><p><small>TAKES</small>${esc(IO[key][0])}</p><p><small>GIVES</small>${esc(IO[key][1])}</p></div>
+      <div class="work-results"><small>RESULTS · newest first</small>${(agent.results || []).length
+        ? `<ul>${agent.results.map((r) => `<li><button type="button" class="result-open" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}">
+            <b>${esc(short(r.summary || r.task, 90))}</b><span>${esc(short(r.task, 60))}</span>
+            <em>${r.link ? 'Open on GitHub ›' : r.file ? 'Open the report ›' : ''}</em></button></li>`).join('')}</ul>`
+        : '<p class="work-empty">Nothing yet. Every result is also saved in Documents\\Apollo\\Crew.</p>'}
+        <button type="button" class="result-folder">Open the Crew folder</button></div>
     </div>`;
 }
 

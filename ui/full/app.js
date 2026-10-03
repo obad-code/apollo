@@ -4760,3 +4760,14 @@ $('desk-final').addEventListener('click', (event) => {
   const pick = event.target.closest('.final-pick[data-ticker]');
   if (pick) openDeep(pick.dataset.ticker, pick.dataset.name);
 });
+
+/* An agent's result: Q's ticket opens on GitHub, the rest as the report file. */
+$('crew-focus').addEventListener('click', (event) => {
+  const api = bridge();
+  if (!api) return;
+  if (event.target.closest('.result-folder')) { if (api.open_crew_folder) api.open_crew_folder(); return; }
+  const item = event.target.closest('.result-open');
+  if (!item) return;
+  if (item.dataset.link && api.open_link) api.open_link(item.dataset.link);
+  else if (item.dataset.file && api.open_crew_file) api.open_crew_file(item.dataset.file);
+});
