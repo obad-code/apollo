@@ -3317,3 +3317,17 @@ body.nav-open:not(.ultra) #stage:has(#markets.wall) { grid-template-columns: 42%
 .fw-lead .fw-tile img, .fw-lead .fw-tile .fw-mark { transition: transform 7.5s linear; transform: scale(1); }
 .fw-lead .fw-tile.on img, .fw-lead .fw-tile.on .fw-mark { transform: scale(1.1); }
 .fw-grid { grid-template-rows: repeat(2, 1fr); }
+
+/* ---- The news on a roller (normal display) ---- */
+#news-roll, #news-back { display: none; }
+body:not(.ultra) #headlines.news-rolled { background: transparent; border-color: transparent; backdrop-filter: none; box-shadow: none; }
+body:not(.ultra) #headlines.news-rolled > :not(#news-roll):not(#story) { display: none !important; }
+body:not(.ultra) #headlines.news-rolled #news-roll { display: flex; flex: 1; align-items: center; min-height: 260px; }
+#news-roller { width: 100%; height: 100%; min-height: 260px; outline: none; }
+#news-roller .ow-item { text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+body:not(.ultra) #headlines:not(.news-rolled) #news-back { display: inline-block; align-self: flex-start; margin: 0 0 8px; padding: 4px 12px;
+  border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 12px; opacity: .75; cursor: pointer; }
+/* opened: no dark slab, just the pictures */
+body:not(.ultra) #headlines:not(.news-rolled) { background: transparent; border-color: transparent; backdrop-filter: none; box-shadow: none; }
+body:not(.ultra) #headlines:not(.news-rolled) #headlines-head, body:not(.ultra) #headlines:not(.news-rolled) #topics,
+body:not(.ultra) #headlines:not(.news-rolled) #feed-fold { display: none; }

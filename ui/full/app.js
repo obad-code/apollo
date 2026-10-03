@@ -4985,3 +4985,40 @@ $('crew-focus').addEventListener('click', (event) => {
   if (item.dataset.link && api.open_link) api.open_link(item.dataset.link);
   else if (item.dataset.file && api.open_crew_file) api.open_crew_file(item.dataset.file);
 });
+
+/* The dock's Edit: arrange the display (the same as F2). */
+$('edit-toggle').addEventListener('click', () => {
+  if (state.hudEdit) exitHudEdit(); else enterHudEdit();
+  $('edit-toggle').setAttribute('aria-pressed', state.hudEdit ? 'true' : 'false');
+});
+
+/* The news as a roller, like the left side's: the topics float on the
+ * scene with no panel; pick one and its stories open as pictures; right-click
+ * (or "‹ Topics") rolls them away again. */
+const NEWS_TOPICS = [['all', 'News'], ['private eye', 'Private Eye'], ['markets', 'Markets'],
+  ['gaming', 'Gaming'], ['marvel', 'Marvel'], ['movies', 'Movies']];
+function rollNews(open, topic) {
+  $('headlines').classList.toggle('news-rolled', !open);
+  if (open) {
+    const i = TOPICS.indexOf(topic);
+    if (i >= 0) { state.topic = i; state.feedKey = null; if (state.snapshot) renderFeed(state.snapshot); }
+    sfx.play('expand');
+  } else sfx.play('collapse');
+}
+const newsWheel = new OptionWheel($('news-roller'), {
+  items: NEWS_TOPICS.map(([, label]) => label),
+  onOpen: (i) => rollNews(true, NEWS_TOPICS[i][0]),
+  sound: (name) => sfx.play(name),
+  fontSize: 1.5, spacing: 1.9, tilt: 5, blur: 0.9, fade: 0.2, inset: 18,
+});
+$('news-roller').addEventListener('click', (event) => {
+  const item = event.target.closest('.ow-item');
+  if (item && Number(item.dataset.i) === newsWheel.selected) rollNews(true, NEWS_TOPICS[newsWheel.selected][0]);
+});
+$('news-back').addEventListener('click', () => rollNews(false));
+$('headlines').addEventListener('contextmenu', (event) => {
+  if ($('headlines').classList.contains('news-rolled') || state.open) return;
+  event.preventDefault();
+  rollNews(false);
+});
+$('headlines').classList.add('news-rolled');

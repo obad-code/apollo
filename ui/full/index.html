@@ -127,6 +127,8 @@
     </div>
     <!-- The normal display's feed: the stories as pictures on a turning
          drum. Hover one for what it is; click it to open it. -->
+    <div id="news-roll"><div id="news-roller"></div></div>
+    <button id="news-back" type="button" data-sfx="none">‹ Topics</button>
     <div id="feed-wheel" aria-label="The stories, as pictures"><div class="fw-ring"></div></div>
     <!-- One story, opened out of its row. -->
     <article id="story" aria-hidden="true"></article>
@@ -326,6 +328,9 @@
     <button class="mode" type="button" data-act="idle" data-sfx="none" aria-pressed="false"
             title="Idle mode now: the idle screen, until you touch a key or the mouse or speak">
       <svg class="mode-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M11.5 10.2A5.2 5.2 0 0 1 5.8 4.5 5.2 5.2 0 1 0 11.5 10.2Z"/></svg>Idle</button>
+    <button class="mode" type="button" id="edit-toggle" data-sfx="none" aria-pressed="false"
+            title="Arrange the display: move and resize the panels (F2)">
+      <svg class="mode-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13l1-3 7-7 2 2-7 7-3 1zM10 4l2 2"/></svg>Edit</button>
     <button class="mode" type="button" id="ambient-toggle" data-sfx="none" aria-pressed="true"
             title="The room's sound: a quiet bed under each mode - an engine, a cabin, fans. No music.">
       <svg class="mode-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h1.5M5 5v6M8 3v10M11 5.5v5M14 7v2"/></svg>Sound</button>
