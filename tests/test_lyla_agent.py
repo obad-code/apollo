@@ -282,7 +282,7 @@ def test_lylas_card_is_hers_unless_told(tmp_path):
 def test_each_mark_is_its_own_shape(tmp_path):
     marks = run(tmp_path, "return ['LYLA', 'THEIA', 'MONEYPENNY', 'Q'].map((k) => A.emblem(k, 40));")
     assert len(set(marks)) == 4
-    for mark, colour in zip(marks, ("#5B8CFF", "#C084FC", "#34D399", "#FF9A4D")):
+    for mark, colour in zip(marks, ("#5B8CFF", "#C084FC", "#6FD8C4", "#FF9A4D")):
         assert mark.startswith("<svg") and colour in mark and 'width="40"' in mark
 
 
