@@ -2618,10 +2618,10 @@ body.agents:not(.ultra):not(.osiris-map) #agents {
 
 /* The roller menu (the side panel's main navigation). */
 #nav-roll, #nav-back { display: none; }
-#markets.rolled > :not(#nav-roll):not(#stock) { display: none !important; }
-#markets.rolled #nav-roll { display: flex; flex: 1; min-height: 260px; align-items: center; }
+body:not(.ultra) #markets.rolled > :not(#nav-roll):not(#stock) { display: none !important; }
+body:not(.ultra) #markets.rolled #nav-roll { display: flex; flex: 1; min-height: 260px; align-items: center; }
 #nav-roller { width: 100%; height: 100%; min-height: 260px; outline: none; }
-body.nav-open #nav-back {
+body.nav-open:not(.ultra) #nav-back {
   display: inline-block; align-self: flex-start; margin: 0 0 10px; padding: 4px 12px;
   border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: transparent;
   color: inherit; font: inherit; font-size: 12px; letter-spacing: .08em; opacity: .75; cursor: pointer;
@@ -2631,7 +2631,7 @@ body.nav-open:not(.ultra) #stage { grid-template-columns: 48% 1fr 22%; transitio
 /* Rolled, the roller floats on the scene like the clock; the panel's box
    comes back round the page it opens. */
 #markets { transition: background .35s, border-color .35s, backdrop-filter .35s; }
-#markets.rolled { background: transparent; border-color: transparent; backdrop-filter: none; }
+body:not(.ultra) #markets.rolled { background: transparent; border-color: transparent; backdrop-filter: none; }
 #markets.rolled .ow-item { text-shadow: 0 2px 12px rgba(0,0,0,.6); }
 
 /* Calmer normal display. The consoles live in the expanded display only,
@@ -3390,3 +3390,10 @@ body:not(.ultra):not(.viewing) #crew-mini { grid-template-columns: repeat(2, min
 .cm-card small.caption { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; opacity: .7; }
 body:not(.ultra):not(.viewing) #markets.rolled #nav-roll { align-items: flex-start; max-height: calc(100% - 150px); }
 body:not(.ultra):not(.viewing) #markets.rolled #nav-roll { flex: none; height: 180px; min-height: 0; } body:not(.ultra):not(.viewing) #markets.rolled #nav-roller { min-height: 0; height: 180px; } body:not(.ultra):not(.viewing) #markets.rolled { align-self: start; }
+
+/* Expanded mode keeps its own design: no rollers, every display at once. */
+body.ultra #nav-roll, body.ultra #nav-back, body.ultra #news-roll, body.ultra #news-back,
+body.ultra #feed-wheel, body.ultra #crew-mini, body.ultra #room-crew { display: none !important; }
+body.ultra #headlines #feed { display: block; }
+body.osiris-map #crew-mini, body.osiris-map #room-crew { display: none !important; }
+body.viewing #crew-toggle, body.osiris-map #crew-toggle, body.roomless #crew-toggle { display: none; }
