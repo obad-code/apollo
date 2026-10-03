@@ -2169,18 +2169,19 @@ const ago = (when) => (when ? `${words(Math.max(0, Date.now() / 1000 - when))} a
 /* Talks: each exchange with Apollo as a soft square - what you said, what
  * he (or an agent) answered, the tools it took. */
 function renderTalks(list) {
-  const talks = (list || []).map((talk, i) => `
-    <div class="talk" style="--i:${Math.min(i, 8)}">
-      <span class="when">${esc(talk.day === 'today' ? talk.time : 'yday ' + talk.time)}</span>
-      <div class="lines">
-        <p class="you" dir="auto">${esc(talk.you)}</p>
-        <p class="said" dir="auto"><b>${esc(talk.who)}</b> ${esc(talk.apollo || '…')}</p>
-        ${(talk.tools || []).length ? `<p class="used">${(talk.tools || []).map((name) =>
-          `<i>${esc(name)}</i>`).join('')}</p>` : ''}
-      </div>
+  // Talks as a conversation: your words on the right, the answer on the
+  // left from whoever gave it, the tools it took as little chips under it.
+  const talks = (list || []).slice(0, 14).reverse().map((talk, i) => `
+    <div class="chat-pair" style="--i:${Math.min(i, 8)}">
+      <span class="chat-when">${esc(talk.day === 'today' ? talk.time : 'yday ' + talk.time)}</span>
+      <p class="chat-you" dir="auto">${esc(talk.you)}</p>
+      <div class="chat-them"><b>${esc(talk.who)}</b><p dir="auto">${esc(talk.apollo || '…')}</p>
+        ${(talk.tools || []).length ? `<span class="chat-tools">${(talk.tools || []).map((name) => `<i>${esc(name)}</i>`).join('')}</span>` : ''}</div>
     </div>`).join('');
-  $('pane-talks').innerHTML = talks ? `<div class="talks-grid">${talks}</div>`
+  $('pane-talks').innerHTML = talks ? `<div class="chat">${talks}</div>`
     : '<p class="quiet">Nothing said yet today. Hold Ctrl+Alt and ask him something.</p>';
+  const chat = $('pane-talks').querySelector('.chat');
+  if (chat) chat.scrollTop = chat.scrollHeight;
 }
 
 /* Projects: every project you have - Claude Code sessions, git folders on
@@ -2278,19 +2279,46 @@ $('pane-projects').addEventListener('click', (event) => {
   }
 });
 
+/* Ideas as a row of light bulbs: the newest burn brightest, older ones
+ * dim; hover one and it lights, its idea under it. Reminders as tags
+ * hanging from a rail, each with a ring that closes as its time comes. */
+const BULB = `<svg class="bulb" viewBox="0 0 40 56" aria-hidden="true">
+  <path class="glass" d="M20 3C10.6 3 4 10 4 18.6c0 6 3.2 9.6 6 12.6 1.7 1.8 2.6 3.6 2.6 5.8V40h14.8v-3c0-2.2.9-4 2.6-5.8 2.8-3 6-6.6 6-12.6C36 10 29.4 3 20 3z"/>
+  <path class="wire" d="M15 30c1.5-6 3-10 5-10s3.5 4 5 10"/>
+  <rect class="cap" x="12.6" y="40" width="14.8" height="10" rx="2"/><path class="cap-l" d="M12.6 43.5h14.8M12.6 47h14.8"/></svg>`;
+
+function untilWords(iso) {
+  const due = Date.parse(iso);
+  if (!due) return { text: '', share: 0 };
+  const left = Math.max(0, (due - Date.now()) / 1000);
+  const h = Math.floor(left / 3600), m = Math.round((left % 3600) / 60);
+  const text = left < 60 ? 'now' : h >= 24 ? `in ${Math.round(h / 24)}d` : h ? `in ${h}h ${m}m` : `in ${m}m`;
+  return { text, share: Math.max(0.03, 1 - Math.min(1, left / 86400)), soon: left < 1800 };
+}
+
 function renderIdeas(data) {
-  const list = (data.ideas || []).map((idea) => `
-    <div class="idea">
-      <p>${esc(idea.text)}</p>
+  const ideas = data.ideas || [];
+  const list = ideas.map((idea, i) => `
+    <div class="idea-bulb" style="--lit:${Math.max(0.25, 1 - i * 0.12)}" tabindex="0">
+      ${BULB}
+      <p dir="auto">${esc(idea.text)}</p>
       <span>${esc(idea.age)}</span>
       <button data-idea="${esc(idea.id)}" title="Remove">×</button>
     </div>`).join('');
-  const due = (data.reminders || []).map((reminder) => `
-    <div class="idea due"><p>${esc(reminder.text)}</p><span>${esc(reminder.due)}</span></div>`).join('');
-  $('pane-ideas').innerHTML = `<h3>Ideas</h3>${list
-    || '<p class="quiet">No ideas kept yet. Say “فكرة” or “idea:” and what it is.</p>'}`;
-  $('pane-reminders').innerHTML = `<h3>Reminders</h3>${due
-    || '<p class="quiet">No reminders set. Ask Apollo to remind you of something.</p>'}`;
+  $('pane-ideas').innerHTML = `<h3>Ideas</h3>${list ? `<div class="bulbs">${list}</div>`
+    : '<p class="quiet">No ideas kept yet. Say “فكرة” or “idea:” and what it is.</p>'}`;
+  const tags = (data.reminders || []).map((reminder) => {
+    const until = untilWords(reminder.due);
+    const at = Date.parse(reminder.due);
+    const clock = at ? new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+    return `<div class="rem-tag${until.soon ? ' soon' : ''}" style="--share:${until.share}">
+      <i class="rem-string"></i>
+      <div class="rem-ring"><b>${esc(until.text)}</b></div>
+      <p dir="auto">${esc(reminder.text)}</p><span>${esc(clock)}</span>
+    </div>`;
+  }).join('');
+  $('pane-reminders').innerHTML = `<h3>Reminders</h3>${tags ? `<div class="rem-rail">${tags}</div>`
+    : '<p class="quiet">No reminders set. Ask Apollo to remind you of something.</p>'}`;
 }
 
 /* Two clicks to take an idea off: the first asks, the second does it. */
@@ -2305,7 +2333,7 @@ $('pane-ideas').addEventListener('click', (event) => {
   }
   const api = window.pywebview && window.pywebview.api;
   if (api && api.drop_idea) api.drop_idea(button.dataset.idea);
-  button.closest('.idea').remove();
+  button.closest('.idea, .idea-bulb').remove();
 });
 
 /* The gauges in the corner: the machine as rows of lit segments, and under

@@ -86,7 +86,7 @@
   --down-ink: #d1453b;
   /* Smoked, warm glass: the dots show through it, blurred, and the words on
      it still read. */
-  --panel: rgba(26, 13, 0, 0.72);
+  --panel: rgba(14, 14, 17, 0.74);
   --paper: #FFF0CE;               /* the feed's bar and the idle screen's ink */
   --panel-soft: rgba(255, 255, 255, 0.045);
   --gutter: 48px;
@@ -155,7 +155,7 @@ html, body {
 .panel {
   background: var(--panel);
   border-radius: var(--radius);
-  border: 1px solid rgba(255, 176, 0, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 22px 24px;
   backdrop-filter: blur(7px) saturate(1.2);
   min-height: 0;
@@ -205,7 +205,7 @@ html, body {
   grid-area: status; align-self: end; position: relative;
   display: flex; flex-wrap: wrap; align-items: center; gap: 7px 18px;
   padding: 11px 18px; border-radius: 16px; background: var(--panel);
-  border: 1px solid rgba(255, 176, 0, 0.14); backdrop-filter: blur(7px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(7px) saturate(1.2);
 }
 #dots { display: flex; gap: 16px; font-size: 11px; font-weight: 700; white-space: nowrap;
         color: rgba(255, 193, 94, 0.78); letter-spacing: 0.08em; }
@@ -3087,3 +3087,52 @@ body.listening .look-cards .cc-hub .cp-node::after { animation-delay: .8s; }
 .cc-badge { background: linear-gradient(145deg, #2a2a2e, #1b1b1e); box-shadow: 4px 4px 10px rgba(0,0,0,.55), -3px -3px 8px rgba(255,255,255,.04), inset 0 1px 0 rgba(255,255,255,.08); }
 .cc-bottom { margin: 0 10px 10px; border-radius: 12px; background: rgba(0,0,0,.22);
   box-shadow: inset 3px 3px 8px rgba(0,0,0,.55), inset -2px -2px 6px rgba(255,255,255,.025); }
+
+/* ---- Ideas: bulbs ---- */
+.bulbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 18px 14px; padding: 6px 2px; }
+.idea-bulb { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; outline: none; }
+.bulb { width: 46px; height: 64px; overflow: visible; transition: filter .35s, transform .35s; }
+.bulb .glass { fill: rgba(255, 214, 120, calc(var(--lit) * .55)); stroke: rgba(255,230,170,.55); stroke-width: 1.2; }
+.bulb .wire { fill: none; stroke: rgba(255, 245, 210, calc(.35 + var(--lit) * .65)); stroke-width: 1.4; stroke-linecap: round; }
+.bulb .cap { fill: #6b6a72; } .bulb .cap-l { stroke: #3c3b42; stroke-width: 1; }
+.idea-bulb .bulb { filter: drop-shadow(0 0 calc(var(--lit) * 14px) rgba(255, 190, 70, calc(var(--lit) * .8))); }
+.idea-bulb:hover .bulb, .idea-bulb:focus .bulb { --lit: 1; transform: translateY(-3px); filter: drop-shadow(0 0 22px rgba(255, 196, 80, .95)); }
+.idea-bulb p { font-size: 12px; line-height: 1.4; color: rgba(255,255,255,.75); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.idea-bulb:hover p, .idea-bulb:focus p { -webkit-line-clamp: 12; color: #fff; }
+.idea-bulb > span { font-size: 10px; opacity: .45; }
+.idea-bulb button { position: absolute; top: -4px; right: 6px; opacity: 0; border: 0; background: none; color: #ff8a8a; cursor: pointer; font-size: 14px; }
+.idea-bulb:hover button { opacity: 1; }
+.idea-bulb button.sure { font-size: 10.5px; }
+
+/* ---- Reminders: tags on a rail ---- */
+.rem-rail { position: relative; display: flex; gap: 16px; padding: 22px 6px 6px; overflow-x: auto; scrollbar-width: none; }
+.rem-rail::before { content: ''; position: absolute; left: 0; right: 0; top: 8px; height: 3px; border-radius: 2px;
+  background: linear-gradient(180deg, #8d8c95, #4a4950); box-shadow: 0 2px 3px rgba(0,0,0,.5); }
+.rem-tag { position: relative; flex: none; width: 150px; padding: 16px 14px 14px; border-radius: 14px; text-align: center;
+  background: linear-gradient(180deg, #232327, #18181b); border: 1px solid rgba(255,255,255,.07);
+  box-shadow: 0 10px 20px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05);
+  transform-origin: 50% -14px; animation: rem-sway 5s ease-in-out infinite; }
+.rem-tag:nth-child(2n) { animation-delay: -2.2s; } .rem-tag:nth-child(3n) { animation-delay: -3.7s; }
+@keyframes rem-sway { 50% { transform: rotate(1.6deg); } }
+.rem-string { position: absolute; left: 50%; top: -14px; width: 1.5px; height: 14px; background: rgba(255,255,255,.35); }
+.rem-ring { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 50%;
+  background: conic-gradient(#FFB000 calc(var(--share) * 360deg), rgba(255,255,255,.08) 0); position: relative; }
+.rem-ring::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: #1b1b1e; box-shadow: inset 0 2px 5px rgba(0,0,0,.6); }
+.rem-ring b { position: relative; font-size: 11px; font-weight: 600; color: #fff; }
+.rem-tag.soon .rem-ring { background: conic-gradient(#ff5a5f calc(var(--share) * 360deg), rgba(255,255,255,.08) 0); animation: glow 1.4s infinite; border-radius: 50%; }
+.rem-tag p { font-size: 12px; line-height: 1.4; color: #ececef; }
+.rem-tag > span { display: block; margin-top: 6px; font-size: 10.5px; opacity: .5; }
+.rem-ring { width: 72px; height: 72px; } .rem-ring b { font-size: 10px; letter-spacing: -.02em; white-space: nowrap; }
+
+/* ---- Talks: a conversation ---- */
+.chat { display: flex; flex-direction: column; gap: 16px; max-height: 100%; overflow-y: auto; padding: 4px 4px 8px; scrollbar-width: none; }
+.chat-pair { display: flex; flex-direction: column; gap: 6px; animation: step-in .4s both; animation-delay: calc(var(--i) * 40ms); }
+.chat-when { align-self: center; font-size: 9.5px; letter-spacing: .14em; opacity: .4; }
+.chat-you { align-self: flex-end; max-width: 78%; padding: 9px 13px; border-radius: 16px 16px 4px 16px; font-size: 12.5px; line-height: 1.45;
+  background: linear-gradient(180deg, #2c2c32, #232328); color: #f3f3f5; box-shadow: 0 4px 10px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06); }
+.chat-them { align-self: flex-start; max-width: 86%; padding: 9px 13px; border-radius: 16px 16px 16px 4px; background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.07); }
+.chat-them b { display: block; font-size: 9.5px; letter-spacing: .18em; color: #FFB000; margin-bottom: 3px; }
+.chat-them p { font-size: 12.5px; line-height: 1.5; color: rgba(255,255,255,.82); }
+.chat-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chat-tools i { font-style: normal; font-size: 9.5px; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.06); color: rgba(255,255,255,.55); }
