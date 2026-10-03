@@ -237,7 +237,15 @@ class Orb:
 
         # What is on screen: your words, Apollo's body, and what it is doing.
         self._heard = ""
-        self._activity = ""
+        self._said = ""                   # Apollo's plain reply, in the bar
+        self._isl_cache = (None, [])
+        self._isl_w = overlay_state.Spring(float(self.ISLAND_REST[0]), response=0.38)
+        self._isl_h = overlay_state.Spring(float(self.ISLAND_REST[1]), response=0.38)
+        self._isl_icons = overlay_state.Spring(0.0, response=0.3)
+        self._isl_eyes = overlay_state.Spring(1.0, response=0.3)
+        self._isl_globe = overlay_state.Spring(0.0, response=0.34)
+        self._isl_corner = overlay_state.Spring(0.0, response=0.36)
+        self._isl_text = overlay_state.Spring(0.0, response=0.3)
         self._content = None              # the built, cached, drawable body
         self._content_at = 0.0            # when it arrived, for the stagger
         self._pending = None
@@ -395,6 +403,7 @@ class Orb:
 
         if clear_at is not None and time.monotonic() >= clear_at:
             self._heard = ""
+            self._said = ""
             self._activity = ""
             self._drop(self._content)
             self._content = None
@@ -413,6 +422,12 @@ class Orb:
             return
 
         if not text and not visual:
+            return
+        if visual is None:
+            # Plain words go in Mini Apollo's bar, not on the card.
+            self._said = text
+            self._drop(self._content)
+            self._content = None
             return
         previous = self._content
         try:
@@ -517,16 +532,123 @@ class Orb:
         right edges, so widening it is invisible, and easing it would only
         delay the point at which text has room to wrap into.
         """
-        if self.view.panel_open <= 0.005 and self._content is None and not self._heard:
-            # At rest: wide enough for Mini Apollo's bar and its shadow.
-            return float(max(self.art, self.MINI_W)), float(self.art)
+        if self._content is None:
+            # Mini Apollo's bar, at whatever size it is heading for.
+            iw, ih = self._island_target()
+            return (float(max(self.art, iw + 60)),
+                    float(max(self.art, self.overhang + ih + 30)))
         width = float(max(self.art, self.PANEL_W + self.WINDOW_MARGIN * 2))
         height = (self.overhang - self.hidden_height() + self.panel_height()
                   + self.SHADOW_ROOM)
         return width, float(max(self.art, height))
 
+    # -- Mini Apollo's bar: eyes at rest, Apollo while you talk, words in it --
+
+    ISLAND_REST = (150, 40)        # just his eyes, following the pointer
+    ISLAND_ON = (300, 78)          # the bar, with Apollo in the well
+    ISLAND_TEXT_W = 540            # the bar, with what is said in it
+    ISLAND_LINES = 4
+    ISLAND_LH = 22
+
+    def _island_words(self):
+        return self._said or self._heard
+
+    def _island_active(self):
+        return bool(self._island_words()) or self.view.state != overlay_state.REST
+
+    def _island_lines(self):
+        text = self._island_words()
+        width = self.ISLAND_TEXT_W - 16 - 58
+        key = (text, width)
+        if self._isl_cache[0] != key:
+            rtl = overlay_content.is_rtl(text)
+            fonts = self._font_set()
+            font = fonts["rtl"] if rtl else fonts["caption"]
+            metrics = Metrics(self._char_w, lambda t: self._measure(t, rtl, font=font))
+            lines = overlay_content.wrap(text, 0, metrics, width) if text else []
+            self._isl_cache = (key, lines[-self.ISLAND_LINES:])
+        return self._isl_cache[1]
+
+    def _island_target(self):
+        if self._island_words():
+            n = max(1, len(self._island_lines()))
+            return self.ISLAND_TEXT_W, overlay_paint.MiniApollo.HEAD_ROW + 6 + n * self.ISLAND_LH + 22
+        if self._island_active():
+            return self.ISLAND_ON
+        return self.ISLAND_REST
+
+    def _cursor_look(self, ex, ey):
+        """Where the pointer is, from the eyes at (ex, ey) in the window, as
+        a direction squashed into -1..1."""
+        try:
+            pt = POINT()
+            _user32.GetCursorPos(ctypes.byref(pt))
+        except Exception:  # noqa: BLE001
+            return (0.0, 0.0)
+        dx = pt.x - (self.rect[0] + ex)
+        dy = pt.y - (self.rect[1] + ey)
+        return (max(-1.0, min(1.0, dx / 500.0)), max(-1.0, min(1.0, dy / 300.0)))
+
+    def _advance_island(self, dt):
+        tw, th = self._island_target()
+        words = bool(self._island_words())
+        active = self._island_active()
+        for spring, goal in ((self._isl_w, tw), (self._isl_h, th),
+                             (self._isl_icons, 1.0 if active else 0.0),
+                             (self._isl_eyes, 0.0 if active else 1.0),
+                             (self._isl_globe, 1.0 if active else 0.0),
+                             (self._isl_corner, 1.0 if words else 0.0),
+                             (self._isl_text, 1.0 if words else 0.0)):
+            spring.to(goal)
+            spring.step(dt)
+
+    def _draw_island(self, g, cx, t, fade):
+        a = 255 * fade
+        w, h = self._isl_w.value, self._isl_h.value
+        icons = max(0.0, min(1.0, self._isl_icons.value))
+        (wx, wy, ww, wh), well = self.mini.shell(g, cx, self.overhang, w, h, a, icons)
+        g.SetClip(well)
+        try:
+            # His eyes, alone, when nothing is going on: watching the pointer.
+            eyes = max(0.0, min(1.0, self._isl_eyes.value))
+            if eyes > 0.02:
+                ecx, ecy = wx + ww / 2.0, wy + wh / 2.0
+                self.mini.eyes(g, ecx, ecy, t, a * eyes, self._cursor_look(ecx, ecy),
+                               size=min(1.0, wh / 26.0))
+            # Apollo: in the middle of the well, then off to its corner
+            # when there are words to make room for.
+            globe = max(0.0, min(1.0, self._isl_globe.value))
+            if globe > 0.02:
+                k = max(0.0, min(1.0, self._isl_corner.value))
+                big = min(wh * 0.36, 17.0)
+                gx = (wx + ww / 2.0) * (1 - k) + (wx + 28.0) * k
+                gy = (wy + wh / 2.0) * (1 - k) + (wy + 22.0) * k
+                r = big * (1 - k) + 12.0 * k
+                spin = 5.0 if self.view.state == overlay_state.SEARCHING else 1.0
+                self.mark.draw_at(g, gx, gy, r, t * spin, level=self._level, fade=globe * fade)
+            # The words, where the bot used to sit.
+            shown = max(0.0, min(1.0, self._isl_text.value))
+            lines = self._island_lines()
+            if shown > 0.02 and lines:
+                fonts = self._font_set()
+                text = self._island_words()
+                rtl = overlay_content.is_rtl(text)
+                font = fonts["rtl"] if rtl else fonts["caption"]
+                fmt = fonts["rtl_fmt"] if rtl else fonts["fmt"]
+                colour = PALETTE["you"] if not self._said else PALETTE["ink"]
+                left, right = wx + 54.0, wx + ww - 14.0
+                y = wy + 11.0
+                for line in lines:
+                    self._string(g, line, font, fmt, right if rtl else left, y,
+                                 colour, 235 * shown * fade)
+                    y += self.ISLAND_LH
+        finally:
+            g.ResetClip()
+            well.Dispose()
+
     def _advance(self, dt):
         self.view.step(dt)
+        self._advance_island(dt)
         want_w, want_h = self._targets()
         self._height.to(want_h)
         self._height.step(dt)
@@ -996,13 +1118,14 @@ class Orb:
         g.Clear(D.Color.FromArgb(0, 0, 0, 0))          # genuinely nothing
 
         try:
-            ring_fade = self.view.ring_fade
-            if ring_fade > 0.01:
-                # Mini Apollo, hanging from the screen's edge (`overhang` is
-                # where that edge falls in the window).
-                self.mini.draw_at(g, w / 2.0, self.overhang, t, level=self._level, fade=ring_fade,
-                                  busy=self.view.state == overlay_state.SEARCHING)
-            if self.view.panel_open > 0.005:
+            # Mini Apollo's bar, hanging from the screen's edge (`overhang`
+            # is where that edge falls in the window). The card drops only
+            # for what the bar cannot hold: charts and cards.
+            rich = self._content is not None
+            card = self.view.panel_open if rich else 0.0
+            if card < 0.99:
+                self._draw_island(g, w / 2.0, t, 1.0 - card)
+            if rich and self.view.panel_open > 0.005:
                 self._draw_panel(g, w, t, now)
         finally:
             g.Dispose()

@@ -690,6 +690,59 @@ class MiniApollo:
             g.ResetClip()
             well.Dispose()
 
+    def shell(self, g, cx, top, w, h, a, icons=1.0):
+        """The bar at any size - `w` wide, `h` showing under the screen's
+        edge at `top` - with the icon row faded by `icons`. Returns the
+        well's (x, y, w, h) and its path; the caller disposes the path."""
+        b = self.brushes
+        x = cx - w / 2.0
+        y = top - self.RADIUS
+        full = h + self.RADIUS
+        for spread, share in ((10, 0.10), (5, 0.16)):
+            path = self._round(x - spread, y, w + spread * 2, full + spread, self.RADIUS + spread)
+            g.FillPath(b.brush((0, 0, 0), a * share), path)
+            path.Dispose()
+        bar = self._round(x, y, w, full, self.RADIUS)
+        g.FillPath(b.brush(self.INK, a * 0.94), bar)
+        g.DrawPath(b.pen(self.LINE, a * 0.07, 1.0), bar)
+        bar.Dispose()
+        row_h = self.HEAD_ROW * icons
+        if icons > 0.02:
+            ia = a * icons
+            row = top + 4 + self.HEAD_ROW / 2.0
+            pill = self._round(x + 12, row - 10, 34, 20, 10)
+            g.FillPath(b.brush(self.LINE, ia * 0.10), pill)
+            pill.Dispose()
+            self._home(g, x + 29, row, ia)
+            self._chat(g, x + 62, row, ia * 0.75)
+            self._plus(g, x + 86, row, ia * 0.75)
+            self._gear(g, x + w - 50, row, ia * 0.75)
+            self._sound(g, x + w - 24, row, ia * 0.75)
+        inset = 6 + 2 * icons
+        wx, wy = x + inset, top + row_h + 6 * icons + 4 * (1 - icons)
+        ww, wh = w - inset * 2, max(8.0, top + h - inset - wy)
+        well = self._round(wx, wy, ww, wh, min(14, wh / 2))
+        g.FillPath(b.brush(self.WELL, a), well)
+        return (wx, wy, ww, wh), well
+
+    EYE_LIT = (255, 244, 220)
+
+    def eyes(self, g, cx, cy, t, a, look=(0.0, 0.0), size=1.0):
+        """Apollo's eyes alone: two warm white ovals on the dark, blinking,
+        turned toward `look` (each from -1 to 1)."""
+        b = self.brushes
+        shut = self.blink(t)
+        ew, eh = 7.0 * size, 12.0 * size * (1.0 - 0.88 * shut)
+        lx, ly = look
+        for side in (-1, 1):
+            ex = cx + side * 11.0 * size + lx * 5.0 * size
+            ey = cy + ly * 3.5 * size
+            for reach, share in ((2.4, 0.08), (1.6, 0.16)):
+                g.FillEllipse(b.brush(self.GLOW, a * share), float(ex - ew * reach / 2),
+                              float(ey - eh * reach / 2), float(ew * reach), float(max(2.0, eh * reach)))
+            g.FillEllipse(b.brush(self.EYE_LIT, a), float(ex - ew / 2), float(ey - eh / 2),
+                          float(ew), float(max(1.4, eh)))
+
     def _face(self, g, cx, cy, t, level, a, busy):
         b = self.brushes
         bob = math.sin(t * 1.6) * 1.2 - level * 2.0
