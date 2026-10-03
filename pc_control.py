@@ -608,3 +608,130 @@ def system_power(action):
         _run(["shutdown", "/a"])
         return "Cancelled."
     return f"Failed: unknown power action {action}."
+
+
+# --- things that take more than one step -------------------------------------
+#
+# "Open YouTube and search for X", "open Discord and send Ahmed hi": asked as
+# separate tools, the model opened the app and stopped there - or typed
+# before the app had come up, into whatever was in front. These do the whole
+# thing, waiting for each step to land before the next.
+
+SEARCH_URLS = {
+    "youtube": "https://www.youtube.com/results?search_query=",
+    "google": "https://www.google.com/search?q=",
+    "amazon": "https://www.amazon.com/s?k=",
+    "github": "https://github.com/search?q=",
+    "reddit": "https://www.reddit.com/search/?q=",
+    "x": "https://x.com/search?q=", "twitter": "https://x.com/search?q=",
+    "spotify": "https://open.spotify.com/search/",
+    "maps": "https://www.google.com/maps/search/", "google maps": "https://www.google.com/maps/search/",
+    "images": "https://www.google.com/search?tbm=isch&q=",
+    "noon": "https://www.noon.com/saudi-en/search/?q=",
+    "wikipedia": "https://en.wikipedia.org/w/index.php?search=",
+}
+
+
+def search_url(site, query):
+    """The address that searches `site` for `query`, or None for a site it
+    does not know how to search."""
+    key = (site or "").strip().lower().removesuffix(".com")
+    base = SEARCH_URLS.get(key)
+    if not base or not (query or "").strip():
+        return None
+    return base + urllib.parse.quote(query.strip()) if base.endswith("/") else \
+        base + urllib.parse.quote_plus(query.strip())
+
+
+def search_site(site, query):
+    url = search_url(site, query)
+    if url is None:
+        url = "https://www.google.com/search?q=" + urllib.parse.quote_plus(f"{query} site:{site}")
+    if not _try_start(url):
+        return f"Failed: could not open the browser for {site}."
+    return f"Searched {site} for {query}."
+
+
+def youtube_first(query):
+    """The top YouTube result's watch address for `query`, or None."""
+    try:
+        import yt_dlp
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True,
+                               "skip_download": True}) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+        entries = (info or {}).get("entries") or []
+        if entries and entries[0].get("id"):
+            return "https://www.youtube.com/watch?v=" + entries[0]["id"]
+    except Exception:  # noqa: BLE001 - the results page is still there
+        return None
+    return None
+
+
+def play_youtube(query):
+    """Play the top result, or open the results when it cannot be found."""
+    url = youtube_first(query)
+    if url and _try_start(url):
+        return f"Playing the top YouTube result for {query}."
+    return search_site("youtube", query)
+
+
+# Each chat app's way to jump to a conversation by name.
+CHAT_APPS = {
+    "discord": {"exe": "discord", "find": "ctrl+k"},
+    "whatsapp": {"exe": "whatsapp", "find": "ctrl+f"},
+    "telegram": {"exe": "telegram", "find": "ctrl+f"},
+    "slack": {"exe": "slack", "find": "ctrl+k"},
+    "teams": {"exe": "teams", "find": "ctrl+e"},
+}
+
+
+def wait_for_app(app, timeout=20.0, sleep=time.sleep, find=None, front=None):
+    """Wait until a window of `app` is in front. Its window handle, or None."""
+    find = find or find_windows
+    front = front or _foreground
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        windows = find(app)
+        if windows:
+            hwnd = windows[0][0]
+            if front() == hwnd:
+                return hwnd
+            _focus(hwnd)
+        sleep(0.4)
+    return None
+
+
+def send_chat(app, to, text, sleep=time.sleep):
+    """Open `app`, go to the conversation with `to`, and send `text`.
+
+    Every keystroke waits for the one before to land, and it stops the moment
+    the app is no longer in front - so nothing is ever typed into the wrong
+    window."""
+    spec = CHAT_APPS.get((app or "").strip().lower())
+    if spec is None:
+        return f"Failed: I can send messages in {', '.join(CHAT_APPS)}, not {app}."
+    if not (to or "").strip() or not (text or "").strip():
+        return "Failed: I need who to send it to and what to say."
+    opened = open_app(spec["exe"])
+    if opened.startswith("Failed"):
+        return opened
+    hwnd = wait_for_app(spec["exe"], timeout=25 if opened.startswith("Launched") else 6)
+    if hwnd is None:
+        return f"Failed: {app} did not come up in time - try again once it is open."
+    if not wait_for_release():
+        return "Failed: let go of Ctrl, Alt and Shift first, then ask me again."
+    sleep(0.6 if opened.startswith("Switched") else 2.5)    # a fresh launch draws its UI late
+
+    def still_there():
+        return _foreground() == hwnd
+
+    steps = [lambda: press_keys(spec["find"]), lambda: sleep(0.6),
+             lambda: type_text(to), lambda: sleep(1.0),
+             lambda: press_keys("enter"), lambda: sleep(1.2),
+             lambda: type_text(text), lambda: sleep(0.3),
+             lambda: press_keys("enter")]
+    for step in steps:
+        if not still_there():
+            return f"Failed: {app} lost focus partway, so I stopped before sending anything wrong."
+        step()
+    return f"Sent to {to} on {app}."

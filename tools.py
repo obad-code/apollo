@@ -1471,3 +1471,39 @@ def _apollo_features(ctx, area=""):
     area = str(area or "").strip().lower()
     found = {k: v for k, v in FEATURES.items() if area and (area in k or k in area)}
     return {"ok": True, "features": found or FEATURES}
+
+
+# --- more than one step ----------------------------------------------------------
+
+@_tool("search_site", "searching",
+       "Open a website already searching for something - one step, never open the "
+       "site and stop: \"افتح يوتيوب وابحث عن...\", \"search Amazon for a mouse\", "
+       "\"find it on Google Maps\". Sites: YouTube, Google, Amazon, GitHub, Reddit, "
+       "X, Spotify, Maps, Images, Noon, Wikipedia (others go through Google).",
+       _obj({"site": _str("The site"), "query": _str("What to search for")}, ("site", "query")))
+def _search_site(ctx, site, query):
+    ctx.activity(f"searching {site}")
+    return pc_control.search_site(site, query)
+
+
+@_tool("play_youtube", "playing it on YouTube",
+       "Play a video on YouTube right away - the top result for what the user asked "
+       "for: \"شغل لي...\", \"play the new trailer\", \"put on lofi\".",
+       _obj({"query": _str("What to play")}, ("query",)))
+def _play_youtube(ctx, query):
+    ctx.activity("finding it on YouTube")
+    return pc_control.play_youtube(query)
+
+
+@_tool("send_chat_message", "sending the message",
+       "Send a message to someone in a chat app on this PC - Discord, WhatsApp, "
+       "Telegram, Slack or Teams: \"ارسل لأحمد في الديسكورد...\", \"tell Sara on "
+       "WhatsApp I'm late\". It opens the app, finds the conversation and sends - all "
+       "in one step. Read back who and what first; send only after the user says yes.",
+       _obj({"app": _enum(pc_control.CHAT_APPS, "Which app"),
+             "to": _str("The person, server channel or group, as named in the app"),
+             "text": _str("The message, exactly")}, ("app", "to", "text")),
+       confirm=True)
+def _send_chat_message(ctx, app, to, text):
+    ctx.activity(f"sending on {app}")
+    return pc_control.send_chat(app, to, text)
