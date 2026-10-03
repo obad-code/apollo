@@ -245,4 +245,10 @@ def snapshot():
     if now - _github[0] > GITHUB_EVERY:
         user = github_user(found)
         _github = (now, github_repos(user, _saved("GITHUB_TOKEN")) if user else [])
-    return {"sessions": claude_sessions(), "folders": found, "repos": _github[1]}
+    out = {"sessions": claude_sessions(), "folders": found, "repos": _github[1]}
+    try:
+        import project_art
+        project_art.decorate(out)
+    except Exception:  # noqa: BLE001 - pictures are a nicety
+        pass
+    return out

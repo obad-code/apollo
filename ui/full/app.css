@@ -3136,3 +3136,20 @@ body.listening .look-cards .cc-hub .cp-node::after { animation-delay: .8s; }
 .chat-them p { font-size: 12.5px; line-height: 1.5; color: rgba(255,255,255,.82); }
 .chat-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .chat-tools i { font-style: normal; font-size: 9.5px; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.06); color: rgba(255,255,255,.55); }
+
+/* ---- Projects out of the wall: no panel, the cards slide in from the left
+   edge one after another and fan away into the room. Right-click: away. ---- */
+#markets.wall { background: transparent; border-color: transparent; backdrop-filter: none; box-shadow: none; overflow: visible; }
+#markets.wall > :not(#pane-projects):not(#stock) { display: none !important; }
+body.nav-open:not(.ultra) #stage:has(#markets.wall) { grid-template-columns: 42% 1fr 22%; }
+#markets.wall .proj-deck { min-height: 380px; perspective: 1300px; perspective-origin: 0% 50%; margin-left: calc(var(--gutter) * -1); }
+#markets.wall .deck-card { left: 0; width: 56%; height: 168px;
+  transform-origin: left center;
+  transform: translate3d(calc(var(--i) * 52px), calc(var(--i) * -26px), calc(var(--i) * -70px)) rotateY(24deg);
+  animation: deck-out .7s cubic-bezier(.22,1,.36,1) both; animation-delay: calc((var(--n) - var(--i)) * 60ms); }
+#markets.wall .deck-card:hover { transform: translate3d(calc(var(--i) * 52px + 24px), calc(var(--i) * -26px - 10px), calc(var(--i) * -70px + 60px)) rotateY(10deg); }
+@keyframes deck-out { from { transform: translate3d(-110%, calc(var(--i) * -26px), calc(var(--i) * -70px)) rotateY(70deg); opacity: 0; } }
+.deck-art { position: absolute; left: 0; right: 0; top: 29px; bottom: 0; width: 100%; height: calc(100% - 29px); object-fit: cover; opacity: .55; }
+.deck-card .deck-body { position: relative; }
+.deck-card:has(.deck-art) .deck-body { background: linear-gradient(90deg, rgba(10,10,12,.85), rgba(10,10,12,.2)); height: calc(100% - 29px); }
+#markets.wall .proj-deck { margin-left: -14px; }

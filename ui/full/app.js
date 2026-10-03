@@ -2137,6 +2137,8 @@ function showTab(name) {
 let navWheel = null;
 function rollNav(open, name) {
   document.body.classList.toggle('nav-open', open);
+  // Projects come out of the wall on their own, with no panel round them.
+  $('markets').classList.toggle('wall', open && name === 'projects');
   $('markets').classList.toggle('rolled', !open);
   if (open) {
     showTab(name);
@@ -2157,6 +2159,13 @@ $('nav-roller').addEventListener('click', (event) => {
   if (item && Number(item.dataset.i) === navWheel.selected) rollNav(true, NAV[navWheel.selected][0]);
 });
 $('nav-back').addEventListener('click', () => rollNav(false));
+// A right-click on an open page puts it away, back to the roller (an open
+// stock has its own right-click: back to the list).
+$('markets').addEventListener('contextmenu', (event) => {
+  if (!document.body.classList.contains('nav-open') || state.stock) return;
+  event.preventDefault();
+  rollNav(false);
+});
 $('markets').classList.add('rolled');
 
 $('panel-tabs').addEventListener('click', (event) => {
@@ -2193,11 +2202,11 @@ const KIND_NAMES = { claude: 'Claude Code', pc: 'On this PC', github: 'GitHub' }
 
 function projectList(p) {
   return [
-    ...(p.sessions || []).map((s) => ({ kind: 'claude', name: s.title || s.project, sub: s.project,
+    ...(p.sessions || []).map((s) => ({ kind: 'claude', art: s.art || '', name: s.title || s.project, sub: s.project,
       when: s.when, lines: [s.prompt && s.prompt !== s.title ? s.prompt : ''] })),
-    ...(p.folders || []).map((f, n) => ({ kind: 'pc', name: f.name, sub: f.branch ? `on ${f.branch}` : '',
+    ...(p.folders || []).map((f, n) => ({ kind: 'pc', art: f.art || '', name: f.name, sub: f.branch ? `on ${f.branch}` : '',
       when: f.when, lines: [f.last ? `Last commit: ${f.last}` : ''], folder: n })),
-    ...(p.repos || []).map((r, n) => ({ kind: 'github', name: r.name, sub: r.private ? 'private' : 'public',
+    ...(p.repos || []).map((r, n) => ({ kind: 'github', art: r.art || '', name: r.name, sub: r.private ? 'private' : 'public',
       when: r.when, lines: [r.about || ''], repo: n })),
   ];
 }
@@ -2234,6 +2243,7 @@ function renderProjects(p) {
   deck.innerHTML = shown.length ? shown.map((item, i) => `
     <button type="button" class="deck-card k-${item.kind}" data-i="${i}" style="--i:${i};--n:${shown.length}">
       <span class="deck-bar"><i></i><i></i><i></i><em>${esc(KIND_NAMES[item.kind])}</em></span>
+      ${item.art ? `<img class="deck-art" src="${esc(item.art)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
       <span class="deck-body"><b>${esc(item.name)}</b>${item.sub ? `<small>${esc(item.sub)}</small>` : ''}
         ${item.lines.filter(Boolean).slice(0, 2).map((line) => `<span class="deck-line">${esc(line)}</span>`).join('')}
         <span class="deck-when">${esc(ago(item.when))}</span></span>

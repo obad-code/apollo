@@ -56,3 +56,6 @@ probes/shots/
 
 # This machine's own Claude Code permissions - not the project's.
 .claude/settings.local.json
+
+# Pictures drawn for the projects page (project_art.py)
+ui/full/art/
