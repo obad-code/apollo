@@ -1218,7 +1218,37 @@ function renderFeed(snapshot) {
   }
   markReading();
   $('peek').innerHTML = drawn.map((item) => `<div class="shot">${shot(item)}</div>`).join('');
+  drawFeedWheel(items);
 }
+
+/* The stories as a drum of pictures, turning slowly - each with its topic's
+ * mark when it came without one. Hover: what it is, from where, and whether
+ * Private Eye found it. Click: it opens like a row does. */
+function drawFeedWheel(items) {
+  const ring = document.querySelector('#feed-wheel .fw-ring');
+  if (!ring) return;
+  const list = items.slice(0, 12);
+  const n = Math.max(list.length, 6);
+  const tileH = 150;
+  const radius = Math.round((tileH / 2) / Math.tan(Math.PI / n) + 18);
+  ring.style.setProperty('--r', `${radius}px`);
+  ring.innerHTML = list.map((item, i) => {
+    const img = safeImage(item.image);
+    const tag = item.eye ? 'Private Eye' : Feed.topicTag(item.topic, 'all') || item.topic;
+    return `<button type="button" class="fw-tile ${topicClass(item.topic)}${img ? '' : ' bare'}" data-i="${i}"
+        style="--a:${(360 / n) * i}deg">
+      ${img ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('bare');this.remove()">` : ''}
+      <span class="fw-mark">${glyph(item.topic)}</span>
+      <span class="fw-info"><em class="${item.eye ? 'eye' : ''}">${esc(tag)}</em><b>${esc(String(item.title).slice(0, 110))}</b>
+        <small>${esc(item.source)} · ${esc(item.age)}${item.moving ? ' · market-moving' : ''}</small></span>
+    </button>`;
+  }).join('');
+}
+
+$('feed-wheel').addEventListener('click', (event) => {
+  const tile = event.target.closest('.fw-tile');
+  if (tile) openStory(Number(tile.dataset.i));
+});
 
 /* The reading head: every few seconds the next story is the one Apollo is
  * on - brighter, with a line in its colour running along under it for as

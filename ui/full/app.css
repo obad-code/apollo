@@ -2937,3 +2937,37 @@ body:not(.ultra) #status-block:not(:hover) :is(#gauges, #system-line) { display:
 #stock > * { flex: none; }
 #stock::before { position: fixed; }
 #stock .stock-hint { margin-top: 10px; font-size: 10.5px; letter-spacing: .08em; opacity: .4; text-align: center; }
+
+/* ---- The feed as a drum of pictures (normal display) ---- */
+#feed-wheel { display: none; }
+body:not(.ultra) #headlines #feed { display: none; }
+body:not(.ultra) #feed-wheel { display: block; position: relative; flex: 1; min-height: 0; perspective: 1100px; overflow: hidden;
+  -webkit-mask: linear-gradient(180deg, transparent, #000 16%, #000 84%, transparent); }
+.fw-ring { position: absolute; left: 6%; right: 6%; top: 50%; height: 150px; margin-top: -75px; transform-style: preserve-3d;
+  animation: fw-turn 48s linear infinite; }
+#feed-wheel:hover .fw-ring { animation-play-state: paused; }
+@keyframes fw-turn { from { transform: translateZ(calc(var(--r) * -1)) rotateX(0deg); } to { transform: translateZ(calc(var(--r) * -1)) rotateX(-360deg); } }
+.fw-tile { position: absolute; inset: 0; padding: 0; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; overflow: hidden; cursor: pointer;
+  transform: rotateX(var(--a)) translateZ(var(--r)); backface-visibility: hidden; background: #15141a; color: #fff;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45); transition: border-color .25s, box-shadow .25s; }
+.fw-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .5s, filter .3s; }
+.fw-tile.bare { background: radial-gradient(circle at 30% 25%, rgba(var(--topic, 255,176,0), .35), rgba(var(--topic, 255,176,0), .06) 70%), #15141a; }
+.fw-mark { position: absolute; inset: 0; display: grid; place-items: center; }
+.fw-mark .glyph { width: 40px; height: 40px; fill: none; stroke: rgb(var(--topic, 255,176,0)); stroke-width: 1.4; opacity: .8; }
+.fw-tile:not(.bare) .fw-mark { display: none; }
+.fw-info { position: absolute; left: 0; right: 0; bottom: 0; padding: 30px 12px 10px; text-align: left; display: grid; gap: 3px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,.88)); opacity: 0; transform: translateY(8px); transition: opacity .25s, transform .25s; }
+.fw-info em { font-style: normal; font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: rgb(var(--topic, 255,176,0)); }
+.fw-info em.eye { color: #ff9f6b; }
+.fw-info b { font-size: 12.5px; line-height: 1.3; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fw-info small { font-size: 10px; opacity: .7; }
+.fw-tile:hover { border-color: rgba(255,255,255,.4); box-shadow: 0 14px 40px rgba(0,0,0,.6), 0 0 0 1px rgba(var(--topic, 255,176,0), .5); }
+.fw-tile:hover .fw-info { opacity: 1; transform: none; }
+.fw-tile:hover img { transform: scale(1.06); filter: brightness(.85); }
+@media (prefers-reduced-motion: reduce) { .fw-ring { animation: none; transform: translateZ(calc(var(--r) * -1)); } }
+.fw-tile.t-gaming { --topic: 176, 124, 255; }
+.fw-tile.t-marvel { --topic: 255, 154, 60; }
+.fw-tile.t-movies { --topic: 255, 90, 110; }
+.fw-tile.t-markets { --topic: 62, 224, 143; }
+.fw-tile.t-posts { --topic: 111, 140, 255; }
+.fw-tile.t-private-eye { --topic: 127, 227, 255; }
