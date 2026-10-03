@@ -313,6 +313,7 @@
      screen, now), away (the PC kept up with Claude open while you are out)
      and hands-free (always listening, Ctrl+1); and LYLA's room in or out.
      By voice too: "clear mode", "الوضع الموسع", "ادخل وضع الخمول", "أنا طالع". -->
+<div id="room-crew" aria-hidden="true"></div>
 <nav id="dock" aria-label="Modes">
   <div class="modes" role="group" aria-label="Modes">
     <button class="mode" type="button" data-mode="normal" data-sfx="none" aria-pressed="true"
@@ -347,6 +348,9 @@
   </div>
   <button id="room-toggle" class="hud-button" type="button" data-sfx="none" aria-pressed="true" title="Show or hide LYLA's room">
     <i class="led"></i><span>LYLA</span><em>ROOM ON</em>
+  </button>
+  <button id="crew-toggle" class="hud-button" type="button" data-sfx="none" aria-pressed="true" title="The crew walking about LYLA's room, or LYLA alone">
+    <i class="led"></i><span>CREW</span><em>IN ROOM</em>
   </button>
 </nav>
 

@@ -5009,6 +5009,7 @@ const newsWheel = new OptionWheel($('news-roller'), {
   items: NEWS_TOPICS.map(([, label]) => label),
   onOpen: (i) => rollNews(true, NEWS_TOPICS[i][0]),
   sound: (name) => sfx.play(name),
+  mirror: -1,     // the right side's roller curves the other way
   fontSize: 1.5, spacing: 1.9, tilt: 5, blur: 0.9, fade: 0.2, inset: 18,
 });
 $('news-roller').addEventListener('click', (event) => {
@@ -5055,3 +5056,51 @@ $('crew-mini').addEventListener('click', (event) => {
 });
 setInterval(drawCrewMini, 10000);
 setTimeout(drawCrewMini, 1500);
+
+/* LYLA's room, with the crew: THEIA, MONEYPENNY and Q wander her floor -
+ * stroll, stop, look about, stroll on - and hop while they are on a job.
+ * Her room itself is untouched; the toggle in the dock leaves her alone. */
+const roomCrew = {
+  on: (() => { try { return localStorage.getItem('room-crew') !== 'off'; } catch { return true; } })(),
+  walkers: [],
+};
+function buildRoomCrew() {
+  const box = $('room-crew');
+  box.innerHTML = ['THEIA', 'MONEYPENNY', 'Q'].map((key) =>
+    `<span class="rc-walker" data-key="${key}"><span class="rc-body">${CrewView.creature(key, 34)}</span><em>${key === 'MONEYPENNY' ? 'M.PENNY' : key}</em></span>`).join('');
+  roomCrew.walkers = [...box.querySelectorAll('.rc-walker')].map((el, i) => ({
+    el, x: 0.2 + i * 0.25, target: 0.2 + i * 0.25, wait: 1 + i * 1.5, speed: 0.025 + i * 0.006, face: 1 }));
+}
+let roomCrewLast = performance.now();
+function stepRoomCrew(now) {
+  const dt = Math.min(0.1, (now - roomCrewLast) / 1000);
+  roomCrewLast = now;
+  const busy = crewAgents();
+  for (const w of roomCrew.walkers) {
+    const key = w.el.dataset.key;
+    w.el.classList.toggle('busy', Boolean((busy[key] || {}).working));
+    if (w.wait > 0) { w.wait -= dt; w.el.classList.remove('walking'); }
+    else {
+      const d = w.target - w.x;
+      if (Math.abs(d) < 0.004) { w.wait = 2 + Math.random() * 5; w.target = 0.06 + Math.random() * 0.88; }
+      else { w.face = Math.sign(d); w.x += Math.sign(d) * Math.min(Math.abs(d), w.speed * dt); w.el.classList.add('walking'); }
+    }
+    w.el.style.left = `${(w.x * 100).toFixed(2)}%`;
+    w.el.style.setProperty('--face', w.face);
+  }
+  requestAnimationFrame(stepRoomCrew);
+}
+function showRoomCrew() {
+  document.body.classList.toggle('room-crew', roomCrew.on);
+  $('crew-toggle').setAttribute('aria-pressed', roomCrew.on ? 'true' : 'false');
+  $('crew-toggle').querySelector('em').textContent = roomCrew.on ? 'IN ROOM' : 'LYLA ONLY';
+}
+$('crew-toggle').addEventListener('click', () => {
+  roomCrew.on = !roomCrew.on;
+  try { localStorage.setItem('room-crew', roomCrew.on ? 'on' : 'off'); } catch { /* private */ }
+  sfx.play(roomCrew.on ? 'expand' : 'collapse');
+  showRoomCrew();
+});
+buildRoomCrew();
+showRoomCrew();
+requestAnimationFrame(stepRoomCrew);

@@ -27,9 +27,10 @@ export function placeItem(d, { rowH, tilt = 6, curve = 1, blur = 2, fade = 0.25,
 export class OptionWheel {
   constructor(root, { items = [], selected = 0, onChange = () => {}, onOpen = () => {},
                       fontSize = 1.6, spacing = 1.5, tilt = 7, blur = 1.6, fade = 0.24, inset = 22,
-                      smoothing = 190, sound = () => {} } = {}) {
+                      smoothing = 190, sound = () => {}, mirror = 1 } = {}) {
     this.root = root;
-    this.opts = { fontSize, spacing, tilt, blur, fade, inset, smoothing };
+    this.opts = { fontSize, spacing, tilt, blur, fade, inset, smoothing, mirror };
+    if (mirror < 0) root.classList.add('owheel-right');
     this.onChange = onChange;
     this.onOpen = onOpen;
     this.sound = sound;
@@ -138,7 +139,7 @@ export class OptionWheel {
     this.pos = next;
     const rowH = this.rowH;
     this.els.forEach((el, i) => {
-      const p = placeItem(i - next, { rowH, tilt: this.opts.tilt, blur: this.opts.blur, fade: this.opts.fade });
+      const p = placeItem(i - next, { rowH, tilt: this.opts.tilt, blur: this.opts.blur, fade: this.opts.fade, mirror: this.opts.mirror });
       el.style.transform = `translate(${p.x.toFixed(2)}px, calc(${p.y.toFixed(2)}px - 50%)) rotate(${p.rot.toFixed(3)}deg)`;
       el.style.opacity = String(p.opacity);
       el.style.filter = p.blur ? `blur(${p.blur.toFixed(2)}px)` : 'none';

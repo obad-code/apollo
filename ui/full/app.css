@@ -3357,3 +3357,16 @@ body:not(.ultra):not(.viewing) #crew-mini { display: grid; grid-area: markets; a
 .cm-failing .cm-battery i { background: #ff5a5f; } .cm-failing .cm-head em { color: #ff5a5f; }
 .cm-card small { font-size: 8.5px; letter-spacing: .1em; opacity: .55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cm-head em { font-size: 8px; } .cm-card { padding: 7px 8px 7px 6px; gap: 6px; }
+.owheel-right .ow-item { left: auto; right: var(--ow-inset); text-align: right; transform-origin: right center; }
+
+/* ---- The crew in LYLA's room ---- */
+#room-crew { display: none; position: fixed; left: 4%; right: 4%; bottom: 90px; height: 54px; z-index: 4; pointer-events: none; }
+body.room-crew:not(.roomless):not(.viewing):not(.asleep):not(.ultra) #room-crew { display: block; }
+.rc-walker { position: absolute; bottom: 0; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); }
+.rc-body { display: block; transform: scaleX(var(--face, 1)); }
+.rc-body .cr-svg { width: 34px; height: 34px; image-rendering: pixelated; filter: drop-shadow(0 3px 0 rgba(0,0,0,.45)); }
+.rc-walker.walking .rc-body .cr-body { animation: rc-step .38s steps(2) infinite; }
+@keyframes rc-step { 50% { transform: translateY(-3px) rotate(-3deg); } }
+.rc-walker.busy .rc-body .cr-body { animation: cr-hop .9s cubic-bezier(.3,.7,.4,1) infinite; }
+.rc-walker em { font: 700 7px Orbitron; letter-spacing: .12em; font-style: normal; color: rgba(255,255,255,.55); margin-top: 2px; }
+#crew-toggle[aria-pressed="false"] .led { opacity: .3; }
