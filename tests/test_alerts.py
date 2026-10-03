@@ -43,16 +43,17 @@ def test_the_same_story_from_two_sources_is_one():
 def test_a_sharp_move_is_spotted_once():
     moves = alerts.Moves()
     assert moves.note({"NVDA": 100.0}, now=NOW) == []
-    moved = moves.note({"NVDA": 105.0}, now=NOW + 300)
-    assert moved == [("NVDA", 5.0, 100.0, 105.0)]
-    assert moves.note({"NVDA": 105.2}, now=NOW + 360) == []
+    assert moves.note({"NVDA": 105.0}, now=NOW + 300) == []      # 5% is a normal day
+    moved = moves.note({"NVDA": 110.0}, now=NOW + 330)
+    assert moved == [("NVDA", 10.0, 100.0, 110.0)]
+    assert moves.note({"NVDA": 110.2}, now=NOW + 360) == []
 
 
 def watcher(tmp_path, stories, prices=None, **kw):
     told = {"email": [], "voice": []}
     w = alerts.Watcher(speak=told["voice"].append, email=told["email"].append,
                        watch=lambda: ["NVDA"], prices=lambda watch: dict(prices or {}),
-                       sources=lambda watch: list(stories), explain=lambda s, t: "ACTION: BUY X\nSUMMARY: it matters",
+                       sources=lambda watch: list(stories), explain=lambda s, t: "ACTION: BUY X\nSUMMARY: it matters\nCONFIDENCE: high\nMAJOR: yes",
                        path=str(tmp_path / "seen.json"), clock=lambda: NOW, **kw)
     return w, told
 
@@ -130,7 +131,28 @@ def test_the_call_is_read_off_the_desks_answer():
     call = alerts.parse_call("ACTION: SELL TSLA\nSUMMARY: Recall of 2M cars. Margins at risk.\n"
                              "WHY:\n- recall\n- margins\n- guidance cut\nCONFIDENCE: high")
     assert call == {"action": "SELL", "ticker": "TSLA", "summary": "Recall of 2M cars. Margins at risk.",
-                    "why": ["recall", "margins", "guidance cut"], "confidence": "high"}
+                    "why": ["recall", "margins", "guidance cut"], "confidence": "high",
+                    "major": False}
+
+
+def test_only_major_sure_calls_interrupt_you():
+    assert alerts.major({"action": "SELL", "confidence": "high", "major": True})
+    assert not alerts.major({"action": "SELL", "confidence": "medium", "major": True})
+    assert not alerts.major({"action": "HOLD", "confidence": "high", "major": True})
+    assert not alerts.major({"action": "BUY", "confidence": "high", "major": False})
+
+
+def test_no_more_than_a_few_a_week_even_across_restarts(tmp_path):
+    stories = []
+    w, told = watcher(tmp_path, stories)
+    w.check(quiet=True)
+    for day, word in enumerate(("misses", "botches", "fumbles", "blows", "flubs", "sinks")):
+        w.clock = lambda d=day: NOW + d * 86400
+        stories.append(story(f"Nvidia {word} earnings, stock plunges", minutes=-day * 1440 + 3))
+        w.check()
+    assert len(told["email"]) == alerts.MOST_PER_WEEK
+    again, _ = watcher(tmp_path, [])
+    assert len(again.sent) == alerts.MOST_PER_WEEK
 
 
 def test_ignored_news_is_not_sent(tmp_path):

@@ -41,10 +41,13 @@ import urllib.parse
 log = logging.getLogger("apollo.alerts")
 
 CHECK_EVERY = int(os.environ.get("APOLLO_ALERT_EVERY") or 60)
-THRESHOLD = int(os.environ.get("APOLLO_ALERT_THRESHOLD") or 7)
-MOST_PER_HOUR = 6
+THRESHOLD = int(os.environ.get("APOLLO_ALERT_THRESHOLD") or 10)
+MOST_PER_HOUR = 1
+# Only the big ones: a few a week at most, and only what the desk calls a
+# major, near-certain move (MAJOR: yes, CONFIDENCE: high, BUY or SELL).
+MOST_PER_WEEK = int(os.environ.get("APOLLO_ALERTS_PER_WEEK") or 3)
 FRESH_MINUTES = 90          # a story older than this is not breaking
-MOVE_PCT = 4.0
+MOVE_PCT = 8.0
 MOVE_WINDOW = 15 * 60
 LANGUAGE = os.environ.get("APOLLO_ALERT_LANGUAGE") or "Arabic (Saudi dialect), then the same in English"
 SEEN = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
@@ -202,7 +205,10 @@ EXPLAIN = (
     "watches. IGNORE means it does not matter enough to act on.\n"
     "SUMMARY: two short sentences - what happened, and why that is the call.\n"
     "WHY:\n- three short bullets: the facts the call rests on.\n"
-    "CONFIDENCE: low, medium or high.")
+    "CONFIDENCE: low, medium or high.\n"
+    "MAJOR: yes or no. Yes ONLY for the rare news that comes a few times a year "
+    "and is near-certain to move the stock hard (a huge earnings shock, a "
+    "takeover, a bankruptcy, a ban, a CEO ousted). Everyday news is no.")
 
 ACTIONS = ("BUY", "SELL", "HOLD", "IGNORE")
 
@@ -211,7 +217,7 @@ def parse_call(text):
     """The desk's answer -> {action, ticker, summary, why, confidence}.
     Anything it did not say is left empty; no ACTION reads as HOLD."""
     import re
-    out = {"action": "HOLD", "ticker": "", "summary": "", "why": [], "confidence": ""}
+    out = {"action": "HOLD", "ticker": "", "summary": "", "why": [], "confidence": "", "major": False}
     text = str(text or "")
     found = re.search(r"ACTION:\s*\**\s*(BUY|SELL|HOLD|IGNORE)\b\s*\**\s*([A-Z0-9.\-]{1,10})?", text, re.I)
     if found:
@@ -223,12 +229,21 @@ def parse_call(text):
     why = re.search(r"WHY:\s*(.+?)(?:\n\s*CONFIDENCE:|$)", text, re.S | re.I)
     if why:
         out["why"] = [line.strip(" -•*\t") for line in why.group(1).splitlines() if line.strip(" -•*\t")][:4]
+    major = re.search(r"MAJOR:\s*(yes|no)", text, re.I)
+    out["major"] = bool(major and major.group(1).lower() == "yes")
     confidence = re.search(r"CONFIDENCE:\s*(low|medium|high)", text, re.I)
     if confidence:
         out["confidence"] = confidence.group(1).lower()
     if not out["summary"] and not found:
         out["summary"] = " ".join(text.split())[:300]
     return out
+
+
+def major(call):
+    """Worth interrupting you for: a BUY or SELL the desk is sure of, on
+    news it calls major. Everything else stays quiet."""
+    return (call.get("action") in ("BUY", "SELL") and call.get("major")
+            and call.get("confidence") == "high")
 
 
 def explain(story, tickers, language=LANGUAGE, think=None):
@@ -263,7 +278,8 @@ class Watcher:
         self.clock = clock
         self.moves = Moves()
         self.seen = self._load()
-        self.sent = collections.deque()
+        # What was told, kept across restarts so the weekly cap holds.
+        self.sent = collections.deque(sorted(v for k, v in self.seen.items() if k.startswith("sent:")))
         self._stop = threading.Event()
         self._thread = None
 
@@ -276,8 +292,9 @@ class Watcher:
             return {}
 
     def _save(self):
-        cutoff = self.clock() - 3 * 86400
-        self.seen = {k: v for k, v in self.seen.items() if v >= cutoff}
+        now = self.clock()
+        self.seen = {k: v for k, v in self.seen.items()
+                     if v >= now - (8 if k.startswith("sent:") else 3) * 86400}
         try:
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
             with open(self.path, "w", encoding="utf-8") as handle:
@@ -308,9 +325,9 @@ class Watcher:
 
     def _room(self):
         now = self.clock()
-        while self.sent and now - self.sent[0] > 3600:
-            self.sent.popleft()
-        return len(self.sent) < MOST_PER_HOUR
+        week = [t for t in self.sent if now - t < 7 * 86400]
+        hour = [t for t in week if now - t < 3600]
+        return len(hour) < MOST_PER_HOUR and len(week) < MOST_PER_WEEK
 
     def check(self, quiet=False):
         """One round. `quiet` (the first) only learns what is already out, so
@@ -347,12 +364,13 @@ class Watcher:
             alert["call"] = parse_call(alert["explained"])
             # Only news worth acting on is told: the desk's IGNORE is not, and
             # nor is a HOLD on a stock you do not watch - that was the spam.
-            if alert["call"]["action"] == "IGNORE" or (
-                    alert["call"]["action"] == "HOLD"
-                    and not any(t in watch for t in alert["tickers"])):
+            call = alert["call"]
+            if not major(call):
                 log.info("alert not told (%s): %s", alert["call"]["action"], alert["story"]["title"])
                 continue
             self.sent.append(now)
+            self.seen[f"sent:{now}"] = now
+            self._save()
             self._tell(alert)
             told.append(alert)
         return told

@@ -544,9 +544,9 @@ class Orb:
 
     # -- Mini Apollo's bar: eyes at rest, Apollo while you talk, words in it --
 
-    ISLAND_REST = (150, 40)        # just his eyes, following the pointer
-    ISLAND_ON = (300, 78)          # the bar, with Apollo in the well
-    ISLAND_TEXT_W = 540            # the bar, with what is said in it
+    ISLAND_REST = (300, 34)        # the row alone: Apollo left, his eyes right
+    ISLAND_ON = (300, 34)
+    ISLAND_TEXT_W = 540            # the bar, with what is said in its well
     ISLAND_LINES = 4
     ISLAND_LH = 22
 
@@ -558,7 +558,7 @@ class Orb:
 
     def _island_lines(self):
         text = self._island_words()
-        width = self.ISLAND_TEXT_W - 16 - 58
+        width = self.ISLAND_TEXT_W - 16 - 32
         key = (text, width)
         if self._isl_cache[0] != key:
             rtl = overlay_content.is_rtl(text)
@@ -572,7 +572,7 @@ class Orb:
     def _island_target(self):
         if self._island_words():
             n = max(1, len(self._island_lines()))
-            return self.ISLAND_TEXT_W, overlay_paint.MiniApollo.HEAD_ROW + 6 + n * self.ISLAND_LH + 22
+            return self.ISLAND_TEXT_W, overlay_paint.MiniApollo.HEAD_ROW + 12 + n * self.ISLAND_LH + 18
         if self._island_active():
             return self.ISLAND_ON
         return self.ISLAND_REST
@@ -603,30 +603,24 @@ class Orb:
             spring.step(dt)
 
     def _draw_island(self, g, cx, t, fade):
+        """Mini Apollo's bar: Apollo in the pill on the left, his eyes on
+        the right watching the pointer, and what is said in the well."""
         a = 255 * fade
         w, h = self._isl_w.value, self._isl_h.value
-        icons = max(0.0, min(1.0, self._isl_icons.value))
-        (wx, wy, ww, wh), well = self.mini.shell(g, cx, self.overhang, w, h, a, icons)
+        well_box, well = self.mini.shell(g, cx, self.overhang, w, h, a, 1.0)
+        slots = self.mini.slots
+        # Apollo: always there, spinning up while he works, brighter with your voice.
+        ax, ay = slots["apollo"]
+        spin = 5.0 if self.view.state == overlay_state.SEARCHING else 1.0
+        self.mark.draw_at(g, ax, ay, 8.5 + 1.5 * self._level, t * spin, level=self._level, fade=fade)
+        # His eyes, following the pointer.
+        ex, ey = slots["eyes"]
+        self.mini.eyes(g, ex, ey, t, a, self._cursor_look(ex, ey), size=0.62)
+        if well is None:
+            return
+        wx, wy, ww, wh = well_box
         g.SetClip(well)
         try:
-            # His eyes, alone, when nothing is going on: watching the pointer.
-            eyes = max(0.0, min(1.0, self._isl_eyes.value))
-            if eyes > 0.02:
-                ecx, ecy = wx + ww / 2.0, wy + wh / 2.0
-                self.mini.eyes(g, ecx, ecy, t, a * eyes, self._cursor_look(ecx, ecy),
-                               size=min(1.0, wh / 26.0))
-            # Apollo: in the middle of the well, then off to its corner
-            # when there are words to make room for.
-            globe = max(0.0, min(1.0, self._isl_globe.value))
-            if globe > 0.02:
-                k = max(0.0, min(1.0, self._isl_corner.value))
-                big = min(wh * 0.36, 17.0)
-                gx = (wx + ww / 2.0) * (1 - k) + (wx + 28.0) * k
-                gy = (wy + wh / 2.0) * (1 - k) + (wy + 22.0) * k
-                r = big * (1 - k) + 12.0 * k
-                spin = 5.0 if self.view.state == overlay_state.SEARCHING else 1.0
-                self.mark.draw_at(g, gx, gy, r, t * spin, level=self._level, fade=globe * fade)
-            # The words, where the bot used to sit.
             shown = max(0.0, min(1.0, self._isl_text.value))
             lines = self._island_lines()
             if shown > 0.02 and lines:
@@ -636,8 +630,8 @@ class Orb:
                 font = fonts["rtl"] if rtl else fonts["caption"]
                 fmt = fonts["rtl_fmt"] if rtl else fonts["fmt"]
                 colour = PALETTE["you"] if not self._said else PALETTE["ink"]
-                left, right = wx + 54.0, wx + ww - 14.0
-                y = wy + 11.0
+                left, right = wx + 16.0, wx + ww - 16.0
+                y = wy + 9.0
                 for line in lines:
                     self._string(g, line, font, fmt, right if rtl else left, y,
                                  colour, 235 * shown * fade)

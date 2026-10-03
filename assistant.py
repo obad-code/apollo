@@ -1712,6 +1712,9 @@ def announce(ui, voice, instruction, fallback):
     reminder sounds like every other answer and is in the language you last
     used. With no live session the fallback line goes to the local voices.
     """
+    # Said to them, not about them: never read these notes out, never "the user".
+    instruction = (f"[Private note - do not read it out or mention it] {instruction} "
+                   "Speak straight to them as 'you'; say only the message itself.")
     live = voice.live if voice is not None else None
     held = LISTENING if (voice is not None and voice.auto_vad) else IDLE
     ui.status(SPEAKING)

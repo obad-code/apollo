@@ -713,11 +713,14 @@ class MiniApollo:
             pill = self._round(x + 12, row - 10, 34, 20, 10)
             g.FillPath(b.brush(self.LINE, ia * 0.10), pill)
             pill.Dispose()
-            self._home(g, x + 29, row, ia)
+            # The pill on the left holds Apollo and the right end his eyes
+            # (the caller draws both); chat and new stay between.
             self._chat(g, x + 62, row, ia * 0.75)
             self._plus(g, x + 86, row, ia * 0.75)
-            self._gear(g, x + w - 50, row, ia * 0.75)
-            self._sound(g, x + w - 24, row, ia * 0.75)
+        self.slots = {"apollo": (x + 29, top + 4 + self.HEAD_ROW / 2.0),
+                      "eyes": (x + w - 38, top + 4 + self.HEAD_ROW / 2.0)}
+        if h <= self.HEAD_ROW + 12:
+            return None, None              # no words: no well, just the row
         inset = 6 + 2 * icons
         wx, wy = x + inset, top + row_h + 6 * icons + 4 * (1 - icons)
         ww, wh = w - inset * 2, max(8.0, top + h - inset - wy)
