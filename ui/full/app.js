@@ -1589,6 +1589,7 @@ function stockMarkup(quote) {
       <div><span>Next earnings</span>${nextEarnings(quote)}</div>
     </div>
     ${insidersMarkup(quote)}
+    <section class="verdict loading" data-for="${esc(quote.symbol)}"><p class="quiet">Weighing it up…</p></section>
     <div class="actions">
       <button class="drop" data-act="drop">Remove from watchlist</button>
       <button class="back" data-act="back">Back to the list</button>
@@ -1697,7 +1698,90 @@ function openStock(symbol) {
   drawBig(state.stock.points, quote.change_pct >= 0);
   spanMove(quote.change_pct, '1d');
   loadSpan('1d');
+  fillAnalysis(view.querySelector('.verdict'), symbol);
   return toldStock(quote);
+}
+
+/* The call on a stock - Strong Buy, Buy, Hold or Avoid - with its green and
+ * red flags (analysis.py). `full` adds what the company does, its numbers
+ * and its news: the deep look a final stock opens to. */
+const SAMPLE_ANALYSIS = { ok: true, symbol: 'META', name: 'Meta Platforms', verdict: 'STRONG BUY', tone: 'BUY',
+  sector: 'Communication Services', industry: 'Internet Content',
+  about: 'Meta builds Facebook, Instagram, WhatsApp and Messenger, sells ads across them, and spends on AI and VR headsets.',
+  numbers: { pe: 27.4, forward_pe: 22.1, target: 820, upside: 18, margin: .37, revenue_growth: .22 },
+  green: ['Sales growing fast: +22% a year', 'Very profitable: keeps 37% of every sale',
+    'Makes real cash (positive free cash flow)', "Analysts' target is 18% above the price"],
+  red: ['Heavy spending on AI could squeeze profits'],
+  news: [{ title: 'Meta lifts its AI spending plan', source: 'Reuters', age: '2h' }] };
+
+const analyses = new Map();
+async function getAnalysis(symbol) {
+  if (analyses.has(symbol)) return analyses.get(symbol);
+  const api = bridge();
+  let a;
+  try { a = api && api.analysis ? await api.analysis(symbol) : { ...SAMPLE_ANALYSIS, symbol }; }
+  catch (error) { a = { ok: false, error: 'The analysis did not come back.' }; }
+  if (a && a.ok) analyses.set(symbol, a);
+  return a;
+}
+
+function analysisMarkup(a, full = false) {
+  if (!a || !a.ok) return `<p class="quiet">${esc((a && a.error) || 'No analysis for this one.')}</p>`;
+  const list = (items, cls) => items.length
+    ? `<ul class="flags ${cls}">${items.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>`
+    : `<p class="quiet">${cls === 'green' ? 'No green flags.' : 'No red flags.'}</p>`;
+  const n = a.numbers || {};
+  const num = (v, f) => (v === null || v === undefined ? '—' : f(v));
+  const more = full ? `
+    <p class="about">${esc(a.about || '')}</p>
+    <div class="facts deep-facts">
+      <div><span>P/E</span><b>${num(n.pe, (v) => v.toFixed(1))}</b></div>
+      <div><span>Forward P/E</span><b>${num(n.forward_pe, (v) => v.toFixed(1))}</b></div>
+      <div><span>Target</span><b>${num(n.target, money)}</b></div>
+      <div><span>Margin</span><b>${num(n.margin, (v) => `${(v * 100).toFixed(0)}%`)}</b></div>
+      <div><span>Sales growth</span><b>${num(n.revenue_growth, (v) => `${(v * 100).toFixed(0)}%`)}</b></div>
+    </div>` : '';
+  const news = full && (a.news || []).length ? `<h4>News</h4><ul class="deep-news">${a.news.map((x) =>
+    `<li><b>${esc(x.title)}</b><span>${esc([x.source, x.age].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>` : '';
+  return `
+    <div class="verdict-call t-${esc(a.tone)}"><b>${esc(a.verdict)}</b>
+      <span>${esc([a.sector, a.industry].filter(Boolean).join(' · '))}</span></div>
+    ${more}
+    <div class="flag-cols"><div><h4>Green flags</h4>${list(a.green || [], 'green')}</div>
+      <div><h4>Red flags</h4>${list(a.red || [], 'red')}</div></div>
+    ${news}
+    <p class="fine">Counted from the numbers, not advice.</p>`;
+}
+
+async function fillAnalysis(el, symbol, full = false) {
+  if (!el) return;
+  const a = await getAnalysis(symbol);
+  if (!el.isConnected) return;
+  el.classList.remove('loading');
+  el.innerHTML = analysisMarkup(a, full);
+}
+
+/* A final stock on the trading desk, opened to the deep look. */
+function openDeep(symbol, name) {
+  let deep = $('deep');
+  if (!deep) {
+    deep = document.createElement('div');
+    deep.id = 'deep';
+    document.body.appendChild(deep);
+    deep.addEventListener('click', (event) => {
+      if (event.target === deep || event.target.closest('.deep-close')) {
+        deep.classList.remove('on');
+        sfx.play('collapse');
+      }
+    });
+  }
+  deep.innerHTML = `<article class="deep-card">
+    <header><div><b>${esc(symbol)}</b><span>${esc(name || '')}</span></div>
+      <button class="deep-close" type="button" data-sfx="none">Close ✕</button></header>
+    <section class="verdict loading"><p class="quiet">Weighing it up…</p></section></article>`;
+  deep.classList.add('on');
+  sfx.play('expand');
+  fillAnalysis(deep.querySelector('.verdict'), symbol, true);
 }
 
 /* Opened out of `from`: clipped to it first, then to the whole panel. */
@@ -2579,7 +2663,7 @@ function renderTrading(board) {
   // nothing is worth it this period (trading.final).
   const final = board.final || { picks: [], none: '' };
   body('desk-final').innerHTML = (final.picks || []).length ? final.picks.map((pick, i) => `
-    <div class="final-pick">
+    <div class="final-pick" data-ticker="${esc(pick.ticker)}" data-name="${esc(pick.name)}" title="Open the full analysis">
       <span class="final-n">${i + 1}</span>
       <div class="final-id"><b>${esc(pick.ticker)}</b><span class="final-name">${esc(pick.name)}</span></div>
       ${pick.bull === null || pick.bull === undefined ? '' : `<span class="final-bull">${pct(pick.bull)} متفائلين</span>`}
@@ -4667,3 +4751,8 @@ window.apollo = {
 };
 
 render(SAMPLE);
+
+$('desk-final').addEventListener('click', (event) => {
+  const pick = event.target.closest('.final-pick[data-ticker]');
+  if (pick) openDeep(pick.dataset.ticker, pick.dataset.name);
+});

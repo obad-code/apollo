@@ -1127,6 +1127,11 @@ class Api:
     def suggestions(self):
         return stockdesk.suggestions()
 
+    def analysis(self, symbol):
+        """The whole look at a stock: the call, its flags, the company, news."""
+        import analysis
+        return analysis.analyse(symbol)
+
     def rate_find(self, find_id, useful):
         """A Private Eye find marked useful or not, from the display."""
         if private_eye.rate(str(find_id or ""), bool(useful)) is None:

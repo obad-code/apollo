@@ -143,10 +143,10 @@ def _crumbed(timeout=None):
     return crumb, opener
 
 
-def _summary_json(symbol, timeout=None):
+def _summary_json(symbol, timeout=None, modules=SUMMARY_MODULES):
     timeout = TIMEOUT if timeout is None else timeout
     path = (f"/v10/finance/quoteSummary/{urllib.parse.quote(symbol, safe='')}"
-            f"?modules={SUMMARY_MODULES}")
+            f"?modules={modules}")
     now = time.monotonic()
     with _lock:
         hit = _cache.get(path)

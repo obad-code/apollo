@@ -2653,3 +2653,36 @@ body:not(.ultra) .story.hero:not(:has(.thumb img)) { padding-top: 28px; }
 /* The status block: one thin line; the meters and the rest open on hover. */
 body:not(.ultra) #status-block { padding: 8px 16px; gap: 6px 14px; }
 body:not(.ultra) #status-block:not(:hover) :is(#gauges, #system-line) { display: none; }
+
+/* The call on a stock, and its green and red flags (analysis.py). */
+.verdict { margin: 14px 0 6px; padding: 14px 16px; border-radius: 14px;
+           background: rgba(255,255,255,.03); border: 1px solid rgba(255,176,0,.12); }
+.verdict-call { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.verdict-call b { font-size: 22px; font-weight: 800; letter-spacing: .05em; }
+.verdict-call span { font-size: 11px; opacity: .6; letter-spacing: .08em; }
+.verdict-call.t-BUY b { color: #3ddc84; }
+.verdict-call.t-HOLD b { color: #F5B83D; }
+.verdict-call.t-SELL b { color: #ff5a5f; }
+.flag-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.verdict h4 { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; margin: 6px 0; }
+.flags { list-style: none; padding: 0; margin: 0; display: grid; gap: 5px; font-size: 12.5px; line-height: 1.35; }
+.flags li { padding-left: 16px; position: relative; }
+.flags li::before { content: ''; position: absolute; left: 2px; top: .45em; width: 7px; height: 7px; border-radius: 50%; }
+.flags.green li::before { background: #3ddc84; }
+.flags.red li::before { background: #ff5a5f; }
+.verdict .fine { margin-top: 10px; font-size: 10.5px; opacity: .45; }
+.verdict .about { font-size: 13px; line-height: 1.5; opacity: .85; margin: 4px 0 12px; }
+.deep-news { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; font-size: 12.5px; }
+.deep-news span { display: block; font-size: 10.5px; opacity: .55; margin-top: 2px; }
+.final-pick[data-ticker] { cursor: pointer; transition: transform .2s, background .2s; }
+.final-pick[data-ticker]:hover { transform: translateY(-2px); background: rgba(255,255,255,.04); }
+#deep { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px;
+        background: rgba(6,6,10,.55); backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity .3s; }
+#deep.on { opacity: 1; pointer-events: auto; }
+.deep-card { width: min(760px, 100%); max-height: 86vh; overflow: auto; padding: 22px 24px; border-radius: 22px;
+             background: var(--panel); border: 1px solid rgba(255,176,0,.18); transform: scale(.96); transition: transform .3s; }
+#deep.on .deep-card { transform: none; }
+.deep-card header { display: flex; justify-content: space-between; align-items: center; }
+.deep-card header b { font-size: 24px; margin-right: 10px; }
+.deep-card header span { opacity: .65; }
+.deep-close { font: inherit; font-size: 12px; background: none; border: 1px solid rgba(255,255,255,.15); border-radius: 999px; color: inherit; padding: 4px 12px; cursor: pointer; }
