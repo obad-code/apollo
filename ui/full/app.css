@@ -1644,104 +1644,25 @@ body.offscreen #wordmark *, body.asleep #wordmark * { animation-play-state: paus
   to   { opacity: 1; transform: translateY(0);     filter: blur(0); }
 }
 
-/* --- the answer: the explanation box -------------------------------------
-   While Apollo talks he goes small into the top left corner and what he is
-   saying comes up here, in a box of smoked glass in the middle of the room:
-   your words, his reply, and the chart, figures, picture or steps with it.
-   A slow bloom of amber and violet breathes behind it. */
+/* --- the answer ----------------------------------------------------------- */
 
+/* High enough that a reply with a chart under it clears LYLA's status line
+   and the strip rather than sitting across them. */
 #answer {
-  position: absolute; left: 50%; top: 50%; z-index: 6;
-  width: min(1000px, 66vw); pointer-events: none;
-  opacity: 0; transform: translate(-50%, -46%) scale(.965);
-  transition: opacity .38s ease-out, transform .62s cubic-bezier(.32,.72,0,1);
+  position: absolute; left: 50%; top: 48%; width: min(900px, 62vw);
+  transform: translateX(-50%); text-align: center; pointer-events: none;
+  opacity: 0; transition: opacity .4s;
 }
-#answer.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-.ex-glow {
-  position: absolute; inset: -12% -8%; z-index: -1; pointer-events: none; filter: blur(60px);
-  background:
-    radial-gradient(40% 55% at 22% 30%, rgba(255, 176, 0, .30), transparent 70%),
-    radial-gradient(38% 50% at 80% 70%, rgba(167, 123, 224, .26), transparent 70%),
-    radial-gradient(30% 40% at 60% 18%, rgba(95, 208, 220, .14), transparent 70%);
-  animation: ex-bloom 11s ease-in-out infinite alternate;
-}
-@keyframes ex-bloom {
-  from { transform: translate3d(-2%, 1%, 0) scale(1); opacity: .8; }
-  to { transform: translate3d(2%, -1.5%, 0) scale(1.06); opacity: 1; }
-}
-.ex-card {
-  position: relative; overflow: hidden; max-height: 72vh;
-  padding: 22px 32px 30px; border-radius: 30px; text-align: start;
-  background: linear-gradient(180deg, rgba(24, 19, 14, .88), rgba(9, 8, 7, .92));
-  border: 1px solid rgba(255, 214, 150, .14);
-  box-shadow: 0 50px 140px -40px rgba(0, 0, 0, .85), 0 0 0 1px rgba(0, 0, 0, .4),
-              inset 0 1px 0 rgba(255, 240, 206, .08);
-  backdrop-filter: blur(20px) saturate(1.35);
-}
-/* A hairline of light along the top edge, like the lip of a glass. */
-.ex-card::before {
-  content: ""; position: absolute; left: 8%; right: 8%; top: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 212, 138, .55), rgba(167, 123, 224, .45), transparent);
-}
-.ex-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
-           font: 700 11px var(--hud); letter-spacing: .26em; color: var(--caption); }
-.ex-head b { color: var(--amber-bright); }
-.ex-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber-hot);
-          box-shadow: 0 0 12px 2px rgba(255, 176, 0, .7); animation: pulse 1.6s ease-in-out infinite; }
-.ex-state { margin-left: auto; letter-spacing: .2em; text-transform: uppercase; }
-#you { font-size: 15px; color: var(--you); margin-bottom: 12px; opacity: .72; }
-#you:empty, #reply:empty { display: none; }
-#reply { font-size: 25px; line-height: 1.45; color: var(--amber); }
-#visual:empty { display: none; }
-#visual { margin-top: 20px; display: flex; flex-direction: column; gap: 18px; }
+#answer.show { opacity: 1; }
+#you { font-size: 15px; color: var(--you); margin-bottom: 10px; opacity: .8; }
+#reply { font-size: 26px; line-height: 1.4; color: var(--amber); }
+#visual { margin-top: 18px; }
 #visual svg { width: 100%; height: 170px; }
-.ex-title { font: 600 15px var(--hud); letter-spacing: .14em; text-transform: uppercase; color: var(--cream); }
-.ex-chart { position: relative; padding: 14px 16px 6px; border-radius: 20px;
-            background: rgba(255, 255, 255, .03); border: 1px solid rgba(255, 255, 255, .06); }
-.ex-chart-label { position: absolute; top: 10px; left: 16px; font: 700 12px var(--hud);
-                  letter-spacing: .18em; color: var(--amber-bright); }
-.ex-text { font-size: 16px; line-height: 1.6; color: var(--amber); opacity: .9; }
-
-/* A picture he made: framed like a print under glass, glowing a little. */
-.ex-picture { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px;
-              animation: ex-rise .7s cubic-bezier(.32,.72,0,1) both; }
-.ex-picture img { max-width: 100%; max-height: 46vh; border-radius: 20px; display: block;
-                  box-shadow: 0 30px 80px -24px rgba(0, 0, 0, .9), 0 0 60px -10px rgba(255, 176, 0, .25);
-                  border: 1px solid rgba(255, 240, 206, .12); }
-.ex-picture figcaption { font-size: 12px; letter-spacing: .12em; color: var(--caption); }
-
-/* A visual explanation: numbered cards on a glowing line, lit one by one. */
-.ex-steps { list-style: none; display: grid; gap: 14px; position: relative;
-            grid-template-columns: repeat(var(--n), minmax(0, 1fr)); padding-top: 22px; }
-.ex-steps::before {
-  content: ""; position: absolute; left: 4%; right: 4%; top: 20px; height: 2px; border-radius: 2px;
-  background: linear-gradient(90deg, #FFB000, #f07b4f 40%, #a77be0 75%, #5fd0dc);
-  box-shadow: 0 0 18px rgba(255, 176, 0, .55); opacity: .7;
-}
-.ex-steps li {
-  position: relative; display: flex; flex-direction: column; gap: 8px; padding: 34px 16px 18px;
-  border-radius: 20px; background: linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .02));
-  border: 1px solid rgba(255, 255, 255, .07);
-  animation: ex-rise .6s cubic-bezier(.32,.72,0,1) both; animation-delay: calc(var(--i) * 140ms + 120ms);
-}
-.ex-num {
-  position: absolute; top: -12px; left: 16px; padding: 3px 10px; border-radius: 999px;
-  font: 800 12px var(--hud); letter-spacing: .1em; color: #120a00;
-  background: linear-gradient(135deg, #FFD48A, #FFB000); box-shadow: 0 0 18px rgba(255, 176, 0, .7);
-}
-.ex-steps b { font-size: 15px; color: var(--cream); line-height: 1.35; }
-.ex-steps p { font-size: 13px; line-height: 1.5; color: var(--caption); }
-.ex-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-.ex-figure { padding: 14px 16px; border-radius: 18px; background: rgba(255, 255, 255, .04);
-             border: 1px solid rgba(255, 255, 255, .07); display: flex; flex-direction: column; gap: 6px;
-             animation: ex-rise .5s cubic-bezier(.32,.72,0,1) both; animation-delay: calc(var(--i) * 90ms); }
-.ex-figure small { font: 700 11px var(--hud); letter-spacing: .18em; color: var(--caption); }
-.ex-figure b { font-size: 24px; color: var(--cream); }
-@keyframes ex-rise { from { opacity: 0; transform: translateY(14px) scale(.98); filter: blur(6px); }
-                     to { opacity: 1; transform: none; filter: none; } }
-@media (prefers-reduced-motion: reduce) {
-  .ex-glow, .ex-picture, .ex-steps li, .ex-figure { animation: none; }
-}
+#visual .ex-picture img { max-width: 100%; max-height: 40vh; border-radius: 16px; }
+#visual .ex-steps { list-style: none; display: flex; gap: 12px; justify-content: center; margin-top: 8px; text-align: left; }
+#visual .ex-steps li { flex: 1; max-width: 220px; font-size: 13px; color: var(--caption); }
+#visual .ex-steps b { display: block; color: var(--cream); font-size: 14px; margin: 4px 0; }
+#visual .ex-num { color: var(--amber-hot); font-weight: 800; }
 
 /* --- LYLA ----------------------------------------------------------------- */
 
@@ -1879,17 +1800,8 @@ body.answering #clock-block,
 body.answering #status-block,
 body.answering #lyla-block,
 body.answering #lyla { opacity: .18; transition: opacity .45s ease-in-out; }
-/* ...and Apollo goes small into the top left corner, out of the way of what
-   he is showing you, until the answer has been read (lingering). */
-body:not(.ultra).answering #core, body:not(.ultra).lingering #core {
-  transform: translate(var(--mini-dx, 0px), var(--mini-dy, -64px)) scale(var(--mini-s, .78));
-  transition: transform .7s cubic-bezier(.32,.72,0,1);
-}
-body.answering #hint, body.lingering #hint,
-body.answering #clear-sign, body.lingering #clear-sign { opacity: 0; }
-body:not(.ultra).answering #clock-block, body:not(.ultra).lingering #clock-block { opacity: 0; }
-body.lingering .panel, body.lingering #status-block, body.lingering #lyla-block,
-body.lingering #lyla { opacity: .18; }
+body.answering #core { transform: translateY(-64px) scale(.78); }
+body.answering #hint { opacity: 0; }
 
 /* --- asleep ------------------------------------------------------------------
    Ten quiet minutes, and the display is just its name, one thing worth

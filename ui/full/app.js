@@ -4368,15 +4368,10 @@ function setPhase(phase) {
 
   const answering = phase === 'thinking' || phase === 'speaking';
   const attending = phase !== 'idle';
-  // Apollo goes small into the corner while he answers (explain.js), and
-  // the box stays up a while after he stops, so it can still be read.
-  if (answering) placeMini();
-  linger(!answering && phase === 'idle' && Boolean($('reply').textContent || $('visual').innerHTML));
-  $('ex-state').textContent = { listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking' }[phase] || 'Done';
   document.body.classList.toggle('listening', phase === 'listening');
   document.body.classList.toggle('thinking', phase === 'thinking');
   document.body.classList.toggle('answering', answering);
-  $('answer').classList.toggle('show', answering || document.body.classList.contains('lingering'));
+  $('answer').classList.toggle('show', answering);
   // The room steps back as far as the state warrants: a little while it is
   // listening to you, all the way once it is answering.
   shader.speed(phase === 'thinking' ? 2.2 : attending ? 1.5 : 1);
@@ -4402,33 +4397,6 @@ function setPhase(phase) {
     $('you').textContent = '';
     $('reply').textContent = '';
     $('visual').innerHTML = '';
-  }
-}
-
-/* Where Apollo goes while he answers: the corner, measured from where he is
- * laid out (not where his transform has him), every time he goes there. */
-function placeMini() {
-  const shift = Explain.cornerShift($('core'));
-  if (!shift) return;
-  const root = document.body.style;
-  root.setProperty('--mini-dx', `${shift.dx}px`);
-  root.setProperty('--mini-dy', `${shift.dy}px`);
-  root.setProperty('--mini-s', String(shift.scale));
-}
-
-/* The answer stays on screen for a while after he has finished - long
- * enough to read it - unless you start talking again. */
-const LINGER_MS = 12000;
-let lingerTimer = null;
-function linger(on) {
-  clearTimeout(lingerTimer);
-  document.body.classList.toggle('lingering', on);
-  $('answer').classList.toggle('show', on || document.body.classList.contains('answering'));
-  if (on) {
-    lingerTimer = setTimeout(() => {
-      document.body.classList.remove('lingering');
-      $('answer').classList.remove('show');
-    }, LINGER_MS);
   }
 }
 
@@ -4524,8 +4492,6 @@ window.apollo = {
   // A picture, steps or text Apollo wants to show you (the explain tools).
   explain(payload) {
     $('visual').innerHTML = Explain.markup(payload, chart);
-    if (!document.body.classList.contains('answering')) linger(true);
-    $('answer').classList.add('show');
     return true;
   },
   data(snapshot) { render(snapshot); },
