@@ -2633,3 +2633,23 @@ body.nav-open:not(.ultra) #stage { grid-template-columns: 48% 1fr 22%; transitio
 #markets { transition: background .35s, border-color .35s, backdrop-filter .35s; }
 #markets.rolled { background: transparent; border-color: transparent; backdrop-filter: none; }
 #markets.rolled .ow-item { text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+
+/* Calmer normal display. The consoles live in the expanded display only,
+   and the feed takes the whole right-hand column. */
+body:not(.viewing):not(.ultra):not(.osiris-map) .console { display: none; }
+@supports (anchor-name: --feed) {
+  body:not(.scan-open):not(.hud-free):not(.viewing):not(.ultra):not(.osiris-map) #stage > #headlines { margin-bottom: 0; }
+}
+/* The feed's head: just "Feed"; how many and how new shows on hover. */
+body:not(.ultra) #headlines .feed-sum { opacity: 0; transition: opacity .25s; }
+body:not(.ultra) #headlines-head:hover .feed-sum { opacity: 1; }
+/* The topics on one line that scrolls sideways. */
+body:not(.ultra) #topics { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(90deg, #000 88%, transparent); }
+body:not(.ultra) #topics::-webkit-scrollbar { display: none; }
+body:not(.ultra) #topics .chip { flex: none; }
+/* No picture, no tile: the story keeps its room for words. */
+body:not(.ultra) .story.hero .thumb:not(:has(img)) { display: none; }
+body:not(.ultra) .story.hero:not(:has(.thumb img)) { padding-top: 28px; }
+/* The status block: one thin line; the meters and the rest open on hover. */
+body:not(.ultra) #status-block { padding: 8px 16px; gap: 6px 14px; }
+body:not(.ultra) #status-block:not(:hover) :is(#gauges, #system-line) { display: none; }
