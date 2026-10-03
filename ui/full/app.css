@@ -2628,3 +2628,8 @@ body.nav-open #nav-back {
 }
 body.nav-open #nav-back:hover { opacity: 1; }
 body.nav-open:not(.ultra) #stage { grid-template-columns: 48% 1fr 22%; transition: grid-template-columns .4s; }
+/* Rolled, the roller floats on the scene like the clock; the panel's box
+   comes back round the page it opens. */
+#markets { transition: background .35s, border-color .35s, backdrop-filter .35s; }
+#markets.rolled { background: transparent; border-color: transparent; backdrop-filter: none; }
+#markets.rolled .ow-item { text-shadow: 0 2px 12px rgba(0,0,0,.6); }
