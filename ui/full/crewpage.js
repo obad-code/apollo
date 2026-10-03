@@ -13,7 +13,7 @@ import { creature, health, IO } from './crewview.js';
 
 const KEYS = ['LYLA', 'THEIA', 'MONEYPENNY', 'Q'];
 const ROLE = { LYLA: 'Research & media', THEIA: 'Professor', MONEYPENNY: 'Markets desk', Q: 'Quartermaster' };
-export const STAGES = ['Received', 'Reading', 'Thinking', 'Done'];
+export const STAGES = ['Received', 'Reading', 'Thinking', 'Writing', 'Done'];
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -24,7 +24,7 @@ export function stageOf(agent = {}) {
   if (!agent.working) return -1;
   const steps = agent.steps || [];
   const last = steps.length ? steps[steps.length - 1].stage : 'received';
-  return { received: 0, step: 1, asking: 2, done: 3 }[last] ?? 1;
+  return { received: 0, step: 1, asking: 2, writing: 3, done: 4 }[last] ?? 1;
 }
 
 function lane(key, a, open, now) {
@@ -74,35 +74,6 @@ function totals(board) {
   };
 }
 
-/* The five instruments under the lanes: a figure on a lit screen, and
- * beside it the shape of the day - jobs by hour, a ring, a needle, a lamp,
- * the split between the two brains. All from the board. */
-function instruments(board, t) {
-  const hours = board.hours || {};
-  const byHour = new Array(24).fill(0).map((_, h) => KEYS.reduce((n, k) => n + ((hours[k] || [])[h] || 0), 0));
-  const peak = Math.max(1, ...byHour);
-  const nowH = new Date((board.now || Date.now() / 1000) * 1000).getHours();
-  const bars = `<span class="cp-bars">${byHour.map((v, h) =>
-    `<i style="--h:${v ? 0.2 + 0.8 * (v / peak) : 0.06}"${h === nowH ? ' class="now"' : ''}></i>`).join('')}</span>`;
-  const rate = t.success === '—' ? 0 : parseInt(t.success, 10) / 100;
-  const ring = `<span class="cp-ring" style="--r:${rate}"></span>`;
-  const secs = parseInt(t.avg, 10) || 0;
-  const needle = `<span class="cp-dial"><i style="--a:${Math.min(1, secs / 120) * 180 - 90}deg"></i></span>`;
-  const lamp = `<span class="cp-bulb${t.errors ? ' on' : ''}"></span>`;
-  const sp = board.spend || {};
-  const gt = ((sp.gemini || {}).prompt || 0) + ((sp.gemini || {}).response || 0);
-  const ct = ((sp.claude || {}).prompt || 0) + ((sp.claude || {}).response || 0);
-  const split = `<span class="cp-split"><i style="flex:${gt || 1}"></i><i style="flex:${ct || 0.0001}"></i></span>`;
-  const k = (n) => (n >= 1000 ? `${(n / 1000).toFixed(0)}K` : String(n));
-  return [
-    { label: 'RUNS', value: t.runs, sub: 'by hour', viz: bars, lit: t.runs > 0 },
-    { label: 'SUCCESS', value: t.success, sub: 'finished well', viz: ring, lit: rate >= 0.8 },
-    { label: 'AVG JOB', value: t.avg, sub: 'per job', viz: needle, lit: secs > 0 },
-    { label: 'ERRORS', value: t.errors, sub: t.errors ? 'need a look' : 'all clear', viz: lamp, lit: !t.errors, alarm: Boolean(t.errors) },
-    { label: 'COST', value: t.cost, sub: `${k(t.tokens)} tokens`, viz: split, lit: true },
-  ];
-}
-
 export function render(root, board = {}, { look = 'minimal', open = null } = {}) {
   const t = totals(board);
   const now = board.now || Date.now() / 1000;
@@ -112,23 +83,26 @@ export function render(root, board = {}, { look = 'minimal', open = null } = {})
   root.innerHTML = `
     <header class="cp-top">
       <h1>THE CREW</h1>
-      <div class="cp-meta"><span><b>${t.working}</b> working</span><span><b>${t.runs}</b> jobs today</span>
-        <span><b>${t.success}</b> success</span><span><b>${t.cost}</b> today</span></div>
+      <div class="cp-meta"><span><i class="cp-led${t.working ? ' lit' : ''}"></i><b>${t.working}</b> working</span>
+        <span><i class="cp-led amb"></i><b>${t.runs}</b> jobs today</span>
+        <span><i class="cp-led${t.errors ? ' bad' : ''}"></i><b>${t.errors}</b> errors</span></div>
       <div class="cp-looks" role="group" aria-label="Look">
         <button type="button" data-look="minimal" class="${look === 'minimal' ? 'on' : ''}">MINIMAL</button>
         <button type="button" data-look="console" class="${look === 'console' ? 'on' : ''}">CONSOLE</button>
       </div>
+      <div class="cp-knobs"><label><i class="cp-knob"></i>VOICE</label><label><i class="cp-knob v2"></i>ROUTINES</label></div>
     </header>
     <div class="cp-flow">
       <div class="cp-src"><span class="cp-node">YOU</span><span class="cp-node apollo">APOLLO</span></div>
       <svg class="cp-wires" aria-hidden="true"></svg>
       <div class="cp-lanes">${KEYS.map((key) => lane(key, agents[key] || {}, open === key, now)).join('')}</div>
     </div>
-    <footer class="cp-foot">${instruments(board, t).map((m) => `
-      <div class="cp-inst${m.alarm ? ' alarm' : ''}">
-        <header><i class="cp-led${m.lit ? ' lit' : ''}"></i><span>${m.label}</span></header>
-        <div class="cp-screen"><b>${m.value}</b><small>${m.sub}</small>${m.viz}</div>
-      </div>`).join('')}
+    <footer class="cp-foot">
+      <div class="cp-g"><b>${t.runs}</b><span>RUNS TODAY</span></div>
+      <div class="cp-g"><b>${t.success}</b><span>SUCCESS</span></div>
+      <div class="cp-g"><b>${t.avg}</b><span>AVG JOB</span></div>
+      <div class="cp-g"><b>${t.errors}</b><span>ERRORS</span></div>
+      <div class="cp-g"><b>${t.cost}</b><span>COST TODAY</span></div>
     </footer>`;
   requestAnimationFrame(() => wires(root, agents));
 }
