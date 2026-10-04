@@ -158,8 +158,8 @@ On a keyboard where AltGr types characters, AltGr *is* Ctrl+Alt - change
 - **Mini Apollo** - the bar at the top edge. Native (GDI+ on a layered
   window), so it is truly transparent and never takes focus; the reason it is
   not HTML is in `docs/design-notes.md`.
-- **Normal** - the clock and **Summary** button, the left roller (markets,
-  talks, projects, ideas, reminders), news as picture stories on the right,
+- **Normal** - the clock with the **Summary** and **Fixes** buttons, the left roller (markets,
+  talks, your projects with their boards, ideas, reminders), news as picture stories on the right,
   the crew's tiles, LYLA's room. Everything is movable with **Edit** / F2.
 - **Clear** - only Apollo, big, in the middle.
 - **Trading** - insiders, Congress, SEC 8-K filings, market-moving news,
@@ -312,6 +312,7 @@ and `assistant.py` (`HOTKEY`, `CLAUDE_MODEL`…) are the rest.
 | `autopost.py` / `youtube_upload.py` / `telegram_bot.py` | What happens to a finished Short (post, private draft, keep), the upload, and the phone remote. |
 | `niche.py` | LYLA's niche research for the channel. |
 | `watch.py` | A contact sheet and report of any video or link, for sending to Claude. |
+| `myprojects.py` / `ui/full/board.js` | Your projects, each with a Freeform-style board, and THEIA's notes on them. |
 | `ui/full/crttv.js` | The idle screen's retro TV and its scenes. |
 | `ui/full/idlescenes.js`, `embers.js` | The idle screen's two skies, and the embers over them. |
 | `update.bat` / `make-short.bat` | One double-click to update; one to make a Short. |
@@ -336,12 +337,13 @@ reference that climbs out.
 
 ## The typeface
 
-Apollo sets Arabic in **Thmanyah** (carried in `ui/fonts/` and
-`ui/full/fonts/`) and Latin in Mini Apollo in **Inter** (SIL Open Font
-License). Thmanyah's licence allows embedding it in an app but **not
-publishing the font files** where others can download them - so keep this
-repository **private**, or remove those font folders from its history first
-(or ask thmanyah, ask@thmanyah.com). The licence is `ui/fonts/thmanyah/LICENSE.pdf`.
+Apollo is set in **Inter** (Latin) and **IBM Plex Sans Arabic** (Arabic) -
+the open faces closest to Apple's SF Pro and SF Arabic, which may not be
+shipped inside an app. Both are under the SIL Open Font License and travel
+with the code: `ui/fonts/` for Mini Apollo (GDI+), `ui/full/fonts/` for the
+display. A few faces stay for their one job: Orbitron (the idle LED sign),
+VT323 (the old boot tube), Melete (the neon name) and Martian Mono (the
+trading desk's figures).
 
 ## Troubleshooting
 

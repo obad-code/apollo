@@ -1,5 +1,5 @@
-"""The full display's faces (ui/full/app.css): IBM Plex Mono for everything,
-Melete for Apollo's name, and Thmanyah behind them for Arabic. Every face is
+"""The full display's faces (ui/full/app.css): Inter for everything, Melete
+for Apollo's name, and IBM Plex Sans Arabic behind them for Arabic. Every face is
 carried with the page - pywebview serves nothing above ui/full - and a
 @font-face whose file is missing falls back without a word, so the display
 looks almost right in the wrong typeface. This checks the files are there."""
@@ -30,22 +30,24 @@ def test_every_face_s_file_is_carried_with_the_page():
         assert (FULL / url).is_file(), f"{url} is not under ui/full"
 
 
-def test_plex_mono_in_every_weight_the_display_uses():
-    weights = {weight for weight, _ in faces("IBM Plex Mono")}
-    assert {"200", "300", "400", "500", "600"} <= weights
+def test_inter_covers_every_weight_and_plex_arabic_every_one_used():
+    assert [weight for weight, _ in faces("Inter")] == ["100 900"]
+    weights = {weight for weight, _ in faces("IBM Plex Sans Arabic")}
+    assert {"300", "400", "500", "600", "700"} <= weights
 
 
 def test_melete_for_the_name():
     assert [weight for weight, _ in faces("Melete")] == ["500"]
 
 
-def test_everything_is_set_in_plex_with_thmanyah_behind_it_for_arabic():
+def test_everything_is_set_in_inter_with_plex_arabic_behind_it_for_arabic():
     for token in ("--mono", "--hud", "--display"):
         stack = re.search(token + r":\s*([^;]+);", CSS).group(1)
-        assert stack.strip().startswith('"IBM Plex Mono"'), token
-        assert '"Thmanyah"' in stack, token
+        assert stack.strip().startswith('"Inter"'), token
+        assert '"IBM Plex Sans Arabic"' in stack, token
 
 
 def test_the_faces_licences_travel_with_them():
-    assert (FULL / "fonts" / "ibm-plex-mono" / "OFL.txt").is_file()
+    assert (FULL / "fonts" / "inter" / "OFL.txt").is_file()
+    assert (FULL / "fonts" / "plex-arabic" / "OFL.txt").is_file()
     assert (FULL / "fonts" / "melete" / "OFL.txt").is_file()

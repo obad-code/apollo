@@ -1,9 +1,9 @@
-"""Apollo carries Thmanyah with him; both halves of him have to find it.
+"""Apollo carries his faces with him; both halves of him have to find them.
 
-The overlay is drawn by GDI+ from the OTFs and the display is a web page
-using the WOFF2s, so there are two independent ways for the face to go
-missing - and both fail quietly, falling back to something that looks
-almost right.
+Mini Apollo is drawn by GDI+ from the TTFs (Inter for Latin, IBM Plex Sans
+Arabic for Arabic) and the display is a web page using the WOFF2s, so there
+are two independent ways for a face to go missing - and both fail quietly,
+falling back to something that looks almost right.
 """
 import pathlib
 
@@ -12,7 +12,8 @@ import pytest
 import orb
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-OTF = ROOT / "ui" / "fonts" / "thmanyah"
+OTF = ROOT / "ui" / "fonts" / "plex-arabic"
+LATIN = ROOT / "ui" / "fonts" / "inter"
 WOFF = ROOT / "ui" / "full" / "fonts"
 
 
@@ -21,11 +22,21 @@ def test_the_overlay_has_the_weight_it_asks_for(weight, filename):
     assert (OTF / filename).exists(), f"{weight}: {filename} is not in the tree"
 
 
-def test_the_display_has_the_same_weights():
-    stems = {p.stem for p in OTF.glob("*.otf")}
-    assert stems, "no OTFs at all"
-    assert stems == {p.stem for p in WOFF.glob("*.woff2")}, (
-        "the overlay and the display are carrying different weights")
+@pytest.mark.parametrize("filename", orb.LATIN_FILES)
+def test_the_overlay_has_its_latin_faces(filename):
+    assert (LATIN / filename).exists()
+
+
+def test_the_display_has_both_faces_and_their_licences():
+    assert (WOFF / "inter" / "InterVariable.woff2").is_file()
+    assert list((WOFF / "plex-arabic").glob("*.woff2"))
+    assert (WOFF / "inter" / "OFL.txt").is_file() and (WOFF / "plex-arabic" / "OFL.txt").is_file()
+    assert (OTF / "OFL.txt").is_file()
+
+
+def test_thmanyah_is_gone_for_good():
+    """Its licence forbids publishing the files, and the repository is on GitHub."""
+    assert not list(ROOT.joinpath("ui").rglob("*thmanyah*"))
 
 
 def test_gdi_plus_can_load_them_and_name_them_as_the_overlay_expects():
@@ -40,7 +51,7 @@ def test_gdi_plus_can_load_them_and_name_them_as_the_overlay_expects():
     import System.Drawing as D
 
     collection = D.Text.PrivateFontCollection()
-    for filename in orb.FONT_FILES.values():
+    for filename in set(orb.FONT_FILES.values()):
         collection.AddFontFile(str(OTF / filename))
     found = {family.Name for family in collection.Families}
     for weight, name in orb.FONT_FAMILIES.items():

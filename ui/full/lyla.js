@@ -798,7 +798,7 @@ export class Lyla {
     const ms = this.envLeft || 0;
     const mm = String(Math.floor(ms / 60000)).padStart(2, '0');
     const ss = String(Math.floor(ms / 1000) % 60).padStart(2, '0');
-    ctx.font = '500 11px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.font = '500 11px "Inter", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,193,94,0.86)';
     ctx.shadowColor = 'rgba(255,150,0,0.6)'; ctx.shadowBlur = 8;
@@ -1476,7 +1476,7 @@ export class Lyla {
   drawSpeech(ctx, text, ax, ay, W, elapsed, accent, center, flipY) {
     const chars = Math.floor(Math.max(0, elapsed) / 26);
     if (chars <= 0) return;
-    ctx.font = '500 12px "IBM Plex Mono", monospace';
+    ctx.font = '500 12px "Inter", sans-serif';
     ctx.textBaseline = 'top';
     const max = 30;
     const lines = []; let cur = '';
@@ -1524,7 +1524,7 @@ export class Lyla {
     const chars = Math.min(L.bubble.length, Math.floor(Math.max(0, t - (L.bubT ?? (L.until - 9000))) / 26));
     const shown = L.bubble.slice(0, chars);
     if (!shown) return;
-    ctx.font = '500 12px "IBM Plex Mono", monospace';
+    ctx.font = '500 12px "Inter", sans-serif';
     ctx.textBaseline = 'top';
     const max = 30;
     const words = L.bubble.split(' ');

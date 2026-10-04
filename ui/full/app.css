@@ -14,19 +14,6 @@
 @font-face { font-family: "VT323"; font-weight: 400; font-display: block;
              src: url("fonts/vt323/VT323-Regular.ttf") format("truetype"); }
 
-/* IBM Plex Mono, for everything on the display - the labels, the lists, the
-   buttons, the clock - in the five weights it is set in. SIL Open Font
-   License (fonts/ibm-plex-mono/OFL.txt), carried with the page. */
-@font-face { font-family: "IBM Plex Mono"; font-weight: 200; font-display: block;
-             src: url("fonts/ibm-plex-mono/ibm-plex-mono-latin-200-normal.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Mono"; font-weight: 300; font-display: block;
-             src: url("fonts/ibm-plex-mono/ibm-plex-mono-latin-300-normal.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-display: block;
-             src: url("fonts/ibm-plex-mono/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Mono"; font-weight: 500; font-display: block;
-             src: url("fonts/ibm-plex-mono/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Mono"; font-weight: 600; font-display: block;
-             src: url("fonts/ibm-plex-mono/ibm-plex-mono-latin-600-normal.woff2") format("woff2"); }
 
 /* Melete, for Apollo's name under the ring: the neon sign. SIL Open Font
    License (fonts/melete/OFL.txt). */
@@ -39,32 +26,28 @@
 @font-face { font-family: "Martian Mono"; font-weight: 100 800; font-display: block;
              src: url("fonts/martian-mono/martian-mono-latin-wght-normal.woff2") format("woff2"); }
 
-/* Thmanyah, carried with Apollo rather than expected from the system, and
-   served from under this page because pywebview roots its server here. One
-   family sets both scripts, so a reply in Arabic is in the same face as one
-   in English - which is the whole reason for it. */
-@font-face { font-family: "Thmanyah"; font-weight: 300; font-display: block;
-             src: url("fonts/thmanyahsans-Light.woff2") format("woff2"); }
-@font-face { font-family: "Thmanyah"; font-weight: 400; font-display: block;
-             src: url("fonts/thmanyahsans-Regular.woff2") format("woff2"); }
-@font-face { font-family: "Thmanyah"; font-weight: 500; font-display: block;
-             src: url("fonts/thmanyahsans-Medium.woff2") format("woff2"); }
-@font-face { font-family: "Thmanyah"; font-weight: 700; font-display: block;
-             src: url("fonts/thmanyahsans-Bold.woff2") format("woff2"); }
-@font-face { font-family: "Thmanyah"; font-weight: 900; font-display: block;
-             src: url("fonts/thmanyahsans-Black.woff2") format("woff2"); }
-
-/* The serif, for the two places that are a name rather than a readout: the
-   idle screen's and the clock's, once. Display is cut for size - at 68px its contrast is
-   the point of it, and the text cut would look timid there. */
-@font-face { font-family: "Thmanyah Display"; font-weight: 400; font-display: block;
-             src: url("fonts/thmanyahserifdisplay-Regular.woff2") format("woff2"); }
-@font-face { font-family: "Thmanyah Display"; font-weight: 500; font-display: block;
-             src: url("fonts/thmanyahserifdisplay-Medium.woff2") format("woff2"); }
-@font-face { font-family: "Thmanyah Display"; font-weight: 700; font-display: block;
-             src: url("fonts/thmanyahserifdisplay-Bold.woff2") format("woff2"); }
-@font-face { font-family: "Thmanyah Display"; font-weight: 900; font-display: block;
-             src: url("fonts/thmanyahserifdisplay-Black.woff2") format("woff2"); }
+/* The face of Apollo: Inter for Latin - the open face closest to Apple's San
+   Francisco - and IBM Plex Sans Arabic for Arabic, the closest open match to
+   SF Arabic. Both under the SIL Open Font License (fonts/inter/OFL.txt,
+   fonts/plex-arabic/OFL.txt), so they travel with the code. Plex Arabic is
+   only asked for Arabic letters (unicode-range), so Latin always stays Inter. */
+@font-face { font-family: "Inter"; font-weight: 100 900; font-display: block;
+             src: url("fonts/inter/InterVariable.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 300; font-display: block;
+             src: url("fonts/plex-arabic/ibm-plex-sans-arabic-arabic-300-normal.woff2") format("woff2");
+             unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200E; }
+@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 400; font-display: block;
+             src: url("fonts/plex-arabic/ibm-plex-sans-arabic-arabic-400-normal.woff2") format("woff2");
+             unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200E; }
+@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 500; font-display: block;
+             src: url("fonts/plex-arabic/ibm-plex-sans-arabic-arabic-500-normal.woff2") format("woff2");
+             unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200E; }
+@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 600; font-display: block;
+             src: url("fonts/plex-arabic/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2");
+             unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200E; }
+@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 700; font-display: block;
+             src: url("fonts/plex-arabic/ibm-plex-sans-arabic-arabic-700-normal.woff2") format("woff2");
+             unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200E; }
 
 :root {
   --dock-room: 104px;              /* the bottom edge, with LYLA's room put away */
@@ -97,14 +80,16 @@
   /* Monospace throughout, IBM Plex Mono, with Thmanyah behind it: Plex has
      no Arabic, so a reply in Arabic falls through to Thmanyah letter by
      letter and is still set in a face made for it. */
-  --mono: "IBM Plex Mono", "Thmanyah", ui-monospace, Consolas, monospace;
-  --hud: "IBM Plex Mono", "Thmanyah", ui-monospace, Consolas, monospace;
-  --display: "IBM Plex Mono", "Thmanyah", ui-monospace, Consolas, monospace;
+  --mono: "Inter", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --hud: "Inter", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --display: "Inter", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --body: "Inter", "IBM Plex Sans Arabic", system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
+  font-variant-numeric: tabular-nums;          /* figures line up, as the monospace's did */
   height: 100%;
   overflow: hidden;
   background: #060505;
@@ -1587,7 +1572,7 @@ body.offscreen *, body.offscreen *::before, body.offscreen *::after { animation-
                    animation: ap-word-bloom 6.4s ease-in-out infinite; }
 #wordmark .letters {
   position: relative; display: flex; gap: 6px;
-  font-family: "Melete", "IBM Plex Mono", monospace; font-size: 19px; font-weight: 500;
+  font-family: "Melete", "Inter", sans-serif; font-size: 19px; font-weight: 500;
   letter-spacing: 0.2em; color: #FFF0CE;
 }
 #wordmark .letters b { font-weight: inherit; animation: ap-sign 2.6s ease-in-out infinite; }
@@ -2295,8 +2280,8 @@ body.trading:not(.ultra):not(.osiris-map) #trading {
   --desk-bright: #F4FFF9;
   --desk-caption: rgba(160, 226, 204, 0.6);
   --desk-line: rgba(120, 240, 190, 0.1);
-  --desk-words: "Thmanyah", system-ui, sans-serif;
-  --desk-figures: "Martian Mono", "IBM Plex Mono", "Thmanyah", ui-monospace, monospace;
+  --desk-words: "Inter", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --desk-figures: "Martian Mono", "Inter", "IBM Plex Sans Arabic", ui-monospace, monospace;
   font-family: var(--desk-words);
   color: var(--desk-text);
 }
@@ -2789,10 +2774,10 @@ body:not(.ultra) #status-block:not(:hover) :is(#gauges, #system-line) { display:
 /* ===== The crew page (crewpage.js) ===================================== */
 #agents.paged > :not(#crew-page) { display: none !important; }
 #crew-page { --cp-line: rgba(255,255,255,.08); --cp-dim: rgba(255,255,255,.45); --cp-ok: #3ddc84;
-  position: relative; height: 100%; overflow: auto; padding: 34px 48px 28px; font-family: "IBM Plex Mono", monospace;
+  position: relative; height: 100%; overflow: auto; padding: 34px 48px 28px; font-family: var(--hud);
   color: #ececef; font-size: 13px; scrollbar-width: none; display: flex; flex-direction: column; }
 .cp-top { display: flex; align-items: center; gap: 26px; margin-bottom: 30px; }
-.cp-top h1 { font: 600 13px "IBM Plex Mono"; letter-spacing: .32em; }
+.cp-top h1 { font: 600 13px var(--hud); letter-spacing: .32em; }
 .cp-meta { display: flex; gap: 22px; margin-left: auto; color: var(--cp-dim); font-size: 11px; letter-spacing: .1em; align-items: center; }
 .cp-meta b { color: #ececef; font-weight: 500; margin-right: 4px; }
 .cp-led { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; vertical-align: 0; background: rgba(255,255,255,.18); }
@@ -2800,7 +2785,7 @@ body:not(.ultra) #status-block:not(:hover) :is(#gauges, #system-line) { display:
 .cp-led.amb { background: radial-gradient(circle at 35% 30%, #fff1c8, #FFB000 45%, #8a5d00); box-shadow: 0 0 8px #FFB000; }
 .cp-led.bad { background: radial-gradient(circle at 35% 30%, #ffd0d0, #ff5a5f 45%, #8a1d20); box-shadow: 0 0 8px #ff5a5f; }
 .cp-looks { display: flex; padding: 3px; border-radius: 999px; border: 1px solid var(--cp-line); }
-.cp-looks button { border: 0; background: none; color: var(--cp-dim); font: 500 10px "IBM Plex Mono"; letter-spacing: .16em; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.cp-looks button { border: 0; background: none; color: var(--cp-dim); font: 500 10px var(--hud); letter-spacing: .16em; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
 .cp-looks button.on { background: rgba(255,255,255,.1); color: #fff; }
 .cp-knobs { display: none; }
 .cp-flow { flex: none; display: grid; grid-template-columns: 110px 60px 1fr; align-items: center; }
@@ -2849,7 +2834,7 @@ body:not(.ultra) #status-block:not(:hover) :is(#gauges, #system-line) { display:
 #crew-page.look-minimal { background: #0b0b0d; }
 
 /* ---- CONSOLE: glass, metal and soft relief, as the approved design ---- */
-#crew-page.look-console { padding: 0 30px 30px; border-radius: 28px; font-family: "IBM Plex Mono", monospace;
+#crew-page.look-console { padding: 0 30px 30px; border-radius: 28px; font-family: var(--hud);
   background:
     radial-gradient(38% 55% at 4% 0%, rgba(255,176,0,.55), transparent 70%),
     radial-gradient(36% 55% at 100% 30%, rgba(58,196,170,.5), transparent 70%),
@@ -2871,7 +2856,7 @@ body:not(.ultra) #status-block:not(:hover) :is(#gauges, #system-line) { display:
 .look-console .cp-looks { border-color: rgba(0,0,0,.12); background: linear-gradient(180deg, #cfd0d8, #e8e9ef); box-shadow: inset 0 2px 3px rgba(0,0,0,.2); }
 .look-console .cp-looks button { color: #5a5b66; } .look-console .cp-looks button.on { background: #2a2b33; color: #fff; }
 .look-console .cp-knobs { display: flex; gap: 14px; }
-.cp-knobs label { font: 500 8.5px "IBM Plex Mono"; letter-spacing: .16em; color: #5a5b66; display: grid; gap: 4px; justify-items: center; }
+.cp-knobs label { font: 500 8.5px var(--hud); letter-spacing: .16em; color: #5a5b66; display: grid; gap: 4px; justify-items: center; }
 .cp-knob { width: 30px; height: 30px; border-radius: 50%; position: relative;
   background: conic-gradient(#f4f4f7, #a9abb5, #f4f4f7, #a9abb5, #f4f4f7, #a9abb5, #f4f4f7);
   box-shadow: 0 3px 5px rgba(0,0,0,.35), inset 0 1px 1px #fff, 0 0 0 3px #d4d5dc, 0 0 0 4px #a5a6b0; }

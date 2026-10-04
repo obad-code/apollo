@@ -63,22 +63,22 @@ PHOSPHOR = (255, 170, 60)
 AMBER = (255, 184, 0)
 AMBER_WARM = (255, 212, 92)
 
-# Thmanyah, which Apollo carries with him rather than expecting Windows to
-# have it. One family sets both scripts, so Arabic and English are no longer
-# in different faces. GDI+ exposes each weight as its own family name.
-FONT_FILES = {"light": "thmanyahsans-Light.otf",
-              "regular": "thmanyahsans-Regular.otf",
-              "medium": "thmanyahsans-Medium.otf",
-              "bold": "thmanyahsans-Bold.otf",
-              "black": "thmanyahsans-Black.otf"}
-FONT_FAMILIES = {"light": "thmanyah sans Light",
-                 "regular": "thmanyah sans",
-                 "medium": "thmanyah sans Med",
-                 "bold": "thmanyah sans",
-                 "black": "thmanyah sans Black"}
+# Arabic in IBM Plex Sans Arabic - the open face closest to Apple's SF Arabic -
+# carried with Apollo rather than expected from Windows (SIL Open Font License,
+# ui/fonts/plex-arabic/OFL.txt). GDI+ names Regular and Bold one family, and
+# Medium and SemiBold each a family of their own.
+FONT_FILES = {"light": "IBMPlexSansArabic-Regular.ttf",
+              "regular": "IBMPlexSansArabic-Regular.ttf",
+              "medium": "IBMPlexSansArabic-Medium.ttf",
+              "bold": "IBMPlexSansArabic-Bold.ttf",
+              "black": "IBMPlexSansArabic-SemiBold.ttf"}
+FONT_FAMILIES = {"light": "IBM Plex Sans Arabic",
+                 "regular": "IBM Plex Sans Arabic",
+                 "medium": "IBM Plex Sans Arabic Medium",
+                 "bold": "IBM Plex Sans Arabic",
+                 "black": "IBM Plex Sans Arabic SemiBold"}
 
-# Inter for Latin text - the open face closest to Apple's San Francisco, and
-# carried in the repository like Thmanyah. Arabic stays in Thmanyah.
+# Inter for Latin text - the open face closest to Apple's San Francisco.
 LATIN_FILES = ("Inter-Regular.ttf", "Inter-Medium.ttf", "Inter-SemiBold.ttf", "Inter-Bold.ttf")
 LATIN_FAMILIES = {"light": "Inter", "regular": "Inter Medium", "medium": "Inter SemiBold",
                   "bold": "Inter", "black": "Inter"}
@@ -821,7 +821,7 @@ class Orb:
     # -- fonts and text -----------------------------------------------------
 
     def _private_faces(self):
-        """Thmanyah, loaded from the repository rather than from Windows.
+        """The Arabic and Latin faces, loaded from the repository rather than from Windows.
 
         One family draws both scripts, so Apollo no longer sets Arabic in a
         different face from English. Loading it privately means it works on a
@@ -835,8 +835,8 @@ class Orb:
         faces = {}
         collection = D.Text.PrivateFontCollection()
         loaded = 0
-        for weight, filename in FONT_FILES.items():
-            path = os.path.join(HERE, "ui", "fonts", "thmanyah", filename)
+        for filename in sorted(set(FONT_FILES.values())):
+            path = os.path.join(HERE, "ui", "fonts", "plex-arabic", filename)
             if os.path.exists(path):
                 collection.AddFontFile(path)
                 loaded += 1
@@ -852,7 +852,7 @@ class Orb:
         return faces
 
     def _face(self, weight, size, style=None, latin=False):
-        """One font in Thmanyah if it is there, in the old stack if not.
+        """One font in Inter (Latin) or Plex Sans Arabic if it is there, in the old stack if not.
 
         Bold is a style of the regular family here, not a family of its own -
         the Light, Medium and Black weights are separate families, which is
@@ -886,7 +886,7 @@ class Orb:
         # Medium, not regular: light strokes on black thin out, and the
         # reply is the thing on the card that has to read.
         body = self._face("medium", FONT_PT, latin=True)
-        # Arabic in Thmanyah, a step heavier so it reads as firmly as the Latin.
+        # Arabic in Plex Sans Arabic, a step heavier so it reads as firmly as the Latin.
         rtl = self._face("bold", FONT_PT)
         small = self._face("light", FONT_SMALL_PT, latin=True)
         caption = self._face("regular", CAPTION_PT, latin=True)

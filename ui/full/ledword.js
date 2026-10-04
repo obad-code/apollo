@@ -19,7 +19,7 @@
 //
 // Frames only while it runs, at most `fps` of them.
 
-const DEFAULT_FONT = '"Thmanyah", "Segoe UI", system-ui, sans-serif';
+const DEFAULT_FONT = '"Inter", "IBM Plex Sans Arabic", "Segoe UI", system-ui, sans-serif';
 // The scramble component's own alphabet.
 const CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`░▒▓█▀▄■□▪▫●○◆◇◈◊※†‡';
 
