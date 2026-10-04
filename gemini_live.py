@@ -827,6 +827,9 @@ class LiveSession:
         # The speaker under its lock: a write still running on its worker
         # thread - cancelling the task does not stop the thread - finishes its
         # slice first, and finds no speaker when it comes back for the next.
+        # Said before the lock is asked for: a writer looping slice after slice could
+        # otherwise take the lock straight back each time and play the whole chunk first.
+        self._hushes += 1
         with self._speaker_lock:
             speaker, self._speaker = self._speaker, None
             self._shut(speaker)
@@ -1018,8 +1021,10 @@ class LiveSession:
         """
         self._play_open.clear()
         self._drain(self._play_q)
+        # Counted before the lock is asked for, so the writer stops at its next slice even
+        # if it would win the lock back first (a lock is not fair about who gets it next).
+        self._hushes += 1
         with self._speaker_lock:
-            self._hushes += 1
             speaker = self._speaker
             if speaker is None:
                 return

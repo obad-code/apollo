@@ -23,7 +23,7 @@ log = logging.getLogger("apollo.hud")
 PATH = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
                     "Apollo", "hud.json")
 
-PANELS = ("today", "markets", "system", "core", "lyla", "feed", "scan",
+PANELS = ("today", "markets", "system", "core", "lyla", "feed", "scan", "crew",
           "console-left", "console-right")
 MIN_W = 0.08
 MIN_H = 0.04
