@@ -8,6 +8,9 @@ obeyed. You can message it:
     post 2                    (or: نزل 2)              post that one to YouTube
     skip                      (or: لا تنزل)            post nothing today
     status
+    anything else, typed or as a VOICE NOTE: Apollo answers it (text and a
+    voice note back), or hands it to LYLA, THEIA, MONEYPENNY or Q and sends
+    what they find here.
 
 Setup (once):
     1. In Telegram, message @BotFather -> /newbot -> keep the token it gives you.
@@ -119,9 +122,9 @@ def handle(text, make_short=None, make_batch=None, choose=None, status=None, set
     if m:
         r = choose(int(m.group(1)))
         return r.get("result") or r.get("error") or "Done."
-    if re.match(r"^/?(skip|keep|لا|لا تنزل|لا تنشر|لا تنزله)", low):
+    if re.match(r"^/?(skip|keep|لا|لا تنزل|لا تنشر|لا تنزله)(\s+(شي|شيء|اليوم))?\s*$", low):
         return (choose(0).get("result") or "Nothing posted today.")
-    if re.match(r"^/?(today|trends?|ترند|اليوم)\b", low):
+    if re.match(r"^/?(today|trends?|ترند|مقاطع اليوم)\s*$", low):
         make_batch()
         return "LYLA is reading the trends and making today's Shorts - a few minutes. They'll arrive here."
     m = re.match(r"^/?(?:niche|نيش)\s*(\d*)\b", low)
@@ -131,7 +134,7 @@ def handle(text, make_short=None, make_batch=None, choose=None, status=None, set
             return r.get("result") or r.get("error")
         find_niches()
         return "LYLA is researching the best niches - a minute or two. I'll send the list here."
-    m = re.match(r"^/?(?:short|شورت|مقطع|سوي)\s*(?:about|عن)?\s*(.*)$", t, re.I | re.S)
+    m = re.match(r"^/?(?:short|شورت|سوي مقطع|سوي شورت|مقطع)(?:\s+|$)(?:about\s+|عن\s+)?(.*)$", t, re.I | re.S)
     if m:
         make_short(m.group(1).strip())
         return "LYLA is on it - a few minutes. I'll send it here."
@@ -146,7 +149,105 @@ def handle(text, make_short=None, make_batch=None, choose=None, status=None, set
     if low in ("/status", "status", "الحالة"):
         import shorts
         return f"{status()}\nbuild: {shorts.VERSION}"
-    return HELP
+    return None                      # not a command: Apollo answers it (converse)
+
+
+# -- talking to Apollo, by text or by voice ------------------------------------------------
+
+TALK = (
+    "You are Apollo, the user's own assistant, answering them on Telegram. Reply in the language "
+    "and dialect they used (Gulf Arabic if they wrote Arabic). Be short and direct - this may be "
+    "played back as a voice note. Use search for anything current. If the request is a job for "
+    "one of your crew - LYLA (research, YouTube Shorts, downloads), THEIA (deep analysis of an "
+    "idea or plan), MONEYPENNY (a stock or the watchlist), Q (something to add to or fix in "
+    "Apollo) - or they name one, answer ONLY with JSON: {\"agent\": NAME, \"task\": the job in "
+    "their words, \"stock\": the company or ticker if any}. Otherwise answer normally, no JSON.")
+
+
+def converse(text, think=None, take=None):
+    """Apollo's answer to anything that is not a command: a reply, or a job handed to the crew."""
+    if think is None:
+        import lyla
+        think = lambda prompt: lyla.ask_gemini(prompt, TALK)  # noqa: E731
+    answer = (think(text) or "").strip()
+    found = re.search(r"\{.*\}", answer, re.S)
+    if found:
+        try:
+            job = json.loads(found.group(0))
+        except ValueError:
+            job = None
+        name = str((job or {}).get("agent", "")).upper().replace(" ", "")
+        if job and name in ("LYLA", "THEIA", "MONEYPENNY", "Q"):
+            if take is None:
+                import crew
+                take = lambda n, task, stock: crew.desk(n).take(task, stock, telegram=True)  # noqa: E731
+            take(name, job.get("task") or text, job.get("stock") or "")
+            return f"{name} is on it - I'll send what comes back here."
+    return answer or "I didn't catch that - say it again?"
+
+
+def transcribe(audio_bytes, mime="audio/ogg"):
+    """What was said in a voice note, word for word (Gemini)."""
+    from google import genai
+    from google.genai import types
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    last = None
+    for model in ("gemini-flash-latest", "gemini-2.5-flash"):
+        try:
+            out = client.models.generate_content(model=model, contents=[
+                types.Part.from_bytes(data=audio_bytes, mime_type=mime),
+                "Transcribe this voice note exactly, in the language spoken. Answer with the words only."])
+            if out.text and out.text.strip():
+                return out.text.strip()
+        except Exception as e:  # noqa: BLE001 - the next model may answer
+            last = e
+    raise RuntimeError(f"Could not hear the voice note: {last}")
+
+
+def _download(file_id):
+    path = _call("getFile", {"file_id": file_id})["result"]["file_path"]
+    with urllib.request.urlopen(f"https://api.telegram.org/file/bot{token()}/{path}", timeout=60) as r:  # noqa: S310
+        return r.read()
+
+
+def send_voice(text, to=None):
+    """Apollo's reply as a voice note (edge-tts, free) - as a plain audio file if it cannot be one."""
+    import asyncio
+    import subprocess
+    import tempfile
+    import edge_tts
+    arabic = bool(re.search(r"[؀-ۿ]", text))
+    voice = os.environ.get("APOLLO_TELEGRAM_VOICE") or ("ar-SA-HamedNeural" if arabic else "en-US-GuyNeural")
+    folder = tempfile.mkdtemp(prefix="apollo-tg-")
+    mp3, ogg = os.path.join(folder, "reply.mp3"), os.path.join(folder, "reply.ogg")
+    asyncio.run(edge_tts.Communicate(re.sub(r"[*_#`>]", "", text)[:1500], voice).save(mp3))
+    try:
+        import imageio_ffmpeg
+        flags = {"creationflags": 0x08000000} if os.name == "nt" else {}
+        subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-i", mp3, "-c:a", "libopus", "-b:a", "32k", ogg],
+                       capture_output=True, check=True, **flags)
+        _call("sendVoice", {"chat_id": to or chat()}, files={"voice": ogg}, timeout=120)
+    except Exception:  # noqa: BLE001 - no opus encoder: send it as an audio file
+        _call("sendAudio", {"chat_id": to or chat()}, files={"audio": mp3}, timeout=120)
+
+
+def reply_to(msg, wire=None, talk=converse, hear=None, voice=None):
+    """One message from you: a command, something to answer, or a voice note."""
+    wire = _wire() if wire is None else wire
+    note = msg.get("voice") or msg.get("audio")
+    if note:
+        said = (hear or (lambda n: transcribe(_download(n["file_id"]), n.get("mime_type") or "audio/ogg")))(note)
+        answer = handle(said, **wire) or talk(said)
+        send(f"🎙 {said}\n\n{answer}")
+        try:
+            (voice or send_voice)(answer)
+        except Exception:  # noqa: BLE001 - the text already went
+            log.info("voice reply failed", exc_info=True)
+        return answer
+    body = msg.get("text") or ""
+    answer = handle(body, **wire) or talk(body)
+    send(answer)
+    return answer
 
 
 def _wire():
@@ -183,7 +284,7 @@ def start(stopping):
                         send(f"Your chat number: {who}", to=who)
                     elif chat() and who == chat():
                         try:
-                            send(handle(body, **_wire()))
+                            reply_to(msg)
                         except Exception as e:  # noqa: BLE001
                             send(f"That failed: {e}")
             except Exception:  # noqa: BLE001

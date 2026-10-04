@@ -18,7 +18,30 @@ def test_commands():
     assert run("post")[1] == [("choose", 1)] and run("نزله")[1] == [("choose", 1)]
     assert run("خله درافت")[1] == [("draft", 1)] and run("draft")[1] == [("draft", 1)]
     assert run("لا")[1] == [("choose", 0)]
-    assert run("hello")[0] == tb.HELP
+    assert run("hello")[0] is None                       # not a command: Apollo answers it
+    assert run("لا تنسى تذكرني بكرة")[1] == []           # ordinary talk is never a command
+    assert run("اليوم وش الطقس")[1] == []
+    assert run("سوي لي تحليل لانفيديا")[1] == []
+
+
+def test_anything_else_is_answered_or_handed_to_the_crew(monkeypatch):
+    sent, taken = [], []
+    monkeypatch.setattr(tb, "send", lambda text, to=None: sent.append(text))
+    wire = dict(make_short=None, make_batch=None, choose=None, status=None)
+    tb.reply_to({"text": "وش الطقس"}, wire=wire, talk=lambda t: tb.converse(t, think=lambda p: "حار، ٤٢"))
+    assert sent[-1] == "حار، ٤٢"
+    out = tb.converse("حللي انفيديا", think=lambda p: '{"agent": "MONEYPENNY", "task": "حللي انفيديا", "stock": "NVDA"}',
+                      take=lambda n, task, stock: taken.append((n, stock)))
+    assert taken == [("MONEYPENNY", "NVDA")] and "MONEYPENNY" in out
+
+
+def test_a_voice_note_is_heard_answered_and_spoken_back(monkeypatch):
+    sent, spoken = [], []
+    monkeypatch.setattr(tb, "send", lambda text, to=None: sent.append(text))
+    wire = dict(make_short=None, make_batch=None, choose=None, status=None)
+    tb.reply_to({"voice": {"file_id": "f"}}, wire=wire, hear=lambda n: "كم سعر الذهب",
+                talk=lambda t: "٢٤٠٠ دولار", voice=spoken.append)
+    assert "كم سعر الذهب" in sent[-1] and spoken == ["٢٤٠٠ دولار"]
 
 
 def test_style_notes(tmp_path, monkeypatch):

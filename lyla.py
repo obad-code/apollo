@@ -410,6 +410,13 @@ class Desk:
         self._pass_on(job)
 
     def _pass_on(self, job):
+        if job.get("telegram"):              # asked from the phone: the answer goes back there too
+            try:
+                import telegram_bot
+                telegram_bot.send_report(f"{self.name}: " + (job.get("summary", "") + "\n\n" + job.get("report", "")
+                                                           if job.get("ok") else f"that failed - {job.get('error', '')}"))
+            except Exception:  # noqa: BLE001
+                log.info("telegram report failed", exc_info=True)
         if self.report is None:
             return
         try:
