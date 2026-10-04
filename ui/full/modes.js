@@ -1,8 +1,8 @@
 /* The display's modes: one at a time, on the bar along the bottom of the
- * screen, and by voice ("clear mode", "trading mode", "الوضع الموسع").
+ * screen, and by voice ("summary mode", "trading mode", "الوضع الموسع").
  *
  *   normal    - the display as it always was
- *   clear     - nothing but Apollo and the sign to press Ctrl+Alt
+ *   summary   - the whole of Apollo on one calm page (summarymode.js)
  *   trading   - the trading desk: insiders, Congress, the filings and
  *               headlines that move a price, what traders are on, and the
  *               read of what they pick next
@@ -11,7 +11,7 @@
  *   osiris    - the OSIRIS map laid into the display
  *
  * Underneath they are three switches: ultra mode, the map, and which view
- * of the normal display is up (normal, clear, trading or agents). This says
+ * of the normal display is up (normal, summary, trading or agents). This says
  * which mode those make, and which to throw, in order, to get to another:
  * leaving before arriving, so the map and ultra mode never fight over the
  * screen. Going into ultra mode from the map leaves the map on - ultra mode
@@ -20,7 +20,7 @@
 
 export const MODES = [
   { id: 'normal', label: 'Normal' },
-  { id: 'clear', label: 'Clear' },
+  { id: 'summary', label: 'Summary' },
   { id: 'trading', label: 'Trading' },
   { id: 'agents', label: 'Agents' },
   { id: 'expanded', label: 'Expanded' },
@@ -28,7 +28,7 @@ export const MODES = [
 ];
 
 // The views of the normal display; each is a mode of its own.
-export const VIEWS = ['normal', 'clear', 'trading', 'agents'];
+export const VIEWS = ['normal', 'summary', 'trading', 'agents'];
 
 /* Which mode the switches make. */
 export function current({ ultra, osiris, view }) {

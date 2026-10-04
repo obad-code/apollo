@@ -34,6 +34,7 @@ import { Digest } from './digest.js';
 import { Fixes } from './fixes.js';
 import { Board } from './board.js';
 import { IdeaView } from './ideaview.js';
+import { SummaryMode } from './summarymode.js';
 import { Embers } from './embers.js';
 import * as CrewPage from './crewpage.js';
 import { Ambient } from './ambient.js';
@@ -1810,6 +1811,55 @@ document.addEventListener('focusout', (e) => { if (e.target.closest(EDITABLE)) w
 new MutationObserver(() => wantKeys($('board').classList.contains('on'))).observe($('board'), { attributes: true, attributeFilter: ['class'] });
 
 const ideaView = new IdeaView($('idea-view'), bridge);
+
+/* Summary mode's page, from what the display already has and what the crew made. */
+const shortPreviews = new Map();
+const summaryMode = new SummaryMode($('summary-view'), {
+  async data() {
+    const api = bridge();
+    const snap = state.snapshot || {};
+    let dg = {}, alerts = [];
+    try { dg = (api && api.digest ? await api.digest() : {}) || {}; } catch { /* none yet */ }
+    try { alerts = (api && api.recent_alerts ? await api.recent_alerts() : []) || []; } catch { /* none */ }
+    if (api && api.crew_board) { try { crew.board = (await api.crew_board()) || crew.board; } catch { /* keep */ } }
+    const agents = crewAgents();
+    const market = snap.market || {};
+    const verdicts = Object.fromEntries((dg.stocks || []).map((x) => [x.symbol, x.verdict]));
+    const indices = (dg.indices && dg.indices.length ? dg.indices : market.indices) || [];
+    const stocks = (market.watchlist && market.watchlist.length ? market.watchlist : dg.stocks || [])
+      .map((q) => ({ ...q, verdict: q.verdict || verdicts[q.symbol] || '' }))
+      .sort((a, b) => Math.abs(b.change_pct || 0) - Math.abs(a.change_pct || 0));
+    const shorts = ((agents.LYLA || {}).results || []).filter((r) => r.video).slice(0, 4).map((r, i) => ({
+      title: (r.summary || r.task || '').replace(/^Your Short is ready: /, '').slice(0, 90), video: r.video, preview: r.preview,
+      waiting: i === 0 && /post|draft|keep/i.test(r.summary || ''), previewSrc: shortPreviews.get(r.preview) || '' }));
+    shorts.filter((x) => x.preview && !shortPreviews.has(x.preview) && api && api.crew_image).forEach((x) => {
+      shortPreviews.set(x.preview, '');
+      Promise.resolve(api.crew_image(x.preview)).then((src) => { if (src) { shortPreviews.set(x.preview, src); summaryMode.refresh(); } });
+    });
+    return { indices, stocks, accuracy: dg.accuracy, theia: dg.theia, projects: (snap.projects || {}).mine || [],
+      ideas: (snap.ideas || {}).ideas || [], crew: agents, shorts, alerts };
+  },
+  go(where) {
+    const modeOf = { home: 'normal', crew: 'agents', markets: 'trading', summary: 'summary' };
+    if (modeOf[where]) { setMode(modeOf[where]); return; }
+    if (where === 'projects' || where === 'ideas') { setMode('normal'); setTimeout(() => window.apollo.tab(where), 400); return; }
+    if (where === 'shorts') { reader.filter = 'LYLA'; openReader('ALL', 0); return; }
+    if (where === 'results') { reader.filter = null; openReader('ALL', 0); return; }
+    if (where === 'fixes') { fixes.open(); return; }
+    if (where === 'idle') { const b = document.querySelector('[data-act="idle"]'); if (b) b.click(); }
+  },
+  open(kind, id) {
+    if (kind === 'idea') { ideaView.open(id); return; }
+    const project = (((state.snapshot || {}).projects || {}).mine || []).find((p) => p.id === id);
+    if (project) board.open(project);
+  },
+  short(i) {
+    const api = bridge();
+    const r = (((crewAgents().LYLA || {}).results || []).filter((x) => x.video))[i];
+    if (r && api && api.open_crew_file) api.open_crew_file(r.video);
+  },
+  link(url) { const api = bridge(); if (api && api.open_link) api.open_link(url); },
+});
 const digest = new Digest($('digest-btn'), $('digest'), bridge);
 const fixes = new Fixes($('fixes-btn'), $('fixes'), bridge);
 window.addEventListener('pywebviewready', () => { digest.check(); fixes.check(); });
@@ -3532,7 +3582,8 @@ function setView(view) {
   if (was === 'agents') leaveAgents();
   renderModes();
   channelChange(() => {
-    for (const name of ['clear', 'trading', 'agents']) document.body.classList.toggle(name, view === name);
+    for (const name of ['summary', 'trading', 'agents']) document.body.classList.toggle(name, view === name);
+    if (view === 'summary') summaryMode.show(); else summaryMode.hide();
     document.body.classList.toggle('viewing', view !== 'normal');
     if (view === 'agents') {
       showAgents();

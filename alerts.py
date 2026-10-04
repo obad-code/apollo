@@ -463,6 +463,7 @@ class Watcher:
         return told
 
     def _tell(self, alert):
+        remember(alert)
         for name, send in (("email", self.email), ("voice", self.speak)):
             if send is None:
                 continue
@@ -492,6 +493,38 @@ class Watcher:
                      "\n".join([head, ""] + lines + ["", story.get("link", "")]),
                      rich=emailer.card(story["title"], lines, story.get("link", ""), action=head,
                                        tone=call["action"]))
+
+
+TOLD = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "Apollo", "alerts_told.json")
+
+
+def remember(alert, path=None):
+    """The alerts that were told, newest first, for the display's Summary mode."""
+    path = path or TOLD
+    call = alert.get("call") or {}
+    story = alert.get("story") or {}
+    row = {"action": call.get("action", ""), "ticker": call.get("ticker") or ", ".join(alert.get("tickers", [])[:2]),
+           "title": story.get("title", ""), "source": story.get("source", ""), "link": story.get("link", ""),
+           "confidence": call.get("confidence", ""), "when": time.time()}
+    try:
+        rows = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else []
+    except (OSError, ValueError):
+        rows = []
+    rows = [row] + [r for r in rows if isinstance(r, dict)][:19]
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(rows, f, ensure_ascii=False)
+    except OSError:
+        log.debug("could not keep the alert", exc_info=True)
+
+
+def recent(path=None, most=6):
+    try:
+        with open(path or TOLD, encoding="utf-8") as f:
+            return json.load(f)[:most]
+    except (OSError, ValueError):
+        return []
 
 
 def _verdicts(watch):

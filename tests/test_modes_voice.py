@@ -22,7 +22,7 @@ def asking():
     return asked, Context(display_hook=lambda request: asked.append(request) or True)
 
 
-@pytest.mark.parametrize("mode", ["normal", "clear", "trading", "agents", "expanded", "osiris"])
+@pytest.mark.parametrize("mode", ["normal", "summary", "trading", "agents", "expanded", "osiris"])
 def test_each_mode_by_voice(mode):
     asked, ctx = asking()
     result = tools.run("display_mode", {"mode": mode}, ctx)
@@ -30,7 +30,7 @@ def test_each_mode_by_voice(mode):
     assert asked == [{"action": "mode", "mode": mode}]
 
 
-@pytest.mark.parametrize("said,mode", [("ultra", "expanded"), ("Clear", "clear"),
+@pytest.mark.parametrize("said,mode", [("ultra", "expanded"), ("Clear", "summary"), ("summary", "summary"),
                                        ("map", "osiris"), ("OSIRIS", "osiris"),
                                        ("Trading", "trading"), ("trade", "trading"),
                                        ("LYLA", "agents")])
@@ -46,12 +46,12 @@ def test_a_mode_there_is_not_says_so():
 
 
 def test_with_no_display_to_do_it_on_it_says_so():
-    assert tools.run("display_mode", {"mode": "clear"}, Context())["ok"] is False
+    assert tools.run("display_mode", {"mode": "summary"}, Context())["ok"] is False
 
 
 def test_it_says_what_the_modes_are_in_both_languages():
     description = tools.REGISTRY["display_mode"].description
-    for mode in ("normal", "clear", "trading", "agents", "expanded", "osiris"):
+    for mode in ("normal", "summary", "trading", "agents", "expanded", "osiris"):
         assert mode in description.lower()
     assert any("؀" <= ch <= "ۿ" for ch in description)
     assert "display_mode" in tools.TOOL_LABELS
@@ -61,8 +61,8 @@ def test_asked_for_by_voice_the_display_comes_up_in_that_mode(monkeypatch):
     app, log = make(monkeypatch)
     told = []
     app.ui.display = told.append
-    app.request_display({"action": "mode", "mode": "clear"})
+    app.request_display({"action": "mode", "mode": "summary"})
     app.check_displays()
     assert app.presence.full is True
     assert ("show", apollo.Overlay.FULL) in log
-    assert told[-1] == {"action": "mode", "mode": "clear"}
+    assert told[-1] == {"action": "mode", "mode": "summary"}

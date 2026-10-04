@@ -1238,6 +1238,10 @@ class Api:
             ui, voice, f"Tell the user the gist of their agent's report, briefly, in their language: {plain}", plain)).start()
         return True
 
+    def recent_alerts(self):
+        import alerts
+        return alerts.recent()
+
     def keyboard(self, on):
         """The page asks for the keyboard while a field is being typed in."""
         app = self._app

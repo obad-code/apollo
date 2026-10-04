@@ -46,7 +46,7 @@ mark; while you talk it shows what he says, a chart, a stock card. Start-up
 status ("Starting up…", "System online") shows here too. It draws at your
 screen's real resolution (`APOLLO_MINI_SCALE` forces a scale).
 
-**The full display** (`` Ctrl+` ``) - modes: normal, clear, trading, agents,
+**The full display** (`` Ctrl+` ``) - modes: normal, summary, trading, agents,
 expanded, OSIRIS; plus idle, edit, sound, away and hands-free.
 - **Normal** - a HUD you arrange: the left roller (markets, projects, talks,
   reminders), news as picture stories, the crew's four tiles with health bars,
@@ -161,7 +161,7 @@ On a keyboard where AltGr types characters, AltGr *is* Ctrl+Alt - change
 - **Normal** - the clock with the **Summary** and **Fixes** buttons, the left roller (markets,
   talks, your projects with their boards, ideas, reminders), news as picture stories on the right,
   the crew's tiles, LYLA's room. Everything is movable with **Edit** / F2.
-- **Clear** - only Apollo, big, in the middle.
+- **Summary** - everything on one page: what Apollo would tell you in a sentence, markets with your stocks' calls and MONEYPENNY's record, projects and ideas with THEIA's notes, LYLA's Shorts, the crew live, RESULTS, and the alerts that mattered.
 - **Trading** - insiders, Congress, SEC 8-K filings, market-moving news,
   StockTwits and Reddit, and the counted verdict on each stock (`trading.py`).
 - **Agents** - the four crew cards; every result opens in the reader.

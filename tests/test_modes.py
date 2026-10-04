@@ -30,33 +30,33 @@ def flags(**on):
 
 
 def test_the_modes_on_the_bar(tmp_path):
-    assert run(tmp_path, "M.MODES.map((m) => m.id)") == ["normal", "clear", "trading", "agents",
+    assert run(tmp_path, "M.MODES.map((m) => m.id)") == ["normal", "summary", "trading", "agents",
                                                         "expanded", "osiris"]
 
 
-@pytest.mark.parametrize("on,mode", [({}, "normal"), ({"view": "clear"}, "clear"),
+@pytest.mark.parametrize("on,mode", [({}, "normal"), ({"view": "summary"}, "summary"),
                                      ({"view": "trading"}, "trading"), ({"view": "agents"}, "agents"),
                                      ({"ultra": True}, "expanded"), ({"osiris": True}, "osiris"),
-                                     ({"ultra": True, "view": "clear"}, "expanded")])
+                                     ({"ultra": True, "view": "summary"}, "expanded")])
 def test_which_is_on(tmp_path, on, mode):
     assert run(tmp_path, f"M.current({flags(**on)})") == mode
 
 
 @pytest.mark.parametrize("on,wanted,steps", [
-    ({}, "clear", [["view", "clear"]]),
-    ({"view": "clear"}, "normal", [["view", "normal"]]),
-    ({"view": "clear"}, "trading", [["view", "trading"]]),
+    ({}, "summary", [["view", "summary"]]),
+    ({"view": "summary"}, "normal", [["view", "normal"]]),
+    ({"view": "summary"}, "trading", [["view", "trading"]]),
     ({"view": "trading"}, "agents", [["view", "agents"]]),
-    ({"ultra": True}, "clear", [["ultra", False], ["view", "clear"]]),
+    ({"ultra": True}, "summary", [["ultra", False], ["view", "summary"]]),
     ({"ultra": True}, "trading", [["ultra", False], ["view", "trading"]]),
-    ({"view": "clear"}, "expanded", [["view", "normal"], ["ultra", True]]),
+    ({"view": "summary"}, "expanded", [["view", "normal"], ["ultra", True]]),
     ({"ultra": True}, "osiris", [["ultra", False], ["osiris", True]]),
-    ({"osiris": True}, "clear", [["osiris", False], ["view", "clear"]]),
+    ({"osiris": True}, "summary", [["osiris", False], ["view", "summary"]]),
     ({"osiris": True}, "agents", [["osiris", False], ["view", "agents"]]),
     ({"view": "trading"}, "osiris", [["view", "normal"], ["osiris", True]]),
     ({"osiris": True}, "expanded", [["ultra", True]]),        # the map goes with it, as a tile
     ({}, "normal", []),
-    ({"view": "clear"}, "clear", []),
+    ({"view": "summary"}, "summary", []),
 ])
 def test_the_steps_between_them(tmp_path, on, wanted, steps):
     assert run(tmp_path, f"M.plan({flags(**on)}, {json.dumps(wanted)})") == steps

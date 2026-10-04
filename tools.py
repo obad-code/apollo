@@ -587,33 +587,34 @@ def _ultra_mode(ctx, on=True):
 
 # The display's modes, as the bar along its bottom has them, and the other
 # things people call them.
-MODES = ("normal", "clear", "trading", "agents", "expanded", "osiris")
+MODES = ("normal", "summary", "trading", "agents", "expanded", "osiris")
 _MODE_WORDS = {"ultra": "expanded", "ultra mode": "expanded", "work": "expanded",
                "expand": "expanded", "map": "osiris", "the map": "osiris",
                "regular": "normal", "default": "normal", "usual": "normal",
-               "clean": "clear", "focus": "clear", "trade": "trading",
+               "clean": "summary", "focus": "summary", "clear": "summary", "overview": "summary",
+               "dashboard": "summary", "trade": "trading",
                "trader": "trading", "stocks": "trading", "market": "trading",
                "agent": "agents", "lyla": "agents"}
 
 
 @_tool("display_mode", "switching the display",
        "Put Apollo's full display into one of its modes - the ones on the bar "
-       "along its bottom: normal (the usual display), clear (nothing on the "
-       "screen but Apollo and the sign saying to press Ctrl+Alt), trading (the "
+       "along its bottom: normal (the usual display), summary (everything on "
+       "one page: markets and calls, the crew, projects, ideas, Shorts and alerts), trading (the "
        "trading desk: insider and Congress buying, market-moving filings and "
        "news, what traders are on and the read of their next picks), agents "
        "(the agents, LYLA's pipeline), expanded (ultra mode: every display at "
        "once as tiles) or osiris (the OSIRIS map laid into the display). Use "
-       "this when the user asks for a mode by name - \"clear mode\", \"trading "
+       "this when the user asks for a mode by name - \"summary mode\", \"وضع الملخص\", \"trading "
        "mode\", \"وضع التداول\", \"وضع الوكلاء\", \"الوضع الصافي\", \"رجع "
        "الوضع العادي\", \"الوضع الموسع\", \"وضع اوزيرس\". Confirm in a few words.",
-       _obj({"mode": _str("normal, clear, trading, agents, expanded or osiris")}, ("mode",)))
+       _obj({"mode": _str("normal, summary, trading, agents, expanded or osiris")}, ("mode",)))
 def _display_mode(ctx, mode="normal"):
     said = str(mode or "").strip().lower()
     wanted = _MODE_WORDS.get(said, said)
     if wanted not in MODES:
         return {"ok": False, "error": f"There is no {mode} mode - the modes are normal, "
-                                      "clear, trading, agents, expanded and OSIRIS."}
+                                      "summary, trading, agents, expanded and OSIRIS."}
     ctx.activity("switching the display")
     if ctx.display({"action": "mode", "mode": wanted}) is False:
         return {"ok": False, "error": "The display isn't up to switch modes right now."}

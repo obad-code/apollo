@@ -174,7 +174,6 @@
     </div>
     <div id="hint" class="caption">Hold Ctrl+Alt to talk</div>
     <!-- Clear mode's sign, while Apollo is at rest. -->
-    <div id="clear-sign"><span>Press</span><kbd>Ctrl</kbd><b>+</b><kbd>Alt</kbd><span>to command Apollo</span></div>
     <!-- Only while it is working: the dot matrix and what it is doing. -->
     <div id="thinking"></div>
   </section>
@@ -322,8 +321,8 @@
   <div class="modes" role="group" aria-label="Modes">
     <button class="mode" type="button" data-mode="normal" data-sfx="none" aria-pressed="true"
             title="The display as it always is"><i class="led"></i>Normal</button>
-    <button class="mode" type="button" data-mode="clear" data-sfx="none" aria-pressed="false"
-            title="Nothing but Apollo"><i class="led"></i>Clear</button>
+    <button class="mode" type="button" data-mode="summary" data-sfx="none" aria-pressed="false"
+            title="Everything on one page: markets, the crew, projects, ideas, Shorts and alerts"><i class="led"></i>Summary</button>
     <button class="mode" type="button" data-mode="trading" data-sfx="none" aria-pressed="false"
             title="The trading desk: insiders, Congress, sensitive news, traders and the read of their next picks"><i class="led"></i>Trading</button>
     <button class="mode" type="button" data-mode="agents" data-sfx="none" aria-pressed="false"
@@ -364,8 +363,8 @@
   <div class="modes" role="group" aria-label="Modes">
     <button class="mode" type="button" data-mode="normal" data-sfx="none" aria-pressed="true"
             title="The display as it always is"><i class="led"></i>Normal</button>
-    <button class="mode" type="button" data-mode="clear" data-sfx="none" aria-pressed="false"
-            title="Nothing but Apollo"><i class="led"></i>Clear</button>
+    <button class="mode" type="button" data-mode="summary" data-sfx="none" aria-pressed="false"
+            title="Everything on one page: markets, the crew, projects, ideas, Shorts and alerts"><i class="led"></i>Summary</button>
     <button class="mode" type="button" data-mode="trading" data-sfx="none" aria-pressed="false"
             title="The trading desk: insiders, Congress, sensitive news, traders and the read of their next picks"><i class="led"></i>Trading</button>
     <button class="mode" type="button" data-mode="agents" data-sfx="none" aria-pressed="false"
@@ -445,6 +444,8 @@
 <!-- Your summary (digest.js): opened from the button by the clock. -->
 <div id="digest" aria-hidden="true"></div>
 <div id="fixes" aria-hidden="true"></div>
+<!-- Summary mode (summarymode.js): the whole of Apollo on one page. -->
+<section id="summary-view" aria-label="Summary"></section>
 <!-- A project's board, full screen (board.js). -->
 <div id="board" aria-hidden="true"></div>
 <!-- One idea, full screen, with THEIA (ideaview.js). -->
