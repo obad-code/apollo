@@ -119,6 +119,10 @@ _gdi32.CreateDIBSection.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_u
                                     ctypes.c_uint32]
 
 
+# One frame per screen refresh (60/120/144 Hz) instead of the coarse timer. APOLLO_VSYNC=0 turns it off.
+PACED = os.environ.get("APOLLO_VSYNC", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
 class BLENDFUNCTION(ctypes.Structure):
     _fields_ = [("BlendOp", ctypes.c_byte), ("BlendFlags", ctypes.c_byte),
                 ("SourceConstantAlpha", ctypes.c_byte), ("AlphaFormat", ctypes.c_byte)]
@@ -175,7 +179,8 @@ class Orb:
     """
 
     TICK_MS = 16       # the timer never changes rate; see `_tick`
-    REST_EVERY = 3     # so ~20fps at rest, ~60fps while anything is moving
+    REST_EVERY = 3     # (kept for old callers)
+    REST_GAP = 0.05    # at rest ~20 frames a second; moving, every refresh of the screen
 
     # The card, in the proportions of the approved design.
     PANEL_W = overlay_state.PANEL_W
@@ -317,8 +322,15 @@ class Orb:
                 # up as an overlay that never paints.
                 self._timer = WF.Timer()
                 self._timer.Interval = self.TICK_MS
-                self._timer.Tick += lambda s, e: self._tick()
+                self._timer.Tick += lambda s, e: self._timer_tick()
                 self._timer.Start()
+                # Smoother still: a frame on every refresh of the screen (60, 120, 144 Hz),
+                # paced by the compositor itself. The WinForms timer above is coarse (Windows
+                # rounds it to ~15.6 ms, so frames land unevenly) and stays only as the fallback.
+                if PACED:
+                    paced = Action(self._paced_tick)
+                    threading.Thread(target=self._pace, args=(host_form, paced), daemon=True,
+                                     name="overlay-vsync").start()
             except Exception:
                 import traceback
                 self.run_exc = traceback.format_exc()
@@ -328,6 +340,38 @@ class Orb:
         host_form.Invoke(Action(build))
         self.ready.wait(timeout=10)
         return self.hwnd is not None
+
+    _last_paced = 0.0
+    _paced_waiting = False
+
+    def _pace(self, form, paced):
+        """Wait for each refresh of the screen (DwmFlush), then ask the drawing thread for a
+        frame. Never draws itself: GDI+ here belongs to that thread alone."""
+        try:
+            flush = ctypes.windll.dwmapi.DwmFlush
+        except Exception:  # noqa: BLE001 - no compositor: the timer carries on
+            return
+        while not self.stopping.is_set() and self.hwnd:
+            if flush() != 0:                       # composition off (rare): don't spin
+                time.sleep(0.008)
+            if self._paced_waiting:                # the last frame is not drawn yet - skip, never queue up
+                continue
+            self._paced_waiting = True
+            try:
+                form.BeginInvoke(paced)
+            except Exception:  # noqa: BLE001 - the window is going; the timer is still there
+                self._paced_waiting = False
+                return
+
+    def _paced_tick(self):
+        self._paced_waiting = False
+        self._last_paced = time.monotonic()
+        self._tick()
+
+    def _timer_tick(self):
+        if time.monotonic() - self._last_paced < 0.1:      # the screen's own pace is running
+            return
+        self._tick()
 
     def _tick(self):
         """One timer tick. Redraws every tick while anything is moving, every
@@ -344,7 +388,7 @@ class Orb:
             busy = (not self.view.resting or not self._height.resting
                     or self._level > 0.01 or self._level_target > 0.01
                     or self.view.panel_open > 0.01)
-            if self._visible and (busy or self._ticks % self.REST_EVERY == 0):
+            if self._visible and (busy or time.monotonic() - self._last_draw >= self.REST_GAP):
                 self._draw()
                 self.frames += 1
         except Exception:

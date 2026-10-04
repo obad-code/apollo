@@ -27,6 +27,7 @@ _cache = {}
 # analysts' target can never be better than HOLD.)
 VERDICTS = [(6, "STRONG BUY", "BUY"), (3, "BUY", "BUY"), (0, "HOLD", "HOLD")]
 ORDER = ["AVOID", "HOLD", "BUY", "STRONG BUY"]
+RULES = 2          # bumped whenever the rules change, so a new rule is never told as a stock's "call changed"
 
 
 def call(score):

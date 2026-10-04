@@ -195,3 +195,15 @@ def test_the_email_leads_with_the_call(tmp_path, monkeypatch):
     alerts.Watcher._email({"story": story("Tesla recall"), "tickers": ["TSLA"], "why": [],
                            "explained": "ACTION: SELL TSLA\nSUMMARY: Bad.\nCONFIDENCE: high"})
     assert sent[0]["Subject"].startswith("SELL - TAKE YOUR MONEY OUT TSLA")
+
+
+def test_new_counting_rules_are_taken_in_silently_not_told_as_changed_calls(tmp_path, monkeypatch):
+    import analysis
+    w = alerts.Watcher.__new__(alerts.Watcher)
+    told = []
+    w.seen, w.sent, w.clock = {"verdict:AMD:STRONG BUY": 1, "verdicts:rules:1": 1}, __import__("collections").deque(), lambda: 10 ** 9
+    w.watch, w.email, w.speak = (lambda: ["AMD"]), told.append, None
+    w._room, w._save = (lambda: True), (lambda: None)
+    monkeypatch.setattr(analysis, "RULES", 2)
+    assert w.check_verdicts(lambda syms: [("AMD", "HOLD", "price above target")]) == [] and told == []
+    assert "verdicts:rules:2" in w.seen and "verdict:AMD:HOLD" in w.seen

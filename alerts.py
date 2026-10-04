@@ -412,6 +412,17 @@ class Watcher:
         if now - self.seen.get("verdicts:at", 0) < VERDICT_EVERY:
             return []
         self.seen["verdicts:at"] = now
+        try:
+            import analysis
+            rules = getattr(analysis, "RULES", 1)
+        except Exception:  # noqa: BLE001
+            rules = 1
+        # New counting rules: take the new calls in silently - the stocks did not change, the rules did.
+        mark = f"verdicts:rules:{rules}"                 # a time as its value, so the tidy-up keeps it
+        silent = mark not in self.seen and any(k.startswith("verdict:") for k in self.seen)
+        for k in [k for k in self.seen if k.startswith("verdicts:rules")]:
+            del self.seen[k]
+        self.seen[mark] = now
         told = []
         for symbol, verdict, why in (verdicts or _verdicts)(tuple(self.watch())):
             key = f"verdict:{symbol}:"
@@ -419,7 +430,7 @@ class Watcher:
             for k in [k for k in self.seen if k.startswith(key)]:
                 del self.seen[k]
             self.seen[key + verdict] = now
-            if before is None or before == verdict or not self._room():
+            if silent or before is None or before == verdict or not self._room():
                 continue
             story = {"title": f"{symbol}: {before} → {verdict}", "summary": why,
                      "source": "Apollo's count", "link": "", "when": now}
