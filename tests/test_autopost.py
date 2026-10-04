@@ -8,7 +8,8 @@ def test_pick_topics_pads_and_cleans():
     assert len({p["world"] for p in out}) == 3          # every Short gets its own world
 
 
-def test_choose_and_deadline(tmp_path):
+def test_choose_and_deadline(tmp_path, monkeypatch):
+    monkeypatch.setattr(autopost, "AUTOPOST", True)
     path = str(tmp_path / "p.json")
     made = [{"title": "A", "path": "a.mp4", "notes": ""}, {"title": "B", "path": "b.mp4", "notes": ""}]
     now = dt.datetime(2026, 1, 1, 13)
@@ -27,3 +28,11 @@ def test_due_every():
     assert autopost.due_today(dt.date(2026, 1, 2), "")
     assert autopost.due_today(dt.date(2026, 1, 2), "2026-01-01")
     assert not autopost.due_today(dt.date(2026, 1, 1), "2026-01-01")
+
+
+def test_nothing_posts_by_itself_unless_asked(tmp_path, monkeypatch):
+    path = str(tmp_path / "p.json")
+    now = dt.datetime(2026, 1, 1, 13)
+    autopost.offer([{"title": "A", "path": "a.mp4", "notes": ""}], now, path)
+    monkeypatch.setattr(autopost, "AUTOPOST", False)
+    assert autopost.tick(now + dt.timedelta(hours=9), path, upload=lambda v, n: 1 / 0) is None

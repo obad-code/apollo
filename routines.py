@@ -105,6 +105,8 @@ def start_job(agent):
         return crew.THEIA_DESK.take(task, routine=True)
     if agent == "SHORTS":
         import autopost
+        if not autopost.AUTO:               # only when asked: SHORTS_AUTO=1
+            return None
         if not autopost.due_today(dt.date.today(), autopost.load().get("asked", "")[:10]):
             return None
         return crew.desk("LYLA").take("Make today's Shorts from the trends", short=True,

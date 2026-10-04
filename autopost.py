@@ -26,6 +26,8 @@ log = logging.getLogger("apollo.autopost")
 from shorts import WORLDS  # noqa: E402
 
 COUNT = max(1, min(5, int(os.environ.get("SHORTS_COUNT") or 2)))
+AUTO = os.environ.get("SHORTS_AUTO", "").strip().lower() in ("1", "true", "yes", "on")          # make Shorts by itself every day (off unless asked)
+AUTOPOST = os.environ.get("SHORTS_AUTOPOST", "").strip().lower() in ("1", "true", "yes", "on")  # post by itself after the wait (off unless asked)
 POST_ALL = os.environ.get("SHORTS_POST_ALL", "1").strip().lower() not in ("0", "false", "no", "off")
 EVERY = max(1, int(os.environ.get("SHORTS_EVERY") or 1))
 WAIT_HOURS = float(os.environ.get("SHORTS_WAIT_HOURS") or 3)
@@ -169,6 +171,8 @@ def _post(data, item, path, upload):
 def tick(now=None, path=STATE, upload=None):
     """Past the deadline with no answer: post LYLA's first pick."""
     now = now or dt.datetime.now()
+    if not AUTOPOST:                       # nothing is ever posted unless you say so (post 1 / post all)
+        return None
     data = load(path)
     if data.get("status") != "waiting" or not data.get("made"):
         return None
