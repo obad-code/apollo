@@ -151,11 +151,11 @@ export class CrtTv {
             </div>
             <div class="tv-badge"><b>apollo</b><i>crew</i></div>
             <div class="tv-panel">
-              <span class="tv-btn"><i></i></span>
-              ${['VOLUME', 'CHANNEL', 'TONE', 'MIX'].map((l, i) => `<span class="tv-knob" style="--r:${-40 + i * 37}deg"><em>${l}</em><i></i><small>${['-0.0', '01', '+0.0', '100'][i]}</small></span>`).join('')}
-              <span class="tv-btn tv-power"><i></i></span>
+              <span class="tv-btn" style="--k:#3d8bff"><i></i></span>
+              ${['VOLUME', 'CHANNEL', 'TONE', 'MIX'].map((l, i) => `<span class="tv-knob" style="--r:${-40 + i * 37}deg;--k:${['#ff4d4d', '#ff9a2e', '#3d8bff', '#ff4d4d'][i]};--v:${[0.35, 0.5, 0.62, 0.9][i]}"><em>${l}</em><b class="tv-arc"></b><span class="tv-cap"><i></i></span><small>${['-0.0', '01', '+0.0', '100'][i]}</small></span>`).join('')}
+              <span class="tv-btn tv-power" style="--k:#ff4d4d"><i></i></span>
             </div>
-            <div class="tv-jacks"><span></span><span></span><span class="tv-jack-empty"></span></div>
+            <div class="tv-jacks"><span style="--k:#ff4d4d"></span><span style="--k:#ff9a2e"></span><span class="tv-jack-empty"></span></div>
             <div class="tv-glare"></div>
           </div>
           <div class="tv-cable tv-cable-a"></div><div class="tv-cable tv-cable-b"></div>

@@ -3828,3 +3828,37 @@ body.fx-picking, body.fx-picking * { cursor: crosshair !important; }
 .proj-open .proj-card.k-mine { overflow-y: auto; scrollbar-width: thin; }
 .proj-card.k-mine .proj-preview { max-height: 150px; }
 #board foreignObject { overflow: visible; }
+
+/* -- the set's controls: neumorphic 3D, each with its own colour on the edge -- */
+.tv-panel { border-radius: 22px; background: linear-gradient(145deg, #f6f4f0, #e2dfd8);
+  box-shadow: inset 6px 6px 14px rgba(0,0,0,.07), inset -6px -6px 14px rgba(255,255,255,.9); }
+.tv-knob { background: none !important; box-shadow: none !important; outline: none !important; }
+.tv-knob .tv-arc { position: absolute; inset: -14%; border-radius: 50%;
+  background: conic-gradient(from 225deg, var(--k) 0 calc(var(--v) * 270deg), rgba(0,0,0,.07) 0 270deg, transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 64%, #000 65.5%, #000 71%, transparent 72.5%);
+          mask: radial-gradient(circle, transparent 64%, #000 65.5%, #000 71%, transparent 72.5%);
+  filter: drop-shadow(0 0 5px var(--k)); }
+.tv-knob .tv-cap { position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #ffffff 0%, #f1eee8 42%, #d6d2ca 100%);
+  box-shadow: 10px 12px 22px rgba(0,0,0,.28), -8px -8px 18px rgba(255,255,255,.95),
+              inset 0 -5px 8px rgba(0,0,0,.12), inset 0 4px 6px rgba(255,255,255,1),
+              0 0 0 3px color-mix(in srgb, var(--k) 70%, transparent), 0 0 18px color-mix(in srgb, var(--k) 45%, transparent);
+  transform: translateZ(10px); }
+.tv-knob .tv-cap::after { content: ""; position: absolute; inset: 18%; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #fbfaf7, #e4e0d9);
+  box-shadow: inset 2px 3px 5px rgba(0,0,0,.12), inset -2px -2px 4px rgba(255,255,255,.9); }
+.tv-knob .tv-cap i { position: absolute; z-index: 1; left: 50%; top: 10%; width: 4px; height: 28%; margin-left: -2px; border-radius: 3px;
+  background: var(--k); box-shadow: 0 0 6px var(--k); transform-origin: 50% 143%; transform: rotate(var(--r)); }
+.tv-knob em { color: #6d6a64; font-weight: 700; }
+.tv-knob small { color: var(--k) !important; text-shadow: 0 0 6px var(--k); background: #121214 !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.8); }
+.tv-btn { position: relative; border-radius: 22% !important; background: linear-gradient(145deg, #ffffff, #e4e1da) !important;
+  box-shadow: 8px 9px 18px rgba(0,0,0,.24), -7px -7px 14px rgba(255,255,255,.95),
+              inset 0 -3px 5px rgba(0,0,0,.08), 0 0 0 2px color-mix(in srgb, var(--k) 65%, transparent) !important; }
+.tv-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit;
+  border-left: 3px solid var(--k); border-bottom: 3px solid color-mix(in srgb, var(--k) 60%, transparent); opacity: .85; }
+.tv-btn i { border-color: var(--k) !important; box-shadow: 0 0 10px var(--k), inset 0 0 4px var(--k) !important; }
+.tv-jacks span:not(.tv-jack-empty) { background: radial-gradient(circle at 38% 32%, #fff 0 8%, var(--k) 22%,
+  color-mix(in srgb, var(--k) 70%, #000) 62%, color-mix(in srgb, var(--k) 40%, #000)) !important;
+  box-shadow: 5px 6px 12px rgba(0,0,0,.35), -4px -4px 10px rgba(255,255,255,.9), 0 0 14px color-mix(in srgb, var(--k) 50%, transparent) !important; }
+.tv-jacks .tv-jack-empty { box-shadow: 5px 6px 12px rgba(0,0,0,.3), -4px -4px 10px rgba(255,255,255,.9), 0 0 0 2px #3d8bff !important; }
