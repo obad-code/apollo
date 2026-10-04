@@ -804,9 +804,20 @@ class LiveSession:
             samplerate=INPUT_RATE, blocksize=BLOCK, channels=1,
             dtype="int16", callback=self._mic_callback,
         )
+        # APOLLO_OUTPUT_DEVICE picks the speakers by (part of) their name or
+        # number, for when Windows' default is not where you are listening.
+        wanted = (os.environ.get("APOLLO_OUTPUT_DEVICE") or "").strip()
+        device = None
+        if wanted:
+            device = int(wanted) if wanted.isdigit() else wanted
         speaker = sd.RawOutputStream(
-            samplerate=OUTPUT_RATE, channels=1, dtype="int16",
+            samplerate=OUTPUT_RATE, channels=1, dtype="int16", device=device,
         )
+        try:
+            info = sd.query_devices(speaker.device, "output")
+            log.info("speaker: %s", info.get("name"))
+        except Exception:  # noqa: BLE001
+            pass
         self._mic.start()
         speaker.start()
         with self._speaker_lock:      # handed over started, never half-way
