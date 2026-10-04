@@ -168,7 +168,7 @@ def converse(text, think=None, take=None):
     """Apollo's answer to anything that is not a command: a reply, or a job handed to the crew."""
     if think is None:
         import lyla
-        think = lambda prompt: lyla.ask_gemini(prompt, TALK)  # noqa: E731
+        think = lambda prompt: lyla.think(prompt, TALK)[0]  # noqa: E731 - Gemini, then Claude if Gemini is out
     answer = (think(text) or "").strip()
     found = re.search(r"\{.*\}", answer, re.S)
     if found:

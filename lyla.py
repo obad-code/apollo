@@ -46,6 +46,22 @@ log = logging.getLogger("apollo.lyla")
 NAME = "LYLA"
 MODELS = tuple(filter(None, (os.environ.get("LYLA_MODEL"),
                              "gemini-flash-latest", "gemini-2.5-flash")))
+# Each model has its own free daily allowance, so when the main ones are used up the lighter
+# ones still answer. A model that says its quota is spent is skipped until it said to retry.
+LITE = ("gemini-flash-lite-latest", "gemini-2.5-flash-lite")
+_spent = {}
+
+
+def _quota_wait(error):
+    """Seconds until a model's quota comes back, if `error` says it is spent; else 0."""
+    text = str(error)
+    if "RESOURCE_EXHAUSTED" not in text and "429" not in text:
+        return 0
+    found = re.search(r"retry in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)s", text)
+    if not found:
+        return 60
+    h, m, sec = found.groups()
+    return int(h or 0) * 3600 + int(m or 0) * 60 + float(sec)
 HERMES_TIMEOUT = 600       # an agent that searches can take its time
 REPORTS = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
                        "Apollo", "lyla_reports.json")
@@ -218,16 +234,27 @@ def ask_gemini(prompt, system=None, models=None):
         raise RuntimeError("LYLA needs GEMINI_API_KEY (or Hermes) to think with.")
     last = None
     models = tuple(models or MODELS)
-    for model, search in [*((m, True) for m in models), (models[0], False)]:
+    now = time.time()
+    tries = [*((m, True) for m in models), (models[0], False), *((m, True) for m in LITE if m not in models)]
+    for model, search in tries:
+        if _spent.get(model, 0) > now:
+            continue                                   # its free quota is used up; do not even ask
         try:
             text = _generate(model, prompt, search, system) if system else _generate(model, prompt, search)
         except Exception as e:  # noqa: BLE001 - the next model may answer
-            log.info("LYLA: %s%s failed: %s", model, " with search" if search else "", e)
+            log.info("LYLA: %s%s failed: %s", model, " with search" if search else "", str(e)[:200])
+            wait = _quota_wait(e)
+            if wait:
+                _spent[model] = now + wait
             last = e
             continue
         if text and text.strip():
             return text
-    raise RuntimeError(f"Gemini did not answer: {last}")
+    if last is not None and _quota_wait(last):
+        back = min((t for t in _spent.values() if t > now), default=now)
+        raise RuntimeError("Gemini's free daily limit is used up on every model - it comes back in about "
+                           f"{max(1, round((back - now) / 3600))} h. Enabling billing on the Gemini key lifts it.")
+    raise RuntimeError(f"Gemini did not answer: {str(last)[:300]}")
 
 
 def think(prompt, system=None, models=None):
