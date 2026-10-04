@@ -193,7 +193,7 @@ const NAME = { font: '"Orbitron", "Segoe UI", sans-serif', weight: 900, stretch:
                tracking: 0.3 };
 const sleepWord = new LedWord($('sleep-word'), { ...NAME, rows: 16, fill: 0.7 });
 // In the intro the name is lit in the boot screen's own green phosphor.
-const introWord = new LedWord($('intro-word'), { ...NAME, rows: 22, glow: 1.15,
+const introWord = new LedWord($('intro-word'), { ...NAME, rows: 11, glow: 1.15,
                                                  colour: [168, 255, 192] });
 
 window.addEventListener('resize', () => {
@@ -211,7 +211,7 @@ const READY_HOLD = 800;          // ms it is read before the tube goes off
 const OFF_FOR = 800;             // ms the tube takes to go off
 const REVEAL_FOR = 1100;         // ms the display takes to come into focus
 const INTRO_MOST = 11500;        // ms: done or not, the display comes then
-const LOG_ROWS = 12;             // lines the glass holds before it scrolls
+const LOG_ROWS = 5;              // lines the glass holds before it scrolls
 const LINE_GAP = 0.09;           // s between two lines that came at once
 const LINE_RATE = 300;           // letters a second, a check
 const boot = { steps: [], arrivals: [], done: null, total: 16 };
