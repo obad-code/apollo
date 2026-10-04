@@ -72,3 +72,27 @@ def test_every_stat_split_and_role_draws():
     hero = shorts.shorts_hero.hero_for("t")
     for extra in ({"stat": {"text": "$9,412", "tone": "gain"}, "arrow": "up"}, {"split": [1, 4]}, {"friend": "elder", "tier": 4}, {"friend": "partner"}):
         shorts.frame({"pose": "stand", "prop": "none", "cam": "wide", "bg": "city", "show": "man", "caption": "x", "_hero": hero, **extra}, 0.5, 0.5, "t")
+
+
+def test_claude_writes_when_asked_and_gemini_voice_makes_a_wav(tmp_path, monkeypatch):
+    import sys
+    import types
+    import wave
+    assistant = types.SimpleNamespace(ask_once=None)
+    monkeypatch.setitem(sys.modules, "assistant", assistant)          # the real one needs Windows
+    monkeypatch.setattr(shorts, "WRITER", "claude")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    seen = {}
+    monkeypatch.setattr(assistant, "ask_once", lambda system, prompt, max_tokens=0, model=None: seen.update(model=model) or "claude wrote this")
+    assert shorts._write("p", "s") == "claude wrote this" and seen["model"] == shorts.CLAUDE_WRITER
+    monkeypatch.setattr(assistant, "ask_once", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    import lyla
+    monkeypatch.setattr(lyla, "think", lambda p, s: ("gemini wrote this", "Gemini"))
+    assert shorts._write("p", "s") == "gemini wrote this"                  # a Claude failure never costs the Short
+    monkeypatch.setattr(shorts, "ENGINE", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "g")
+    monkeypatch.setattr(shorts, "_gemini_pcm", lambda text, voice: b"\x00\x01" * 2400)
+    out = str(tmp_path / "v.mp3")
+    shorts.speak("hello", out)
+    with wave.open(out) as w:
+        assert w.getframerate() == 24000 and w.getnframes() == 2400

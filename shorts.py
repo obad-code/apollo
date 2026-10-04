@@ -52,6 +52,11 @@ import shorts_scenes
 BGS = ("none",) + shorts_scenes.NAMES
 IMAGES = os.environ.get("SHORTS_IMAGES", "").strip().lower() == "gemini"       # a Gemini picture per scene (paid)
 STYLE = (os.environ.get("SHORTS_STYLE") or "vector").strip().lower()      # vector (flat, cel-shaded) or ink (pencil)
+WRITER = os.environ.get("SHORTS_WRITER", "").strip().lower()                  # "claude" writes the scripts with Claude (paid)
+CLAUDE_WRITER = os.environ.get("SHORTS_CLAUDE_MODEL") or "claude-sonnet-5-5"
+ENGINE = os.environ.get("SHORTS_VOICE_ENGINE", "").strip().lower()            # "gemini" speaks with Gemini's voices (paid)
+GEMINI_VOICE = os.environ.get("SHORTS_GEMINI_VOICE") or "Charon"
+TTS_MODEL = os.environ.get("SHORTS_TTS_MODEL") or "gemini-2.5-flash-preview-tts"
 GRADES = shorts_hero.GRADES
 SIDES = ("none",) + shorts_hero.SIDES
 WORLDS = {
@@ -163,6 +168,25 @@ KINDS = {
 }
 
 
+def _system():
+    notes = style_notes()
+    return ((SYSTEM.replace("8 to 10 scenes", "6 to 8 scenes") if IMAGES else SYSTEM)
+            + (f" The channel owner's standing instructions, always follow them: {notes}" if notes else ""))
+
+
+def _write(prompt, system):
+    """The writer: Claude when SHORTS_WRITER=claude and there is a key (the strongest scripts),
+    else - or if Claude fails - LYLA's usual brains."""
+    if WRITER == "claude" and os.environ.get("ANTHROPIC_API_KEY"):
+        try:
+            import assistant
+            return assistant.ask_once(system, prompt, max_tokens=4500, model=CLAUDE_WRITER)
+        except Exception as e:  # noqa: BLE001
+            log.info("Claude did not write the script (%s); using LYLA's brains", e)
+    import lyla
+    return lyla.think(prompt, system)[0]
+
+
 def ask_script(kind, topic="", think=None, world=""):
     language = "Arabic (clear Gulf-friendly Fusha)" if LANG == "ar" else "English"
     prompt = (f"Language: {language}. Kind: {KINDS.get(kind, KINDS['fact'])}. "
@@ -170,9 +194,8 @@ def ask_script(kind, topic="", think=None, world=""):
               + (f" Set the whole story in this world: {world}. Backgrounds to use, mostly: {', '.join(WORLDS[world][0])}. "
                  f"Side characters that fit: {', '.join(WORLDS[world][1])}." if world in WORLDS else ""))
     if think is None:
-        import lyla
         notes = style_notes()
-        text, _brain = lyla.think(prompt, (SYSTEM.replace("8 to 10 scenes", "6 to 8 scenes") if IMAGES else SYSTEM) + (f" The channel owner's standing instructions, always follow them: {notes}" if notes else ""))
+        text = _write(prompt, _system())
     else:
         text = think(prompt)
     found = re.search(r"\{.*\}", text or "", re.S)
@@ -228,8 +251,7 @@ def _refine(data, think, prompt):
     """A second pass by the model as editor; the first draft stands if it does not come back clean."""
     try:
         if think is None:
-            import lyla
-            text, _ = lyla.think(REFINE + json.dumps(data, ensure_ascii=False), SYSTEM)
+            text = _write(REFINE + json.dumps(data, ensure_ascii=False), _system())
         else:
             text = think(REFINE + json.dumps(data, ensure_ascii=False))
         found = re.search(r"\{.*\}", text or "", re.S)
@@ -828,7 +850,37 @@ def _ffmpeg():
     return imageio_ffmpeg.get_ffmpeg_exe()
 
 
+def _gemini_pcm(text, voice):
+    """Gemini's text-to-speech: raw 16-bit mono PCM at 24 kHz. Tests replace this."""
+    from google import genai
+    from google.genai import types
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    style = os.environ.get("SHORTS_VOICE_STYLE") or "Read this as a calm, gripping storyteller, natural and unhurried, with real feeling:"
+    response = client.models.generate_content(
+        model=TTS_MODEL, contents=f"{style} {text}",
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(voice_config=types.VoiceConfig(
+                prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)))))
+    for part in response.candidates[0].content.parts:
+        if getattr(part, "inline_data", None) is not None and part.inline_data.data:
+            return part.inline_data.data
+    raise RuntimeError("Gemini returned no audio")
+
+
 def speak(text, path, voice=VOICE):
+    if ENGINE == "gemini" and os.environ.get("GEMINI_API_KEY"):
+        try:
+            import wave
+            pcm = _gemini_pcm(text, GEMINI_VOICE)
+            with wave.open(path, "wb") as w:             # a WAV in the scene's file: FFmpeg reads it by content
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(24000)
+                w.writeframes(pcm)
+            return
+        except Exception as e:  # noqa: BLE001 - the free voice is still there
+            log.info("Gemini voice failed (%s); using the free voice", str(e)[:160])
     import asyncio
     import edge_tts
     asyncio.run(edge_tts.Communicate(text, voice, rate="+8%").save(path))
