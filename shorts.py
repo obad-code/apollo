@@ -48,8 +48,10 @@ POSES = ("stand", "wave", "point", "think", "shock", "run", "cheer", "sad", "shr
 CAMS = ("close", "push", "fisheye", "pull", "shake", "pan", "wide")
 import shorts_art
 import shorts_hero
+import shorts_objects
 import shorts_scenes
 BGS = ("none",) + shorts_scenes.NAMES
+OBJECTS = os.environ.get("SHORTS_OBJECTS", "").strip().lower() == "gemini"     # clear photographic objects on white (paid, cached)
 IMAGES = os.environ.get("SHORTS_IMAGES", "").strip().lower() == "gemini"       # a Gemini picture per scene (paid)
 STYLE = (os.environ.get("SHORTS_STYLE") or "vector").strip().lower()      # vector (flat, cel-shaded) or ink (pencil)
 WRITER = os.environ.get("SHORTS_WRITER", "").strip().lower()                  # "claude" writes the scripts with Claude (paid)
@@ -173,9 +175,16 @@ KINDS = {
 }
 
 
+OBJECTS_HINT = (' Some scenes are about THINGS (money, a laptop, coffee...): for those give "objects": 1 to 3 short noun '
+                'phrases like ["a coffee cup", "a laptop", "a stack of dollar bills"] - they appear as clear detailed pictures on a '
+                'clean white background with no narrator, and the caption is a short lowercase line under them. Use it for 2 or 3 '
+                'scenes at most, where the line names real objects.')
+
+
 def _system():
     notes = style_notes()
     return ((SYSTEM.replace("8 to 10 scenes", "6 to 8 scenes") if IMAGES else SYSTEM)
+            + (OBJECTS_HINT if OBJECTS else "")
             + (f" The channel owner's standing instructions, always follow them: {notes}" if notes else ""))
 
 
@@ -231,6 +240,8 @@ def ask_script(kind, topic="", think=None, world=""):
         sp = s.get("split")
         s["split"] = [int(sp[0]), int(sp[1])] if isinstance(sp, list) and len(sp) == 2 and all(str(x).isdigit() and 1 <= int(x) <= 4 for x in sp) else None
         s["newcomer"] = bool(s.get("newcomer"))
+        objs = s.get("objects")
+        s["objects"] = [str(o)[:40] for o in objs[:3] if str(o).strip()] if (OBJECTS and isinstance(objs, list)) else []
     for i, s in enumerate(scenes):
         if s.get("cam") not in CAMS or (i and s["cam"] == scenes[i - 1]["cam"]):
             s["cam"] = CAMS[i % len(CAMS)]
@@ -746,6 +757,17 @@ def frame(scene, t, progress, title):
         left = min(max(fx - cw / 2, 0), W - cw)
         top = min(max(fy - ch / 2, 0), H - ch)
         return _caption(world.resize((W, H), Image.BILINEAR, box=(left * SS, top * SS, (left + cw) * SS, (top + ch) * SS)), scene, progress, title, t)
+    if scene.get("_objects") and STYLE == "vector":       # a clean white scene of detailed objects
+        world = Image.new("RGB", (int(W * SS), int(H * SS)), (255, 255, 255))
+        shorts_objects.paint(world, scene["_objects"], t, LEAD)
+        z, fx, fy, bulge = camera(scene.get("cam", "wide"), t, progress, (W / 2, 900), (W / 2, 900))
+        z = 1.0 + (z - 1.0) * 0.2
+        fx = W / 2
+        cw, ch = W / z, H / z
+        left = min(max(fx - cw / 2, 0), W - cw)
+        top = min(max(fy - ch / 2, 0), H - ch)
+        return _caption(world.resize((W, H), Image.BILINEAR, box=(left * SS, top * SS, (left + cw) * SS, (top + ch) * SS)),
+                        scene, progress, title, t, plain=True)
     world = _background(pose, (int(W * SS), int(H * SS)))
     raw = ImageDraw.Draw(world)
     d = Pen(raw, SS, seed=int(t * 6))
@@ -816,7 +838,7 @@ def _stat(d, stat, arrow, near, t):
                    (ax + 14, ay - sign * 60), (ax + 14, ay - sign * 22), (ax + 44, ay - sign * 22)], fill=col, outline=INK, width=6, wobble=0)
 
 
-def _caption(img, scene, progress, title, age=9.0):
+def _caption(img, scene, progress, title, age=9.0, plain=False):
     from PIL import Image, ImageDraw
     # the caption sits on the screen, never zoomed: calm ink type, the spoken words dark
     d = ImageDraw.Draw(img)
@@ -831,12 +853,13 @@ def _caption(img, scene, progress, title, age=9.0):
             cur = []
         cur.append(w)
     lines.append(cur)
-    y, n = 400, 0                                         # below the app's top bar, far above the bottom 20%
+    y, n = (1180 if plain else 400), 0                    # below the app's top bar, far above the bottom 20%
     rtl = LANG == "ar"
     widest = max(d.textlength(" ".join(line), font=big) for line in lines)
     card = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    ImageDraw.Draw(card).rounded_rectangle([W / 2 - widest / 2 - 40, y - 24, W / 2 + widest / 2 + 40, y + 100 * len(lines) + 4],
-                                           radius=36, fill=PAPER + (238,))
+    if not plain:
+        ImageDraw.Draw(card).rounded_rectangle([W / 2 - widest / 2 - 40, y - 24, W / 2 + widest / 2 + 40, y + 100 * len(lines) + 4],
+                                               radius=36, fill=PAPER + (238,))
     img = Image.alpha_composite(img.convert("RGBA"), card).convert("RGB")
     d = ImageDraw.Draw(img)
     for line in lines:
@@ -844,7 +867,7 @@ def _caption(img, scene, progress, title, age=9.0):
         x = W / 2 - text_w / 2
         for w in (reversed(line) if rtl else line):
             n += 1
-            d.text((x, y), w, font=big, fill=INK if n <= lit else (176, 174, 170))
+            d.text((x, y), w.lower() if plain else w, font=big, fill=INK if (plain or n <= lit) else (176, 174, 170))
             x += d.textlength(w + " ", font=big)
         y += 100
     return img
@@ -1063,6 +1086,8 @@ def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
             scene["_hero"], scene["tier"] = shorts_hero.hero_for((script.get("title", "") or work) + "#new"), 1
     if IMAGES:
         _pictures(scenes, hero, os.path.join(work, "art"), step)
+    if OBJECTS:
+        shorts_objects.prepare(scenes, step)
     # 1. every scene's voice, with its sound under it
     infos = []
     for i, scene in enumerate(scenes):
