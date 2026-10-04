@@ -143,8 +143,8 @@ def _config():
     from tradingagents.default_config import build_default_config
     config = build_default_config()
     if not os.environ.get("TRADINGAGENTS_LLM_PROVIDER"):          # your own choice wins
-        if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
-            os.environ.setdefault("GOOGLE_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+        if (os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")) or os.environ.get("GOOGLE_API_KEY"):
+            os.environ.setdefault("GOOGLE_API_KEY", (os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY", "")))
             config.update(llm_provider="google",
                           quick_think_llm=os.environ.get("TRADINGAGENTS_QUICK_THINK_LLM") or "gemini-flash-latest",
                           deep_think_llm=os.environ.get("TRADINGAGENTS_DEEP_THINK_LLM") or "gemini-pro-latest")

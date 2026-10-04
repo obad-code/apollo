@@ -70,7 +70,7 @@ def _ask(model, picture, question):
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(api_key=(os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")))
     response = client.models.generate_content(
         model=model,
         contents=[types.Part.from_bytes(data=picture, mime_type="image/jpeg"), question],
@@ -81,7 +81,7 @@ def _ask(model, picture, question):
 def look(question, grab=capture, ask=_ask):
     """What Apollo sees on the screen, as an answer to `question`."""
     question = " ".join(str(question or "").split()) or "What is on my screen?"
-    if not os.environ.get("GEMINI_API_KEY") and ask is _ask:
+    if not (os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")) and ask is _ask:
         raise RuntimeError("Looking at the screen needs GEMINI_API_KEY.")
     picture = grab()
     last = None

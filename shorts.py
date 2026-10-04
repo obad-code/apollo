@@ -197,7 +197,7 @@ def _write(prompt, system):
             return assistant.ask_once(system, prompt, max_tokens=4500, model=CLAUDE_WRITER)
         except Exception as e:  # noqa: BLE001
             log.info("Claude did not write the script (%s); using LYLA's brains", e)
-    if os.environ.get("GEMINI_API_KEY"):
+    if (os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")):
         try:
             return _gemini_json(prompt, system)
         except Exception as e:  # noqa: BLE001
@@ -211,7 +211,7 @@ def _gemini_json(prompt, system):
     import lyla
     from google import genai
     from google.genai import types
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(api_key=(os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")))
     last = None
     for model in lyla.MODELS:
         try:
@@ -925,7 +925,7 @@ def _gemini_pcm(text, voice):
     """Gemini's text-to-speech: raw 16-bit mono PCM at 24 kHz. Tests replace this."""
     from google import genai
     from google.genai import types
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(api_key=(os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")))
     style = os.environ.get("SHORTS_VOICE_STYLE") or "Read this as a calm, gripping storyteller, natural and unhurried, with real feeling:"
     response = client.models.generate_content(
         model=TTS_MODEL, contents=f"{style} {text}",
@@ -960,7 +960,7 @@ def speak(text, path, voice=VOICE):
             return
         except Exception as e:  # noqa: BLE001 - the free voice is still there
             log.info("ElevenLabs voice failed (%s); using the free voice", str(e)[:160])
-    if ENGINE == "gemini" and os.environ.get("GEMINI_API_KEY"):
+    if ENGINE == "gemini" and (os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")):
         try:
             import wave
             pcm = _gemini_pcm(text, GEMINI_VOICE)

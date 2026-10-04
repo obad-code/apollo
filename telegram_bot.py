@@ -190,7 +190,7 @@ def transcribe(audio_bytes, mime="audio/ogg"):
     """What was said in a voice note, word for word (Gemini)."""
     from google import genai
     from google.genai import types
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(api_key=(os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")))
     last = None
     for model in ("gemini-flash-latest", "gemini-2.5-flash"):
         try:

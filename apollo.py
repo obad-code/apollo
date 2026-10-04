@@ -2366,7 +2366,7 @@ class Apollo:
             return
         self._fixes_checked = now
         if (self.overlay.mode != Overlay.FULL or self.presence.asleep or self.turn_busy
-                or not os.environ.get("GEMINI_API_KEY") or not qfixes.due()):
+                or not (os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")) or not qfixes.due()):
             return
         if getattr(self, "_fixes_thread", None) is not None and self._fixes_thread.is_alive():
             return

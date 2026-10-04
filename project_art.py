@@ -50,7 +50,7 @@ def src(name):
 def want(name, about=""):
     """Ask for a picture of `name` if it has none; drawn in the background."""
     import time
-    if not os.environ.get("GEMINI_API_KEY") or path_of(name) or time.time() < _blocked_until:
+    if not (os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")) or path_of(name) or time.time() < _blocked_until:
         return
     global _busy
     with _lock:

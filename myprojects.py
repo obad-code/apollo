@@ -157,7 +157,7 @@ REVIEW = (
 def _vision(picture_png, prompt):
     from google import genai
     from google.genai import types
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(api_key=(os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")))
     parts = ([types.Part.from_bytes(data=picture_png, mime_type="image/png")] if picture_png else []) + [prompt]
     last = None
     for model in ("gemini-flash-latest", "gemini-2.5-flash"):

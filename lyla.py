@@ -220,7 +220,7 @@ def _generate(model, prompt, search, system=None):
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(api_key=(os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")))
     config = types.GenerateContentConfig(
         system_instruction=system or SYSTEM, temperature=0.4,
         tools=[types.Tool(google_search=types.GoogleSearch())] if search else None)
@@ -230,7 +230,7 @@ def _generate(model, prompt, search, system=None):
 def ask_gemini(prompt, system=None, models=None):
     """Gemini with Google Search, on each model in turn; without the search
     as a last try, since the search is the part a free key can run out of."""
-    if not os.environ.get("GEMINI_API_KEY"):
+    if not (os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")):
         raise RuntimeError("LYLA needs GEMINI_API_KEY (or Hermes) to think with.")
     last = None
     models = tuple(models or MODELS)

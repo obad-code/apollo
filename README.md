@@ -114,6 +114,7 @@ terminal (`setx` only reaches terminals opened after it):
 | **LYLA's connectors** (email, messages, calendar…) | `%LOCALAPPDATA%\Apollo\connectors.json` listing remote MCP servers | See `connectors.py`. Uses Claude (`ANTHROPIC_API_KEY`). |
 | **THEIA's deep analysis** | `ANTHROPIC_API_KEY` | Without it, deep runs on Gemini Pro. |
 | Pictures and screen reading | `GEMINI_API_KEY` (Apollo already has it) | - |
+| **The crew on a paid key, Apollo's voice free** | `setx GEMINI_CREW_KEY "..."` | A key from a second Google AI Studio project with billing on. Everything except Apollo's voice uses it (LYLA, THEIA, MONEYPENNY, Q, alerts, the summary, Telegram, Shorts); the voice keeps `GEMINI_API_KEY` on the free tier. |
 | The voice | `APOLLO_VOICE` (a Gemini voice name), `APOLLO_EXPRESSIVE=0`, `APOLLO_BARGE_IN` (0..1) | - |
 
 ---

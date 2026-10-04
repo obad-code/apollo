@@ -83,7 +83,7 @@ def send_to_theia(idea, take=None):
     """Hand a new idea to THEIA, quietly: no announcement when she is done - it waits on the idea."""
     try:
         if take is None:
-            if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")):
+            if not ((os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")) or os.environ.get("ANTHROPIC_API_KEY")):
                 return False                     # nothing for her to think with
             import crew
             take = crew.desk("THEIA").take

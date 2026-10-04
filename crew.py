@@ -482,7 +482,7 @@ def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=No
             "spend": spend, "issues": {"count": len(problems), "failing": failed,
                                        "top": [i.get("title", "") for i in problems[:3]]},
             "alerts": alerts_state, "now": now.timestamp(),
-            "brains": {"Gemini": bool(os.environ.get("GEMINI_API_KEY")),
+            "brains": {"Gemini": bool((os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY"))),
                        "Claude": bool(os.environ.get("ANTHROPIC_API_KEY")),
                        "Hermes": lyla.hermes_settings() is not None}}
 

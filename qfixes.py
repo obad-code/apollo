@@ -64,7 +64,7 @@ def _ask_vision(picture, prompt):
     import screen
     from google import genai
     from google.genai import types
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(api_key=(os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")))
     last = None
     for model in screen.MODELS:
         try:

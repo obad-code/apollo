@@ -28,7 +28,7 @@ def _generate(model, prompt):
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(api_key=(os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")))
     response = client.models.generate_content(
         model=model, contents=prompt,
         config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]))
@@ -45,7 +45,7 @@ def make(prompt, generate=None, save_to=None, now=None):
     prompt = " ".join(str(prompt or "").split())
     if not prompt:
         raise ValueError("Nothing to draw was given.")
-    if not os.environ.get("GEMINI_API_KEY") and generate is None:
+    if not (os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")) and generate is None:
         raise RuntimeError("Drawing needs GEMINI_API_KEY.")
     generate = generate or _generate
     last = None
