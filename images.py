@@ -14,8 +14,9 @@ import re
 
 log = logging.getLogger("apollo.images")
 
+# Gemini 2.5 Flash Image was shut down on 2 October 2026; 3.1 Flash Image (Nano Banana 2) took its place.
 MODELS = tuple(filter(None, (os.environ.get("APOLLO_IMAGE_MODEL"),
-                             "gemini-2.5-flash-image", "gemini-3-pro-image-preview")))
+                             "gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview")))
 LARGEST = 6 * 1024 * 1024        # bytes; a picture past this is not put on the page
 
 
