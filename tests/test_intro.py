@@ -19,6 +19,12 @@ class _UI:
     def intro(self):
         self.log.append("intro")
 
+    def boot(self, step):
+        pass
+
+    def boot_done(self, summary):
+        pass
+
 
 class _Presence:
     full = False
@@ -28,6 +34,7 @@ class _Presence:
 
 
 def _app():
+    apollo.FULLSCREEN_INTRO = True          # these tests are about the old full-screen loading screen
     app = apollo.Apollo.__new__(apollo.Apollo)
     app.log = []
     app.presence = _Presence()
@@ -148,3 +155,44 @@ def test_the_page_is_told_to_play_it():
     ui.intro()
     assert ui.window.scripts[-1] == "window.apollo.intro && window.apollo.intro()"
 
+
+
+
+class _Orb:
+    def __init__(self):
+        self.calls, self._said = [], ""
+
+    def set_content(self, role, text, visual=None):
+        self.calls.append((role, text))
+        self._said = text
+
+    def clear_content(self, after=0.0):
+        self.calls.append(("clear", after))
+
+
+def test_mini_apollo_says_the_start_up_and_never_covers_the_screen(monkeypatch):
+    monkeypatch.setattr(apollo, "FULLSCREEN_INTRO", False)
+    app = _app()
+    apollo.FULLSCREEN_INTRO = False
+    app.orb = _Orb()
+    app.want_intro()
+    app.check_intro(now=100.0)
+    assert app.orb.calls == [("apollo", "Starting up...")]
+    assert app.log == [] and app.intro_until == 0.0 and app.desired_mode() == apollo.Overlay.ORB   # no full-screen takeover
+    app._boot_lock = __import__("threading").Lock()
+    app._boot_results, app._boot_parts = [], set()
+    app.boot_step({"id": "mic", "label": "Microphone", "status": "ok"}, keep=False)
+    assert app.orb.calls[-1] == ("apollo", "Starting up... Microphone")
+    app.boot_part_done("checks")
+    app.boot_part_done("startup")
+    assert app.orb.calls[-2:] == [("apollo", "System online"), ("clear", 4.0)]
+
+
+def test_the_start_up_line_never_overwrites_a_conversation(monkeypatch):
+    monkeypatch.setattr(apollo, "FULLSCREEN_INTRO", False)
+    app = _app()
+    apollo.FULLSCREEN_INTRO = False
+    app.orb = _Orb()
+    app.orb._said = "Sure, here is the answer"
+    app.boot_say("Starting up...")
+    assert app.orb.calls == []

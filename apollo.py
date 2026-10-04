@@ -308,6 +308,9 @@ BRIEF_SETTLE = 25.0
 AFK_SECONDS = 10 * 60
 # The word, once, as Apollo comes up (see `Apollo.play_intro`): long enough
 # for the page's sweep, hold and switch-off, and not a moment longer.
+# The old loading screen took the whole screen. Now Mini Apollo says it, in his own bar, and the
+# display stays out of your way. APOLLO_FULL_INTRO=1 brings the old one back.
+FULLSCREEN_INTRO = os.environ.get("APOLLO_FULL_INTRO", "").strip().lower() in ("1", "true", "yes", "on")
 INTRO_SECONDS = 3.6
 # ...and it is a real loading screen: it stays while the checks and the start
 # run (diagnostics.py), and goes INTRO_TAIL after they are done - time to read
@@ -1563,6 +1566,8 @@ class Apollo:
                 issues.resolve(key)
         with self._boot_lock:
             self._boot_results.append(step)
+        if not FULLSCREEN_INTRO and getattr(self, "boot_done_at", None) is None:
+            self.boot_say(f"Starting up... {step['label'][:28]}" if step["label"] else "Starting up...")
         ui = getattr(self, "ui", None)
         tell = getattr(ui, "boot", None) if ui is not None and ui.alive else None
         if tell is not None:
@@ -1595,6 +1600,9 @@ class Apollo:
             self.boot_done_at = time.monotonic()
             summary = self._summary(self._boot_results)
         log.info("boot done: %d issue(s), %d failing", summary["issues"], summary["fails"])
+        if not FULLSCREEN_INTRO:
+            n = summary["issues"]
+            self.boot_say("System online" if not n else f"System online - {n} thing{'s' if n != 1 else ''} to check", clear_after=4.0)
         ui = getattr(self, "ui", None)
         if ui is not None and ui.alive:
             ui.boot_done(summary)
@@ -1672,6 +1680,22 @@ class Apollo:
         if tell is not None:
             tell(items)
 
+    def boot_say(self, text, clear_after=None):
+        """Mini Apollo says where the start-up is, in his own bar. Never over a conversation:
+        only while the bar holds nothing, or a start-up line of its own."""
+        orb = getattr(self, "orb", None)
+        if orb is None:
+            return
+        try:
+            now = getattr(orb, "_said", "")
+            if now and not str(now).startswith(("Starting up", "System online")):
+                return
+            orb.set_content("apollo", text)
+            if clear_after is not None:
+                orb.clear_content(after=clear_after)
+        except Exception:  # noqa: BLE001 - the status is a courtesy
+            log.info("boot status not shown", exc_info=True)
+
     def want_intro(self):
         """Ask for the intro. The watcher plays it on its next tick."""
         self.intro_wanted = True
@@ -1693,6 +1717,11 @@ class Apollo:
         in `user32_releasing_gil` was found.
         """
         now = time.monotonic() if now is None else now
+        if self.intro_wanted and not FULLSCREEN_INTRO:
+            self.intro_wanted = False
+            log.info("boot status in Mini Apollo")
+            self.boot_say("Starting up...")
+            return
         if self.intro_wanted:
             self.intro_wanted = False
             if screen_busy():
