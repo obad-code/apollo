@@ -21,3 +21,12 @@ def test_a_script_is_cleaned_up():
 def test_no_json_is_an_error():
     with pytest.raises(RuntimeError):
         shorts.ask_script("story", think=lambda p: "sorry")
+
+
+def test_a_prose_answer_gets_one_firm_retry_and_a_clear_error():
+    import json
+    answers = iter(["Sure! Here is a short idea about octopuses.", json.dumps({"scenes": [{"say": "Hi"}]})])
+    s = shorts.ask_script("fact", think=lambda p: next(answers))
+    assert s["scenes"][0]["say"] == "Hi"
+    with pytest.raises(RuntimeError, match="It said: I cannot"):
+        shorts.ask_script("fact", think=lambda p: "I cannot do that.")

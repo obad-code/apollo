@@ -197,8 +197,45 @@ def _write(prompt, system):
             return assistant.ask_once(system, prompt, max_tokens=4500, model=CLAUDE_WRITER)
         except Exception as e:  # noqa: BLE001
             log.info("Claude did not write the script (%s); using LYLA's brains", e)
+    if os.environ.get("GEMINI_API_KEY"):
+        try:
+            return _gemini_json(prompt, system)
+        except Exception as e:  # noqa: BLE001
+            log.info("Gemini JSON mode failed (%s); using LYLA's brains", str(e)[:160])
     import lyla
     return lyla.think(prompt, system)[0]
+
+
+def _gemini_json(prompt, system):
+    """Gemini asked for JSON outright, with no web search (search makes it answer in prose). Tests replace this."""
+    import lyla
+    from google import genai
+    from google.genai import types
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    last = None
+    for model in lyla.MODELS:
+        try:
+            r = client.models.generate_content(
+                model=model, contents=prompt,
+                config=types.GenerateContentConfig(system_instruction=system, temperature=0.8, max_output_tokens=8192,
+                                                   response_mime_type="application/json"))
+            if r.text and r.text.strip():
+                return r.text
+        except Exception as e:  # noqa: BLE001 - the next model may answer
+            last = e
+    raise RuntimeError(f"Gemini returned no JSON: {last}")
+
+
+def _json_of(text):
+    """The first JSON object in a model's answer, or None."""
+    found = re.search(r"\{.*\}", text or "", re.S)
+    if not found:
+        return None
+    try:
+        data = json.loads(found.group(0))
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def ask_script(kind, topic="", think=None, world=""):
@@ -212,10 +249,14 @@ def ask_script(kind, topic="", think=None, world=""):
         text = _write(prompt, _system())
     else:
         text = think(prompt)
-    found = re.search(r"\{.*\}", text or "", re.S)
-    if not found:
-        raise RuntimeError("The script did not come back as JSON.")
-    data = json.loads(found.group(0))
+    data = _json_of(text)
+    if data is None:                                      # one more try, firmly
+        again = ("Your last answer was not valid JSON. Answer with ONLY the JSON object - it must start with { and end with }, "
+                 "no sentences before or after, no code fences.\n\n" + prompt)
+        text = think(again) if think is not None else _write(again, _system())
+        data = _json_of(text)
+    if data is None:
+        raise RuntimeError("The script did not come back as JSON. It said: " + (" ".join(str(text or "(nothing)").split())[:200]))
     if os.environ.get("SHORTS_REFINE", "1").strip().lower() not in ("0", "false", "no", "off"):
         data = _refine(data, think, prompt) or data
     scenes = [s for s in data.get("scenes", []) if str(s.get("say", "")).strip()]
