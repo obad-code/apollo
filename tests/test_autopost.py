@@ -48,3 +48,13 @@ def test_a_single_short_waits_for_your_word_and_can_be_a_private_draft(tmp_path)
     assert seen == ["private"] and "private draft" in r["result"]
     autopost.offer(made, dt.datetime(2026, 1, 1), path)
     assert autopost.choose(0, path)["result"].startswith("Kept as a file")
+
+
+def test_an_email_heads_up_goes_when_a_short_is_posted(tmp_path, monkeypatch):
+    import emailer
+    sent = []
+    monkeypatch.setattr(emailer, "notify", lambda subject, text, attachments=None: sent.append((subject, text)) or True)
+    path = str(tmp_path / "p.json")
+    autopost.offer([{"title": "A", "path": "a.mp4", "notes": ""}], dt.datetime(2026, 1, 1), path)
+    autopost.choose(1, path, upload=lambda v, n: "https://y/1")
+    assert sent == [("Posted on YouTube: A", "https://y/1")]

@@ -1230,7 +1230,8 @@ def make(kind=None, topic="", think=None, speak_fn=speak, now=None, step=lambda 
     with open(base + ".txt", "w", encoding="utf-8") as f:
         f.write(notes)
     log.info("short made: %s", base)
-    return {"path": base + ".mp4", "title": script.get("title", ""), "notes": base + ".txt", "kind": kind}
+    return {"path": base + ".mp4", "title": script.get("title", ""), "notes": base + ".txt", "kind": kind,
+            "preview": base + " preview.png" if os.path.exists(base + " preview.png") else ""}
 
 
 def make_in_background(kind=None, topic="", done=None):

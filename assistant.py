@@ -1827,15 +1827,20 @@ def report_agent(ui, voice, job):
                            f"YouTube as a private draft, 'keep' to only keep the file (number if there are several).")
             try:
                 import autopost
-                import telegram_bot
-                if telegram_bot.ready():
-                    telegram_bot.offer_shorts(autopost.load().get("made", []), job["summary"])
                 import emailer
-                if emailer.ready():
-                    emailer.send("LYLA: which Short should I post?", job["summary"] + "\n\n" + job["report"])
+                import telegram_bot
+                made = autopost.load().get("made", [])
+                if telegram_bot.ready():
+                    telegram_bot.offer_shorts(made, job["summary"])
+                emailer.notify("LYLA: your Short is ready", job["summary"] + "\n\n" + job["report"]
+                               + "\n\nSay: post it / private draft / keep.",
+                               attachments=[m["preview"] for m in made if m.get("preview")])
             except Exception:  # noqa: BLE001
                 logging.getLogger("apollo").info("shorts email failed", exc_info=True)
     else:
+        if job.get("short") or job.get("niche"):
+            import emailer
+            emailer.notify(f"{who} could not finish: {task[:60]}", f"{task}\n\nWhy: {job.get('error', 'no reason given')}")
         instruction = (
             f"{who}, one of your agents, could not finish the job you handed it: "
             f"\"{task}\" ({job.get('error', 'no reason given')}). Tell the user in "

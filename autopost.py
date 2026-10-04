@@ -169,6 +169,11 @@ def _post(data, item, path, upload, privacy=None):
         return {"ok": False, "error": data["error"]}
     data.update(status="posted", posted=item["title"], link=link)
     save(data, path)
+    try:
+        import emailer
+        emailer.notify(("Private draft saved on YouTube: " if privacy == "private" else "Posted on YouTube: ") + item["title"], link)
+    except Exception:  # noqa: BLE001
+        pass
     return {"ok": True, "result": (f"Saved as a private draft on YouTube: {item['title']}" if privacy == "private"
                                     else f"Posted: {item['title']}"), "link": link}
 

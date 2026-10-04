@@ -42,8 +42,8 @@ def ready():
     return settings() is not None
 
 
-def compose(sender, to, subject, text, rich=None):
-    """The message: plain text, and an HTML part when `rich` is given."""
+def compose(sender, to, subject, text, rich=None, attachments=None):
+    """The message: plain text, an HTML part when `rich` is given, and any pictures attached."""
     message = EmailMessage()
     message["From"] = formataddr(("Apollo", sender))
     message["To"] = to
@@ -51,6 +51,14 @@ def compose(sender, to, subject, text, rich=None):
     message.set_content(str(text or ""))
     if rich:
         message.add_alternative(rich, subtype="html")
+    for path in attachments or []:
+        try:
+            with open(path, "rb") as f:
+                kind = "image" if str(path).lower().endswith((".png", ".jpg", ".jpeg")) else "application"
+                sub = "png" if str(path).lower().endswith(".png") else "jpeg" if kind == "image" else "octet-stream"
+                message.add_attachment(f.read(), maintype=kind, subtype=sub, filename=os.path.basename(path))
+        except OSError:
+            log.info("attachment not found: %s", path)
     return message
 
 
@@ -62,7 +70,7 @@ def _deliver(found, message):
         server.send_message(message)
 
 
-def send(subject, text, to=None, rich=None):
+def send(subject, text, to=None, rich=None, attachments=None):
     """Send one email. `to` defaults to you. Raises with a sentence if it cannot."""
     found = settings()
     if found is None:
@@ -71,13 +79,25 @@ def send(subject, text, to=None, rich=None):
     if "@" not in to or any(c in to for c in "\r\n,;"):
         raise ValueError("That is not one email address.")
     try:
-        _deliver(found, compose(found["user"], to, subject, text, rich))
+        _deliver(found, compose(found["user"], to, subject, text, rich, attachments))
     except smtplib.SMTPAuthenticationError as e:
         raise RuntimeError("Gmail refused the login - the app password may be wrong.") from e
     except (smtplib.SMTPException, OSError) as e:
         raise RuntimeError(f"The email did not go: {type(e).__name__}.") from e
     log.info("email sent to %s", to.split("@")[-1])
     return {"to": to}
+
+
+def notify(subject, text, attachments=None):
+    """A heads-up to you by email; quietly does nothing if email is not set up, never raises."""
+    if not ready():
+        return False
+    try:
+        send(subject, text, attachments=attachments)
+        return True
+    except Exception:  # noqa: BLE001 - a notice that fails must never cost the job it is about
+        log.info("notice email failed", exc_info=True)
+        return False
 
 
 TONES = {"BUY": "#3ddc84", "SELL": "#ff5a5f", "HOLD": "#F5B83D"}
