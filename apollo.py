@@ -1213,6 +1213,31 @@ class Api:
             return {"ok": False, "error": str(e)}
 
     # -- your projects and their boards (myprojects.py) --
+    def crew_gist(self, text):
+        """The gist of a report - three lines, the most important first."""
+        import lyla
+        try:
+            out = lyla.ask_gemini(
+                "Give the gist of this report: three short bullets, the most important first - the decision, the "
+                "number that matters, the risk. Put the key words in **bold** and anything risky in !!...!!. Write "
+                "in the language of the report's task (Gulf Arabic if it is Arabic). Nothing else.\n\n" + str(text)[:20000],
+                "You turn long reports into the few lines a busy person needs.")
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, "text": out.strip()}
+
+    def crew_say(self, text):
+        """Apollo says the gist out loud, in his own voice."""
+        app = self._app
+        ui, voice = getattr(app, "ui", None), getattr(app, "voice", None)
+        if ui is None:
+            return False
+        import re as _re
+        plain = _re.sub(r"[*!#>-]+", " ", str(text or ""))[:1500]
+        threading.Thread(target=assistant.announce, daemon=True, name="apollo-gist", args=(
+            ui, voice, f"Tell the user the gist of their agent's report, briefly, in their language: {plain}", plain)).start()
+        return True
+
     def keyboard(self, on):
         """The page asks for the keyboard while a field is being typed in."""
         app = self._app

@@ -476,6 +476,7 @@ $('crew-page').addEventListener('click', (event) => {
     drawCrewPage();
     return;
   }
+  if (event.target.closest('[data-results]')) { event.stopPropagation(); reader.filter = null; openReader('ALL', 0); return; }
   const open = event.target.closest('.cp-open[data-key], .cp-deep');
   if (open) {                                   // the whole result, to read in the page itself
     event.stopPropagation();
@@ -501,9 +502,14 @@ $('crew-page').addEventListener('click', (event) => {
 const READER_NAMES = { LYLA: 'Research & media', THEIA: 'Professor', MONEYPENNY: 'Markets desk', Q: 'Quartermaster' };
 const reader = { key: null, i: 0 };
 
+/* The lines that carry the decision - shown in red, so a long report can be skimmed. */
+const KEY_LINE = /^\**\s*(VERDICT|BOTTOM LINE|RED FLAGS?|RISKS?|WARNING|IMPORTANT|CONFIDENCE|ACTION|THE BEST WAY|الزبدة|الخلاصة|تحذير|مهم|الحكم)\s*\**\s*:/i;
+
 function mdLite(text) {
   const inline = (s) => esc(s)
+    .replace(/!!(.+?)!!/g, '<mark class="rd-red">$1</mark>')
     .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[\s(])([+\-−]?\$?\d[\d,.]*\s?(?:%|[KMBT]\b|bn\b|million\b|billion\b))/g, '$1<b class="rd-num">$2</b>')
     .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="#" data-link="$2">$1</a>')
     .replace(/(^|\s)(https?:\/\/[^\s<]+)/g, '$1<a href="#" data-link="$2">$2</a>');
   const out = []; let list = null;
@@ -515,6 +521,7 @@ function mdLite(text) {
     if (!line.trim()) continue;
     const h = line.match(/^(#{1,4})\s+(.*)$/);
     if (h) out.push(h[1].length <= 2 ? `<h3>${inline(h[2])}</h3>` : `<h4>${inline(h[2])}</h4>`);
+    else if (KEY_LINE.test(line)) out.push(`<p class="rd-key"><b>${inline(line.split(':')[0])}:</b>${inline(line.slice(line.indexOf(':') + 1))}</p>`);
     else if (/^[A-Z][A-Z \/&]{2,40}:/.test(line)) out.push(`<p><b>${inline(line.split(':')[0])}:</b>${inline(line.slice(line.indexOf(':') + 1))}</p>`);
     else out.push(`<p>${inline(line)}</p>`);
   }
@@ -522,27 +529,38 @@ function mdLite(text) {
   return out.join('') || '<p class="quiet">No report text was saved for this job.</p>';
 }
 
+function readerList(key) {
+  if (key !== 'ALL') return ((crewAgents()[key] || {}).results || []).map((r) => ({ agent: key, ...r }));
+  const all = [];
+  Object.entries(crewAgents()).forEach(([agent, a]) => (a.results || []).forEach((r) => all.push({ agent, ...r })));
+  return all.sort((a, b) => (b.done || 0) - (a.done || 0));
+}
+
 function readerMarkup(key, i) {
-  const list = ((crewAgents()[key] || {}).results || []);
+  const list = readerList(reader.filter || key);
   const r = list[i] || {};
   const when = r.done ? new Date(r.done * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
   const took = r.took || r.took_ms ? `${Math.round((r.took || r.took_ms) / 1000)} s` : '';
   return `<div class="rd-panel" role="dialog" aria-label="${esc(key)} result">
     <header class="rd-head">
-      <div><b>${esc(key)}</b><span>${esc(READER_NAMES[key] || '')}</span></div>
+      <div><b>${esc(key === 'ALL' ? (r.agent || 'RESULTS') : key)}</b><span>${esc(key === 'ALL' ? 'Everything the crew made' : READER_NAMES[key] || '')}</span></div>
+      ${key === 'ALL' ? `<div class="rd-tabs">${['ALL', ...Object.keys(READER_NAMES)].map((k) => `<button type="button" data-filter="${k}" class="${(reader.filter || 'ALL') === k ? 'on' : ''}">${k === 'ALL' ? 'All' : k}</button>`).join('')}</div>` : ''}
       <div class="rd-tools">
+        ${r.report ? `<button type="button" class="rd-gist-btn">The gist</button>` : ''}
         ${r.file ? `<button type="button" class="rd-file" data-file="${esc(r.file)}">Open the file</button>` : ''}
         ${r.link ? `<button type="button" class="rd-link" data-link="${esc(r.link)}">Open the link</button>` : ''}
         <button type="button" class="rd-x" aria-label="Close">✕</button></div>
     </header>
     <div class="rd-body">
       <nav class="rd-list">${list.map((x, j) => `<button type="button" class="rd-item${j === i ? ' on' : ''}" data-i="${j}">
+        ${key === 'ALL' ? `<em class="rd-who">${esc(x.agent)}</em>` : ''}
         ${x.verdict ? `<span class="cc-verdict t-${esc(x.tone || 'HOLD')}">${esc(x.verdict)}</span>` : ''}${x.video ? '▶ ' : ''}${esc(String(x.task || x.summary || '').slice(0, 70))}
         <small>${x.done ? new Date(x.done * 1000).toLocaleDateString() : ''}</small></button>`).join('') || '<p class="quiet">Nothing yet.</p>'}</nav>
       <article class="rd-doc">
         <p class="rd-task">${esc(r.task || '')}</p>
         <p class="rd-meta">${[when, r.brain, took].filter(Boolean).map(esc).join(' · ')}</p>
         ${r.summary ? `<p class="rd-summary">${esc(r.summary)}</p>` : ''}
+        <div class="rd-gist" hidden></div>
         ${r.video ? `<div class="rd-short"><img class="rd-preview" alt="The Short, frame by frame" data-src="${esc(r.preview || '')}">
           <div class="rd-short-tools"><button type="button" class="rd-play" data-file="${esc(r.video)}">▶ Play the Short</button>
           <button type="button" class="rd-folder">Open the Shorts folder</button></div></div>` : ''}
@@ -566,7 +584,7 @@ function openReader(key, i) {
   box.innerHTML = readerMarkup(key, i);
   box.classList.add('on');
   sfx.play('expand');
-  const r = (((crewAgents()[key] || {}).results) || [])[i] || {};
+  const r = readerList(reader.filter || key)[i] || {};
   const api = bridge();
   const img = box.querySelector('.rd-preview');
   if (img && img.dataset.src && api && api.crew_image) {
@@ -592,6 +610,24 @@ function onReaderClick(event) {
   if (event.target === box || event.target.closest('.rd-x')) { closeReader(); return; }
   const item = event.target.closest('.rd-item');
   if (item) { openReader(reader.key, +item.dataset.i); return; }
+  const tab = event.target.closest('[data-filter]');
+  if (tab) { reader.filter = tab.dataset.filter === 'ALL' ? null : tab.dataset.filter; openReader('ALL', 0); return; }
+  if (event.target.closest('.rd-say')) {
+    const said = box.querySelector('.rd-gist').innerText;
+    if (api && api.crew_say) api.crew_say(said);
+    return;
+  }
+  if (event.target.closest('.rd-gist-btn')) {
+    const r = readerList(reader.filter || reader.key)[reader.i] || {};
+    const gist = box.querySelector('.rd-gist');
+    gist.hidden = false;
+    gist.innerHTML = '<p class="quiet">Getting the gist…</p>';
+    Promise.resolve(api && api.crew_gist ? api.crew_gist(`${r.task || ''}\n\n${r.summary || ''}\n\n${r.report || ''}`) : null).then((g) => {
+      gist.innerHTML = g && g.ok ? `<h4>The gist</h4>${mdLite(g.text)}<button type="button" class="rd-say">Apollo, say it</button>`
+        : `<p class="quiet">${esc((g && g.error) || 'Could not get the gist just now.')}</p>`;
+    });
+    return;
+  }
   const file = event.target.closest('.rd-file, .rd-play');
   if (file && api && api.open_crew_file) { api.open_crew_file(file.dataset.file); return; }
   if (event.target.closest('.rd-folder') && api && api.open_crew_folder) { api.open_crew_folder(); return; }

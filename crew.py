@@ -55,7 +55,9 @@ SUMMARY_RULE = (
     "Answer in exactly this shape. The first line is `SUMMARY:` and two short "
     "sentences Apollo can say out loud, in the language the job was given in "
     "(Saudi dialect if it was Arabic). Then a blank line, then the report: short "
-    "sections under plain headings.")
+    "sections under plain headings. Put the few phrases that matter most in **bold**, and wrap "
+    "anything risky, urgent or decisive in !!double exclamation marks!! so it shows in red. "
+    "End the report with a `BOTTOM LINE:` line - the one thing to take away.")
 
 THEIA_SYSTEM = (
     "You are THEIA, the professor of Apollo's crew - an analyst who can take any "

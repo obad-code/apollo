@@ -3910,3 +3910,27 @@ body.fx-picking, body.fx-picking * { cursor: crosshair !important; }
   background: rgba(255, 255, 255, .04); color: #ede8f6; font: 400 14px var(--body); outline: none; }
 .iv-say textarea:focus { border-color: #a68bff; }
 @media (max-width: 1100px) { .iv-body { grid-template-columns: 1fr; } .iv-chat { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .06); min-height: 320px; } }
+
+/* -- the crew's results: a clear way in, and the important parts marked -- */
+.cp-results { margin-left: 18px; padding: 10px 20px; border-radius: 999px; border: 0; cursor: pointer;
+  font: 800 12px var(--hud); letter-spacing: .2em; color: #160c00; background: linear-gradient(135deg, #FFD48A, #FFB000);
+  box-shadow: 0 6px 24px rgba(255, 176, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .6); transition: transform .2s, box-shadow .2s; }
+.cp-results b { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, .18); }
+.cp-results:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(255, 176, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .6); }
+.rd-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(255, 255, 255, .05); }
+.rd-tabs button { padding: 6px 14px; border-radius: 999px; border: 0; background: transparent; color: #c9c1ad; font: 700 11px var(--hud);
+  letter-spacing: .12em; cursor: pointer; }
+.rd-tabs button.on { background: #f5b83d; color: #160c00; }
+.rd-who { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 5px; background: rgba(255, 255, 255, .08);
+  color: #f5b83d; font: 800 9px var(--hud); letter-spacing: .12em; font-style: normal; }
+.rd-gist-btn { padding: 8px 16px; border-radius: 999px; border: 0; cursor: pointer; font: 800 11px var(--hud); letter-spacing: .14em;
+  color: #fff; background: linear-gradient(135deg, #ff5c6c, #e5383b); box-shadow: 0 4px 18px rgba(229, 56, 59, .45); }
+.rd-gist { margin: 14px 0; padding: 16px 18px; border-radius: 14px; background: rgba(229, 56, 59, .09); border: 1px solid rgba(255, 92, 108, .35); }
+.rd-gist h4 { margin: 0 0 8px; color: #ff8a95; font: 800 11px var(--hud); letter-spacing: .18em; text-transform: uppercase; }
+.rd-say { margin-top: 10px; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(255, 138, 149, .5); background: transparent;
+  color: #ffb3ba; font: 700 11px var(--hud); cursor: pointer; }
+.rd-red { background: rgba(229, 56, 59, .18); color: #ff6b76; padding: 0 3px; border-radius: 4px; font-weight: 700; }
+.rd-num { color: #fff; font-weight: 800; }
+.rd-text b, .rd-gist b { color: #fff; font-weight: 800; }
+.rd-key { padding: 10px 14px; border-left: 4px solid #e5383b; border-radius: 0 10px 10px 0; background: rgba(229, 56, 59, .08); }
+.rd-key > b:first-child { color: #ff6b76; letter-spacing: .06em; }

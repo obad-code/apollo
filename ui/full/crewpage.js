@@ -148,6 +148,7 @@ function renderCards(root, board, t, look, open, now, analysis = null) {
   root.innerHTML = `
     <header class="cp-top">
       <h1>THE CREW</h1>
+      <button type="button" class="cp-results" data-results title="Everything the crew made - reports, analyses, Shorts">RESULTS <b>${KEYS.reduce((n, k) => n + (((board.agents || {})[k] || {}).results || []).length, 0)}</b> ›</button>
       <div class="cp-meta"><span><i class="cp-led${t.working ? ' lit' : ''}"></i><b>${t.working}</b> working</span>
         <span><i class="cp-led amb"></i><b>${t.runs}</b> jobs today</span>
         <span><i class="cp-led${t.errors ? ' bad' : ''}"></i><b>${t.errors}</b> errors</span></div>
@@ -214,6 +215,7 @@ export function render(root, board = {}, { look = 'cards', open = null, analysis
   root.innerHTML = `
     <header class="cp-top">
       <h1>THE CREW</h1>
+      <button type="button" class="cp-results" data-results title="Everything the crew made - reports, analyses, Shorts">RESULTS <b>${KEYS.reduce((n, k) => n + (((board.agents || {})[k] || {}).results || []).length, 0)}</b> ›</button>
       <div class="cp-meta"><span><i class="cp-led${t.working ? ' lit' : ''}"></i><b>${t.working}</b> working</span>
         <span><i class="cp-led amb"></i><b>${t.runs}</b> jobs today</span>
         <span><i class="cp-led${t.errors ? ' bad' : ''}"></i><b>${t.errors}</b> errors</span></div>
