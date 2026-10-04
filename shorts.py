@@ -394,6 +394,22 @@ def _background(pose, size):
     return _cache[key].copy()
 
 
+def avatar(path, size=1024, pose="pleased", prop="none", glasses=True):
+    """A portrait of the character on paper, in the channel's style - a profile picture."""
+    from PIL import Image, ImageDraw
+    k = 2.0
+    big = Image.new("RGB", (int(W * k), int(H * k)), PAPER)
+    d = Pen(ImageDraw.Draw(big), k, seed=3)
+    draw_man(d, W / 2, 1500, pose, 0.4, prop=prop, glasses=glasses)
+    box = tuple(int(v * k) for v in (W / 2 - 330, 560, W / 2 + 330, 1560))
+    art = big.crop(box)
+    side = max(art.size)
+    canvas = Image.new("RGB", (side, side), PAPER)
+    canvas.paste(art, ((side - art.width) // 2, (side - art.height) // 2))
+    canvas.resize((size, size), Image.LANCZOS).save(path)
+    return path
+
+
 def _ease(x):
     x = max(0.0, min(1.0, x))
     return x * x * (3 - 2 * x)
