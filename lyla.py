@@ -48,7 +48,7 @@ MODELS = tuple(filter(None, (os.environ.get("LYLA_MODEL"),
                              "gemini-flash-latest", "gemini-2.5-flash")))
 # Each model has its own free daily allowance, so when the main ones are used up the lighter
 # ones still answer. A model that says its quota is spent is skipped until it said to retry.
-LITE = ("gemini-flash-lite-latest", "gemini-2.5-flash-lite")
+LITE = ("gemini-flash-lite-latest", "gemini-3.5-flash-lite")   # 2.5 Flash Lite is closed to new users
 _spent = {}
 
 
@@ -232,7 +232,7 @@ def ask_gemini(prompt, system=None, models=None):
     as a last try, since the search is the part a free key can run out of."""
     if not (os.environ.get("GEMINI_CREW_KEY") or os.environ.get("GEMINI_API_KEY")):
         raise RuntimeError("LYLA needs GEMINI_API_KEY (or Hermes) to think with.")
-    last = None
+    last, quota = None, None
     models = tuple(models or MODELS)
     now = time.time()
     tries = [*((m, True) for m in models), (models[0], False), *((m, True) for m in LITE if m not in models)]
@@ -246,11 +246,14 @@ def ask_gemini(prompt, system=None, models=None):
             wait = _quota_wait(e)
             if wait:
                 _spent[model] = now + wait
+                quota = e
+            elif "NOT_FOUND" in str(e) and "model" in str(e).lower():
+                _spent[model] = now + 7 * 86400          # retired or unknown: stop asking it for a week
             last = e
             continue
         if text and text.strip():
             return text
-    if last is not None and _quota_wait(last):
+    if quota is not None:
         back = min((t for t in _spent.values() if t > now), default=now)
         raise RuntimeError("Gemini's free daily limit is used up on every model - it comes back in about "
                            f"{max(1, round((back - now) / 3600))} h. Enabling billing on the Gemini key lifts it.")
