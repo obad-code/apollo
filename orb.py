@@ -77,6 +77,12 @@ FONT_FAMILIES = {"light": "thmanyah sans Light",
                  "bold": "thmanyah sans",
                  "black": "thmanyah sans Black"}
 
+# Inter for Latin text - the open face closest to Apple's San Francisco, and
+# carried in the repository like Thmanyah. Arabic stays in Thmanyah.
+LATIN_FILES = ("Inter-Regular.ttf", "Inter-Medium.ttf", "Inter-SemiBold.ttf", "Inter-Bold.ttf")
+LATIN_FAMILIES = {"light": "Inter", "regular": "Inter Medium", "medium": "Inter SemiBold",
+                  "bold": "Inter", "black": "Inter"}
+
 # What is used if the font files are not there - a checkout without them still
 # has to draw something.
 FONT_STACK = ("Segoe UI", "IBM Plex Mono", "Consolas", "Tahoma")
@@ -266,6 +272,8 @@ class Orb:
         self._private = None
         self._collection = None
         self._marks = {}
+        self._S = None                    # device pixels per design pixel
+        self._phys = (position[0], position[1], 1.0)
 
     # -- lifecycle ----------------------------------------------------------
 
@@ -634,8 +642,9 @@ class Orb:
             _user32.GetCursorPos(ctypes.byref(pt))
         except Exception:  # noqa: BLE001
             return (0.0, 0.0)
-        dx = pt.x - (self.rect[0] + ex)
-        dy = pt.y - (self.rect[1] + ey)
+        px, py, S = self._phys
+        dx = (pt.x - px) / S - ex
+        dy = (pt.y - py) / S - ey
         return (max(-1.0, min(1.0, dx / 500.0)), max(-1.0, min(1.0, dy / 300.0)))
 
     _startled = 0.0
@@ -744,7 +753,8 @@ class Orb:
             _user32.GetCursorPos(ctypes.byref(pt))
         except Exception:  # noqa: BLE001
             return
-        lx, ly = pt.x - self.rect[0], pt.y - self.rect[1]
+        px, py, S = self._phys
+        lx, ly = (pt.x - px) / S, (pt.y - py) / S
         hover = next((n for n, (x1, y1, x2, y2) in self._hits.items()
                       if x1 <= lx <= x2 and y1 <= ly <= y2), None)
         self._hover = hover
@@ -782,6 +792,32 @@ class Orb:
         if self._level < 0.001:
             self._level = 0.0
 
+    def scale(self):
+        """Device pixels per design pixel: 1.5 on a 150% screen, 2 on 200%.
+
+        Everything is laid out in design pixels and drawn at this many real
+        pixels each, so a 2K or 4K screen gets text and edges at its own
+        resolution rather than a small picture or a stretched, blurry one.
+        APOLLO_MINI_SCALE overrides it.
+        """
+        if self._S is None:
+            forced = os.environ.get("APOLLO_MINI_SCALE", "").strip()
+            dpi = 96
+            try:
+                if forced:
+                    self._S = max(1.0, min(4.0, float(forced)))
+                    return self._S
+                if self.hwnd:
+                    dpi = _user32.GetDpiForWindow(ctypes.c_void_p(self.hwnd)) or 96
+                else:
+                    dc = _user32.GetDC(None)
+                    dpi = _gdi32.GetDeviceCaps(dc, 88) or 96      # LOGPIXELSX
+                    _user32.ReleaseDC(None, dc)
+            except Exception:  # noqa: BLE001
+                dpi = 96
+            self._S = max(1.0, min(4.0, dpi / 96.0))
+        return self._S
+
     # -- fonts and text -----------------------------------------------------
 
     def _private_faces(self):
@@ -804,13 +840,18 @@ class Orb:
             if os.path.exists(path):
                 collection.AddFontFile(path)
                 loaded += 1
+        for filename in LATIN_FILES:
+            path = os.path.join(HERE, "ui", "fonts", "inter", filename)
+            if os.path.exists(path):
+                collection.AddFontFile(path)
+                loaded += 1
         if loaded:
             self._collection = collection          # kept alive on purpose
             faces = {family.Name: family for family in collection.Families}
         self._private = faces
         return faces
 
-    def _face(self, weight, size, style=None):
+    def _face(self, weight, size, style=None, latin=False):
         """One font in Thmanyah if it is there, in the old stack if not.
 
         Bold is a style of the regular family here, not a family of its own -
@@ -820,7 +861,8 @@ class Orb:
         D = self._D
         if style is None:
             style = D.FontStyle.Bold if weight == "bold" else D.FontStyle.Regular
-        family = self._private_faces().get(FONT_FAMILIES[weight])
+        faces = self._private_faces()
+        family = (faces.get(LATIN_FAMILIES[weight]) if latin else None) or faces.get(FONT_FAMILIES[weight])
         if family is not None:
             return D.Font(family, size, style, D.GraphicsUnit.Point)
         installed = {f.Name for f in D.FontFamily.Families}
@@ -843,13 +885,13 @@ class Orb:
         D = self._D
         # Medium, not regular: light strokes on black thin out, and the
         # reply is the thing on the card that has to read.
-        body = self._face("medium", FONT_PT)
-        # The same family for Arabic: that is the whole point of it.
-        rtl = self._face("medium", FONT_PT)
-        small = self._face("light", FONT_SMALL_PT)
-        caption = self._face("regular", CAPTION_PT)
+        body = self._face("medium", FONT_PT, latin=True)
+        # Arabic in Thmanyah, a step heavier so it reads as firmly as the Latin.
+        rtl = self._face("bold", FONT_PT)
+        small = self._face("light", FONT_SMALL_PT, latin=True)
+        caption = self._face("regular", CAPTION_PT, latin=True)
         # The name in the footer carries a weight: it is a label, not a readout.
-        name_font = self._face("bold", NAME_PT)
+        name_font = self._face("bold", NAME_PT, latin=True)
 
         fmt = D.StringFormat(D.StringFormat.GenericTypographic)
         fmt.FormatFlags = fmt.FormatFlags | D.StringFormatFlags.MeasureTrailingSpaces
@@ -950,15 +992,20 @@ class Orb:
         if plan["height"] <= 0:
             return None
 
-        bitmap = D.Bitmap(self.PANEL_W, plan["height"],
+        S = self.scale()
+        bitmap = D.Bitmap(int(math.ceil(self.PANEL_W * S)), int(math.ceil(plan["height"] * S)),
                           D.Imaging.PixelFormat.Format32bppPArgb)
         g = D.Graphics.FromImage(bitmap)
         try:
+            g.ScaleTransform(S, S)
             g.SmoothingMode = D.Drawing2D.SmoothingMode.AntiAlias
             # AntiAlias, never ClearType: sub-pixel rendering assumes it knows
             # what is behind the glyph, and on a surface whose whole point is
             # that nothing is, it leaves coloured fringes on every letter.
-            g.TextRenderingHint = D.Text.TextRenderingHint.AntiAlias
+            # Grid-fitted: the glyphs snap to whole pixels, so the strokes stay crisp
+            # rather than smeared across two - still greyscale, never ClearType.
+            g.TextRenderingHint = D.Text.TextRenderingHint.AntiAliasGridFit
+            g.PixelOffsetMode = D.Drawing2D.PixelOffsetMode.HighQuality
             g.Clear(D.Color.FromArgb(0, 0, 0, 0))
             for block in plan["blocks"]:
                 if block["kind"] == "text":
@@ -1200,6 +1247,14 @@ class Orb:
 
         x, y, w, h = self.rect
         w, h = max(8, w), max(8, h)
+        # Laid out in design pixels, drawn in device pixels: the window is S
+        # times the size, hung from the same screen edge and the same centre.
+        S = self.scale()
+        lw = w
+        w, h = int(math.ceil(w * S)), int(math.ceil(h * S))
+        x = self.home[0] - w // 2
+        y = int(round(self.home[1] + self.overhang - self.overhang * S))
+        self._phys = (x, y, S)
 
         # A GDI+ Bitmap built the ordinary way and converted with GetHbitmap()
         # does not dependably preserve alpha - .NET's own docs call it lossy,
@@ -1230,8 +1285,12 @@ class Orb:
                        self._IntPtr(bits_ptr.value))
         g = D.Graphics.FromImage(bmp)
         g.SmoothingMode = D.Drawing2D.SmoothingMode.AntiAlias
-        g.TextRenderingHint = D.Text.TextRenderingHint.AntiAlias
+        g.TextRenderingHint = D.Text.TextRenderingHint.AntiAliasGridFit
+        g.PixelOffsetMode = D.Drawing2D.PixelOffsetMode.HighQuality
+        g.InterpolationMode = D.Drawing2D.InterpolationMode.HighQualityBicubic
+        g.CompositingQuality = D.Drawing2D.CompositingQuality.HighQuality
         g.Clear(D.Color.FromArgb(0, 0, 0, 0))          # genuinely nothing
+        g.ScaleTransform(S, S)
 
         try:
             # Mini Apollo's bar, hanging from the screen's edge (`overhang`
@@ -1240,9 +1299,9 @@ class Orb:
             rich = self._content is not None
             card = self.view.panel_open if rich else 0.0
             if card < 0.99:
-                self._draw_island(g, w / 2.0, t, 1.0 - card)
+                self._draw_island(g, lw / 2.0, t, 1.0 - card)
             if rich and self.view.panel_open > 0.005:
-                self._draw_panel(g, w, t, now)
+                self._draw_panel(g, lw, t, now)
         finally:
             g.Dispose()
             self._push(hbmp, x, y, w, h)
@@ -1415,16 +1474,19 @@ class Orb:
     def _blit(self, g, bitmap, dx, dy, sx, sy, sw, sh, attrs):
         """One clipped copy out of the content bitmap onto the frame."""
         D = self._D
-        sx, sy = max(0, int(sx)), max(0, int(sy))
-        sw = min(int(sw), bitmap.Width - sx)
-        sh = min(int(sh), bitmap.Height - sy)
+        S = self.scale()
+        # The bitmap holds S device pixels per design pixel; the frame is
+        # scaled by S too, so the copy lands one source pixel per screen pixel.
+        sx, sy = max(0, int(sx * S)), max(0, int(sy * S))
+        sw = min(int(round(sw * S)), bitmap.Width - sx)
+        sh = min(int(round(sh * S)), bitmap.Height - sy)
         if sw <= 0 or sh <= 0:
             return
-        dest = D.Rectangle(int(dx), int(dy), sw, sh)
+        dest = D.RectangleF(float(round(dx * S) / S), float(round(dy * S) / S), sw / S, sh / S)
         if attrs is None:
-            g.DrawImage(bitmap, dest, sx, sy, sw, sh, D.GraphicsUnit.Pixel)
+            g.DrawImage(bitmap, dest, float(sx), float(sy), float(sw), float(sh), D.GraphicsUnit.Pixel)
         else:
-            g.DrawImage(bitmap, dest, sx, sy, sw, sh, D.GraphicsUnit.Pixel, attrs)
+            g.DrawImage(bitmap, dest, float(sx), float(sy), float(sw), float(sh), D.GraphicsUnit.Pixel, attrs)
 
     def _fade_attrs(self, scale):
         """How see-through something is, as ImageAttributes, cached in steps."""
