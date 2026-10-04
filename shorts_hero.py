@@ -26,7 +26,7 @@ BUILDS = {"stockier": 1.12, "average": 1.0, "slimmer": 0.92}
 LEANS = ("warm", "cool", "earth")
 GRADES = ("warm", "cool", "neutral", "night")
 SIDES = ("boss", "friend", "landlord", "banker", "stranger", "guard", "prisoner", "librarian", "doctor",
-         "teacher", "waiter", "pilot", "sailor", "farmer", "king")
+         "teacher", "waiter", "pilot", "sailor", "farmer", "king", "elder", "partner")
 
 
 def hero_for(seed):
@@ -205,7 +205,8 @@ _SIDE_LOOK = {"boss": ((200, 150, 120), (60, 50, 46), (86, 90, 110)), "friend": 
               "doctor": ((226, 182, 150), (50, 40, 36), (236, 242, 246)), "teacher": ((206, 160, 126), (90, 56, 40), (120, 150, 110)),
               "waiter": ((232, 192, 156), (36, 32, 34), (240, 238, 232)), "pilot": ((222, 178, 142), (50, 44, 44), (40, 60, 110)),
               "sailor": ((190, 140, 104), (200, 200, 200), (60, 90, 150)), "farmer": ((206, 158, 120), (120, 80, 50), (170, 120, 80)),
-              "king": ((236, 196, 164), (190, 190, 196), (150, 40, 60))}
+              "king": ((236, 196, 164), (190, 190, 196), (150, 40, 60)), "elder": ((226, 184, 152), (200, 200, 204), (130, 110, 90)),
+              "partner": ((226, 176, 140), (120, 60, 40), (176, 96, 120))}
 
 
 def draw_side(d, role, x, ground, t, mood="calm"):
@@ -233,7 +234,9 @@ def draw_side(d, role, x, ground, t, mood="calm"):
         d.dot((ex, hc[1] - 2), 7)
         d.line([(ex - 20, hc[1] - 34 + (6 if mood == "angry" else 0) * s), (ex + 20, hc[1] - 34 - (6 if mood == "angry" else 0) * s)], fill=INK, width=6, wobble=0)
     d.polygon([(hc[0], hc[1] - 4), (hc[0] + 16, hc[1] + 34), (hc[0] - 14, hc[1] + 36)], fill=tuple(max(0, c - 22) for c in skin), outline=INK, width=4, wobble=0)
-    if mood in ("sad", "angry"):
+    if mood == "warm":                                       # institutions smile once there is money
+        d.arc([hc[0] - 42, hc[1] + 24, hc[0] + 42, hc[1] + 86], 15, 165, width=7)
+    elif mood in ("sad", "angry"):
         d.arc([hc[0] - 30, hc[1] + 58, hc[0] + 30, hc[1] + 92], 200, 340, width=6)
     else:
         d.arc([hc[0] - 34, hc[1] + 36, hc[0] + 34, hc[1] + 78], 20, 160, width=6)

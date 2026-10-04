@@ -36,6 +36,7 @@ SIDE = {"boss": "a middle-aged boss in a grey shirt with tired eyes, tan skin", 
         "doctor": "a doctor in a white coat with a stethoscope", "teacher": "a teacher with brown hair and a green sweater",
         "waiter": "a waiter in a white shirt and black apron", "pilot": "a pilot in a navy uniform with a peaked cap",
         "sailor": "a weathered sailor with a white beard and a blue jersey", "farmer": "a farmer with a straw hat and a brown vest",
+        "elder": "a wise elderly man with white hair and a brown cardigan", "partner": "a warm partner with auburn hair and a soft pink sweater",
         "king": "a king with a grey beard, a gold crown and a crimson robe"}
 PLACE = {
     "sea": "an open blue sea under a bright sky with a small sailboat, gulls and rolling waves", "beach": "a sandy beach at the edge of a calm blue sea",

@@ -51,3 +51,24 @@ def test_every_prop_and_side_character_draws():
         shorts.frame({"pose": "stand", "prop": prop, "cam": "wide", "bg": "room", "show": "man", "caption": "x", "_hero": hero}, 0.5, 0.5, "t")
     for side in shorts.shorts_hero.SIDES:
         shorts.frame({"pose": "sad", "prop": "none", "cam": "wide", "bg": "room", "show": "man", "friend": side, "caption": "x", "_hero": hero}, 0.5, 0.5, "t")
+
+
+def test_wealth_kinds_split_stat_tags_and_anchor():
+    import json
+    raw = json.dumps({"title": "T", "description": "hook", "tags": ["wealth", "pov finance"] + ["x" * 40] * 30,
+                      "scenes": [{"say": "a", "bg": "room", "tier": 1, "stat": {"text": "$34", "tone": "loss"}, "arrow": "down", "split": [3, 1]},
+                                 {"say": "b", "bg": "office", "tier": 3}, {"say": "c", "bg": "bank", "tier": 4, "newcomer": True}]})
+    data = shorts.ask_script("paths", think=lambda p: raw)
+    sc = data["scenes"]
+    assert sc[0]["split"] == [3, 1] and sc[0]["stat"] == {"text": "$34", "tone": "loss"} and sc[0]["arrow"] == "down"
+    assert sc[-1]["bg"] == sc[0]["bg"] == "room" and sc[-1]["newcomer"]       # opens and closes on the same moment
+    assert sc[1]["tier"] == 3                                                  # the tiers stay in a wealth story
+    assert len(", ".join(data["tags"])) <= 500 and "Disclaimer" in data["description"]
+    other = shorts.ask_script("fact", think=lambda p: raw)["scenes"]
+    assert {s["tier"] for s in other} == {1} and not any(s["grade"] for s in other)   # one look for non-wealth stories
+
+
+def test_every_stat_split_and_role_draws():
+    hero = shorts.shorts_hero.hero_for("t")
+    for extra in ({"stat": {"text": "$9,412", "tone": "gain"}, "arrow": "up"}, {"split": [1, 4]}, {"friend": "elder", "tier": 4}, {"friend": "partner"}):
+        shorts.frame({"pose": "stand", "prop": "none", "cam": "wide", "bg": "city", "show": "man", "caption": "x", "_hero": hero, **extra}, 0.5, 0.5, "t")

@@ -83,7 +83,14 @@ SYSTEM = (
     "longer ones, never three sentences in a row with the same shape); never state an emotion, "
     "show it through an action or a detail; every money figure is oddly specific ($34, $1,847 - "
     "never $1,000); banned words: delve, moreover, furthermore, game-changer, unlock, elevate, "
-    "navigate, landscape, embark, tapestry, 'in today's world'. No music, nothing indecent, "
+    "navigate, landscape, embark, tapestry, testament to, 'in today's world', 'let's dive in', 'in "
+    "conclusion', 'it's important to note', 'at the end of the day'. Use fragments on purpose ('Just "
+    "tired.'), let some beats stay unresolved, add an occasional plainly-delivered quoted line from "
+    "a side character and never explain it, and give each closing 'rule' line a different lead-in "
+    "(or none). For money stories the narration is second person, present tense, flat and deadpan, "
+    "zero exclamation marks, figures illustrative, and the video opens and closes on the same "
+    "hyper-mundane moment (an exact time, one tiny detail); the closing scene may hand off to a new "
+    "anonymous person starting at level one (newcomer: true). No music, nothing indecent, "
     "nothing against Islam. Answer ONLY with JSON: "
     '{"title": "...", "description": "...", "hashtags": ["#..."], "scenes": [{"say": '
     '"what the narrator says", "caption": "at most ONE short text: a number or 2-4 words", "bg": one of '
@@ -91,7 +98,15 @@ SYSTEM = (
     + json.dumps(POSES) + ', "prop": one of ' + json.dumps(PROPS) + ', "cam": one of ' + json.dumps(CAMS)
     + ', "sfx": one of ' + json.dumps(SFX) + ', "grade": one of ' + json.dumps(GRADES)
     + ', "tier": 1 broke / 2 stable / 3 established / 4 elite (his clothes), "friend": one of '
-    + json.dumps(SIDES) + " (a side character with a real face, when one is in the beat)}]}. "
+    + json.dumps(SIDES) + ' (a side character with a real face, when one is in the beat), "stat": '
+    '{"text": "$1,847", "tone": "gain" or "loss"} (optional floating figure box), "arrow": "up" or "down" '
+    '(optional), "split": [1-4, 1-4] (optional split-screen of two tiers), "newcomer": true (optional)}], '
+    '"tags": ["..."] (15-25 searchable tags: broad, format, specific, long-tail; under 450 characters in all). '
+    'The title follows a click formula with a specific dollar anchor when it fits (e.g. "Your Life at Every '
+    'Level of Wealth - $0 to $10M", "Which Path? Same $60,000 a Year, Two Different Lives"); the description is '
+    'a one-line hook, then 2-3 plain sentences, then a soft call to action. '
+    'Side-character archetypes: a reckless-but-likable spender (friend), a wise elder (elder), a partner '
+    '(partner), institutional figures (banker, boss, landlord) who get warmer as the tier rises. '
     "Pick the bg that matches what is told in that very scene; stay inside one world and change place "
     "only when the story truly moves. Keep the same side character throughout. "
     "grade is the mood (ladder stories only): warm = comfort or progress, cool = stress or hardship, neutral = facts, "
@@ -125,12 +140,21 @@ def set_style(text, add=True):
 
 def kind_for(day):
     """A fact one day, a story the next."""
-    return ("fact", "story", "ladder")[day.toordinal() % 3]
+    return ("fact", "story", "ladder", "paths", "treatment")[day.toordinal() % 5]
 
 
 KINDS = {
     "fact": "one amazing true fact, explained",
     "story": "a gripping short story with a twist (fiction is fine)",
+    "paths": ("PATH A vs PATH B: one person, one identical paycheck, two lives run in parallel across the same age "
+              "checkpoints - a builder who saves and invests disciplined amounts against a spender who upgrades "
+              "his lifestyle - ending on the stark net-worth gap. At least 6 checkpoints, each a split-screen scene "
+              "(split: [tier of the builder, tier of the spender]). Second person, present tense, flat and deadpan, "
+              "oddly specific figures. Illustrative figures."),
+    "treatment": ("a TREATMENT LADDER: how banks, family, coworkers and landlords treat the very same person at each "
+                  "wealth tier. At least 6 tiers, each opening with an oddly specific dollar figure; the institutional "
+                  "figure (teller, banker, landlord) gets visibly warmer as the money rises. Second person, present "
+                  "tense, flat and deadpan, a closing one-line rule per tier. Illustrative figures."),
     "ladder": ("a POV wealth ladder: second person, present tense, flat and deadpan. Six levels from broke to "
                "elite, each opening with an oddly specific dollar figure (never round: $34, $1,847, $9,412), "
                "one hyper-granular money detail, a side character beat, and a closing one-line rule worded "
@@ -172,11 +196,22 @@ def ask_script(kind, topic="", think=None, world=""):
         s["friend"] = s.get("friend") if s.get("friend") in shorts_hero.SIDES else ""
         s["tier"] = s.get("tier") if s.get("tier") in (1, 2, 3, 4) else 2
         s["caption"] = " ".join(s["caption"].split()[:6])
+        stat = s.get("stat")
+        s["stat"] = ({"text": str(stat.get("text", ""))[:12], "tone": stat.get("tone") if stat.get("tone") in ("gain", "loss") else "gain"}
+                     if isinstance(stat, dict) and stat.get("text") else None)
+        s["arrow"] = s.get("arrow") if s.get("arrow") in ("up", "down") else ""
+        sp = s.get("split")
+        s["split"] = [int(sp[0]), int(sp[1])] if isinstance(sp, list) and len(sp) == 2 and all(str(x).isdigit() and 1 <= int(x) <= 4 for x in sp) else None
+        s["newcomer"] = bool(s.get("newcomer"))
     for i, s in enumerate(scenes):
         if s.get("cam") not in CAMS or (i and s["cam"] == scenes[i - 1]["cam"]):
             s["cam"] = CAMS[i % len(CAMS)]
     _lock_consistency(scenes, kind, world)
     data["scenes"] = scenes
+    data["tags"] = trim_tags(data.get("tags") or [])
+    if kind in WEALTH_KINDS and "disclaimer" not in str(data.get("description", "")).lower():
+        data["description"] = (str(data.get("description", "")).strip() + "\n\nDisclaimer: this video is for entertainment and "
+                               "educational illustration only. Figures are simplified, hypothetical estimates, not financial advice.").strip()
     return data
 
 
@@ -205,6 +240,20 @@ def _refine(data, think, prompt):
         return None
 
 
+WEALTH_KINDS = ("ladder", "paths", "treatment")
+
+
+def trim_tags(tags, limit=480):
+    """Comma-joined tags kept under YouTube's ~500 character limit."""
+    out, size = [], 0
+    for t in tags:
+        t = str(t).strip().lstrip("#")
+        if t and size + len(t) + 2 <= limit:
+            out.append(t)
+            size += len(t) + 2
+    return out
+
+
 def _lock_consistency(scenes, kind, world):
     """One look for the whole video: the places stay in one world, the same side character,
     the same clothes and colour - unless it is a wealth ladder, where those change on purpose."""
@@ -219,8 +268,10 @@ def _lock_consistency(scenes, kind, world):
             last = s["bg"]
         if friend and s.get("friend"):
             s["friend"] = friend
-        if kind != "ladder":
+        if kind not in WEALTH_KINDS:
             s["tier"], s["grade"] = tier, ""
+    if kind in WEALTH_KINDS and len(scenes) > 2:       # the anchor: the story ends where it began
+        scenes[-1]["bg"] = scenes[0]["bg"]
 
 
 # -- drawing -------------------------------------------------------------------------
@@ -674,20 +725,32 @@ def frame(scene, t, progress, title):
     if bg:
         shorts_scenes.draw(d, bg, t)
     k, mx = (0.7, W * 0.62) if bg else (1.0, cx)         # in a place he is smaller, off to one side
+    tier = scene.get("tier", 2)
     if show == "env":
         head, body = (W / 2, 700), (W / 2, 900)
+    elif scene.get("split") and STYLE == "vector":        # path A | path B: the same man, two lives, side by side
+        for x, tr, p in ((W * 0.27, scene["split"][0], "pleased"), (W * 0.73, scene["split"][1], pose if pose != "stand" else "sad")):
+            d.place(0.56, (cx, ground), (x, ground))
+            draw_man(d, cx, ground, p, t, prop="none", hero=scene.get("_hero"), tier=tr)
+            d.place()
+        d.line([(W / 2, 260), (W / 2, 1560)], width=10, wobble=0)
+        head, body = (W / 2, 900), (W / 2, 1000)
     else:
         d.place(k, (cx, ground), (mx, ground))
         head = draw_man(d, cx, ground, pose, t, talking=progress < 1, prop=scene["prop"],
-                        hero=scene.get("_hero"), tier=scene.get("tier", 2))
+                        hero=scene.get("_hero"), tier=tier)
         d.place()
         if scene.get("friend") and STYLE == "vector":
             side = scene["friend"]
+            institutional = side in ("banker", "boss", "landlord", "guard", "teacher", "doctor", "librarian")
+            mood = "warm" if (institutional and tier >= 3) else ("angry" if pose == "shock" else ("sad" if pose == "sad" else "calm"))
             d.place(0.6, (W * 0.27, ground), (W * 0.27, ground))
-            shorts_hero.draw_side(d, side, W * 0.27, ground, t, "angry" if pose == "shock" else ("sad" if pose == "sad" else "calm"))
+            shorts_hero.draw_side(d, side, W * 0.27, ground, t, mood)
             d.place()
         head = (mx + (head[0] - cx) * k, ground + (head[1] - ground) * k)
         body = (mx, ground + (1000 - ground) * k)
+    if scene.get("stat") and STYLE == "vector":            # a floating figure box, and an arrow
+        _stat(d, scene["stat"], scene.get("arrow", ""), head if show != "env" else (W / 2, 700), t)
     # the camera: crop the big world to a window and scale it to the screen
     z, fx, fy, bulge = camera(scene.get("cam", "wide"), t, progress, head, body)
     if bg:
@@ -704,6 +767,24 @@ def frame(scene, t, progress, title):
     if scene.get("grade") and STYLE == "vector":
         img = shorts_hero.grade(img, scene["grade"])
     return _caption(img, scene, progress, title)
+
+
+def _stat(d, stat, arrow, near, t):
+    """A rounded callout with a glowing border and a bold number, plus an up or down arrow."""
+    x, y = near[0] + 20, near[1] - 330 + math.sin(t * 2.2) * 6
+    col = (46, 190, 110) if stat["tone"] == "gain" else (214, 70, 70)
+    glow = tuple(int(c + (255 - c) * 0.65) for c in col)
+    w = 56 + 40 * len(stat["text"])
+    for grow, c in ((16, glow), (8, glow), (0, col)):
+        box = [x - w / 2 - grow, y - 56 - grow, x + w / 2 + grow, y + 56 + grow]
+        d.polygon([(box[0], box[1]), (box[2], box[1]), (box[2], box[3]), (box[0], box[3])], fill=None if grow else (255, 255, 255),
+                  outline=c, width=8, wobble=0)
+    d.text((x, y), stat["text"], font=_font(78), fill=(30, 29, 33), anchor="mm")
+    if arrow:
+        sign = -1 if arrow == "up" else 1
+        ax, ay = x + w / 2 + 70, y
+        d.polygon([(ax, ay + sign * 56), (ax - 44, ay - sign * 22), (ax - 14, ay - sign * 22), (ax - 14, ay - sign * 60),
+                   (ax + 14, ay - sign * 60), (ax + 14, ay - sign * 22), (ax + 44, ay - sign * 22)], fill=col, outline=INK, width=6, wobble=0)
 
 
 def _caption(img, scene, progress, title):
@@ -899,6 +980,8 @@ def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
     hero = shorts_hero.hero_for(script.get("title", "") or work)          # picked once, locked for the whole video
     for scene in scenes:
         scene["_hero"] = hero
+        if scene.get("newcomer"):                       # the hand-off: someone new, at level one
+            scene["_hero"], scene["tier"] = shorts_hero.hero_for((script.get("title", "") or work) + "#new"), 1
     if IMAGES:
         _pictures(scenes, hero, os.path.join(work, "art"), step)
     # 1. every scene's voice, with its sound under it
@@ -983,7 +1066,9 @@ def make(kind=None, topic="", think=None, speak_fn=speak, now=None, step=lambda 
     render(script, base + ".mp4", speak_fn, step=step)
     step("Joining the scenes")
     notes = (f"{script.get('title', '')}\n\n{script.get('description', '')}\n\n"
-             + " ".join(script.get("hashtags", []) + ["#shorts"]) + f"\n\n[made by Apollo build {VERSION}]")
+             + " ".join(script.get("hashtags", []) + ["#shorts"])
+             + (f"\n\nTags: {', '.join(script['tags'])}" if script.get("tags") else "")
+             + f"\n\n[made by Apollo build {VERSION}]")
     with open(base + ".txt", "w", encoding="utf-8") as f:
         f.write(notes)
     log.info("short made: %s", base)

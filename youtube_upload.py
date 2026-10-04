@@ -39,7 +39,16 @@ def read_notes(notes_path):
     title = (parts[0] or "Short")[:95]
     if "#shorts" not in title.lower():
         title = (title[:86] + " #shorts")
-    tags = [w.lstrip("#") for w in text.split() if w.startswith("#")][:15]
+    listed = next((line[5:].strip() for line in text.splitlines() if line.startswith("Tags:")), "")
+    if listed:                                           # the channel's real tag list, under YouTube's 500 characters
+        tags, size = [], 0
+        for tag in (t.strip() for t in listed.split(",")):
+            if tag and size + len(tag) + 1 <= 480:
+                tags.append(tag)
+                size += len(tag) + 1
+        text = "\n".join(line for line in text.splitlines() if not line.startswith("Tags:"))
+    else:
+        tags = [w.lstrip("#") for w in text.split() if w.startswith("#")][:15]
     return title, text[:4900], tags
 
 
