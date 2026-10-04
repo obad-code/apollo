@@ -45,9 +45,11 @@ HOUR = int(os.environ.get("SHORTS_HOUR") or 13)
 
 POSES = ("stand", "wave", "point", "think", "shock", "run", "cheer", "sad", "shrug")
 CAMS = ("close", "push", "fisheye", "pull", "shake", "pan", "wide")
+import shorts_art
 import shorts_hero
 import shorts_scenes
 BGS = ("none",) + shorts_scenes.NAMES
+IMAGES = os.environ.get("SHORTS_IMAGES", "").strip().lower() == "gemini"       # a Gemini picture per scene (paid)
 STYLE = (os.environ.get("SHORTS_STYLE") or "vector").strip().lower()      # vector (flat, cel-shaded) or ink (pencil)
 GRADES = shorts_hero.GRADES
 SIDES = ("none",) + shorts_hero.SIDES
@@ -141,7 +143,7 @@ def ask_script(kind, topic="", think=None, world=""):
     if think is None:
         import lyla
         notes = style_notes()
-        text, _brain = lyla.think(prompt, SYSTEM + (f" The channel owner's standing instructions, always follow them: {notes}" if notes else ""))
+        text, _brain = lyla.think(prompt, (SYSTEM.replace("9 to 12 scenes", "6 to 8 scenes") if IMAGES else SYSTEM) + (f" The channel owner's standing instructions, always follow them: {notes}" if notes else ""))
     else:
         text = think(prompt)
     found = re.search(r"\{.*\}", text or "", re.S)
@@ -601,6 +603,18 @@ def frame(scene, t, progress, title):
     """One picture of `scene`, `t` seconds in, `progress` 0..1 through its words."""
     from PIL import Image, ImageDraw
     pose = scene["pose"]
+    art = scene.get("_art")
+    if art:                                   # a Gemini picture: just move the camera over it
+        key = ("art", art)
+        if key not in _cache:
+            _cache[key] = shorts_art.fits(art, (int(W * SS), int(H * SS)))
+        world = _cache[key].copy()
+        z, fx, fy, bulge = camera(scene.get("cam", "wide"), t, progress, (W / 2, 820), (W / 2, 1000))
+        z = 1.0 + (z - 1.0) * 0.5
+        cw, ch = W / z, H / z
+        left = min(max(fx - cw / 2, 0), W - cw)
+        top = min(max(fy - ch / 2, 0), H - ch)
+        return _caption(world.resize((W, H), Image.BILINEAR, box=(left * SS, top * SS, (left + cw) * SS, (top + ch) * SS)), scene, progress, title)
     world = _background(pose, (int(W * SS), int(H * SS)))
     raw = ImageDraw.Draw(world)
     d = Pen(raw, SS, seed=int(t * 6))
@@ -638,6 +652,11 @@ def frame(scene, t, progress, title):
             pass
     if scene.get("grade") and STYLE == "vector":
         img = shorts_hero.grade(img, scene["grade"])
+    return _caption(img, scene, progress, title)
+
+
+def _caption(img, scene, progress, title):
+    from PIL import Image, ImageDraw
     # the caption sits on the screen, never zoomed: calm ink type, the spoken words dark
     d = ImageDraw.Draw(img)
     big, small = _font(78), _font(34)
@@ -699,6 +718,28 @@ def _pad(audio, out):
     return out
 
 
+IMAGE_MAX = int(os.environ.get("SHORTS_IMAGE_MAX") or 12)
+
+
+def _pictures(scenes, hero, folder, step):
+    """A Gemini picture per scene. Stops for good on a quota or billing error; one scene that
+    fails is simply drawn the usual way."""
+    made = 0
+    for i, scene in enumerate(scenes):
+        if made >= IMAGE_MAX:
+            break
+        step(f"Picture {i + 1} of {len(scenes)} (Gemini)")
+        try:
+            scene["_art"] = shorts_art.generate(scene, hero, folder)
+            made += 1
+        except Exception as e:  # noqa: BLE001
+            text = str(e)
+            log.info("Gemini picture %d failed: %s", i + 1, text[:200])
+            if any(k in text for k in ("429", "RESOURCE_EXHAUSTED", "billing", "PERMISSION_DENIED", "limit: 0", "quota")):
+                step("Gemini pictures are not available on this key (billing or quota) - drawing the rest myself")
+                break
+
+
 def _with_sound(padded, scene, first, work):
     """The voice with the sound of the place and the accents on the cut; the bare voice if numpy is missing."""
     try:
@@ -720,8 +761,11 @@ def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
     work = work or tempfile.mkdtemp(prefix="short-")
     parts = []
     hero = shorts_hero.hero_for(script.get("title", "") or work)          # picked once, locked for the whole video
-    for i, scene in enumerate(script["scenes"]):
+    for scene in script["scenes"]:
         scene["_hero"] = hero
+    if IMAGES:
+        _pictures(script["scenes"], hero, os.path.join(work, "art"), step)
+    for i, scene in enumerate(script["scenes"]):
         step(f"Scene {i + 1} of {len(script['scenes'])}: voice and drawing")
         audio = os.path.join(work, f"s{i}.mp3")
         speak_fn(scene["say"], audio)
