@@ -37,6 +37,7 @@ VOICE = os.environ.get("SHORTS_VOICE") or ("ar-SA-HamedNeural" if LANG == "ar" e
 HOUR = int(os.environ.get("SHORTS_HOUR") or 13)
 
 POSES = ("stand", "wave", "point", "think", "shock", "run", "cheer", "sad", "shrug")
+CAMS = ("close", "push", "fisheye", "pull", "shake", "pan", "wide")
 PROPS = ("none", "question", "exclaim", "bulb", "money", "clock", "skull", "heart", "earth", "fire")
 
 SYSTEM = (
@@ -45,7 +46,9 @@ SYSTEM = (
     "music, nothing indecent, nothing against Islam. Answer ONLY with JSON: "
     '{"title": "...", "description": "...", "hashtags": ["#..."], "scenes": [{"say": '
     '"what the narrator says", "caption": "3-6 key words", "pose": one of '
-    + json.dumps(POSES) + ', "prop": one of ' + json.dumps(PROPS) + "}]} with 6 to 9 scenes.")
+    + json.dumps(POSES) + ', "prop": one of ' + json.dumps(PROPS) + ', "cam": one of ' + json.dumps(CAMS)
+    + "}]} with 6 to 9 scenes. The camera must keep moving: open on a close-up or fisheye "
+    "for the hook, never the same cam twice in a row, shake for shocks.")
 
 
 def kind_for(day):
@@ -73,6 +76,9 @@ def ask_script(kind, topic="", think=None):
         s["pose"] = s.get("pose") if s.get("pose") in POSES else "stand"
         s["prop"] = s.get("prop") if s.get("prop") in PROPS else "none"
         s["caption"] = str(s.get("caption") or s["say"])[:60]
+    for i, s in enumerate(scenes):
+        if s.get("cam") not in CAMS or (i and s["cam"] == scenes[i - 1]["cam"]):
+            s["cam"] = CAMS[i % len(CAMS)]
     data["scenes"] = scenes
     return data
 
@@ -90,20 +96,76 @@ def _font(size):
     return ImageFont.load_default()
 
 
+SS = 1.25         # the world is drawn this much bigger, so a close-up stays sharp
+INK = (24, 24, 30)
+SKIN = (255, 255, 255)
+# background gradients (top, bottom) and ray colour, by mood
+LOOKS = {
+    "shock": ((255, 120, 70), (200, 40, 60), (255, 170, 110)),
+    "cheer": ((255, 214, 80), (255, 140, 60), (255, 236, 140)),
+    "sad": ((120, 140, 190), (50, 60, 100), (140, 160, 205)),
+    "think": ((150, 110, 230), (60, 40, 140), (175, 140, 245)),
+    "run": ((90, 210, 200), (30, 120, 150), (130, 230, 220)),
+    "point": ((100, 190, 255), (40, 90, 200), (140, 210, 255)),
+    "wave": ((110, 220, 150), (30, 140, 110), (150, 235, 180)),
+    "shrug": ((250, 170, 190), (170, 70, 130), (255, 190, 205)),
+    "stand": ((120, 200, 255), (60, 100, 220), (150, 215, 255)),
+}
+_cache = {}
+
+
+class Pen:
+    """An ImageDraw that scales everything by k, so the drawing code stays in
+    plain 1080x1920 numbers while the picture is drawn bigger."""
+
+    def __init__(self, d, k):
+        self.d, self.k = d, k
+
+    def _p(self, pts):
+        if pts and isinstance(pts[0], (int, float)):
+            pts = list(zip(pts[::2], pts[1::2]))
+        return [(x * self.k, y * self.k) for x, y in pts]
+
+    def _w(self, width):
+        return max(1, round(width * self.k))
+
+    def line(self, pts, fill=None, width=1):
+        pts = self._p(pts)
+        w = self._w(width)
+        self.d.line(pts, fill=fill, width=w)
+        r = w / 2 - 0.5    # round caps: a stick man is made of sausages, not planks
+        for x, y in pts:
+            self.d.ellipse([x - r, y - r, x + r, y + r], fill=fill)
+
+    def ellipse(self, box, fill=None, outline=None, width=1):
+        (x0, y0), (x1, y1) = self._p([(box[0], box[1]), (box[2], box[3])])
+        self.d.ellipse([x0, y0, x1, y1], fill=fill, outline=outline, width=self._w(width))
+
+    def arc(self, box, start, end, fill=None, width=1):
+        (x0, y0), (x1, y1) = self._p([(box[0], box[1]), (box[2], box[3])])
+        self.d.arc([x0, y0, x1, y1], start, end, fill=fill, width=self._w(width))
+
+    def text(self, xy, text, font=None, fill=None, anchor=None):
+        (x, y), = self._p([xy])
+        if hasattr(font, "font_variant"):
+            font = font.font_variant(size=max(1, int(font.size * self.k)))
+        self.d.text((x, y), text, font=font, fill=fill, anchor=anchor)
+
+
 def limbs(pose, t):
     """Angles (degrees from straight down) of left arm, right arm, left leg,
-    right leg, and a jump in px, for `pose` at time `t` seconds."""
-    s = math.sin(t * 6.0)
+    right leg, and a small hop in px, for `pose` at time `t` seconds."""
+    s = math.sin(t * 5.0)
     table = {
-        "stand": (15 + 3 * s, -15 - 3 * s, 8, -8, 0),
-        "wave": (15, -150 + 25 * s, 8, -8, 0),
-        "point": (15, -90, 8, -8, 0),
-        "think": (20, -150, 8, -8, 0),
-        "shock": (140 + 10 * s, -140 - 10 * s, 25, -25, abs(math.sin(t * 9)) * 40),
-        "run": (50 * s, -50 * s, 35 * s, -35 * s, abs(s) * 18),
-        "cheer": (160 + 8 * s, -160 - 8 * s, 15, -15, abs(math.sin(t * 7)) * 30),
-        "sad": (5, -5, 4, -4, 0),
-        "shrug": (70, -70, 8, -8, 0),
+        "stand": (18 + 4 * s, -18 - 4 * s, 7, -7, 0),
+        "wave": (18, -140 + 28 * math.sin(t * 8), 7, -7, 0),
+        "point": (18, -95 + 4 * s, 7, -7, 0),
+        "think": (18, -155, 7, -7, 0),
+        "shock": (125 + 6 * s, -125 - 6 * s, 16, -16, abs(math.sin(t * 7)) * 14),
+        "run": (45 * s, -45 * s, 30 * s, -30 * s, abs(s) * 8),
+        "cheer": (150 + 8 * s, -150 - 8 * s, 12, -12, abs(math.sin(t * 6)) * 14),
+        "sad": (6, -6, 4, -4, 0),
+        "shrug": (65 + 4 * s, -65 - 4 * s, 7, -7, 0),
     }
     return table.get(pose, table["stand"])
 
@@ -111,45 +173,53 @@ def limbs(pose, t):
 def _line(d, a, length, angle, width=14):
     rad = math.radians(angle)
     b = (a[0] + length * math.sin(rad), a[1] + length * math.cos(rad))
-    d.line([a, b], fill=(20, 20, 24), width=width)
+    d.line([a, b], fill=INK, width=width)
     return b
 
 
-def draw_man(d, cx, ground, pose, t):
+def draw_man(d, cx, ground, pose, t, talking=False):
     la, ra, ll, rl, jump = limbs(pose, t)
     breathe = math.sin(t * 2.2) * 4
     hip = (cx, ground - 300 - jump)
     neck = (cx, hip[1] - 260 + breathe)
-    tilt = -8 if pose == "sad" else 0
-    head_c = (neck[0], neck[1] - 75 + (12 if pose == "sad" else 0))
-    d.line([hip, neck], fill=(20, 20, 24), width=16)
-    d.ellipse([head_c[0] - 70, head_c[1] - 70, head_c[0] + 70, head_c[1] + 70], outline=(20, 20, 24), width=14, fill="white")
-    # eyes: a blink now and then; wide when shocked
-    shut = (t % 3.3) < 0.12
-    ew = 14 if pose == "shock" else 9
-    for side in (-1, 1):
-        ex, ey = head_c[0] + side * 24, head_c[1] - 6 + tilt
-        if shut:
-            d.line([ex - ew, ey, ex + ew, ey], fill=(20, 20, 24), width=6)
-        else:
-            d.ellipse([ex - ew, ey - ew, ex + ew, ey + ew], fill=(20, 20, 24))
-    mouth = {"shock": "o", "sad": "frown", "cheer": "smile", "wave": "smile"}.get(pose, "line")
-    mx, my = head_c[0], head_c[1] + 30
-    if mouth == "o":
-        d.ellipse([mx - 14, my - 10, mx + 14, my + 22], outline=(20, 20, 24), width=6)
-    elif mouth == "smile":
-        d.arc([mx - 28, my - 24, mx + 28, my + 14], 20, 160, fill=(20, 20, 24), width=6)
-    elif mouth == "frown":
-        d.arc([mx - 26, my + 2, mx + 26, my + 34], 200, 340, fill=(20, 20, 24), width=6)
-    else:
-        d.line([mx - 18, my + 4, mx + 18, my + 4], fill=(20, 20, 24), width=6)
+    sad = pose == "sad"
+    head_c = (neck[0] + math.sin(t * 1.6) * 6, neck[1] - 80 + (12 if sad else 0))
+    d.line([hip, neck], fill=INK, width=18)
     shoulder = (neck[0], neck[1] + 30)
     for angle in (la, ra):
-        elbow = _line(d, shoulder, 120, angle)
-        _line(d, elbow, 110, angle * 0.8)
+        elbow = _line(d, shoulder, 120, angle, 16)
+        _line(d, elbow, 110, angle * 0.8, 16)
     for angle in (ll, rl):
-        knee = _line(d, hip, 150, angle, 16)
-        _line(d, knee, 140, angle * 0.6, 16)
+        knee = _line(d, hip, 150, angle, 18)
+        _line(d, knee, 140, angle * 0.6, 18)
+    r = 82
+    d.ellipse([head_c[0] - r, head_c[1] - r, head_c[0] + r, head_c[1] + r], outline=INK, width=14, fill=SKIN)
+    # eyes: big, with pupils that look about; a blink now and then; huge when shocked
+    shut = (t % 3.3) < 0.12
+    ew = 20 if pose == "shock" else 15
+    look = math.sin(t * 0.9) * 5
+    for side in (-1, 1):
+        ex, ey = head_c[0] + side * 31, head_c[1] - 8
+        if shut:
+            d.line([ex - ew, ey, ex + ew, ey], fill=INK, width=6)
+        else:
+            d.ellipse([ex - ew, ey - ew, ex + ew, ey + ew], fill="white", outline=INK, width=5)
+            pr = 8 if pose == "shock" else 10
+            d.ellipse([ex + look - pr, ey - pr, ex + look + pr, ey + pr], fill=INK)
+        # brows say the mood
+        tilt = {"shock": -16, "sad": 14, "think": 8, "cheer": -6}.get(pose, 0) * side
+        d.line([ex - 18, ey - 30 + tilt * 0.6, ex + 18, ey - 30 - tilt * 0.6], fill=INK, width=7)
+    mx, my = head_c[0], head_c[1] + 38
+    open_ = abs(math.sin(t * 13)) if talking else 0
+    if pose == "shock" or (talking and open_ > 0.45):
+        h = 14 + 22 * (open_ if talking else 1)
+        d.ellipse([mx - 18, my - 6, mx + 18, my - 6 + h], fill=INK)
+    elif pose in ("cheer", "wave"):
+        d.arc([mx - 32, my - 28, mx + 32, my + 16], 20, 160, fill=INK, width=7)
+    elif sad:
+        d.arc([mx - 28, my + 2, mx + 28, my + 36], 200, 340, fill=INK, width=7)
+    else:
+        d.line([mx - 20, my + 4, mx + 20, my + 4], fill=INK, width=7)
     return head_c
 
 
@@ -161,45 +231,119 @@ def draw_prop(d, prop, x, y, t, font):
     glyph = {"question": "?", "exclaim": "!", "money": "$", "skull": "☠", "heart": "♥",
              "earth": "◍", "clock": "◷", "fire": "▲", "bulb": "✦"}[prop]
     colour = {"money": (30, 160, 80), "heart": (220, 50, 70), "fire": (240, 110, 30),
-              "bulb": (245, 180, 0), "exclaim": (230, 60, 60)}.get(prop, (20, 20, 24))
-    d.ellipse([x - 95, y - 95, x + 95, y + 95], fill=(245, 245, 247), outline=colour, width=8)
+              "bulb": (245, 180, 0), "exclaim": (230, 60, 60)}.get(prop, INK)
+    d.ellipse([x - 95, y - 95, x + 95, y + 95], fill=(250, 250, 252), outline=colour, width=9)
     d.text((x, y), glyph, font=font, fill=colour, anchor="mm")
+
+
+def _background(pose, size):
+    key = (pose, size)
+    if key not in _cache:
+        from PIL import Image, ImageOps
+        top, bottom, _ = LOOKS.get(pose, LOOKS["stand"])
+        _cache[key] = ImageOps.colorize(Image.linear_gradient("L").resize(size), top, bottom)
+    return _cache[key].copy()
+
+
+def _ease(x):
+    x = max(0.0, min(1.0, x))
+    return x * x * (3 - 2 * x)
+
+
+def camera(cam, t, p, head, body):
+    """Where the camera looks: (zoom, focus x, focus y, bulge), in 1080x1920 numbers."""
+    punch = 1 + 0.30 * _ease(1 - t / 0.28) if t < 0.28 else 1      # every cut starts with a punch-in
+    bulge = 0.0
+    if cam == "close":
+        z, f = 1.9 + 0.35 * _ease(p), (head[0], head[1] + 30)
+    elif cam == "push":
+        z, f = 1.0 + 0.55 * _ease(p), (body[0], body[1] + (head[1] - body[1]) * _ease(p))
+    elif cam == "pull":
+        z, f = 2.0 - 0.95 * _ease(p), (head[0], head[1] + 120 * _ease(p))
+    elif cam == "fisheye":
+        z, f, bulge = 1.55 + 0.2 * math.sin(t * 2), (head[0], head[1] + 40), 0.55 + 0.15 * math.sin(t * 3)
+    elif cam == "shake":
+        z, f = 1.3, (body[0] + math.sin(t * 47) * 16, body[1] + math.cos(t * 39) * 16)
+    elif cam == "pan":
+        z, f = 1.45, (W * (0.3 + 0.4 * _ease(p)), body[1] - 60)
+    else:
+        z, f = 1.0, (W / 2, H / 2)
+    return z * punch, f[0], f[1], bulge
+
+
+def _bulge(img, s):
+    """A fisheye: the middle swells, the edges hold."""
+    import numpy as np
+    from PIL import Image
+    s = round(s, 1)
+    key = ("bulge", s)
+    if key not in _cache:
+        ys, xs = np.mgrid[0:H, 0:W].astype(np.float32)
+        dx, dy = (xs - W / 2) / (W / 2), (ys - H / 2) / (H / 2)
+        r2 = np.clip((dx * dx + dy * dy) / 2, 0, 1)
+        k = 1 - s * (1 - r2)
+        _cache[key] = (np.clip(W / 2 + dx * k * W / 2, 0, W - 1).astype(np.int32),
+                       np.clip(H / 2 + dy * k * H / 2, 0, H - 1).astype(np.int32))
+    sx, sy = _cache[key]
+    return Image.fromarray(np.asarray(img)[sy, sx])
 
 
 def frame(scene, t, progress, title):
     """One picture of `scene`, `t` seconds in, `progress` 0..1 through its words."""
     from PIL import Image, ImageDraw
-    img = Image.new("RGB", (W, H), "white")
-    d = ImageDraw.Draw(img)
-    big, mid, small = _font(92), _font(64), _font(40)
-    # a soft floor, and the stick man walking a little across it
+    pose = scene["pose"]
+    world = _background(pose, (int(W * SS), int(H * SS)))
+    raw = ImageDraw.Draw(world)
+    # light rays behind him when the mood is loud
+    if pose in ("shock", "cheer") or scene["prop"] in ("fire", "money"):
+        ray = LOOKS.get(pose, LOOKS["stand"])[2]
+        ox, oy = W / 2 * SS, 760 * SS
+        for i in range(14):
+            a0 = t * 0.35 + i * (math.pi * 2 / 14)
+            a1 = a0 + math.pi / 14
+            raw.polygon([(ox, oy)] + [(ox + math.cos(a) * 2600 * SS, oy + math.sin(a) * 2600 * SS) for a in (a0, a1)], fill=ray)
+    d = Pen(raw, SS)
     ground = 1500
-    d.ellipse([W / 2 - 230, ground - 18, W / 2 + 230, ground + 18], fill=(236, 236, 240))
-    cx = W / 2 + math.sin(t * 0.8) * 30 + (min(t, 3) * 25 if scene["pose"] == "run" else 0)
-    head = draw_man(d, cx, ground, scene["pose"], t)
-    draw_prop(d, scene["prop"], head[0] + 260, head[1] - 60, t, _font(130))
-    # the caption: big, centred, words lighting up as they are said
+    shade = tuple(int(c * 0.55) for c in LOOKS.get(pose, LOOKS["stand"])[1])
+    d.ellipse([W / 2 - 240, ground - 20, W / 2 + 240, ground + 20], fill=shade)
+    cx = W / 2 + math.sin(t * 0.7) * 14
+    head = draw_man(d, cx, ground, pose, t, talking=progress < 1)
+    draw_prop(d, scene["prop"], head[0] + 215, head[1] - 150, t, _font(130))
+    # the camera: crop the big world to a window and scale it to the screen
+    z, fx, fy, bulge = camera(scene.get("cam", "wide"), t, progress, head, (cx, 1000))
+    cw, ch = W / z, H / z
+    left = min(max(fx - cw / 2, 0), W - cw)
+    top = min(max(fy - ch / 2, 0), H - ch)
+    img = world.resize((W, H), Image.BILINEAR, box=(left * SS, top * SS, (left + cw) * SS, (top + ch) * SS))
+    if bulge:
+        try:
+            img = _bulge(img, bulge)
+        except ImportError:
+            pass
+    # the caption sits on the screen, never zoomed: big, outlined, spoken words in yellow
+    d = ImageDraw.Draw(img)
+    big, small = _font(100), _font(38)
     words = scene["caption"].split()
     lit = max(1, math.ceil(len(words) * min(1.0, progress * 1.15)))
     lines, cur = [], []
     for w in words:
-        if len(" ".join(cur + [w])) > 16 and cur:
+        if len(" ".join(cur + [w])) > 15 and cur:
             lines.append(cur)
             cur = []
         cur.append(w)
     lines.append(cur)
-    y, n = 330, 0
+    y, n = 1560, 0
     rtl = LANG == "ar"
     for line in lines:
         text_w = d.textlength(" ".join(line), font=big)
         x = W / 2 - text_w / 2
         for w in (reversed(line) if rtl else line):
             n += 1
-            colour = (20, 20, 24) if n <= lit else (205, 205, 212)
-            d.text((x, y), w, font=big, fill=colour)
+            colour = (255, 221, 40) if n <= lit else (255, 255, 255)
+            d.text((x, y), w, font=big, fill=colour, stroke_width=9, stroke_fill=(15, 15, 20))
             x += d.textlength(w + " ", font=big)
-        y += 112
-    d.text((W / 2, 1780), title[:40], font=small, fill=(150, 150, 160), anchor="mm")
+        y += 120
+    d.text((W / 2, 1850), title[:40], font=small, fill=(255, 255, 255), anchor="mm", stroke_width=3, stroke_fill=(15, 15, 20))
     return img
 
 
