@@ -33,6 +33,7 @@ import { CrtTv } from './crttv.js';
 import { Digest } from './digest.js';
 import { Fixes } from './fixes.js';
 import { Board } from './board.js';
+import { IdeaView } from './ideaview.js';
 import { Embers } from './embers.js';
 import * as CrewPage from './crewpage.js';
 import { Ambient } from './ambient.js';
@@ -1749,6 +1750,30 @@ const PENDING_FOR = 45000;        // a card asked for and never delivered goes
 const BIG_W = 600, BIG_H = 200, BIG_PAD = 14;
 
 const bridge = () => (window.pywebview && window.pywebview.api) || null;
+/* Typing on the display. The window never takes focus on its own (it would steal the keyboard from
+ * whatever you work in), so a field you click into asks for the keyboard, and gives it back when you
+ * leave it. The board asks for it the whole time it is open. */
+const EDITABLE = 'input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=file]), textarea, [contenteditable="true"]';
+let keysHeld = false, keysTimer = null;
+function wantKeys(on) {
+  clearTimeout(keysTimer);
+  keysTimer = setTimeout(() => {
+    const want = on || $('board').classList.contains('on');
+    if (want === keysHeld) return;
+    keysHeld = want;
+    const api = bridge();
+    if (api && api.keyboard) api.keyboard(want);
+  }, on ? 0 : 250);
+}
+document.addEventListener('pointerdown', (e) => {
+  const field = e.target.closest(EDITABLE);
+  if (field) { wantKeys(true); setTimeout(() => { if (document.activeElement !== field) field.focus(); }, 60); }
+}, true);
+document.addEventListener('focusin', (e) => { if (e.target.closest(EDITABLE)) wantKeys(true); });
+document.addEventListener('focusout', (e) => { if (e.target.closest(EDITABLE)) wantKeys(false); });
+new MutationObserver(() => wantKeys($('board').classList.contains('on'))).observe($('board'), { attributes: true, attributeFilter: ['class'] });
+
+const ideaView = new IdeaView($('idea-view'), bridge);
 const digest = new Digest($('digest-btn'), $('digest'), bridge);
 const fixes = new Fixes($('fixes-btn'), $('fixes'), bridge);
 window.addEventListener('pywebviewready', () => { digest.check(); fixes.check(); });
@@ -2543,8 +2568,7 @@ function renderIdeas(data) {
       ${BULB}
       <p dir="auto">${esc(idea.text)}</p>
       <span>${esc(idea.age)}</span>
-      ${idea.theia ? `<button class="idea-theia${idea.theia.seen ? '' : ' new'}" data-theia="${i}" type="button">THEIA's read ›</button>
-        <div class="idea-read" hidden><p dir="auto"><b>${esc(idea.theia.summary)}</b></p>${mdLite(idea.theia.report)}</div>`
+      ${idea.theia ? `<button class="idea-theia${idea.theia.seen ? '' : ' new'}" data-open-idea="${esc(idea.id)}" type="button">THEIA's read ›</button>`
         : '<span class="idea-wait">THEIA is reading it…</span>'}
       <button data-idea="${esc(idea.id)}" title="Remove">×</button>
     </div>`).join('');
@@ -2566,13 +2590,11 @@ function renderIdeas(data) {
 
 /* Two clicks to take an idea off: the first asks, the second does it. */
 $('pane-ideas').addEventListener('click', (event) => {
-  const read = event.target.closest('[data-theia]');
-  if (read) {
-    const box = read.nextElementSibling;
-    box.hidden = !box.hidden;
-    read.classList.remove('new');
-    const api = window.pywebview && window.pywebview.api;
-    if (api && api.ideas_seen) api.ideas_seen();
+  // An idea opens across the whole screen, THEIA's read and a chat with her beside it.
+  const bulb = event.target.closest('.idea-bulb');
+  if (bulb && !event.target.closest('[data-idea]')) {
+    const id = bulb.querySelector('[data-idea]')?.dataset.idea;
+    if (id) { ideaView.open(id); sfx.play('expand'); }
     return;
   }
   const button = event.target.closest('[data-idea]');

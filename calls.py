@@ -2,8 +2,8 @@
 was made at; a week and a month later the price is looked at again and the
 call is marked right or wrong.
 
-    BUY / STRONG BUY   right if the price went up
-    AVOID / SELL       right if it went down
+    STRONG BUY / GOOD / DECENT   right if the price went up
+    WEAK / AVOID / SELL          right if it went down
     HOLD               right if it stayed within 5% either way
 
 The price at the mark is written down once, so a call's grade never changes
@@ -43,9 +43,9 @@ def save(rows, path=PATH):
 
 def side(verdict):
     v = str(verdict or "").upper()
-    if "BUY" in v:
+    if "BUY" in v or v in ("GOOD", "DECENT"):
         return "up"
-    if v in ("AVOID", "SELL", "TRIM", "PULL"):
+    if v in ("AVOID", "SELL", "TRIM", "PULL", "WEAK"):
         return "down"
     return "flat" if v else ""
 

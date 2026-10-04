@@ -26,7 +26,7 @@ def test_its_own_letters_are_bundled_with_their_licences():
 
 def test_the_desk_is_set_in_them():
     desk = block("#trading")
-    assert '"Thmanyah"' in desk and '"Martian Mono"' in desk
+    assert '"Inter"' in desk and '"Martian Mono"' in desk
     assert "font-family: var(--desk-words)" in desk
 
 

@@ -32,7 +32,7 @@ def test_the_letters_spell_the_name_and_the_first_o_is_failing():
 
 def test_set_in_melete_as_the_old_display_had_it():
     style = rule("#wordmark .letters")
-    assert '"Melete"' in style and '"IBM Plex Mono"' in style
+    assert '"Melete"' in style and '"Inter"' in style
     assert "font-size: 19px" in style
     assert "letter-spacing: 0.2em" in style
     assert "#FFF0CE" in style

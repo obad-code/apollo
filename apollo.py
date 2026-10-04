@@ -536,6 +536,22 @@ class Overlay:
         _user32.ShowWindow(self.hwnd, win32con.SW_SHOWNOACTIVATE)
         self.set_alpha(ALPHA.get(mode, 255))
 
+    def set_keyboard(self, on):
+        """Let the display take the keyboard while you type in it (a project's name, a note on a
+        board, a fix for Q), and give it back after. At every other moment it stays NOACTIVATE,
+        so it never steals focus from what you are working in."""
+        if not self.hwnd:
+            return False
+        style = win32gui.GetWindowLong(self.hwnd, GWL_EXSTYLE)
+        style = (style & ~WS_EX_NOACTIVATE) if on else (style | WS_EX_NOACTIVATE)
+        _user32.SetWindowLongPtrW(self.hwnd, GWL_EXSTYLE, style)
+        if on:
+            try:
+                _user32.SetForegroundWindow(self.hwnd)
+            except Exception:  # noqa: BLE001 - Windows may refuse; the click usually makes it allowed
+                pass
+        return True
+
     def hide_page(self):
         if self.hwnd:
             _user32.ShowWindow(self.hwnd, win32con.SW_HIDE)
@@ -1197,6 +1213,13 @@ class Api:
             return {"ok": False, "error": str(e)}
 
     # -- your projects and their boards (myprojects.py) --
+    def keyboard(self, on):
+        """The page asks for the keyboard while a field is being typed in."""
+        app = self._app
+        if app is None or getattr(app, "overlay", None) is None:
+            return False
+        return app.overlay.set_keyboard(bool(on))
+
     def project_add(self, name, about=""):
         import myprojects
         try:
@@ -1258,6 +1281,24 @@ class Api:
         myprojects.seen(str(pid))
         self._poke("projects")
         return True
+
+    def idea(self, idea_id):
+        import ideas
+        return ideas.get(str(idea_id))
+
+    def idea_analyse(self, idea_id):
+        import ideas
+        try:
+            return {"ok": True, "idea": ideas.analyse_now(str(idea_id))}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": str(e)}
+
+    def idea_chat(self, idea_id, message):
+        import ideas
+        try:
+            return {"ok": True, "reply": ideas.chat(str(idea_id), message)}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": str(e)}
 
     def ideas_seen(self):
         import ideas

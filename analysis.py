@@ -25,9 +25,10 @@ _cache = {}
 # (The first version gave it from +4, and over half of the big names got it - analysts' own
 # optimism and a few easy greens were enough. Now it takes +6, and a price already above the
 # analysts' target can never be better than HOLD.)
-VERDICTS = [(6, "STRONG BUY", "BUY"), (3, "BUY", "BUY"), (0, "HOLD", "HOLD")]
-ORDER = ["AVOID", "HOLD", "BUY", "STRONG BUY"]
-RULES = 2          # bumped whenever the rules change, so a new rule is never told as a stock's "call changed"
+# Six grades, so a good stock is not lumped in with a merely decent one, nor a weak one with a broken one.
+VERDICTS = [(6, "STRONG BUY", "BUY"), (4, "GOOD", "BUY"), (2, "DECENT", "BUY"), (0, "HOLD", "HOLD"), (-2, "WEAK", "HOLD")]
+ORDER = ["AVOID", "WEAK", "HOLD", "DECENT", "GOOD", "STRONG BUY"]
+RULES = 3          # bumped whenever the rules change, so a new rule is never told as a stock's "call changed"
 
 
 def call(score):
@@ -46,14 +47,14 @@ def verdict(score, n):
     def cap(top, why):
         nonlocal words, tone
         if ORDER.index(words) > ORDER.index(top):
-            words, tone = top, ("HOLD" if top == "HOLD" else "BUY")
+            words, tone = top, ("HOLD" if top in ("HOLD", "WEAK") else "BUY")
             notes.append(f"Held at {top}: {why}")
 
     if (n.get("upside") is not None) and n["upside"] < 0:
         cap("HOLD", "the price is already above the analysts' target")
     pe, fpe = n.get("pe"), n.get("forward_pe")
     if (pe is not None and pe > 100) or (fpe is not None and fpe > 60):
-        cap("BUY", "the price assumes years of perfect growth")
+        cap("GOOD", "the price assumes years of perfect growth")
     return words, tone, notes
 
 

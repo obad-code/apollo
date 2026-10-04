@@ -448,7 +448,8 @@ class Watcher:
                 continue
             story = {"title": f"{symbol}: {before} → {verdict}", "summary": why,
                      "source": "Apollo's count", "link": "", "when": now}
-            tone = "SELL" if verdict == "AVOID" else "BUY" if "BUY" in verdict else "HOLD"
+            tone = ("SELL" if verdict == "AVOID" else "BUY" if verdict in ("STRONG BUY", "GOOD", "DECENT", "BUY")
+                    else "HOLD")
             alert = {"kind": "verdict", "story": story, "score": THRESHOLD, "why": [why],
                      "tickers": [symbol], "explained": f"ACTION: {tone} {symbol}\nSUMMARY: {why}",
                      "call": {"action": tone, "ticker": symbol, "summary": f"{before} → {verdict}. {why}",
@@ -503,7 +504,7 @@ def _verdicts(watch):
         except Exception:  # noqa: BLE001
             continue
         if a.get("ok"):
-            reasons = (a.get("green") if "BUY" in a["verdict"] else a.get("red")) or a.get("green") or [""]
+            reasons = (a.get("green") if a.get("tone") == "BUY" else a.get("red")) or a.get("green") or [""]
             out.append((a["symbol"], a["verdict"], reasons[0]))
             try:                                  # kept, so the calls can be graded later (calls.py)
                 import calls

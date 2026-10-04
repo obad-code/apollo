@@ -34,7 +34,7 @@ def test_an_extreme_price_holds_a_buy_at_buy_and_a_downtrend_is_a_red_flag():
          "upside": 20, "price": 100, "avg200": 90, "pe": 160, "forward_pe": 70}
     green, red = analysis.flags(n)
     words, _tone, why = analysis.verdict(len(green) - len(red), n)
-    assert words in ("BUY", "HOLD") and why
+    assert words in ("GOOD", "DECENT", "HOLD") and why
     _g, r = analysis.flags({"price": 80, "avg200": 100})
     assert any("Downtrend" in x for x in r)
 
@@ -42,3 +42,9 @@ def test_an_extreme_price_holds_a_buy_at_buy_and_a_downtrend_is_a_red_flag():
 def test_the_analysts_never_count_twice():
     g, _r = analysis.flags({"rating": 1.2, "upside": 40})
     assert len(g) == 1 and "rating 1.2" in g[0] and "target 40%" in g[0]
+
+
+def test_six_grades_from_the_score():
+    got = [analysis.call(s)[0] for s in (7, 6, 5, 4, 3, 2, 1, 0, -1, -2, -3)]
+    assert got == ["STRONG BUY", "STRONG BUY", "GOOD", "GOOD", "DECENT", "DECENT", "HOLD", "HOLD",
+                   "WEAK", "WEAK", "AVOID"]

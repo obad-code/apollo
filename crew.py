@@ -79,7 +79,7 @@ MONEYPENNY_SYSTEM = (
     "members of Congress and traders are doing with it; the news and the "
     "catalysts coming up.\n"
     "Then, for each stock:\n"
-    "- VERDICT: one of STRONG BUY, BUY, HOLD, TRIM, SELL - and CONFIDENCE: low, "
+    "- VERDICT: one of STRONG BUY, GOOD, DECENT, HOLD, WEAK, AVOID - and CONFIDENCE: low, "
     "medium or high.\n"
     "- WHY BUY: the reasons for it.\n"
     "- RED FLAGS: the reasons not to buy, or to take money out - debt, falling "

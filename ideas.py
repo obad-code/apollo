@@ -127,3 +127,65 @@ def waiting():
     """Ideas THEIA has not analysed yet (for a catch-up at start)."""
     with _lock:
         return [i for i in _read() if not i.get("theia")]
+
+
+# -- talking an idea through with THEIA -------------------------------------------------------
+
+CHAT = (
+    "You are THEIA, the user's analyst, talking an idea of theirs through with them. You have "
+    "already analysed it (below). Answer what they ask - think with them, be concrete and honest, "
+    "push back when something is weak, suggest the next step. Short: a few sentences or a few "
+    "bullets. Reply in the language and dialect they write in (Gulf Arabic if Arabic).")
+
+
+def get(idea_id):
+    with _lock:
+        return next((i for i in _read() if i.get("id") == idea_id), None)
+
+
+def _save_idea(idea):
+    with _lock:
+        items = _read()
+        for n, i in enumerate(items):
+            if i.get("id") == idea["id"]:
+                items[n] = idea
+                _write(items)
+                return True
+    return False
+
+
+def analyse_now(idea_id, think=None):
+    """THEIA's read, now, while you wait - for an idea she has not got to yet."""
+    idea = get(idea_id)
+    if idea is None:
+        raise ValueError("That idea is gone.")
+    if think is None:
+        import crew
+        think = lambda prompt: crew.thinker(crew.THEIA_SYSTEM, True)(prompt)[0]  # noqa: E731
+    import lyla
+    summary, report = lyla.split(think(THEIA_TASK.format(text=idea["text"])))
+    attach(idea_id, summary, report)
+    return get(idea_id)
+
+
+def chat(idea_id, message, think=None):
+    """One turn of your conversation with THEIA about an idea. Returns her reply."""
+    message = " ".join(str(message or "").split())[:2000]
+    idea = get(idea_id)
+    if idea is None or not message:
+        raise ValueError("Nothing to answer.")
+    talk = idea.get("chat", [])[-16:]
+    read = idea.get("theia") or {}
+    prompt = (f"Their idea: {idea['text']}\n\nYour analysis of it:\n{read.get('summary', '')}\n{read.get('report', '')[:6000]}\n\n"
+              "The conversation so far:\n" + "\n".join(f"{'Them' if m['who'] == 'you' else 'You'}: {m['text']}" for m in talk)
+              + f"\n\nThem now: {message}")
+    if think is None:
+        import lyla
+        think = lambda p: lyla.ask_gemini(p, CHAT)  # noqa: E731
+    reply = (think(prompt) or "").strip() or "I need a moment - ask me again."
+    now = time.time()
+    idea = get(idea_id) or idea
+    idea["chat"] = (idea.get("chat", []) + [{"who": "you", "text": message, "at": now},
+                                            {"who": "theia", "text": reply[:4000], "at": now}])[-60:]
+    _save_idea(idea)
+    return reply

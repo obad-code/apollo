@@ -56,5 +56,5 @@ def test_no_dot_pulses_without_something_live():
 
 def test_the_desk_is_in_apollos_own_letters():
     assert "Space Grotesk" not in CSS
-    assert '"Thmanyah"' in rule("#trading")
+    assert '"Inter"' in rule("#trading")
     assert not (FULL / "fonts" / "space-grotesk").exists()
