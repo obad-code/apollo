@@ -20,6 +20,7 @@ SHORTS_LANG=ar for Arabic (default English); SHORTS_VOICE to pick a voice.
 """
 
 import datetime as dt
+import functools
 import json
 import logging
 import math
@@ -34,11 +35,12 @@ log = logging.getLogger("apollo.shorts")
 W, H, FPS = 1080, 1920, 15
 LANG = (os.environ.get("SHORTS_LANG") or "en").lower()
 VOICE = os.environ.get("SHORTS_VOICE") or ("ar-SA-HamedNeural" if LANG == "ar" else "en-US-AndrewNeural")
+GLASSES = os.environ.get("SHORTS_GLASSES", "1").strip().lower() in ("1", "true", "yes", "on")
 HOUR = int(os.environ.get("SHORTS_HOUR") or 13)
 
 POSES = ("stand", "wave", "point", "think", "shock", "run", "cheer", "sad", "shrug")
 CAMS = ("close", "push", "fisheye", "pull", "shake", "pan", "wide")
-PROPS = ("none", "question", "exclaim", "bulb", "money", "clock", "skull", "heart", "earth", "fire")
+PROPS = ("none", "note", "question", "exclaim", "bulb", "money", "clock", "skull", "heart", "earth", "fire")
 
 SYSTEM = (
     "You write YouTube Shorts scripts for a stick-man animation channel. 35-50 seconds "
@@ -48,7 +50,8 @@ SYSTEM = (
     '"what the narrator says", "caption": "3-6 key words", "pose": one of '
     + json.dumps(POSES) + ', "prop": one of ' + json.dumps(PROPS) + ', "cam": one of ' + json.dumps(CAMS)
     + "}]} with 6 to 9 scenes. The camera must keep moving: open on a close-up or fisheye "
-    "for the hook, never the same cam twice in a row, shake for shocks.")
+    "for the hook, never the same cam twice in a row, shake for shocks. Use prop \"note\" "
+    "(he writes on a pad) for facts and explanations.")
 
 
 def kind_for(day):
@@ -85,6 +88,27 @@ def ask_script(kind, topic="", think=None):
 
 # -- drawing -------------------------------------------------------------------------
 
+SS = 1.25         # the world is drawn this much bigger, so a close-up stays sharp
+INK = (38, 36, 42)
+CREAM = (252, 249, 241)
+SHADE = (236, 233, 226)
+OL = 13           # the outline: thick and even, like a sticker
+# soft backgrounds (top, bottom, ray), by mood - pale, so the cream character and the colourful props pop
+LOOKS = {
+    "shock": ((255, 255, 255), (255, 224, 214), (255, 238, 228)),
+    "cheer": ((255, 255, 255), (255, 240, 190), (255, 247, 215)),
+    "sad": ((255, 255, 255), (214, 224, 244), (232, 238, 250)),
+    "think": ((255, 255, 255), (230, 222, 250), (240, 234, 252)),
+    "run": ((255, 255, 255), (214, 242, 236), (232, 248, 244)),
+    "point": ((255, 255, 255), (216, 234, 255), (232, 242, 255)),
+    "wave": ((255, 255, 255), (220, 246, 228), (236, 250, 240)),
+    "shrug": ((255, 255, 255), (252, 226, 236), (254, 238, 244)),
+    "stand": ((255, 255, 255), (232, 238, 248), (242, 246, 252)),
+}
+_cache = {}
+
+
+@functools.lru_cache(maxsize=16)
 def _font(size):
     from PIL import ImageFont
     here = os.path.dirname(os.path.abspath(__file__))
@@ -94,24 +118,6 @@ def _font(size):
         if os.path.exists(path):
             return ImageFont.truetype(path, size)
     return ImageFont.load_default()
-
-
-SS = 1.25         # the world is drawn this much bigger, so a close-up stays sharp
-INK = (24, 24, 30)
-SKIN = (255, 255, 255)
-# background gradients (top, bottom) and ray colour, by mood
-LOOKS = {
-    "shock": ((255, 120, 70), (200, 40, 60), (255, 170, 110)),
-    "cheer": ((255, 214, 80), (255, 140, 60), (255, 236, 140)),
-    "sad": ((120, 140, 190), (50, 60, 100), (140, 160, 205)),
-    "think": ((150, 110, 230), (60, 40, 140), (175, 140, 245)),
-    "run": ((90, 210, 200), (30, 120, 150), (130, 230, 220)),
-    "point": ((100, 190, 255), (40, 90, 200), (140, 210, 255)),
-    "wave": ((110, 220, 150), (30, 140, 110), (150, 235, 180)),
-    "shrug": ((250, 170, 190), (170, 70, 130), (255, 190, 205)),
-    "stand": ((120, 200, 255), (60, 100, 220), (150, 215, 255)),
-}
-_cache = {}
 
 
 class Pen:
@@ -133,7 +139,7 @@ class Pen:
         pts = self._p(pts)
         w = self._w(width)
         self.d.line(pts, fill=fill, width=w)
-        r = w / 2 - 0.5    # round caps: a stick man is made of sausages, not planks
+        r = w / 2 - 0.5    # round caps: every limb is a sausage, not a plank
         for x, y in pts:
             self.d.ellipse([x - r, y - r, x + r, y + r], fill=fill)
 
@@ -141,9 +147,19 @@ class Pen:
         (x0, y0), (x1, y1) = self._p([(box[0], box[1]), (box[2], box[3])])
         self.d.ellipse([x0, y0, x1, y1], fill=fill, outline=outline, width=self._w(width))
 
+    def rounded(self, box, radius, fill=None, outline=None, width=1):
+        (x0, y0), (x1, y1) = self._p([(box[0], box[1]), (box[2], box[3])])
+        self.d.rounded_rectangle([x0, y0, x1, y1], radius * self.k, fill=fill, outline=outline, width=self._w(width))
+
     def arc(self, box, start, end, fill=None, width=1):
         (x0, y0), (x1, y1) = self._p([(box[0], box[1]), (box[2], box[3])])
         self.d.arc([x0, y0, x1, y1], start, end, fill=fill, width=self._w(width))
+
+    def polygon(self, pts, fill=None, outline=None, width=1):
+        pts = self._p(pts)
+        self.d.polygon(pts, fill=fill)
+        if outline:
+            self.line(list(pts_back(pts, self.k)) + [pts_back(pts, self.k)[0]], fill=outline, width=width)
 
     def text(self, xy, text, font=None, fill=None, anchor=None):
         (x, y), = self._p([xy])
@@ -152,88 +168,203 @@ class Pen:
         self.d.text((x, y), text, font=font, fill=fill, anchor=anchor)
 
 
+def pts_back(pts, k):
+    return [(x / k, y / k) for x, y in pts]
+
+
 def limbs(pose, t):
-    """Angles (degrees from straight down) of left arm, right arm, left leg,
-    right leg, and a small hop in px, for `pose` at time `t` seconds."""
+    """Angles (degrees from straight down) of the +x arm, the -x arm, the +x leg,
+    the -x leg, and a small hop in px, for `pose` at time `t` seconds."""
     s = math.sin(t * 5.0)
     table = {
-        "stand": (18 + 4 * s, -18 - 4 * s, 7, -7, 0),
-        "wave": (18, -140 + 28 * math.sin(t * 8), 7, -7, 0),
-        "point": (18, -95 + 4 * s, 7, -7, 0),
-        "think": (18, -155, 7, -7, 0),
-        "shock": (125 + 6 * s, -125 - 6 * s, 16, -16, abs(math.sin(t * 7)) * 14),
-        "run": (45 * s, -45 * s, 30 * s, -30 * s, abs(s) * 8),
-        "cheer": (150 + 8 * s, -150 - 8 * s, 12, -12, abs(math.sin(t * 6)) * 14),
-        "sad": (6, -6, 4, -4, 0),
-        "shrug": (65 + 4 * s, -65 - 4 * s, 7, -7, 0),
+        "stand": (22 + 4 * s, -22 - 4 * s, 5, -5, 0),
+        "wave": (22, -140 + 26 * math.sin(t * 8), 5, -5, 0),
+        "point": (22, -100 + 4 * s, 5, -5, 0),
+        "think": (22, -150, 5, -5, 0),
+        "shock": (125 + 6 * s, -125 - 6 * s, 12, -12, abs(math.sin(t * 7)) * 14),
+        "run": (45 * s, -45 * s, 28 * s, -28 * s, abs(s) * 8),
+        "cheer": (150 + 8 * s, -150 - 8 * s, 10, -10, abs(math.sin(t * 6)) * 14),
+        "sad": (8, -8, 3, -3, 0),
+        "pleased": (22, -22, 5, -5, 0),
+        "shrug": (70 + 4 * s, -70 - 4 * s, 5, -5, 0),
     }
     return table.get(pose, table["stand"])
 
 
-def _line(d, a, length, angle, width=14):
+def _tip(a, length, angle):
     rad = math.radians(angle)
-    b = (a[0] + length * math.sin(rad), a[1] + length * math.cos(rad))
-    d.line([a, b], fill=INK, width=width)
-    return b
+    return (a[0] + length * math.sin(rad), a[1] + length * math.cos(rad))
 
 
-def draw_man(d, cx, ground, pose, t, talking=False):
+def _limb(d, pts, width):
+    """An outlined, filled limb through `pts` - the outline first, so joints merge."""
+    d.line(pts, fill=INK, width=width + 2 * OL)
+    d.line(pts, fill=CREAM, width=width)
+
+
+def _ball(d, c, r):
+    d.ellipse([c[0] - r - OL, c[1] - r - OL, c[0] + r + OL, c[1] + r + OL], fill=INK)
+    d.ellipse([c[0] - r, c[1] - r, c[0] + r, c[1] + r], fill=CREAM)
+
+
+def draw_man(d, cx, ground, pose, t, talking=False, prop="none", glasses=GLASSES):
     la, ra, ll, rl, jump = limbs(pose, t)
     breathe = math.sin(t * 2.2) * 4
-    hip = (cx, ground - 300 - jump)
-    neck = (cx, hip[1] - 260 + breathe)
-    sad = pose == "sad"
-    head_c = (neck[0] + math.sin(t * 1.6) * 6, neck[1] - 80 + (12 if sad else 0))
-    d.line([hip, neck], fill=INK, width=18)
-    shoulder = (neck[0], neck[1] + 30)
-    for angle in (la, ra):
-        elbow = _line(d, shoulder, 120, angle, 16)
-        _line(d, elbow, 110, angle * 0.8, 16)
-    for angle in (ll, rl):
-        knee = _line(d, hip, 150, angle, 18)
-        _line(d, knee, 140, angle * 0.6, 18)
-    r = 82
-    d.ellipse([head_c[0] - r, head_c[1] - r, head_c[0] + r, head_c[1] + r], outline=INK, width=14, fill=SKIN)
-    # eyes: big, with pupils that look about; a blink now and then; huge when shocked
-    shut = (t % 3.3) < 0.12
-    ew = 20 if pose == "shock" else 15
-    look = math.sin(t * 0.9) * 5
-    for side in (-1, 1):
-        ex, ey = head_c[0] + side * 31, head_c[1] - 8
-        if shut:
-            d.line([ex - ew, ey, ex + ew, ey], fill=INK, width=6)
-        else:
-            d.ellipse([ex - ew, ey - ew, ex + ew, ey + ew], fill="white", outline=INK, width=5)
-            pr = 8 if pose == "shock" else 10
-            d.ellipse([ex + look - pr, ey - pr, ex + look + pr, ey + pr], fill=INK)
-        # brows say the mood
-        tilt = {"shock": -16, "sad": 14, "think": 8, "cheer": -6}.get(pose, 0) * side
-        d.line([ex - 18, ey - 30 + tilt * 0.6, ex + 18, ey - 30 - tilt * 0.6], fill=INK, width=7)
-    mx, my = head_c[0], head_c[1] + 38
-    open_ = abs(math.sin(t * 13)) if talking else 0
-    if pose == "shock" or (talking and open_ > 0.45):
-        h = 14 + 22 * (open_ if talking else 1)
-        d.ellipse([mx - 18, my - 6, mx + 18, my - 6 + h], fill=INK)
-    elif pose in ("cheer", "wave"):
-        d.arc([mx - 32, my - 28, mx + 32, my + 16], 20, 160, fill=INK, width=7)
-    elif sad:
-        d.arc([mx - 28, my + 2, mx + 28, my + 36], 200, 340, fill=INK, width=7)
-    else:
-        d.line([mx - 20, my + 4, mx + 20, my + 4], fill=INK, width=7)
+    hip_y = ground - 215 - jump
+    sh_y = hip_y - 300 + breathe                       # shoulder line
+    # soft shadow on the floor
+    d.ellipse([cx - 230, ground - 22, cx + 230, ground + 26], fill=SHADE)
+    # legs and shoes
+    for side, ang in ((1, ll), (-1, rl)):
+        hip = (cx + side * 62, hip_y)
+        foot = _tip(hip, 190, ang)
+        _limb(d, [hip, foot], 54)
+        d.ellipse([foot[0] - 70 + side * 14 - OL, foot[1] - 22 - OL, foot[0] + 70 + side * 14 + OL, foot[1] + 38 + OL], fill=INK)
+        d.ellipse([foot[0] - 70 + side * 14, foot[1] - 22, foot[0] + 70 + side * 14, foot[1] + 38], fill=CREAM)
+    # the torso
+    d.rounded([cx - 125 - OL, sh_y - OL, cx + 125 + OL, hip_y + 40 + OL], 80, fill=INK)
+    d.rounded([cx - 125, sh_y, cx + 125, hip_y + 40], 80, fill=CREAM)
+    # the head: big, flat cream, a soft shade where it sits on the body
+    head_c = (cx + math.sin(t * 1.6) * 6, sh_y - 128 + (14 if pose == "sad" else 0))
+    d.ellipse([cx - 120, sh_y - 30, cx + 120, sh_y + 40], fill=SHADE)
+    r = 165
+    d.ellipse([head_c[0] - r - OL, head_c[1] - r - OL, head_c[0] + r + OL, head_c[1] + r + OL], fill=INK)
+    d.ellipse([head_c[0] - r, head_c[1] - r, head_c[0] + r, head_c[1] + r], fill=CREAM)
+    _face(d, head_c, pose, t, talking, glasses)
+    # arms in front, hands as fists; the prop is held in them
+    hands = {}
+    for side, ang in ((1, la), (-1, ra)):
+        sh = (cx + side * 118, sh_y + 55)
+        elbow = _tip(sh, 105, ang)
+        hand = _tip(elbow, 95, ang * 0.85 + (-side * 25 if pose in ("stand", "think", "point") else 0))
+        hands[side] = hand
+    # items first, so a fist closes over them
+    _hold(d, prop, hands, t)
+    for side, ang in ((1, la), (-1, ra)):
+        sh = (cx + side * 118, sh_y + 55)
+        elbow = _tip(sh, 105, ang)
+        _limb(d, [sh, elbow, hands[side]], 46)
+        _ball(d, hands[side], 33)
     return head_c
 
 
-def draw_prop(d, prop, x, y, t, font):
-    bob = math.sin(t * 3) * 12
-    y += bob
+def _face(d, head_c, pose, t, talking=False, glasses=GLASSES):
+    x, y = head_c
+    shut = (t % 3.3) < 0.12
+    big = pose == "shock"
+    look = math.sin(t * 0.9) * 5
+    for side in (-1, 1):
+        ex, ey = x + side * 58, y - 6
+        if shut:
+            d.line([ex - 18, ey, ex + 18, ey], fill=INK, width=8)
+        else:
+            w, h = (17, 30) if big else (13, 22)
+            d.ellipse([ex + look - w, ey - h, ex + look + w, ey + h], fill=INK)
+        lift = {"shock": -26, "sad": 0, "think": -10 if side > 0 else 6, "cheer": -14}.get(pose, 0)
+        slant = {"sad": -14, "shock": 0, "cheer": 0}.get(pose, 0 if pose == "pleased" else 16) * side * -1   # angry-ish by default, like the reference
+        d.line([ex - 26, ey - 52 + lift + slant, ex + 26, ey - 52 + lift - slant], fill=INK, width=10)
+    if glasses:
+        for side in (-1, 1):
+            gx, gy = x + side * 58, y - 6
+            d.ellipse([gx - 50, gy - 46, gx + 50, gy + 46], outline=INK, width=11, fill=None)
+            d.line([gx - 38, gy - 30, gx - 18, gy - 40], fill=(255, 255, 255), width=6)    # a glint
+        d.line([x - 10, y - 8, x + 10, y - 8], fill=INK, width=9)
+        d.line([x - 108, y - 14, x - 164, y - 30], fill=INK, width=9)
+        d.line([x + 108, y - 14, x + 164, y - 30], fill=INK, width=9)
+    mx, my = x, y + 62
+    open_ = abs(math.sin(t * 13)) if talking else 0
+    if big or (talking and open_ > 0.45):
+        h = 18 + 28 * (open_ if talking else 1)
+        d.ellipse([mx - 24, my - 8, mx + 24, my - 8 + h], fill=INK)
+    elif pose in ("cheer", "wave", "pleased"):
+        d.arc([mx - 44, my - 40, mx + 44, my + 22], 20, 160, fill=INK, width=9)
+    elif pose == "sad":
+        d.arc([mx - 38, my + 4, mx + 38, my + 50], 200, 340, fill=INK, width=9)
+    else:
+        d.arc([mx - 30, my - 4, mx + 30, my + 30], 200, 340, fill=INK, width=9)    # the little frown
+
+
+def _outlined(d, shape, *args, fill, width=OL - 3):
+    getattr(d, shape)(*args, fill=INK)
+
+
+def _hold(d, prop, hands, t):
+    """What he is holding or showing, drawn at his hands."""
     if prop == "none":
         return
-    glyph = {"question": "?", "exclaim": "!", "money": "$", "skull": "☠", "heart": "♥",
-             "earth": "◍", "clock": "◷", "fire": "▲", "bulb": "✦"}[prop]
-    colour = {"money": (30, 160, 80), "heart": (220, 50, 70), "fire": (240, 110, 30),
-              "bulb": (245, 180, 0), "exclaim": (230, 60, 60)}.get(prop, INK)
-    d.ellipse([x - 95, y - 95, x + 95, y + 95], fill=(250, 250, 252), outline=colour, width=9)
-    d.text((x, y), glyph, font=font, fill=colour, anchor="mm")
+    hx, hy = hands[1]
+    ox, oy = hands[-1]
+    f = _font(110)
+    bob = math.sin(t * 3) * 6
+    if prop == "note":                                   # a pencil and a pad, like the picture
+        pad = [(hx - 50, hy - 150), (hx + 95, hy - 135), (hx + 70, hy + 40), (hx - 70, hy + 25)]
+        d.polygon(pad, fill=(255, 239, 196), outline=INK, width=OL - 3)
+        a, b = (ox - 70, oy - 150), (ox + 55, oy + 25)
+        d.line([a, b], fill=INK, width=44 + 2 * (OL - 4))
+        d.line([a, b], fill=(246, 190, 40), width=44)
+        d.ellipse([a[0] - 26, a[1] - 26, a[0] + 26, a[1] + 26], fill=(238, 140, 120), outline=INK, width=OL - 4)
+        d.polygon([(b[0] - 20, b[1] - 4), (b[0] + 20, b[1] - 8), (b[0] + 18, b[1] + 44)], fill=(244, 214, 160), outline=INK, width=OL - 5)
+        return
+    cx, cy = hx + 10, hy - 95 + bob
+    if prop in ("question", "exclaim"):
+        col = (232, 70, 70) if prop == "exclaim" else (60, 120, 230)
+        d.ellipse([cx - 78, cy - 78, cx + 78, cy + 78], fill=(255, 255, 255), outline=INK, width=OL - 3)
+        d.text((cx, cy + 4), "?" if prop == "question" else "!", font=f, fill=col, anchor="mm")
+    elif prop == "bulb":
+        d.ellipse([cx - 66, cy - 80, cx + 66, cy + 52], fill=(255, 214, 60), outline=INK, width=OL - 3)
+        d.rounded([cx - 34, cy + 44, cx + 34, cy + 90], 14, fill=(190, 190, 200), outline=INK, width=OL - 5)
+        for ang in (-60, -20, 20, 60, 100, 140, 180, 220):
+            a = math.radians(ang - 90)
+            d.line([cx + math.cos(a) * 95, cy - 14 + math.sin(a) * 95, cx + math.cos(a) * 125, cy - 14 + math.sin(a) * 125], fill=(245, 170, 20), width=9)
+    elif prop == "money":
+        d.rounded([cx - 100, cy - 58, cx + 100, cy + 58], 16, fill=(140, 208, 130), outline=INK, width=OL - 3)
+        d.ellipse([cx - 38, cy - 38, cx + 38, cy + 38], fill=(190, 232, 176), outline=INK, width=7)
+        d.text((cx, cy + 2), "$", font=f, fill=(40, 120, 60), anchor="mm")
+    elif prop == "heart":
+        col = (236, 70, 100)
+        d.ellipse([cx - 78, cy - 66, cx + 6, cy + 20], fill=col, outline=INK, width=OL - 4)
+        d.ellipse([cx - 6, cy - 66, cx + 78, cy + 20], fill=col, outline=INK, width=OL - 4)
+        d.polygon([(cx - 76, cy - 10), (cx + 76, cy - 10), (cx, cy + 80)], fill=col, outline=INK, width=OL - 4)
+        d.polygon([(cx - 66, cy - 14), (cx + 66, cy - 14), (cx, cy + 68)], fill=col)
+    elif prop == "clock":
+        d.ellipse([cx - 78, cy - 78, cx + 78, cy + 78], fill=(255, 255, 255), outline=INK, width=OL - 3)
+        a = t * 2
+        d.line([cx, cy, cx + math.sin(a) * 52, cy - math.cos(a) * 52], fill=INK, width=9)
+        d.line([cx, cy, cx + math.sin(a / 12) * 36, cy - math.cos(a / 12) * 36], fill=INK, width=11)
+    elif prop == "earth":
+        d.ellipse([cx - 80, cy - 80, cx + 80, cy + 80], fill=(100, 176, 240), outline=INK, width=OL - 3)
+        d.ellipse([cx - 52, cy - 44, cx + 4, cy + 12], fill=(120, 200, 120))
+        d.ellipse([cx + 8, cy + 6, cx + 56, cy + 52], fill=(120, 200, 120))
+    elif prop == "fire":
+        sway = math.sin(t * 9) * 8
+        d.polygon([(cx - 70, cy + 60), (cx - 50 + sway, cy - 20), (cx - 8, cy - 60), (cx + sway, cy - 110), (cx + 36, cy - 40), (cx + 70, cy - 10), (cx + 66, cy + 60)],
+                  fill=(250, 130, 40), outline=INK, width=OL - 4)
+        d.ellipse([cx - 32, cy - 10, cx + 32, cy + 60], fill=(255, 214, 70))
+    elif prop == "skull":
+        d.ellipse([cx - 70, cy - 76, cx + 70, cy + 40], fill=(250, 250, 250), outline=INK, width=OL - 3)
+        d.rounded([cx - 38, cy + 20, cx + 38, cy + 76], 12, fill=(250, 250, 250), outline=INK, width=OL - 5)
+        for s in (-1, 1):
+            d.ellipse([cx + s * 30 - 17, cy - 22, cx + s * 30 + 17, cy + 14], fill=INK)
+
+
+def draw_prop(*_):
+    """Kept for old callers: props are held by the man now (see draw_man)."""
+
+
+def avatar(path, size=1024, pose="pleased", prop="note", glasses=True):
+    """A portrait of the character on white, in the channel's style - a profile picture."""
+    from PIL import Image, ImageDraw
+    k = 2.0
+    big = Image.new("RGB", (int(W * k), int(H * k)), "white")
+    d = Pen(ImageDraw.Draw(big), k)
+    draw_man(d, W / 2, 1500, pose, 0.4, prop=prop, glasses=glasses)
+    box = tuple(int(v * k) for v in (W / 2 - 330, 640, W / 2 + 330, 1560))
+    art = big.crop(box)
+    side = max(art.size)
+    canvas = Image.new("RGB", (side, side), "white")
+    canvas.paste(art, ((side - art.width) // 2, (side - art.height) // 2))
+    canvas.resize((size, size), Image.LANCZOS).save(path)
+    return path
 
 
 def _background(pose, size):
@@ -255,19 +386,19 @@ def camera(cam, t, p, head, body):
     punch = 1 + 0.30 * _ease(1 - t / 0.28) if t < 0.28 else 1      # every cut starts with a punch-in
     bulge = 0.0
     if cam == "close":
-        z, f = 1.9 + 0.35 * _ease(p), (head[0], head[1] + 30)
+        z, f = 1.7 + 0.3 * _ease(p), (head[0], head[1] + 40)
     elif cam == "push":
-        z, f = 1.0 + 0.55 * _ease(p), (body[0], body[1] + (head[1] - body[1]) * _ease(p))
+        z, f = 1.35 + 0.55 * _ease(p), (body[0], body[1] + (head[1] - body[1]) * _ease(p))
     elif cam == "pull":
-        z, f = 2.0 - 0.95 * _ease(p), (head[0], head[1] + 120 * _ease(p))
+        z, f = 2.1 - 0.75 * _ease(p), (head[0], head[1] + 140 * _ease(p))
     elif cam == "fisheye":
-        z, f, bulge = 1.55 + 0.2 * math.sin(t * 2), (head[0], head[1] + 40), 0.55 + 0.15 * math.sin(t * 3)
+        z, f, bulge = 1.5 + 0.1 * math.sin(t * 2), (body[0], body[1] - 40), 0.35 + 0.1 * math.sin(t * 3)
     elif cam == "shake":
-        z, f = 1.3, (body[0] + math.sin(t * 47) * 16, body[1] + math.cos(t * 39) * 16)
+        z, f = 1.55, (body[0] + math.sin(t * 47) * 16, body[1] + math.cos(t * 39) * 16)
     elif cam == "pan":
-        z, f = 1.45, (W * (0.3 + 0.4 * _ease(p)), body[1] - 60)
+        z, f = 1.6, (W * (0.3 + 0.4 * _ease(p)), body[1])
     else:
-        z, f = 1.0, (W / 2, H / 2)
+        z, f = 1.4, (body[0], body[1])
     return z * punch, f[0], f[1], bulge
 
 
@@ -304,11 +435,8 @@ def frame(scene, t, progress, title):
             raw.polygon([(ox, oy)] + [(ox + math.cos(a) * 2600 * SS, oy + math.sin(a) * 2600 * SS) for a in (a0, a1)], fill=ray)
     d = Pen(raw, SS)
     ground = 1500
-    shade = tuple(int(c * 0.55) for c in LOOKS.get(pose, LOOKS["stand"])[1])
-    d.ellipse([W / 2 - 240, ground - 20, W / 2 + 240, ground + 20], fill=shade)
     cx = W / 2 + math.sin(t * 0.7) * 14
-    head = draw_man(d, cx, ground, pose, t, talking=progress < 1)
-    draw_prop(d, scene["prop"], head[0] + 215, head[1] - 150, t, _font(130))
+    head = draw_man(d, cx, ground, pose, t, talking=progress < 1, prop=scene["prop"])
     # the camera: crop the big world to a window and scale it to the screen
     z, fx, fy, bulge = camera(scene.get("cam", "wide"), t, progress, head, (cx, 1000))
     cw, ch = W / z, H / z
@@ -332,7 +460,7 @@ def frame(scene, t, progress, title):
             cur = []
         cur.append(w)
     lines.append(cur)
-    y, n = 1560, 0
+    y, n = 170, 0
     rtl = LANG == "ar"
     for line in lines:
         text_w = d.textlength(" ".join(line), font=big)
@@ -343,7 +471,7 @@ def frame(scene, t, progress, title):
             d.text((x, y), w, font=big, fill=colour, stroke_width=9, stroke_fill=(15, 15, 20))
             x += d.textlength(w + " ", font=big)
         y += 120
-    d.text((W / 2, 1850), title[:40], font=small, fill=(255, 255, 255), anchor="mm", stroke_width=3, stroke_fill=(15, 15, 20))
+    d.text((W / 2, 1850), title[:40], font=small, fill=(150, 150, 165), anchor="mm")
     return img
 
 
