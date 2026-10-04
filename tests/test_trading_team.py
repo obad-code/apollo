@@ -29,3 +29,20 @@ def test_a_seat_that_fails_never_stops_the_call():
     final, _brain, notes = trading_team.debate("FACTS", ask, "F")
     assert final == "SUMMARY: ok."
     assert notes["News analyst"].startswith("(no answer")
+
+
+def test_the_real_team_runs_and_moneypenny_reads_it_all():
+    class Graph:
+        def propagate(self, symbol, date):
+            return ({"market_report": "chart ok", "news_report": "quiet", "fundamentals_report": "cheap",
+                     "sentiment_report": "calm", "investment_debate_state": {"bull_history": "up", "bear_history": "down"},
+                     "investment_plan": "hold", "trader_investment_plan": "HOLD", "final_trade_decision": "Hold.",
+                     "risk_debate_state": {"aggressive_history": "a", "neutral_history": "n", "conservative_history": "c"}},
+                    "Hold")
+
+    seen = []
+    final, brain, notes = trading_team.with_real(
+        "NVDA", "FACTS", lambda p, s: (seen.append(p) or "SUMMARY: hold.", "Gemini"), "F", graph=Graph())
+    assert brain == "Gemini · TradingAgents" and final == "SUMMARY: hold."
+    assert "chart ok" in seen[0] and "Their rating: Hold" in seen[0]
+    assert notes["Bull researcher"] == "up" and "Trader" in notes

@@ -343,7 +343,16 @@ class MoneypennyDesk(CrewDesk):
             if self._job is not None:
                 self._tell(self._job, stage="step", text=text)
 
-        final, brain, notes = trading_team.debate(facts, ask, MONEYPENNY_SYSTEM, step)
+        symbol = (self._job or {}).get("symbol")
+        final = None
+        if symbol and trading_team.installed():
+            try:
+                final, brain, notes = trading_team.with_real(symbol, facts, ask, MONEYPENNY_SYSTEM, step)
+            except Exception as e:  # noqa: BLE001 - the built-in team still answers
+                log.warning("TradingAgents failed on %s: %s", symbol, e)
+                step(f"TradingAgents failed ({e}); the built-in team takes it")
+        if final is None:
+            final, brain, notes = trading_team.debate(facts, ask, MONEYPENNY_SYSTEM, step)
         return final + trading_team.appendix(notes), brain
 
 
