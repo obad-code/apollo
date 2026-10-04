@@ -1165,6 +1165,20 @@ class Api:
         """Ping each brain the crew thinks with; what each said."""
         return crew.check()
 
+    def digest(self):
+        """The last summary made, for the summary page."""
+        import digest
+        return digest.load()
+
+    def digest_refresh(self):
+        """A new summary, now."""
+        import digest
+        return digest.make("now")
+
+    def digest_seen(self):
+        import digest
+        return digest.mark_seen()
+
     def analysis(self, symbol):
         """The whole look at a stock: the call, its flags, the company, news."""
         import analysis
@@ -2151,6 +2165,31 @@ class Apollo:
                                                 name="apollo-briefing")
         self.briefing_thread.start()
 
+    def check_digest(self):
+        """Your summary, made in the morning and after the US close - never said out loud;
+        the display's summary button lights up instead."""
+        import digest
+        if getattr(self, "_digest_thread", None) is not None and self._digest_thread.is_alive():
+            return
+        now = time.monotonic()
+        if now - getattr(self, "_digest_checked", 0.0) < 60:
+            return
+        self._digest_checked = now
+        edition = digest.due(last_iso=digest.load().get("made", ""))
+        if not edition:
+            return
+
+        def run():
+            try:
+                made = digest.make(edition)
+                ui = getattr(self, "ui", None)
+                if ui is not None:
+                    ui._call("digestReady", made.get("made", ""))
+            except Exception:  # noqa: BLE001 - a summary that fails waits for the next try
+                log.warning("summary failed", exc_info=True)
+        self._digest_thread = threading.Thread(target=run, daemon=True, name="apollo-digest")
+        self._digest_thread.start()
+
     def check_prayer(self):
         """Fifteen minutes before each prayer, once.
 
@@ -2221,6 +2260,7 @@ class Apollo:
         self.keep_clips(now, locked)
         self.check_briefing(idle)
         self.check_prayer()
+        self.check_digest()
 
     def keep_clips(self, now, locked):
         """The replay buffer records while you are here to be recorded.

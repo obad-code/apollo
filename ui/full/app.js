@@ -30,6 +30,7 @@ import { WidgetGrid } from './widgetgrid.js';
 import { OptionWheel } from './optionwheel.js';
 import { IdleScenes } from './idlescenes.js';
 import { CrtTv } from './crttv.js';
+import { Digest } from './digest.js';
 import { Embers } from './embers.js';
 import * as CrewPage from './crewpage.js';
 import { Ambient } from './ambient.js';
@@ -1746,6 +1747,8 @@ const PENDING_FOR = 45000;        // a card asked for and never delivered goes
 const BIG_W = 600, BIG_H = 200, BIG_PAD = 14;
 
 const bridge = () => (window.pywebview && window.pywebview.api) || null;
+const digest = new Digest($('digest-btn'), $('digest'), bridge);
+window.addEventListener('pywebviewready', () => digest.check());
 const rowFor = (symbol) =>
   [...$('watchlist').children].find((row) => row.dataset.symbol === symbol) || null;
 
@@ -4969,6 +4972,7 @@ window.apollo = {
   },
   data(snapshot) { render(snapshot); },
   // "Show my projects": one tab of the side panel.
+  digestReady() { digest.ready(true); },
   tab(name) {
     const key = String(name || '');
     if (!ultraOn() && TABS.includes(key)) rollNav(true, key); else showTab(key);

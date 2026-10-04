@@ -329,7 +329,15 @@ class MoneypennyDesk(CrewDesk):
 
     def run(self, job):
         self._job = job
-        return super().run(job)
+        result = super().run(job)
+        if job.get("ok") and job.get("symbol") and job.get("verdict"):
+            try:                                  # kept, so her calls can be graded later (calls.py)
+                import analysis
+                import calls
+                calls.record(job["symbol"], job["verdict"], analysis.analyse(job["symbol"]).get("price"))
+            except Exception:  # noqa: BLE001
+                log.debug("call not kept", exc_info=True)
+        return result
 
     def team_think(self, prompt):
         import trading_team

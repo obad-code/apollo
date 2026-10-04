@@ -505,6 +505,11 @@ def _verdicts(watch):
         if a.get("ok"):
             reasons = (a.get("green") if "BUY" in a["verdict"] else a.get("red")) or a.get("green") or [""]
             out.append((a["symbol"], a["verdict"], reasons[0]))
+            try:                                  # kept, so the calls can be graded later (calls.py)
+                import calls
+                calls.record(a["symbol"], a["verdict"], a.get("price"), source="count")
+            except Exception:  # noqa: BLE001
+                log.debug("call not kept", exc_info=True)
     return out
 
 

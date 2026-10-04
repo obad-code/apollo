@@ -40,6 +40,7 @@
        expand, laid out by tiles.js. -->
   <header id="clock-block" class="rise" data-display="today">
     <div id="clock"><span id="hhmm">--:--</span><span id="seconds">:--</span></div>
+    <button id="digest-btn" type="button" data-sfx="none" aria-label="Your summary"></button>
     <div id="date" class="line">&nbsp;</div>
     <div id="date-extra" class="caption">&nbsp;</div>
     <div id="weather" class="caption">&nbsp;</div>
@@ -437,6 +438,9 @@
 
 <!-- One display's settings in ultra mode: its size, and what it shows. -->
 <div id="tile-config" role="dialog" aria-hidden="true"></div>
+
+<!-- Your summary (digest.js): opened from the button by the clock. -->
+<div id="digest" aria-hidden="true"></div>
 
 <!-- A line of light down the glass as ultra mode brings its displays up. -->
 <div id="ultra-sweep" aria-hidden="true"></div>
