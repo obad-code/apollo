@@ -3461,3 +3461,30 @@ body.revealing #stage { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   #intro.on, #intro.off, #intro-bar::after { animation: none; }
 }
+
+
+/* agents mode: a stock's call as a chip, and its full analysis inside the card (the trading desk's own look) */
+.cc-verdict { display: inline-block; white-space: nowrap; margin-right: 8px; padding: 2px 8px; border-radius: 999px; font: 700 10px/1.4 Orbitron, sans-serif;
+  letter-spacing: .12em; vertical-align: 1px; background: rgba(255,255,255,.08); }
+.cc-verdict.t-BUY { color: #3ddc84; background: rgba(61,220,132,.14); } .cc-verdict.t-HOLD { color: #F5B83D; background: rgba(245,184,61,.14); }
+.cc-verdict.t-SELL { color: #ff5a5f; background: rgba(255,90,95,.14); }
+.cc-res { display: flex; gap: 8px; align-items: center; }
+.cc-res .cp-deep { flex: 1; text-align: left; }
+.cp-deep { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 4px 0; }
+.cp-deep:hover b, .cp-deep.on b { color: #fff; }
+.cp-mini { font-size: 10px; opacity: .6; }
+.cc-analysis-row { list-style: none; }
+.cc-analysis { margin: 6px 0 12px; padding: 14px 16px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+  animation: step-in .35s both; }
+.cc-analysis .about { font-size: 12px; line-height: 1.5; color: rgba(255,255,255,.7); margin: 6px 0 10px; }
+.cc-analysis .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.cc-analysis .facts div { padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.cc-analysis .facts span { display: block; font-size: 9.5px; letter-spacing: .12em; opacity: .55; }
+.cc-analysis h4 { margin: 12px 0 6px; font-size: 10px; letter-spacing: .18em; opacity: .5; }
+.cc-analysis .flags.green li::before { background: #3ddc84; } .cc-analysis .flags.red li::before { background: #ff5a5f; }
+.cc-analysis .deep-news { list-style: none; padding: 0; display: grid; gap: 8px; font-size: 12px; }
+.cc-analysis .deep-news span { display: block; opacity: .5; font-size: 10.5px; }
+.cc-analysis .fine { margin-top: 10px; font-size: 10px; opacity: .45; }
+/* Apollo's mark stays in view, a little higher, however tall a card grows */
+.look-cards .cc-wires { height: 72px; }
+.look-cards .cc-card.open { max-height: calc(100vh - 470px); min-height: 300px; }

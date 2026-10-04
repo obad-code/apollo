@@ -108,7 +108,7 @@ def stock_facts(symbol, step=lambda text: None):
         import analysis
         counted = analysis.analyse(symbol)
         if counted.get("ok"):
-            facts["counted_verdict"] = {k: counted[k] for k in ("verdict", "green", "red", "numbers", "about")}
+            facts["counted_verdict"] = {k: counted[k] for k in ("verdict", "tone", "green", "red", "numbers", "about")}
     except Exception:  # noqa: BLE001
         pass
 
@@ -382,6 +382,8 @@ class Desk:
                     log.info("%s: no ticker for %r (%s)", self.name, job["stock"], e)
                     job["symbol"] = ""
             facts = self.facts(job, lambda text: self._tell(job, stage="step", text=text))
+            counted = facts.get("counted_verdict") or {}
+            job["verdict"], job["tone"] = counted.get("verdict", ""), counted.get("tone", "")
             self._tell(job, stage="asking", text="Writing it up")
             answer, brain = self.think(self.prompt_for(job, facts))
             summary, report = split(answer)
@@ -398,7 +400,7 @@ class Desk:
             keep_file(job)
             self.reports.insert(0, {k: job.get(k, "") for k in ("task", "symbol", "summary", "report",
                                                                  "brain", "asked", "done", "took",
-                                                                 "file", "link")})
+                                                                 "file", "link", "verdict", "tone")})
             del self.reports[KEEP:]
             _save_reports(self.reports, self.path)
         else:

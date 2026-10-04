@@ -153,3 +153,17 @@ def test_the_board_counts_todays_jobs_by_agent_and_hour(tmp_path):
     assert got["agents"]["THEIA"]["done_today"] == 1 and got["hours"]["THEIA"][9] == 1
     assert got["jobs"][0]["task"] == "plan" and got["tools"] == [("ask_theia", 2)]
     assert got["issues"] == {"count": 1, "failing": 1, "top": ["MIC"]}
+
+
+def test_a_stock_result_carries_its_symbol_and_counted_call_to_the_board():
+    import datetime as dt
+    desk = crew.DESKS["MONEYPENNY"]
+    kept = desk.reports
+    desk.reports = [{"task": "Is META a buy?", "summary": "BUY MORE", "symbol": "META", "verdict": "STRONG BUY", "tone": "BUY",
+                     "done": dt.datetime(2026, 10, 3, 9, 30).timestamp()}]
+    try:
+        got = crew.board(dt.datetime(2026, 10, 3, 15, 0), journal_day=[], spend={}, problems=[], alerts_state={})
+    finally:
+        desk.reports = kept
+    top = got["agents"]["MONEYPENNY"]["results"][0]
+    assert (top["symbol"], top["verdict"], top["tone"]) == ("META", "STRONG BUY", "BUY")

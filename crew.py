@@ -374,7 +374,8 @@ def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=No
             jobs.append({"agent": name, "task": report.get("task", ""),
                          "summary": report.get("summary", ""), "took": report.get("took", 0),
                          "brain": report.get("brain", ""), "done": done,
-                         "file": report.get("file", ""), "link": report.get("link", ""), "report": (report.get("report", "") or "")[:6000]})
+                         "file": report.get("file", ""), "link": report.get("link", ""), "report": (report.get("report", "") or "")[:6000],
+                         "symbol": report.get("symbol", ""), "verdict": report.get("verdict", ""), "tone": report.get("tone", "")})
             if done >= start:
                 agents[name]["done_today"] += 1
                 hours[name][dt.datetime.fromtimestamp(done).hour] += 1

@@ -450,7 +450,12 @@ async function loadCrew() {
 }
 
 /* The crew page: its look kept per viewer, one lane open at a time. */
-const page = { open: null, look: (() => { try { return localStorage.getItem('crew-look') || 'minimal'; } catch { return 'minimal'; } })() };
+const page = { open: null, analysis: null, look: (() => { try { return localStorage.getItem('crew-look') || 'minimal'; } catch { return 'minimal'; } })() };
+CrewPage.setAnalysisRenderer((symbol) => {
+  const a = analyses.get(symbol);
+  if (!a) { getAnalysis(symbol).then(() => { if (page.analysis === symbol) drawCrewPage(); }); return '<p class="quiet">Weighing it up…</p>'; }
+  return analysisMarkup(a, true);
+});
 function drawCrewPage() {
   CrewPage.render($('crew-page'), { ...crew.board, agents: crewAgents() }, page);
 }
@@ -461,6 +466,13 @@ $('crew-page').addEventListener('click', (event) => {
     page.look = look.dataset.look;
     try { localStorage.setItem('crew-look', page.look); } catch { /* private */ }
     sfx.play('tick');
+    drawCrewPage();
+    return;
+  }
+  const deep = event.target.closest('.cp-deep');
+  if (deep) {                                   // a stock's full analysis, opened inside the card
+    page.analysis = page.analysis === deep.dataset.symbol ? null : deep.dataset.symbol;
+    sfx.play(page.analysis ? 'expand' : 'collapse');
     drawCrewPage();
     return;
   }

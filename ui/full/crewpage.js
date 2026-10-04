@@ -11,6 +11,11 @@
 
 import { creature, health, IO } from './crewview.js';
 
+let analysisHtml = () => '';
+/* app.js hands in how a stock's full analysis is drawn (the trading desk's own look). */
+export function setAnalysisRenderer(fn) { analysisHtml = fn; }
+const chip = (r) => (r && r.verdict ? `<span class="cc-verdict t-${esc(r.tone || 'HOLD')}">${esc(r.verdict)}</span>` : '');
+
 const KEYS = ['LYLA', 'THEIA', 'MONEYPENNY', 'Q'];
 const ROLE = { LYLA: 'Research & media', THEIA: 'Professor', MONEYPENNY: 'Markets desk', Q: 'Quartermaster' };
 export const STAGES = ['Received', 'Reading', 'Thinking', 'Writing', 'Done'];
@@ -105,7 +110,7 @@ function flowMarkup(key, at) {
       <b>${esc(title)}</b><span>${esc(line)}</span></div>`).join('')}<i class="cf-runner"></i></div>`;
 }
 
-function card(key, a, open, now) {
+function card(key, a, open, now, analysis = null) {
   const at = stageOf(a);
   const h = health(a, now);
   const last = (a.results || [])[0];
@@ -116,7 +121,7 @@ function card(key, a, open, now) {
     : h.state === 'failing'
       ? `<p class="cc-now"><i class="cc-dot s-failing"></i>Last job failed</p><small>${esc(short((a.error || {}).why, 80))}</small>`
       : last
-        ? `<p class="cc-now"><i class="cc-dot s-idle"></i>${esc(short(last.summary || last.task, 70))}</p>
+        ? `<p class="cc-now"><i class="cc-dot s-idle"></i>${chip(last)}${esc(short(last.summary || last.task, 70))}</p>
            <button type="button" class="cp-open" data-file="${esc(last.file || '')}" data-link="${esc(last.link || '')}" data-report="${esc(last.report || last.summary || '')}">${last.link ? 'Open on GitHub ›' : 'Open report ›'}</button>`
         : '<p class="cc-now"><i class="cc-dot s-idle"></i>Ready · nothing yet</p>';
   const steps = a.working ? (a.steps || []) : [];
@@ -129,16 +134,20 @@ function card(key, a, open, now) {
     </div>
     <div class="cc-bottom">${lower}</div>
     ${open ? `<div class="cc-more">
-      <h4>HOW IT WORKS</h4>${flowMarkup(key, a.working ? Math.min(stageOf(a), 3) : -1)}
+      ${analysis ? '' : `<h4>HOW IT WORKS</h4>${flowMarkup(key, a.working ? Math.min(stageOf(a), 3) : -1)}`}
       <h4>${a.working ? 'LIVE' : 'RESULTS'}</h4>
       ${a.working ? `<ul>${steps.map((x) => `<li>· ${esc(short(x.text || x.stage, 70))}</li>`).join('') || '<li>Starting…</li>'}</ul>`
-        : results.length ? `<ul>${results.map((r) => `<li><button type="button" class="cp-open" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}" data-report="${esc(r.report || r.summary || '')}">${esc(short(r.summary || r.task, 60))} ›</button></li>`).join('')}</ul>`
+        : results.length ? `<ul>${results.map((r) => r.symbol
+          ? `<li class="cc-res"><button type="button" class="cp-deep${analysis === r.symbol ? ' on' : ''}" data-symbol="${esc(r.symbol)}">${chip(r)}${String(r.summary || '').toUpperCase().startsWith(r.symbol) ? '' : `<b>${esc(r.symbol)}</b> `}${esc(short(r.summary || r.task, 52))} ${analysis === r.symbol ? '▾' : '›'}</button>
+             <button type="button" class="cp-open cp-mini" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}" data-report="${esc(r.report || r.summary || '')}">report</button></li>
+             ${analysis === r.symbol ? `<li class="cc-analysis-row"><section class="cc-analysis verdict">${analysisHtml(r.symbol)}</section></li>` : ''}`
+          : `<li><button type="button" class="cp-open" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}" data-report="${esc(r.report || r.summary || '')}">${esc(short(r.summary || r.task, 60))} ›</button></li>`).join('')}</ul>`
           : '<p>No results yet.</p>'}
     </div>` : ''}
   </article>`;
 }
 
-function renderCards(root, board, t, look, open, now) {
+function renderCards(root, board, t, look, open, now, analysis = null) {
   const agents = board.agents || {};
   root.innerHTML = `
     <header class="cp-top">
@@ -150,7 +159,7 @@ function renderCards(root, board, t, look, open, now) {
     </header>
     <div class="cc-hub"><canvas class="cc-apollo" width="320" height="200" aria-label="Apollo"></canvas><span class="cp-node apollo">APOLLO</span></div>
     <svg class="cc-wires" aria-hidden="true"></svg>
-    <div class="cc-row">${KEYS.map((key) => card(key, agents[key] || {}, open === key, now)).join('')}</div>
+    <div class="cc-row">${KEYS.map((key) => card(key, agents[key] || {}, open === key, now, analysis)).join('')}</div>
     <footer class="cp-foot">
       <div class="cp-g"><b>${t.runs}</b><span>RUNS TODAY</span></div>
       <div class="cp-g"><b>${t.success}</b><span>SUCCESS</span></div>
@@ -190,7 +199,7 @@ const looksSwitch = (look) => `<div class="cp-looks" role="group" aria-label="Lo
   ${LOOKS.map((l) => `<button type="button" data-look="${l}" class="${look === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}
 </div>`;
 
-export function render(root, board = {}, { look = 'cards', open = null } = {}) {
+export function render(root, board = {}, { look = 'cards', open = null, analysis = null } = {}) {
   // Every look is the cards; the looks only dress them differently.
   look = 'minimal';
   {
@@ -198,7 +207,7 @@ export function render(root, board = {}, { look = 'cards', open = null } = {}) {
     const settled = root.dataset.drawn === look + ':' + (open || '');
     root.dataset.drawn = look + ':' + (open || '');
     root.className = `cp look-cards look-${look}${settled ? ' settled' : ''}`;
-    renderCards(root, board, totals(board), look, open, board.now || Date.now() / 1000);
+    renderCards(root, board, totals(board), look, open, board.now || Date.now() / 1000, analysis);
     return;
   }
   const t = totals(board);
