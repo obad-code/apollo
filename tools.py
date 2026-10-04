@@ -1366,12 +1366,13 @@ def _pick_niche(ctx, number):
 
 @_tool("post_short", "posting the Short",
        "Post one of today's Shorts that LYLA made to YouTube, after she asked which one. "
-       "number is 1, 2, 3...; 0 means post none today. Use it for \"نزل رقم ٢\", "
-       "\"post the second one\", \"لا تنزل شي\".",
-       _obj({"number": {"type": "integer", "description": "Which Short, 1-based; 0 for none"}}, ("number",)))
-def _post_short(ctx, number):
+       "number is 1, 2, 3...; 0 means post none today; all=true posts every one waiting. Use it for "
+       "\"نزل رقم ٢\", \"post the second one\", \"نزل الكل\", \"لا تنزل شي\".",
+       _obj({"number": {"type": "integer", "description": "Which Short, 1-based; 0 for none"},
+             "all": {"type": "boolean", "description": "Post every Short waiting"}}, ()))
+def _post_short(ctx, number=0, all=False):  # noqa: A002 - the tool's own word
     import autopost
-    return autopost.choose(int(number))
+    return autopost.choose_all() if all else autopost.choose(int(number))
 
 
 @_tool("crew_findings", "reading the crew's reports",

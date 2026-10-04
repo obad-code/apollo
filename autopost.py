@@ -23,7 +23,10 @@ import xml.etree.ElementTree as ET
 
 log = logging.getLogger("apollo.autopost")
 
-COUNT = max(1, min(5, int(os.environ.get("SHORTS_COUNT") or 3)))
+from shorts import WORLDS  # noqa: E402
+
+COUNT = max(1, min(5, int(os.environ.get("SHORTS_COUNT") or 2)))
+POST_ALL = os.environ.get("SHORTS_POST_ALL", "1").strip().lower() not in ("0", "false", "no", "off")
 EVERY = max(1, int(os.environ.get("SHORTS_EVERY") or 1))
 WAIT_HOURS = float(os.environ.get("SHORTS_WAIT_HOURS") or 3)
 GEO = os.environ.get("SHORTS_GEO") or "US"
@@ -31,12 +34,13 @@ STATE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
                      "Apollo", "shorts_pending.json")
 
 PICK_SYSTEM = (
-    "You pick topics for a faceless stick-man YouTube Shorts channel that wants views. "
+    "You pick topics for a faceless animated YouTube Shorts channel that wants views. "
     "Given today's trending searches, choose topics that are curious, shareable and "
-    "evergreen-friendly: a surprising fact or a gripping story tied to a trend. Never "
-    "politics, tragedy, real private people, anything indecent or against Islam. "
-    'Answer ONLY with JSON: [{"kind": "fact" or "story", "topic": "...", "why": "..."}], '
-    "best first.")
+    "evergreen-friendly: a surprising fact, a gripping story, or a POV wealth ladder, tied to a "
+    "trend. Never politics, tragedy, real private people, anything indecent or against Islam. "
+    "Every pick must happen in a DIFFERENT world - each Short gets its own setting and look. "
+    'Answer ONLY with JSON: [{"kind": "fact" or "story" or "ladder", "world": one of '
+    + json.dumps(sorted(WORLDS)) + ', "topic": "...", "why": "..."}], best first.')
 
 
 def trends(geo=GEO, fetch=None):
@@ -69,9 +73,16 @@ def pick_topics(count=COUNT, found=None, think=None):
     except ValueError:
         pass
     while len(picks) < count:
-        picks.append({"kind": "fact" if len(picks) % 2 == 0 else "story", "topic": ""})
-    return [{"kind": p.get("kind") if p.get("kind") in ("fact", "story") else "fact",
-             "topic": str(p.get("topic", ""))[:120]} for p in picks[:count]]
+        picks.append({"kind": ("fact", "story", "ladder")[len(picks) % 3], "topic": ""})
+    out, used = [], set()
+    for p in picks[:count]:
+        world = p.get("world") if p.get("world") in WORLDS and p.get("world") not in used else ""
+        if not world:                                  # a different world for every Short
+            world = next((w for w in sorted(WORLDS) if w not in used), "")
+        used.add(world)
+        out.append({"kind": p.get("kind") if p.get("kind") in ("fact", "story", "ladder") else "fact",
+                    "world": world, "topic": str(p.get("topic", ""))[:120]})
+    return out
 
 
 # -- the pending choice ----------------------------------------------------------------
@@ -101,6 +112,9 @@ def offer(made, now=None, path=STATE):
 
 def question(made):
     lines = [f"{i + 1}. {m['title']}" for i, m in enumerate(made)]
+    if POST_ALL:
+        return ("Today's Shorts are ready: " + " | ".join(lines)
+                + f". I'll post them all in {WAIT_HOURS:g} hours unless you say which one only (post 2) or skip.")
     return ("Shorts ready - which one should I post? " + " | ".join(lines)
             + f". If you don't answer in {WAIT_HOURS:g} hours I'll post number 1.")
 
@@ -118,6 +132,21 @@ def choose(number, path=STATE, upload=None):
     if not 1 <= number <= len(made):
         return {"ok": False, "error": f"Pick 1 to {len(made)}."}
     return _post(data, made[number - 1], path, upload)
+
+
+def choose_all(path=STATE, upload=None):
+    """Post every Short that is waiting."""
+    data = load(path)
+    if data.get("status") != "waiting":
+        return {"ok": False, "error": "No Shorts are waiting for a pick."}
+    links, errors = [], []
+    for item in data.get("made", []):
+        r = _post(dict(data), item, path, upload)
+        (links if r.get("ok") else errors).append(r.get("link") or r.get("error"))
+    data.update(status="posted" if links else "failed", posted=f"{len(links)} Shorts", link=", ".join(links), error="; ".join(errors))
+    save(data, path)
+    return {"ok": bool(links), "result": f"Posted {len(links)} Short(s)" + (f"; {len(errors)} failed" if errors else ""),
+            "link": ", ".join(links), **({"error": "; ".join(errors)} if errors and not links else {})}
 
 
 def _post(data, item, path, upload):
@@ -145,6 +174,8 @@ def tick(now=None, path=STATE, upload=None):
         return None
     if now < dt.datetime.fromisoformat(data["deadline"]):
         return None
+    if POST_ALL:
+        return choose_all(path, upload)
     return _post(data, data["made"][0], path, upload)
 
 

@@ -40,7 +40,7 @@ W, H, FPS = 1080, 1920, 15
 LEAD, PAUSE = 0.12, 0.3      # a short breath around each scene's words: brisk, but never a rant
 LANG = (os.environ.get("SHORTS_LANG") or "en").lower()
 VOICE = os.environ.get("SHORTS_VOICE") or ("ar-SA-HamedNeural" if LANG == "ar" else "en-US-AndrewNeural")
-GLASSES = os.environ.get("SHORTS_GLASSES", "1").strip().lower() in ("1", "true", "yes", "on")
+GLASSES = os.environ.get("SHORTS_GLASSES", "0").strip().lower() in ("1", "true", "yes", "on")
 HOUR = int(os.environ.get("SHORTS_HOUR") or 13)
 
 POSES = ("stand", "wave", "point", "think", "shock", "run", "cheer", "sad", "shrug")
@@ -51,9 +51,22 @@ BGS = ("none",) + shorts_scenes.NAMES
 STYLE = (os.environ.get("SHORTS_STYLE") or "vector").strip().lower()      # vector (flat, cel-shaded) or ink (pencil)
 GRADES = shorts_hero.GRADES
 SIDES = ("none",) + shorts_hero.SIDES
+WORLDS = {
+    "sea": (("sea", "beach", "island", "underwater", "night"), ("sailor", "stranger")),
+    "forest": (("forest", "mountains", "cave", "rain", "night"), ("farmer", "stranger")),
+    "library": (("library", "room", "school", "night", "rain"), ("librarian", "teacher")),
+    "prison": (("prison", "room", "rain", "night"), ("guard", "prisoner")),
+    "money": (("city", "office", "bank", "chart", "cafe", "room"), ("boss", "banker", "landlord")),
+    "desert": (("desert", "night", "cave", "mountains"), ("stranger",)),
+    "space": (("space", "night", "room"), ("friend", "stranger")),
+    "hospital": (("hospital", "room", "night"), ("doctor", "friend")),
+    "school": (("school", "library", "room"), ("teacher", "friend")),
+    "travel": (("airport", "city", "cafe", "sea"), ("pilot", "waiter", "stranger")),
+    "castle": (("castle", "forest", "night", "mountains"), ("king", "guard")),
+}
 SHOWS = ("man", "env")
 SFX = ("whoosh", "pop", "ding", "boom", "riser", "click")
-PROPS = ("none", "note", "question", "exclaim", "bulb", "money", "clock", "skull", "heart", "earth", "fire")
+PROPS = ("none", "note", "book", "key", "coffee", "map", "phone", "suitcase", "trophy", "question", "exclaim", "bulb", "money", "clock", "skull", "heart", "earth", "fire")
 
 SYSTEM = (
     "You write YouTube Shorts scripts for a faceless channel in a flat 2D vector, bold-outline "
@@ -119,10 +132,12 @@ KINDS = {
 }
 
 
-def ask_script(kind, topic="", think=None):
+def ask_script(kind, topic="", think=None, world=""):
     language = "Arabic (clear Gulf-friendly Fusha)" if LANG == "ar" else "English"
     prompt = (f"Language: {language}. Kind: {KINDS.get(kind, KINDS['fact'])}. "
-              f"Topic: {topic or 'your choice - something people would share'}.")
+              f"Topic: {topic or 'your choice - something people would share'}."
+              + (f" Set the whole story in this world: {world}. Backgrounds to use, mostly: {', '.join(WORLDS[world][0])}. "
+                 f"Side characters that fit: {', '.join(WORLDS[world][1])}." if world in WORLDS else ""))
     if think is None:
         import lyla
         notes = style_notes()
@@ -434,6 +449,41 @@ def _hold(d, prop, hands, t):
         d.polygon([(b2[0] - 14, b2[1] - 2), (b2[0] + 16, b2[1] - 6), (b2[0] + 14, b2[1] + 40)], fill=(244, 214, 160), outline=INK, width=5)
         return
     cx, cy = hx + 10, hy - 100 + math.sin(t * 2) * 5
+    if prop == "book":
+        d.polygon([(cx - 70, cy - 60), (cx + 70, cy - 60), (cx + 70, cy + 60), (cx - 70, cy + 60)], fill=(196, 90, 80), outline=INK, width=8)
+        d.polygon([(cx - 56, cy - 46), (cx + 56, cy - 46), (cx + 56, cy + 46), (cx - 56, cy + 46)], fill=(246, 240, 226), outline=INK, width=5)
+        d.line([(cx, cy - 46), (cx, cy + 46)], width=5)
+        return
+    if prop == "key":
+        d.ellipse([cx - 56, cy - 56, cx + 8, cy + 8], fill=(240, 200, 70), outline=INK, width=8)
+        d.line([(cx - 8, cy), (cx + 80, cy + 70)], fill=INK, width=30)
+        d.line([(cx - 8, cy), (cx + 80, cy + 70)], fill=(240, 200, 70), width=16)
+        d.line([(cx + 50, cy + 48), (cx + 50, cy + 80)], fill=(240, 200, 70), width=12)
+        return
+    if prop == "coffee":
+        d.polygon([(cx - 50, cy - 40), (cx + 50, cy - 40), (cx + 38, cy + 56), (cx - 38, cy + 56)], fill=(250, 250, 248), outline=INK, width=8)
+        d.polygon([(cx - 46, cy - 14), (cx + 46, cy - 14), (cx + 42, cy + 16), (cx - 42, cy + 16)], fill=(140, 90, 60), outline=None)
+        d.line([(cx - 20, cy - 70), (cx - 10, cy - 100), (cx - 20, cy - 130)], fill=(200, 200, 206), width=6)
+        return
+    if prop == "map":
+        d.polygon([(cx - 90, cy - 60), (cx - 30, cy - 70), (cx + 30, cy - 56), (cx + 90, cy - 66), (cx + 90, cy + 60), (cx + 30, cy + 70), (cx - 30, cy + 56), (cx - 90, cy + 66)],
+                  fill=(244, 226, 176), outline=INK, width=8)
+        d.line([(cx - 60, cy + 30), (cx - 10, cy - 10), (cx + 30, cy + 20), (cx + 60, cy - 30)], fill=(200, 60, 60), width=7)
+        return
+    if prop == "phone":
+        d.polygon([(cx - 36, cy - 66), (cx + 36, cy - 66), (cx + 36, cy + 66), (cx - 36, cy + 66)], fill=(40, 44, 56), outline=INK, width=8)
+        d.polygon([(cx - 26, cy - 50), (cx + 26, cy - 50), (cx + 26, cy + 44), (cx - 26, cy + 44)], fill=(150, 214, 255), outline=None)
+        return
+    if prop == "suitcase":
+        d.polygon([(cx - 80, cy - 40), (cx + 80, cy - 40), (cx + 80, cy + 60), (cx - 80, cy + 60)], fill=(150, 100, 64), outline=INK, width=8)
+        d.line([(cx - 30, cy - 40), (cx - 30, cy - 66), (cx + 30, cy - 66), (cx + 30, cy - 40)], fill=INK, width=8)
+        d.line([(cx - 80, cy + 8), (cx + 80, cy + 8)], fill=INK, width=5)
+        return
+    if prop == "trophy":
+        d.polygon([(cx - 56, cy - 70), (cx + 56, cy - 70), (cx + 40, cy + 10), (cx - 40, cy + 10)], fill=(244, 200, 70), outline=INK, width=8)
+        d.line([(cx, cy + 10), (cx, cy + 56)], fill=INK, width=14)
+        d.polygon([(cx - 46, cy + 56), (cx + 46, cy + 56), (cx + 46, cy + 80), (cx - 46, cy + 80)], fill=(244, 200, 70), outline=INK, width=7)
+        return
     f = _font(110)
     if prop in ("question", "exclaim"):
         d.ellipse([cx - 70, cy - 70, cx + 70, cy + 70], fill=PAPER, width=7)
@@ -488,7 +538,7 @@ def _background(pose, size):
     return _cache[key].copy()
 
 
-def avatar(path, size=1024, pose="pleased", prop="none", glasses=True):
+def avatar(path, size=1024, pose="pleased", prop="none", glasses=False):
     """A portrait of the character on paper, in the channel's style - a profile picture."""
     from PIL import Image, ImageDraw
     k = 2.0
@@ -711,7 +761,7 @@ def folder():
     return path
 
 
-def make(kind=None, topic="", think=None, speak_fn=speak, now=None, step=lambda t: None):
+def make(kind=None, topic="", think=None, speak_fn=speak, now=None, step=lambda t: None, world=""):
     """Write, voice, draw and join one Short. Returns {path, title, notes}."""
     now = now or dt.datetime.now()
     kind = kind or kind_for(now.date())
@@ -721,7 +771,7 @@ def make(kind=None, topic="", think=None, speak_fn=speak, now=None, step=lambda 
         except ImportError as e:
             raise RuntimeError("Missing a library: run  python -m pip install pillow edge-tts imageio-ffmpeg") from e
     step(f"Writing the script ({kind})")
-    script = ask_script(kind, topic, think)
+    script = ask_script(kind, topic, think, world)
     slug = re.sub(r"[^\w\- ]+", "", script.get("title", "short"))[:50].strip() or "short"
     base = os.path.join(folder(), f"{now:%Y-%m-%d %H%M} {slug}")
     render(script, base + ".mp4", speak_fn, step=step)

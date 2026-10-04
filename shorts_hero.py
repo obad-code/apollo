@@ -25,7 +25,8 @@ HAIR_STYLES = ("messy swept", "neat parted", "tousled", "curls", "crop")
 BUILDS = {"stockier": 1.12, "average": 1.0, "slimmer": 0.92}
 LEANS = ("warm", "cool", "earth")
 GRADES = ("warm", "cool", "neutral", "night")
-SIDES = ("boss", "friend", "landlord", "banker", "stranger")
+SIDES = ("boss", "friend", "landlord", "banker", "stranger", "guard", "prisoner", "librarian", "doctor",
+         "teacher", "waiter", "pilot", "sailor", "farmer", "king")
 
 
 def hero_for(seed):
@@ -122,7 +123,10 @@ def _face(d, c, rx, ry, pose, t, glasses):
         if shut:
             d.line([(ex - 12, ey), (ex + 12, ey)], fill=INK, width=6, wobble=0)
         else:
-            d.dot((ex + math.sin(t * 0.7) * 3, ey), 12 if mood == "shock" else 10)
+            r = 14 if mood == "shock" else 12
+            ox = ex + math.sin(t * 0.7) * 3
+            d.dot((ox, ey), r)
+            d.dot((ox + r * 0.38, ey - r * 0.4), r * 0.3, fill=(255, 255, 255))      # the glint: the channel's eyes
         lift = {"shock": -16, "think": -6 if side > 0 else 4}.get(mood, 0)
         slant = {"sad": -12, "calm": 3}.get(mood, 0) * side * -1
         d.line([(ex - 22, ey - 38 + lift + slant), (ex + 22, ey - 38 + lift - slant)], fill=INK, width=6, wobble=0)
@@ -146,6 +150,8 @@ def _face(d, c, rx, ry, pose, t, glasses):
 
 def draw_hero(d, cx, ground, pose, t, prop, hero, tier, angles, hold, glasses=False):
     la, ra, ll, rl, jump = angles
+    if prop not in ("none", "note") and la < 90:          # lift the arm that shows the object
+        la = 135
     b = BUILDS.get(hero["build"], 1.0)
     top, trousers, shoes, accent = outfit(tier, hero["lean"])
     hip_y = ground - 215 - jump
@@ -184,17 +190,22 @@ def draw_hero(d, cx, ground, pose, t, prop, hero, tier, angles, hold, glasses=Fa
         elbow = _tip(sh, 108, ang)
         hand = _tip(elbow, 100, ang * 0.85 + (-side * 22 if pose in ("stand", "think", "point", "pleased") else 0))
         hands[side] = (sh, elbow, hand)
-    hold(d, prop, {s: h[2] for s, h in hands.items()}, t)
     for sh, elbow, hand in hands.values():
         _limb(d, [sh, elbow, hand], 48 * b, top)
         _ball(d, hand, 31)
+    hold(d, prop, {s: h[2] for s, h in hands.items()}, t)        # in front, held up beside the head
     return hc
 
 
 # -- people with real faces ------------------------------------------------------------
 _SIDE_LOOK = {"boss": ((200, 150, 120), (60, 50, 46), (86, 90, 110)), "friend": ((232, 190, 150), (120, 70, 40), (210, 120, 90)),
               "landlord": ((186, 136, 104), (150, 150, 150), (120, 140, 100)), "banker": ((240, 205, 175), (40, 40, 46), (40, 56, 90)),
-              "stranger": ((150, 106, 80), (28, 26, 30), (90, 90, 96))}
+              "stranger": ((150, 106, 80), (28, 26, 30), (90, 90, 96)), "guard": ((214, 170, 134), (40, 36, 34), (70, 84, 120)),
+              "prisoner": ((190, 140, 108), (60, 44, 36), (230, 150, 60)), "librarian": ((236, 200, 170), (160, 160, 168), (150, 100, 130)),
+              "doctor": ((226, 182, 150), (50, 40, 36), (236, 242, 246)), "teacher": ((206, 160, 126), (90, 56, 40), (120, 150, 110)),
+              "waiter": ((232, 192, 156), (36, 32, 34), (240, 238, 232)), "pilot": ((222, 178, 142), (50, 44, 44), (40, 60, 110)),
+              "sailor": ((190, 140, 104), (200, 200, 200), (60, 90, 150)), "farmer": ((206, 158, 120), (120, 80, 50), (170, 120, 80)),
+              "king": ((236, 196, 164), (190, 190, 196), (150, 40, 60))}
 
 
 def draw_side(d, role, x, ground, t, mood="calm"):

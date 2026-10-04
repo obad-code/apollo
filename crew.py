@@ -263,9 +263,9 @@ class LylaDesk(lyla.Desk):
                 step("Reading today's trends")
                 made = []
                 for n, pick in enumerate(autopost.pick_topics(job["batch"]), 1):
-                    step(f"Short {n}: {pick['topic'] or pick['kind']}")
+                    step(f"Short {n} ({pick.get('world') or pick['kind']}): {pick['topic'] or pick['kind']}")
                     try:
-                        made.append(shorts.make(pick["kind"], pick["topic"], step=step))
+                        made.append(shorts.make(pick["kind"], pick["topic"], step=step, world=pick.get("world", "")))
                     except Exception as e:  # noqa: BLE001 - one bad Short never costs the rest
                         log.warning("short %d failed: %s", n, e)
                         if n == job["batch"] and not made:

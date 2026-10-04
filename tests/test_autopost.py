@@ -3,8 +3,9 @@ import autopost
 
 
 def test_pick_topics_pads_and_cleans():
-    out = autopost.pick_topics(3, found=["x"], think=lambda p: '[{"kind":"story","topic":"Moon"}]')
-    assert out[0] == {"kind": "story", "topic": "Moon"} and len(out) == 3
+    out = autopost.pick_topics(3, found=["x"], think=lambda p: '[{"kind":"story","world":"sea","topic":"Moon"},{"kind":"fact","world":"sea","topic":"B"}]')
+    assert out[0] == {"kind": "story", "world": "sea", "topic": "Moon"} and len(out) == 3
+    assert len({p["world"] for p in out}) == 3          # every Short gets its own world
 
 
 def test_choose_and_deadline(tmp_path):
@@ -14,7 +15,7 @@ def test_choose_and_deadline(tmp_path):
     autopost.offer(made, now, path)
     assert autopost.tick(now, path, upload=lambda v, n: "L") is None
     r = autopost.tick(now + dt.timedelta(hours=5), path, upload=lambda v, n: "L/" + v)
-    assert r["ok"] and r["link"] == "L/a.mp4"
+    assert r["ok"] and r["link"] == "L/a.mp4, L/b.mp4"      # both go up when nobody answers
     assert not autopost.choose(2, path, upload=lambda v, n: "x")["ok"]   # already posted
     autopost.offer(made, now, path)
     assert autopost.choose(2, path, upload=lambda v, n: v)["link"] == "b.mp4"

@@ -276,9 +276,187 @@ def bank(d, t):
     d.ellipse([500, 560, 580, 640], fill=(255, 226, 140), width=6)
 
 
+def _wood(d, top):
+    _rect(d, 0, top, W, H, (212, 178, 136))
+    d.line([(0, top), (W, top + 4)], width=7, wobble=2)
+    for i in range(1, 6):
+        d.line([(0, top + i * 90), (W, top + i * 90 + 4)], width=3, wobble=2, fill=(180, 146, 106))
+
+
+def library(d, t):
+    _rect(d, 0, 0, W, 1380, (240, 228, 206))
+    rnd = random.Random(21)
+    cols = ((196, 90, 80), (90, 130, 176), (226, 186, 90), (110, 158, 120), (150, 110, 170), (214, 140, 90))
+    for x0 in (30, 700):                                                       # two tall bookcases
+        d.polygon([(x0, 180), (x0 + 320, 180), (x0 + 320, 1380), (x0, 1380)], fill=(176, 130, 92), width=8)
+        for row in range(6):
+            y = 230 + row * 190
+            d.line([(x0, y + 150), (x0 + 320, y + 150)], width=7, wobble=1)
+            x = x0 + 16
+            while x < x0 + 300:
+                w = rnd.randint(22, 40)
+                h = rnd.randint(100, 146)
+                d.polygon([(x, y + 150 - h), (x + w, y + 150 - h), (x + w, y + 148), (x, y + 148)], fill=rnd.choice(cols), width=4, wobble=0.5)
+                x += w + 3
+    d.polygon([(400, 340), (640, 340), (640, 760), (400, 760)], fill=SKY, width=8)               # a window between them
+    d.arc([400, 250, 640, 430], 180, 360, width=8)
+    d.line([(520, 340), (520, 760)], width=6, wobble=1)
+    for i, y in enumerate(range(520, 1340, 70)):                                                 # a ladder on the left
+        d.line([(350, y), (410, y)], width=7, wobble=1)
+    d.line([(350, 500), (350, 1380)], width=8, wobble=1)
+    d.line([(410, 500), (410, 1380)], width=8, wobble=1)
+    _wood(d, 1380)
+
+
+def prison(d, t):
+    _rect(d, 0, 0, W, 1380, (188, 190, 198))
+    for y in range(120, 1380, 130):
+        d.line([(0, y), (W, y + 4)], width=3, wobble=2, fill=(160, 162, 170))
+    d.polygon([(110, 300), (430, 300), (430, 620), (110, 620)], fill=(150, 176, 214), width=9)          # a barred window
+    for x in (190, 270, 350):
+        d.line([(x, 300), (x, 620)], width=9, wobble=0.5)
+    d.polygon([(110, 620), (430, 620), (700, 1380), (-200, 1380)], fill=(255, 238, 190), outline=None)    # the light from it
+    _rect(d, 0, 1380, W, H, (150, 152, 158))
+    d.line([(0, 1380), (W, 1384)], width=7, wobble=2)
+    d.polygon([(720, 1180), (1040, 1180), (1040, 1380), (720, 1380)], fill=(120, 130, 150), width=8)    # a cot
+    d.polygon([(700, 1150), (1040, 1150), (1040, 1200), (700, 1200)], fill=(220, 220, 226), width=7)
+    for x in range(40, W, 90):                                                                          # the cell door, in front
+        d.line([(x, 0), (x, 1380)], width=8, wobble=0.5, fill=(60, 64, 72))
+    d.line([(0, 300), (W, 300)], width=9, wobble=0.5, fill=(60, 64, 72))
+    d.line([(0, 1000), (W, 1000)], width=9, wobble=0.5, fill=(60, 64, 72))
+
+
+def cafe(d, t):
+    _rect(d, 0, 0, W, 1380, (244, 226, 204))
+    d.polygon([(560, 260), (1000, 260), (1000, 900), (560, 900)], fill=SKY, width=9)                    # window to the street
+    _building(d, 620, 130, 360, 900, 4)
+    _building(d, 790, 170, 280, 900, 6)
+    d.line([(780, 260), (780, 900)], width=7, wobble=1)
+    for x in (200, 420):                                                                                # pendant lamps
+        d.line([(x, 0), (x, 300)], width=5, wobble=1)
+        d.polygon([(x - 60, 380), (x + 60, 380), (x + 30, 300), (x - 30, 300)], fill=(255, 214, 120), width=6)
+    d.polygon([(40, 960), (520, 960), (520, 1380), (40, 1380)], fill=(176, 130, 92), width=8)           # the counter
+    d.polygon([(40, 920), (520, 920), (520, 970), (40, 970)], fill=(214, 176, 130), width=7)
+    d.polygon([(90, 800), (190, 800), (190, 920), (90, 920)], fill=(120, 128, 140), width=7)            # the coffee machine
+    for i in range(3):                                                                                  # steam
+        x = 140 + math.sin(t * 2 + i) * 8
+        d.line([(x + i * 14 - 14, 780), (x + i * 14 - 6, 700), (x + i * 14 - 14, 640)], width=5, wobble=2, fill=(200, 200, 206))
+    _rect(d, 0, 1380, W, H, (190, 150, 110))
+    d.line([(0, 1380), (W, 1384)], width=7, wobble=2)
+    d.polygon([(700, 1260), (940, 1260), (940, 1290), (700, 1290)], fill=(214, 176, 130), width=7)      # a little table
+    d.line([(820, 1290), (820, 1420)], width=10, wobble=1)
+
+
+def airport(d, t):
+    _rect(d, 0, 0, W, 1380, (226, 232, 240))
+    d.polygon([(60, 240), (1020, 240), (1020, 940), (60, 940)], fill=SKY, width=9)                      # the big window
+    x = (t * 40) % 900 + 120
+    d.polygon([(x - 150, 640), (x + 120, 620), (x + 190, 590), (x + 120, 650), (x - 150, 670)], fill=PAPER, width=6)
+    d.polygon([(x - 150, 640), (x - 190, 560), (x - 130, 600)], fill=PAPER, width=5)
+    d.line([(60, 940), (1020, 940)], width=9, wobble=1)
+    d.polygon([(300, 80), (780, 80), (780, 200), (300, 200)], fill=(40, 56, 90), width=7)               # a departures board
+    for i, y in enumerate((110, 140, 170)):
+        d.line([(330, y), (330 + 200 + (i % 2) * 120, y)], width=6, wobble=0.5, fill=(255, 214, 120))
+    _rect(d, 0, 1380, W, H, (206, 208, 214))
+    d.line([(0, 1380), (W, 1384)], width=7, wobble=2)
+    for x in range(80, 1000, 160):                                                                      # a row of seats
+        d.polygon([(x, 1240), (x + 110, 1240), (x + 110, 1380), (x, 1380)], fill=(90, 110, 150), width=7)
+
+
+def hospital(d, t):
+    _rect(d, 0, 0, W, 1380, (226, 240, 244))
+    d.polygon([(470, 200), (610, 200), (610, 340), (470, 340)], fill=(255, 255, 255), width=7)             # a red cross
+    d.polygon([(520, 220), (560, 220), (560, 320), (520, 320)], fill=(214, 70, 70), outline=None)
+    d.polygon([(490, 250), (590, 250), (590, 290), (490, 290)], fill=(214, 70, 70), outline=None)
+    d.polygon([(560, 1040), (1040, 1040), (1040, 1380), (560, 1380)], fill=(240, 244, 248), width=8)        # a bed
+    d.polygon([(560, 1000), (1040, 1000), (1040, 1100), (560, 1100)], fill=(190, 214, 236), width=7)
+    d.polygon([(100, 700), (320, 700), (320, 920), (100, 920)], fill=(30, 40, 56), width=8)                # a monitor, a heartbeat
+    pts = []
+    for i in range(12):
+        x = 120 + i * 16
+        phase = (i - int(t * 6) % 12)
+        pts.append((x, 810 + (-60 if phase == 0 else 50 if phase == 1 else 0)))
+    d.line(pts, width=6, wobble=0.3, fill=(110, 255, 160))
+    _rect(d, 0, 1380, W, H, (206, 222, 226))
+    d.line([(0, 1380), (W, 1384)], width=7, wobble=2)
+
+
+def school(d, t):
+    _rect(d, 0, 0, W, 1380, (238, 232, 214))
+    d.polygon([(90, 300), (990, 300), (990, 840), (90, 840)], fill=(60, 110, 92), width=12)               # a green board
+    d.line([(160, 400), (560, 404)], width=6, wobble=2, fill=(240, 240, 236))
+    d.line([(160, 480), (760, 476)], width=6, wobble=2, fill=(240, 240, 236))
+    d.text((820, 600), "A+", font=None, fill=(240, 240, 236)) if False else d.line([(760, 560), (820, 680), (880, 560)], width=7, wobble=1, fill=(240, 240, 236))
+    d.ellipse([480, 90, 600, 210], fill=PAPER, width=7)                                                    # a clock
+    a = t * 0.5
+    d.line([(540, 150), (540 + math.sin(a) * 40, 150 - math.cos(a) * 40)], width=6, wobble=0.3)
+    _rect(d, 0, 1380, W, H, (198, 176, 140))
+    d.line([(0, 1380), (W, 1384)], width=7, wobble=2)
+    for x in (120, 470, 820):                                                                              # desks
+        d.polygon([(x, 1240), (x + 200, 1240), (x + 200, 1280), (x, 1280)], fill=(214, 176, 130), width=7)
+        d.line([(x + 20, 1280), (x + 20, 1400)], width=8, wobble=1)
+        d.line([(x + 180, 1280), (x + 180, 1400)], width=8, wobble=1)
+
+
+def cave(d, t):
+    _rect(d, 0, 0, W, H, (92, 82, 88))
+    d.polygon([(0, 0), (W, 0), (W, 200), (900, 340), (760, 180), (560, 420), (380, 200), (180, 380), (0, 220)], fill=(64, 56, 64), width=8, wobble=2)
+    for x, h in ((140, 250), (420, 330), (700, 210), (930, 300)):                                            # stalactites
+        d.polygon([(x - 40, 160), (x + 40, 160), (x, 160 + h)], fill=(76, 68, 76), width=7)
+    pulse = 24 + math.sin(t * 3) * 6
+    for cx, cy in ((260, 1180), (820, 1090)):                                                                # glowing crystals
+        d.ellipse([cx - pulse * 3, cy - pulse * 3, cx + pulse * 3, cy + pulse * 3], fill=(120, 130, 168), outline=None)
+        d.polygon([(cx - 36, cy + 50), (cx - 14, cy - 80), (cx + 12, cy + 50)], fill=(150, 220, 255), width=6)
+        d.polygon([(cx, cy + 50), (cx + 30, cy - 50), (cx + 54, cy + 50)], fill=(190, 240, 255), width=6)
+    _rect(d, 0, 1380, W, H, (70, 62, 66))
+    d.line([(0, 1380), (W, 1384)], width=7, wobble=3)
+    d.ellipse([880, 600, 1000, 720], fill=(255, 190, 90), width=6)                                           # a torch, lit
+    d.line([(940, 720), (940, 860)], width=14, wobble=1)
+
+
+def island(d, t):
+    _rect(d, 0, 0, W, 1000, SKY)
+    _rect(d, 0, 1000, W, H, SEA)
+    _sun(d, 840, 420, 90, t)
+    _cloud(d, (t * 14) % 1300 - 220, 280, 1.0)
+    d.line([(0, 1000), (W, 1004)], width=6, wobble=2)
+    for i in range(6):
+        _wave(d, 1080 + i * 90, t, i, amp=10)
+    d.polygon([(120, 1380), (260, 1300), (820, 1300), (980, 1380), (1060, 1480), (20, 1480)], fill=SAND, width=8)     # a small island
+    base = (240, 1310)
+    sway = math.sin(t * 1.3) * 10
+    d.line([base, (base[0] + 40 + sway * 0.5, 1010), (base[0] + 70 + sway, 760)], width=22, wobble=2)
+    for ang in (-150, -110, -70, -30, 10, 40):
+        a = math.radians(ang)
+        tip = (base[0] + 70 + sway + math.cos(a) * 220, 760 + math.sin(a) * 110 + 40)
+        d.polygon([(base[0] + 70 + sway, 760), (tip[0], tip[1] - 30), (tip[0] + 30, tip[1] + 24)], fill=(120, 190, 120), width=6)
+    _bird(d, 600, 600, t)
+
+
+def castle(d, t):
+    _rect(d, 0, 0, W, 1380, (214, 228, 246))
+    _sun(d, 190, 360, 80, t)
+    d.polygon([(0, 1000), (320, 880), (700, 1010), (W, 900), (W, 1380), (0, 1380)], fill=(190, 214, 176), width=7, wobble=2)
+    for x0, w, h in ((140, 190, 700), (700, 220, 800)):                                                       # two towers
+        d.polygon([(x0, 1300), (x0, 1300 - h), (x0 + w, 1300 - h), (x0 + w, 1300)], fill=STONE, width=8, wobble=1)
+        for k in range(4):
+            d.polygon([(x0 + k * (w / 4), 1300 - h), (x0 + k * (w / 4) + w / 8, 1300 - h), (x0 + k * (w / 4) + w / 8, 1300 - h - 46),
+                       (x0 + k * (w / 4), 1300 - h - 46)], fill=STONE, width=6)
+        d.polygon([(x0 + w * 0.4, 1300 - h * 0.6), (x0 + w * 0.6, 1300 - h * 0.6), (x0 + w * 0.6, 1300 - h * 0.45), (x0 + w * 0.4, 1300 - h * 0.45)], fill=(60, 56, 70), width=5)
+    d.polygon([(330, 1300), (700, 1300), (700, 760), (330, 760)], fill=(226, 218, 206), width=8, wobble=1)  # the keep between
+    d.polygon([(450, 1300), (580, 1300), (580, 1100), (515, 1050), (450, 1100)], fill=(120, 84, 60), width=8)
+    flag = math.sin(t * 4) * 12
+    d.line([(815, 500), (815, 380)], width=7, wobble=0.5)
+    d.polygon([(815, 380), (900 + flag, 410), (815, 440)], fill=(200, 60, 70), width=5)
+    _rect(d, 0, 1380, W, H, (170, 200, 150))
+    d.line([(0, 1380), (W, 1384)], width=7, wobble=3)
+
+
 PLACES = {"sea": sea, "beach": beach, "desert": desert, "city": city, "space": space, "night": night,
           "forest": forest, "mountains": mountains, "rain": rain, "underwater": underwater,
-          "room": room, "chart": chart, "office": office, "bank": bank}
+          "room": room, "chart": chart, "office": office, "bank": bank, "library": library, "prison": prison,
+          "cafe": cafe, "airport": airport, "hospital": hospital, "school": school, "cave": cave,
+          "island": island, "castle": castle}
 NAMES = tuple(PLACES)
 
 

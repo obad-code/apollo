@@ -37,3 +37,17 @@ def test_script_scenes_get_places_and_sound():
 def test_every_place_draws():
     for name in shorts_scenes.NAMES:
         shorts.frame({"pose": "stand", "prop": "none", "cam": "wide", "bg": name, "show": "man", "caption": "x"}, 0.5, 0.5, "t")
+
+
+def test_every_world_has_places_and_people():
+    for name, (places, people) in shorts.WORLDS.items():
+        assert all(p in shorts_scenes.NAMES for p in places), name
+        assert all(p in shorts.shorts_hero.SIDES for p in people), name
+
+
+def test_every_prop_and_side_character_draws():
+    hero = shorts.shorts_hero.hero_for("t")
+    for prop in shorts.PROPS:
+        shorts.frame({"pose": "stand", "prop": prop, "cam": "wide", "bg": "room", "show": "man", "caption": "x", "_hero": hero}, 0.5, 0.5, "t")
+    for side in shorts.shorts_hero.SIDES:
+        shorts.frame({"pose": "sad", "prop": "none", "cam": "wide", "bg": "room", "show": "man", "friend": side, "caption": "x", "_hero": hero}, 0.5, 0.5, "t")

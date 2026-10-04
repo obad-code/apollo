@@ -29,7 +29,7 @@ import uuid
 log = logging.getLogger("apollo.telegram")
 
 HELP = ("short about <topic> - one Short\ntoday - today's Shorts from the trends\n"
-        "post <number> - post that one\nskip - post nothing today\nstyle <instructions> - how every Short should be told\nstatus")
+        "post <number> - post that one (post all - both)\nskip - post nothing today\nstyle <instructions> - how every Short should be told\nstatus")
 DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 
 
@@ -99,12 +99,15 @@ def offer_shorts(made, question):
     send(question)
 
 
-def handle(text, make_short=None, make_batch=None, choose=None, status=None, set_style=None, find_niches=None, pick_niche=None):
+def handle(text, make_short=None, make_batch=None, choose=None, status=None, set_style=None, find_niches=None, pick_niche=None, choose_all=None):
     """What to do with one message; returns the reply. The doers are injectable."""
     t = (text or "").strip().translate(DIGITS)
     low = t.lower()
     if low in ("/start", "/help", "help", "مساعدة"):
         return HELP
+    if re.match(r"^/?(post all|نزل الكل|نزل الاثنين|انشر الكل|انشر الاثنين)", low):
+        r = choose_all()
+        return r.get("result") or r.get("error") or "Done."
     m = re.match(r"^/?(?:post|نزل|انشر)\s*(?:رقم\s*|number\s*|#)?(\d)\b", low)
     if m:
         r = choose(int(m.group(1)))
@@ -152,7 +155,7 @@ def _wire():
         make_batch=lambda: crew.desk("LYLA").take("Make today's Shorts from the trends", short=True, batch=autopost.COUNT),
         find_niches=lambda: crew.desk("LYLA").take("Find the best niches for the channel", niche=True),
         pick_niche=__import__("niche").choose,
-        choose=autopost.choose, status=status, set_style=lambda text, add=True: shorts.set_style(text, add) if text or not add else shorts.style_notes())
+        choose=autopost.choose, choose_all=autopost.choose_all, status=status, set_style=lambda text, add=True: shorts.set_style(text, add) if text or not add else shorts.style_notes())
 
 
 def start(stopping):
