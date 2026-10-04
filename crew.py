@@ -218,7 +218,38 @@ class LylaDesk(lyla.Desk):
     """LYLA's desk: a connectors job goes straight to them, with no reading;
     a Short is made here, step by step, so its card shows how it is going."""
 
+    def _niche(self, job):
+        import time as _t
+        import niche
+        started = _t.monotonic()
+        self._tell(job, stage="received", text=job["task"], by="Apollo")
+        try:
+            self._tell(job, stage="step", text="Researching niches")
+            rows = niche.ask()
+            niche.save(rows)
+            job.update(ok=True, brain="Gemini", sources={}, report=niche.render(rows),
+                       summary=f"Best niche now: {rows[0]['niche']} - say \"niche 1\" to pick it, or another number.")
+        except Exception as e:  # noqa: BLE001
+            log.warning("niche research failed: %s", e)
+            job.update(ok=False, summary="", report="", error=str(e) or type(e).__name__)
+        job["took"] = int((_t.monotonic() - started) * 1000)
+        job["done"] = _t.time()
+        if job["ok"]:
+            self._tell(job, stage="done", text=job["summary"], report=job["report"], ms=job["took"], brain="Gemini")
+            lyla.keep_file(job)
+            self.reports.insert(0, {k: job.get(k, "") for k in ("task", "symbol", "summary", "report",
+                                                                 "brain", "asked", "done", "took", "file", "link")})
+            del self.reports[lyla.KEEP:]
+            lyla._save_reports(self.reports, self.path)
+        else:
+            self.last_error = {"when": job["done"], "why": job["error"], "task": job["task"]}
+            self.failures = (self.failures + [job["done"]])[-50:]
+            self._tell(job, stage="error", text=job["error"])
+        self._pass_on(job)
+
     def run(self, job):
+        if job.get("niche"):
+            return self._niche(job)
         if not job.get("short"):
             return super().run(job)
         import time as _t

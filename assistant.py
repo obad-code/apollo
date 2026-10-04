@@ -1813,6 +1813,13 @@ def report_agent(ui, voice, job):
             f"about a stock, say it is a read, not advice. The full report is "
             f"there if they ask for more (crew_findings).")
         fallback = f"{who} is done: {job['summary']}"
+        if job.get("niche"):
+            try:
+                import telegram_bot
+                if telegram_bot.ready():
+                    telegram_bot.send_report(job["report"] + "\n\nPick one: niche 1, niche 2 ...")
+            except Exception:  # noqa: BLE001
+                logging.getLogger("apollo").info("niche to telegram failed", exc_info=True)
         if job.get("ask_pick"):
             instruction = (f"LYLA made today's YouTube Shorts and asks which one to post. "
                            f"Read the user this, short, in their language: {job['summary']} "

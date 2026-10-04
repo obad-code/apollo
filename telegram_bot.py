@@ -86,6 +86,12 @@ def send_video(path, caption="", to=None):
         return False
 
 
+def send_report(text):
+    """A long report, in the chat, in pieces Telegram accepts."""
+    for i in range(0, len(text), 3800):
+        send(text[i:i + 3800])
+
+
 def offer_shorts(made, question):
     """Today's Shorts, as videos in the chat, then the question."""
     for i, m in enumerate(made, 1):
@@ -93,7 +99,7 @@ def offer_shorts(made, question):
     send(question)
 
 
-def handle(text, make_short=None, make_batch=None, choose=None, status=None, set_style=None):
+def handle(text, make_short=None, make_batch=None, choose=None, status=None, set_style=None, find_niches=None, pick_niche=None):
     """What to do with one message; returns the reply. The doers are injectable."""
     t = (text or "").strip().translate(DIGITS)
     low = t.lower()
@@ -108,6 +114,13 @@ def handle(text, make_short=None, make_batch=None, choose=None, status=None, set
     if re.match(r"^/?(today|trends?|ترند|اليوم)\b", low):
         make_batch()
         return "LYLA is reading the trends and making today's Shorts - a few minutes. They'll arrive here."
+    m = re.match(r"^/?(?:niche|نيش)\s*(\d*)\b", low)
+    if m:
+        if m.group(1):
+            r = pick_niche(int(m.group(1)))
+            return r.get("result") or r.get("error")
+        find_niches()
+        return "LYLA is researching the best niches - a minute or two. I'll send the list here."
     m = re.match(r"^/?(?:short|شورت|مقطع|سوي)\s*(?:about|عن)?\s*(.*)$", t, re.I | re.S)
     if m:
         make_short(m.group(1).strip())
@@ -137,6 +150,8 @@ def _wire():
     return dict(
         make_short=lambda topic: shorts.make_in_background(None, topic),
         make_batch=lambda: crew.desk("LYLA").take("Make today's Shorts from the trends", short=True, batch=autopost.COUNT),
+        find_niches=lambda: crew.desk("LYLA").take("Find the best niches for the channel", niche=True),
+        pick_niche=__import__("niche").choose,
         choose=autopost.choose, status=status, set_style=lambda text, add=True: shorts.set_style(text, add) if text or not add else shorts.style_notes())
 
 

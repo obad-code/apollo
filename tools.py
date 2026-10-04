@@ -1344,6 +1344,26 @@ def _short_style(ctx, instructions="", clear=False):
     return {"ok": True, "result": f"Saved. LYLA's standing instructions: {notes or 'none'}"}
 
 
+@_tool("find_niches", "LYLA is researching niches",
+       "LYLA researches the best niches for the faceless Shorts channel right now: a ranked "
+       "list of ten with competition, earning estimates and first video ideas. Use it for "
+       "\"ليلى دوري لي على أفضل نيش\", \"what niche should the channel be\". Takes a minute; "
+       "returns at once.",
+       _obj({}, ()))
+def _find_niches(ctx):
+    crew.desk("LYLA").take("Find the best niches for the channel", niche=True)
+    return {"ok": True, "result": "LYLA is on it - the list lands on her card and in Telegram."}
+
+
+@_tool("pick_niche", "choosing the niche",
+       "Make one of the niches LYLA listed the channel's niche, by its number (1 is the best). "
+       "Use it for \"اختار النيش رقم ٣\".",
+       _obj({"number": {"type": "integer", "description": "Which niche, 1-based"}}, ("number",)))
+def _pick_niche(ctx, number):
+    import niche
+    return niche.choose(int(number))
+
+
 @_tool("post_short", "posting the Short",
        "Post one of today's Shorts that LYLA made to YouTube, after she asked which one. "
        "number is 1, 2, 3...; 0 means post none today. Use it for \"نزل رقم ٢\", "

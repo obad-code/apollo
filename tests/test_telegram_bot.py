@@ -24,3 +24,23 @@ def test_style_notes(tmp_path, monkeypatch):
     assert shorts.set_style("slow and calm") == "slow and calm"
     assert shorts.set_style("no money talk") == "slow and calm\nno money talk"
     assert shorts.set_style("", False) == ""
+
+
+def test_niche_commands(monkeypatch, tmp_path):
+    import json
+    import niche
+    import shorts
+    monkeypatch.setattr(niche, "path", lambda: str(tmp_path / "n.json"))
+    monkeypatch.setattr(shorts, "style_file", lambda: str(tmp_path / "s.txt"))
+    rows = niche.ask(2, think=lambda p: json.dumps([{"niche": "History twists", "angle": "a", "ideas": ["x", "y"]},
+                                                    {"niche": "Money habits", "angle": "b"}]))
+    assert len(rows) == 2 and "History twists" in niche.render(rows)
+    niche.save(rows)
+    assert niche.choose(2)["ok"] and "Money habits" in shorts.style_notes()
+    assert niche.choose(1)["ok"] and shorts.style_notes().count("Channel niche:") == 1
+    assert not niche.choose(9)["ok"]
+    calls = []
+    out = tb.handle("niche 2", pick_niche=lambda n: calls.append(n) or {"result": "ok"})
+    assert calls == [2] and out == "ok"
+    tb.handle("نيش", find_niches=lambda: calls.append("find"))
+    assert calls[-1] == "find"
