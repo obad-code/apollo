@@ -356,6 +356,18 @@ WORKSPACE_ID = os.environ.get("ANTHROPIC_WORKSPACE_ID", "").strip()
 client = anthropic.Anthropic(
     default_headers={"anthropic-workspace-id": WORKSPACE_ID} if WORKSPACE_ID else None
 )
+
+
+def _drop_bad_workspace(error):
+    """A workspace the key does not belong to is a 404 on every call. The key
+    alone is enough, so the header goes and the call is tried again."""
+    global client, WORKSPACE_ID
+    if WORKSPACE_ID and "workspace" in str(error).lower():
+        log.warning("ANTHROPIC_WORKSPACE_ID %s was refused; going on without it", WORKSPACE_ID)
+        WORKSPACE_ID = ""
+        client = anthropic.Anthropic()
+        return True
+    return False
 history = []
 
 # Set to False automatically if this account can't use the fallback beta.
@@ -735,6 +747,12 @@ def _send(request, stream=False):
     global use_fallbacks
 
     try:
+        response = _call(request, use_fallbacks, stream)
+        _note_usage(response)
+        return response
+    except anthropic.NotFoundError as e:
+        if not _drop_bad_workspace(e):
+            raise
         response = _call(request, use_fallbacks, stream)
         _note_usage(response)
         return response
@@ -1471,7 +1489,12 @@ def check_api():
         )
 
     try:
-        client.models.retrieve(CLAUDE_MODEL)
+        try:
+            client.models.retrieve(CLAUDE_MODEL)
+        except anthropic.NotFoundError as e:
+            if not _drop_bad_workspace(e):
+                raise
+            client.models.retrieve(CLAUDE_MODEL)
     except anthropic.APIConnectionError as e:
         raise Offline(f"Couldn't reach the API. Check your internet.\n  {e}")
     except anthropic.APIStatusError as e:
