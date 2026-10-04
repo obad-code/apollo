@@ -94,8 +94,9 @@ def send_report(text):
 
 def offer_shorts(made, question):
     """Today's Shorts, as videos in the chat, then the question."""
+    import shorts
     for i, m in enumerate(made, 1):
-        send_video(m["path"], f"{i}. {m['title']}")
+        send_video(m["path"], f"{i}. {m['title']}\n(build {shorts.VERSION})")
     send(question)
 
 
@@ -137,7 +138,8 @@ def handle(text, make_short=None, make_batch=None, choose=None, status=None, set
             return "Style notes cleared."
         return "Saved. From the next Short: " + set_style(m.group(1))
     if low in ("/status", "status", "الحالة"):
-        return status()
+        import shorts
+        return f"{status()}\nbuild: {shorts.VERSION}"
     return HELP
 
 

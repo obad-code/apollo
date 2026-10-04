@@ -34,6 +34,7 @@ import threading
 log = logging.getLogger("apollo.shorts")
 
 # FFmpeg is run many times per Short; without this each run flashes a black console window on Windows
+VERSION = "2026.10.04-r6 (vector, worlds, transitions, refined scripts)"      # shown in Telegram so you know which build made a Short
 NOWIN = {"creationflags": 0x08000000} if os.name == "nt" else {}
 
 W, H, FPS = 1080, 1920, 15
@@ -72,10 +73,13 @@ PROPS = ("none", "note", "book", "key", "coffee", "map", "phone", "suitcase", "t
 
 SYSTEM = (
     "You write YouTube Shorts scripts for a faceless channel in a flat 2D vector, bold-outline "
-    "animation style: a blank-faced narrator-hero and the story shown on screen. 40-55 seconds "
-    "spoken, brisk and gripping: the first line is a hook that lands in two seconds. Each scene "
-    "is ONE sentence of 6 to 14 words, 9 to 12 scenes, and every scene SHOWS something - never "
-    "just a man talking. WRITING RULES: vary sentence length constantly (short fragments beside "
+    "animation style: a blank-faced narrator-hero and the story shown on screen. 50-60 seconds "
+    "spoken (140 to 165 words in all). Build a real arc: a hook that lands in two seconds, the "
+    "setup, the rising problem, the twist or the key insight, the payoff, then one line the viewer "
+    "can repeat. EXPLAIN FULLY: say what happened, WHY it happened and what it means - a stranger "
+    "must understand the whole idea, with concrete names, places, numbers and cause and effect, "
+    "never vague claims. 8 to 10 scenes, each 1 or 2 flowing sentences of 14 to 26 words, and every "
+    "scene SHOWS something - never just a man talking. WRITING RULES: vary sentence length constantly (short fragments beside "
     "longer ones, never three sentences in a row with the same shape); never state an emotion, "
     "show it through an action or a detail; every money figure is oddly specific ($34, $1,847 - "
     "never $1,000); banned words: delve, moreover, furthermore, game-changer, unlock, elevate, "
@@ -88,8 +92,9 @@ SYSTEM = (
     + ', "sfx": one of ' + json.dumps(SFX) + ', "grade": one of ' + json.dumps(GRADES)
     + ', "tier": 1 broke / 2 stable / 3 established / 4 elite (his clothes), "friend": one of '
     + json.dumps(SIDES) + " (a side character with a real face, when one is in the beat)}]}. "
-    "Pick the bg that matches what is told in that very scene and change it as the story moves. "
-    "grade is the mood: warm = comfort or progress, cool = stress or hardship, neutral = facts, "
+    "Pick the bg that matches what is told in that very scene; stay inside one world and change place "
+    "only when the story truly moves. Keep the same side character throughout. "
+    "grade is the mood (ladder stories only): warm = comfort or progress, cool = stress or hardship, neutral = facts, "
     "night = high stakes or late at night. sfx: boom for a shock, ding for a win or an idea, pop "
     "when an object appears, riser before a reveal, whoosh otherwise. Keep the camera moving, "
     "never the same cam twice in a row, fisheye and shake at most once.")
@@ -143,13 +148,15 @@ def ask_script(kind, topic="", think=None, world=""):
     if think is None:
         import lyla
         notes = style_notes()
-        text, _brain = lyla.think(prompt, (SYSTEM.replace("9 to 12 scenes", "6 to 8 scenes") if IMAGES else SYSTEM) + (f" The channel owner's standing instructions, always follow them: {notes}" if notes else ""))
+        text, _brain = lyla.think(prompt, (SYSTEM.replace("8 to 10 scenes", "6 to 8 scenes") if IMAGES else SYSTEM) + (f" The channel owner's standing instructions, always follow them: {notes}" if notes else ""))
     else:
         text = think(prompt)
     found = re.search(r"\{.*\}", text or "", re.S)
     if not found:
         raise RuntimeError("The script did not come back as JSON.")
     data = json.loads(found.group(0))
+    if os.environ.get("SHORTS_REFINE", "1").strip().lower() not in ("0", "false", "no", "off"):
+        data = _refine(data, think, prompt) or data
     scenes = [s for s in data.get("scenes", []) if str(s.get("say", "")).strip()]
     if not scenes:
         raise RuntimeError("The script had no scenes.")
@@ -168,8 +175,52 @@ def ask_script(kind, topic="", think=None, world=""):
     for i, s in enumerate(scenes):
         if s.get("cam") not in CAMS or (i and s["cam"] == scenes[i - 1]["cam"]):
             s["cam"] = CAMS[i % len(CAMS)]
+    _lock_consistency(scenes, kind, world)
     data["scenes"] = scenes
     return data
+
+
+REFINE = ("You are the editor. Below is a draft Shorts script as JSON. Improve it and return the SAME JSON schema, "
+          "nothing else. Check and fix: (1) does it FULLY explain the idea - what, why, and what it means - so a "
+          "stranger understands it; add the missing cause-and-effect and concrete detail; (2) a hook that lands in two "
+          "seconds, a clear arc, a closing line worth repeating; (3) specific figures, no banned words (delve, moreover, "
+          "furthermore, game-changer, unlock, elevate, navigate, landscape, embark, tapestry); (4) every scene sentence "
+          "has something visual to show; (5) 140-165 words in total; (6) captions at most 4 words. Keep every field "
+          "(bg, show, pose, prop, cam, sfx, tier, friend) valid. Draft:\n")
+
+
+def _refine(data, think, prompt):
+    """A second pass by the model as editor; the first draft stands if it does not come back clean."""
+    try:
+        if think is None:
+            import lyla
+            text, _ = lyla.think(REFINE + json.dumps(data, ensure_ascii=False), SYSTEM)
+        else:
+            text = think(REFINE + json.dumps(data, ensure_ascii=False))
+        found = re.search(r"\{.*\}", text or "", re.S)
+        better = json.loads(found.group(0)) if found else None
+        return better if better and len(better.get("scenes", [])) >= 4 else None
+    except Exception:  # noqa: BLE001 - the draft is still good
+        log.info("script refine failed", exc_info=True)
+        return None
+
+
+def _lock_consistency(scenes, kind, world):
+    """One look for the whole video: the places stay in one world, the same side character,
+    the same clothes and colour - unless it is a wealth ladder, where those change on purpose."""
+    places = WORLDS[world][0] if world in WORLDS else ()
+    last = places[0] if places else ""
+    friend = next((s["friend"] for s in scenes if s.get("friend")), "")
+    tier = scenes[0].get("tier", 2)
+    for s in scenes:
+        if places and s["bg"] not in places:
+            s["bg"] = last
+        if s["bg"]:
+            last = s["bg"]
+        if friend and s.get("friend"):
+            s["friend"] = friend
+        if kind != "ladder":
+            s["tier"], s["grade"] = tier, ""
 
 
 # -- drawing -------------------------------------------------------------------------
@@ -756,8 +807,8 @@ def _with_sound(padded, scene, first, work):
         return padded
 
 
-def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
-    """The whole video. Returns out_path."""
+def _render_cuts(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
+    """The whole video as separate scene clips joined with hard cuts (used when numpy is missing)."""
     work = work or tempfile.mkdtemp(prefix="short-")
     parts = []
     hero = shorts_hero.hero_for(script.get("title", "") or work)          # picked once, locked for the whole video
@@ -798,6 +849,117 @@ def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
     return out_path
 
 
+TRANS = 0.3       # seconds two scenes overlap in a transition
+TRANSITIONS = ("slide", "fade", "zoom", "whip")
+
+
+def _transition(a, b, p, kind):
+    """The picture `p` (0..1) of the way from scene picture `a` to `b`."""
+    from PIL import Image, ImageFilter
+    p = _ease(p)
+    if kind == "fade":
+        return Image.blend(a, b, p)
+    if kind == "zoom":                                   # a pushes in and dissolves into b
+        z = 1 + 0.45 * p
+        cw, ch = W / z, H / z
+        zoomed = a.resize((W, H), Image.BILINEAR, box=((W - cw) / 2, (H - ch) / 2, (W + cw) / 2, (H + ch) / 2))
+        return Image.blend(zoomed, b, p)
+    shift = int(W * p)                                   # slide / whip: b pushes a out to the left
+    out = Image.new("RGB", (W, H))
+    out.paste(a, (-shift, 0))
+    out.paste(b, (W - shift, 0))
+    if kind == "whip":
+        out = out.filter(ImageFilter.GaussianBlur(26 * math.sin(math.pi * p)))
+    return out
+
+
+def _pick_transitions(scenes):
+    """Same place: a soft fade. A new place: slide, zoom or whip, never the same twice running."""
+    kinds, last = [], ""
+    for i, sc in enumerate(scenes):
+        if i == 0:
+            kinds.append("")
+            continue
+        same = sc.get("bg") == scenes[i - 1].get("bg")
+        pool = ("fade",) if same else tuple(k for k in TRANSITIONS if k != "fade" and k != last) or TRANSITIONS
+        last = pool[(i * 7) % len(pool)]
+        kinds.append(last)
+    return kinds
+
+
+def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
+    """The whole video in one pass, with real transitions between scenes. Returns out_path."""
+    try:
+        import numpy as np
+        import shorts_sfx
+    except ImportError:
+        return _render_cuts(script, out_path, speak_fn, work, step)
+    work = work or tempfile.mkdtemp(prefix="short-")
+    scenes = script["scenes"]
+    hero = shorts_hero.hero_for(script.get("title", "") or work)          # picked once, locked for the whole video
+    for scene in scenes:
+        scene["_hero"] = hero
+    if IMAGES:
+        _pictures(scenes, hero, os.path.join(work, "art"), step)
+    # 1. every scene's voice, with its sound under it
+    infos = []
+    for i, scene in enumerate(scenes):
+        step(f"Scene {i + 1} of {len(scenes)}: voice and sound")
+        audio = os.path.join(work, f"s{i}.mp3")
+        speak_fn(scene["say"], audio)
+        spoken = duration(audio)
+        padded = _pad(audio, os.path.join(work, f"s{i}.wav"))
+        mixed = _with_sound(padded, scene, first=(i == 0), work=os.path.join(work, f"s{i}m.wav"))
+        infos.append({"wav": mixed, "spoken": spoken, "length": LEAD + spoken + PAUSE})
+    # 2. the timeline: each scene starts TRANS before the last one ends
+    starts, at = [], 0.0
+    for info in infos:
+        starts.append(at)
+        at += info["length"] - TRANS
+    total = starts[-1] + infos[-1]["length"]
+    master = np.zeros(int(total * shorts_sfx.SR) + 1, dtype=np.float32)
+    for st, info in zip(starts, infos):
+        voice, _rate = shorts_sfx.read_wav(info["wav"])
+        s0 = int(st * shorts_sfx.SR)
+        edge = int(0.05 * shorts_sfx.SR)
+        voice[:edge] *= np.linspace(0, 1, edge)
+        voice[-edge:] *= np.linspace(1, 0, edge)
+        master[s0:s0 + len(voice)] += voice
+    master_wav = os.path.join(work, "master.wav")
+    shorts_sfx.write_wav(master_wav, master / max(1.0, float(np.max(np.abs(master)))))
+    # 3. the picture, scene by scene, blended where two overlap
+    kinds = _pick_transitions(scenes)
+    cmd = [_ffmpeg(), "-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", str(FPS), "-i", "-",
+           "-i", master_wav, "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+           "-preset", "veryfast", "-c:a", "aac", "-b:a", "160k", "-t", f"{total:.2f}", out_path]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE, **NOWIN)
+    title = script.get("title", "")
+
+    def pic(i, T):
+        local = T - starts[i]
+        return frame(scenes[i], local, max(0.0, local - LEAD) / max(0.1, infos[i]["spoken"]), title)
+
+    try:
+        frames = int(total * FPS)
+        for f in range(frames):
+            if f % (FPS * 4) == 0:
+                step(f"Drawing the video: {int(100 * f / frames)}%")
+            T = f / FPS
+            i = max(k for k in range(len(starts)) if starts[k] <= T)
+            if i and T < starts[i] + TRANS:
+                img = _transition(pic(i - 1, T), pic(i, T), (T - starts[i]) / TRANS, kinds[i])
+            else:
+                img = pic(i, T)
+            img.save(proc.stdin, "PNG", compress_level=1)
+        proc.stdin.close()
+    except (BrokenPipeError, OSError):
+        pass            # FFmpeg stopped early: its own message says why, below
+    err = proc.stderr.read().decode("utf-8", "replace").strip()
+    if proc.wait() != 0:
+        raise RuntimeError("FFmpeg could not make the video: " + (err[-400:] or "no message"))
+    return out_path
+
+
 def folder():
     import files
     path = os.path.join(files.root(), "Shorts")
@@ -821,7 +983,7 @@ def make(kind=None, topic="", think=None, speak_fn=speak, now=None, step=lambda 
     render(script, base + ".mp4", speak_fn, step=step)
     step("Joining the scenes")
     notes = (f"{script.get('title', '')}\n\n{script.get('description', '')}\n\n"
-             + " ".join(script.get("hashtags", []) + ["#shorts"]))
+             + " ".join(script.get("hashtags", []) + ["#shorts"]) + f"\n\n[made by Apollo build {VERSION}]")
     with open(base + ".txt", "w", encoding="utf-8") as f:
         f.write(notes)
     log.info("short made: %s", base)

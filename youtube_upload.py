@@ -34,6 +34,7 @@ def read_notes(notes_path):
             text = f.read()
     except OSError:
         return "Short", "#shorts", ["shorts"]
+    text = "\n".join(line for line in text.splitlines() if not line.startswith("[made by Apollo build"))
     parts = [p.strip() for p in text.split("\n\n")]
     title = (parts[0] or "Short")[:95]
     if "#shorts" not in title.lower():

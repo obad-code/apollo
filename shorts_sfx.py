@@ -12,8 +12,8 @@ import wave
 import numpy as np
 
 SR = 24000
-GAIN_AMBIENT = 0.16
-GAIN_ACCENT = 0.5
+GAIN_AMBIENT = 0.09
+GAIN_ACCENT = 0.36
 
 
 def _noise(n, seed=0):
