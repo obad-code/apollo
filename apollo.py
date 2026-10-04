@@ -1140,6 +1140,20 @@ class Api:
         os.startfile(full)  # noqa: S606 - a file Apollo wrote, in its own folder
         return True
 
+    def crew_image(self, path):
+        """A picture an agent made (a Short's preview), as a data: address the page can show -
+        only ever one inside Documents\\Apollo, and not a huge one."""
+        import base64
+        import files
+        full = os.path.normpath(str(path or ""))
+        base = os.path.normpath(files.root())
+        if (not full or os.path.commonpath([full, base]) != base or not os.path.isfile(full)
+                or not full.lower().endswith((".png", ".jpg", ".jpeg")) or os.path.getsize(full) > 6 * 1024 * 1024):
+            return ""
+        with open(full, "rb") as f:
+            kind = "png" if full.lower().endswith(".png") else "jpeg"
+            return f"data:image/{kind};base64," + base64.b64encode(f.read()).decode("ascii")
+
     def open_crew_folder(self):
         import files
         folder = os.path.join(files.root(), "Crew")

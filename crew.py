@@ -238,7 +238,8 @@ class LylaDesk(lyla.Desk):
             self._tell(job, stage="done", text=job["summary"], report=job["report"], ms=job["took"], brain="Gemini")
             lyla.keep_file(job)
             self.reports.insert(0, {k: job.get(k, "") for k in ("task", "symbol", "summary", "report",
-                                                                 "brain", "asked", "done", "took", "file", "link")})
+                                                                 "brain", "asked", "done", "took", "file", "link",
+                                                                 "video", "preview")})
             del self.reports[lyla.KEEP:]
             lyla._save_reports(self.reports, self.path)
         else:
@@ -271,12 +272,15 @@ class LylaDesk(lyla.Desk):
                         if n == job["batch"] and not made:
                             raise
                 autopost.offer(made)
+                if made:
+                    job["video"], job["preview"] = made[0]["path"], made[0].get("preview", "")
                 job.update(ok=True, brain="Gemini", sources={}, ask_pick=True,
                            summary=autopost.question(made),
                            report="\n".join(f"{i + 1}. {m['title']}  -  {m['path']}" for i, m in enumerate(made)))
             else:
                 import autopost
                 made = shorts.make(job.get("kind") or None, job.get("topic", ""), step=step)
+                job["video"], job["preview"] = made["path"], made.get("preview", "")
                 autopost.offer([made])                  # waits for your word: post, private draft, or keep the file
                 job.update(ok=True, brain="Gemini", sources={}, ask_pick=True,
                            summary=autopost.question([made]),
@@ -290,7 +294,8 @@ class LylaDesk(lyla.Desk):
             self._tell(job, stage="done", text=job["summary"], report=job["report"], ms=job["took"], brain="Gemini")
             lyla.keep_file(job)
             self.reports.insert(0, {k: job.get(k, "") for k in ("task", "symbol", "summary", "report",
-                                                                 "brain", "asked", "done", "took", "file", "link")})
+                                                                 "brain", "asked", "done", "took", "file", "link",
+                                                                 "video", "preview")})
             del self.reports[lyla.KEEP:]
             lyla._save_reports(self.reports, self.path)
         else:
@@ -375,7 +380,8 @@ def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=No
                          "summary": report.get("summary", ""), "took": report.get("took", 0),
                          "brain": report.get("brain", ""), "done": done,
                          "file": report.get("file", ""), "link": report.get("link", ""), "report": (report.get("report", "") or "")[:6000],
-                         "symbol": report.get("symbol", ""), "verdict": report.get("verdict", ""), "tone": report.get("tone", "")})
+                         "symbol": report.get("symbol", ""), "verdict": report.get("verdict", ""), "tone": report.get("tone", ""),
+                         "video": report.get("video", ""), "preview": report.get("preview", ""), "took_ms": report.get("took", 0)})
             if done >= start:
                 agents[name]["done_today"] += 1
                 hours[name][dt.datetime.fromtimestamp(done).hour] += 1

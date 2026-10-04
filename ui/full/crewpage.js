@@ -122,7 +122,7 @@ function card(key, a, open, now, analysis = null) {
       ? `<p class="cc-now"><i class="cc-dot s-failing"></i>Last job failed</p><small>${esc(short((a.error || {}).why, 80))}</small>`
       : last
         ? `<p class="cc-now"><i class="cc-dot s-idle"></i>${chip(last)}${esc(short(last.summary || last.task, 70))}</p>
-           <button type="button" class="cp-open" data-file="${esc(last.file || '')}" data-link="${esc(last.link || '')}" data-report="${esc(last.report || last.summary || '')}">${last.link ? 'Open on GitHub ›' : 'Open report ›'}</button>`
+           <button type="button" class="cp-open" data-key="${key}" data-i="0">${last.video ? 'Watch the Short ›' : last.symbol ? 'Read the analysis ›' : 'Read the report ›'}</button>`
         : '<p class="cc-now"><i class="cc-dot s-idle"></i>Ready · nothing yet</p>';
   const steps = a.working ? (a.steps || []) : [];
   const results = (a.results || []).slice(0, 6);
@@ -137,11 +137,7 @@ function card(key, a, open, now, analysis = null) {
       ${analysis ? '' : `<h4>HOW IT WORKS</h4>${flowMarkup(key, a.working ? Math.min(stageOf(a), 3) : -1)}`}
       <h4>${a.working ? 'LIVE' : 'RESULTS'}</h4>
       ${a.working ? `<ul>${steps.map((x) => `<li>· ${esc(short(x.text || x.stage, 70))}</li>`).join('') || '<li>Starting…</li>'}</ul>`
-        : results.length ? `<ul>${results.map((r) => r.symbol
-          ? `<li class="cc-res"><button type="button" class="cp-deep${analysis === r.symbol ? ' on' : ''}" data-symbol="${esc(r.symbol)}">${chip(r)}${String(r.summary || '').toUpperCase().startsWith(r.symbol) ? '' : `<b>${esc(r.symbol)}</b> `}${esc(short(r.summary || r.task, 52))} ${analysis === r.symbol ? '▾' : '›'}</button>
-             <button type="button" class="cp-open cp-mini" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}" data-report="${esc(r.report || r.summary || '')}">report</button></li>
-             ${analysis === r.symbol ? `<li class="cc-analysis-row"><section class="cc-analysis verdict">${analysisHtml(r.symbol)}</section></li>` : ''}`
-          : `<li><button type="button" class="cp-open" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}" data-report="${esc(r.report || r.summary || '')}">${esc(short(r.summary || r.task, 60))} ›</button></li>`).join('')}</ul>`
+        : results.length ? `<ul>${results.map((r, i) => `<li><button type="button" class="cp-open cp-row" data-key="${key}" data-i="${i}">${chip(r)}${r.video ? '▶ ' : ''}${esc(short(r.summary || r.task, 64))} ›</button></li>`).join('')}</ul>`
           : '<p>No results yet.</p>'}
     </div>` : ''}
   </article>`;
