@@ -16,3 +16,11 @@ def test_commands():
     assert run("لا تنزل شي")[1] == [("choose", 0)]
     assert run("today")[1] == [("batch",)]
     assert run("hello")[0] == tb.HELP
+
+
+def test_style_notes(tmp_path, monkeypatch):
+    import shorts
+    monkeypatch.setattr(shorts, "style_file", lambda: str(tmp_path / "s.txt"))
+    assert shorts.set_style("slow and calm") == "slow and calm"
+    assert shorts.set_style("no money talk") == "slow and calm\nno money talk"
+    assert shorts.set_style("", False) == ""

@@ -29,7 +29,7 @@ import uuid
 log = logging.getLogger("apollo.telegram")
 
 HELP = ("short about <topic> - one Short\ntoday - today's Shorts from the trends\n"
-        "post <number> - post that one\nskip - post nothing today\nstatus")
+        "post <number> - post that one\nskip - post nothing today\nstyle <instructions> - how every Short should be told\nstatus")
 DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 
 
@@ -93,7 +93,7 @@ def offer_shorts(made, question):
     send(question)
 
 
-def handle(text, make_short=None, make_batch=None, choose=None, status=None):
+def handle(text, make_short=None, make_batch=None, choose=None, status=None, set_style=None):
     """What to do with one message; returns the reply. The doers are injectable."""
     t = (text or "").strip().translate(DIGITS)
     low = t.lower()
@@ -112,6 +112,14 @@ def handle(text, make_short=None, make_batch=None, choose=None, status=None):
     if m:
         make_short(m.group(1).strip())
         return "LYLA is on it - a few minutes. I'll send it here."
+    m = re.match(r"^/?(?:style|ستايل|اسلوب)\s*(.*)$", t, re.I | re.S)
+    if m:
+        if not m.group(1).strip():
+            return "Style notes: " + (set_style(None, True) or "none yet") + "\n(style clear = wipe them)"
+        if m.group(1).strip().lower() in ("clear", "مسح"):
+            set_style("", False)
+            return "Style notes cleared."
+        return "Saved. From the next Short: " + set_style(m.group(1))
     if low in ("/status", "status", "الحالة"):
         return status()
     return HELP
@@ -129,7 +137,7 @@ def _wire():
     return dict(
         make_short=lambda topic: shorts.make_in_background(None, topic),
         make_batch=lambda: crew.desk("LYLA").take("Make today's Shorts from the trends", short=True, batch=autopost.COUNT),
-        choose=autopost.choose, status=status)
+        choose=autopost.choose, status=status, set_style=lambda text, add=True: shorts.set_style(text, add) if text or not add else shorts.style_notes())
 
 
 def start(stopping):

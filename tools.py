@@ -1332,6 +1332,18 @@ def _make_short(ctx, topic="", kind=None):
     return {"ok": True, "result": "LYLA is making it - a few minutes. It lands in Documents\\Apollo\\Shorts."}
 
 
+@_tool("short_style", "LYLA's Shorts style",
+       "Save a standing instruction for how LYLA tells every Short from now on - what to "
+       "talk about, the pace, the tone, what to avoid. Use it for \"ليلى خلي المقاطع ...\", "
+       "\"من الحين مقاطعك لازم ...\". clear=true wipes the saved instructions. It changes "
+       "the story and the narration, not the drawing style (that is code).",
+       _obj({"instructions": _str("What to always do"), "clear": {"type": "boolean", "description": "Wipe the saved ones"}}, ()))
+def _short_style(ctx, instructions="", clear=False):
+    import shorts
+    notes = shorts.set_style("", False) if clear else shorts.set_style(instructions)
+    return {"ok": True, "result": f"Saved. LYLA's standing instructions: {notes or 'none'}"}
+
+
 @_tool("post_short", "posting the Short",
        "Post one of today's Shorts that LYLA made to YouTube, after she asked which one. "
        "number is 1, 2, 3...; 0 means post none today. Use it for \"نزل رقم ٢\", "

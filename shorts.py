@@ -61,6 +61,29 @@ SYSTEM = (
     "his desk) for explaining, and a held prop only when it truly fits. Keep poses calm.")
 
 
+def style_file():
+    import files
+    return os.path.join(files.root(), "shorts_style.txt")
+
+
+def style_notes():
+    """The owner's standing instructions for every Short (what to tell, how slow, what to avoid)."""
+    try:
+        with open(style_file(), encoding="utf-8") as f:
+            return f.read().strip()[:2000]
+    except OSError:
+        return ""
+
+
+def set_style(text, add=True):
+    """Save (or add to) the standing instructions; "" clears them."""
+    text = (text or "").strip()
+    keep = style_notes() if add and text else ""
+    with open(style_file(), "w", encoding="utf-8") as f:
+        f.write((keep + "\n" + text).strip() if text else "")
+    return style_notes()
+
+
 def kind_for(day):
     """A fact one day, a story the next."""
     return "fact" if day.toordinal() % 2 == 0 else "story"
@@ -72,7 +95,8 @@ def ask_script(kind, topic="", think=None):
               f"Topic: {topic or 'your choice - something people would share'}.")
     if think is None:
         import lyla
-        text, _brain = lyla.think(prompt, SYSTEM)
+        notes = style_notes()
+        text, _brain = lyla.think(prompt, SYSTEM + (f" The channel owner's standing instructions, always follow them: {notes}" if notes else ""))
     else:
         text = think(prompt)
     found = re.search(r"\{.*\}", text or "", re.S)
