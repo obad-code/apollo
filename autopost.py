@@ -62,8 +62,8 @@ def pick_topics(count=COUNT, found=None, think=None):
     found = trends() if found is None else found
     prompt = (f"Pick {count} topics. Trending now: {', '.join(found) or 'unknown - use your judgement'}.")
     if think is None:
-        import lyla
-        text, _ = lyla.think(prompt, PICK_SYSTEM)
+        import shorts
+        text = shorts._write(prompt, PICK_SYSTEM)
     else:
         text = think(prompt)
     m = re.search(r"\[.*\]", text or "", re.S)

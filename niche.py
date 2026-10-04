@@ -28,8 +28,8 @@ def path():
 def ask(count=10, think=None):
     prompt = f"List the {count} best niches, ranked. Language of the text: English."
     if think is None:
-        import lyla
-        text, _ = lyla.think(prompt, SYSTEM)
+        import shorts
+        text = shorts._write(prompt, SYSTEM)
     else:
         text = think(prompt)
     found = re.search(r"\[.*\]", text or "", re.S)
