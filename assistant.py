@@ -362,10 +362,12 @@ def _drop_bad_workspace(error):
     """A workspace the key does not belong to is a 404 on every call. The key
     alone is enough, so the header goes and the call is tried again."""
     global client, WORKSPACE_ID
-    if WORKSPACE_ID and "workspace" in str(error).lower():
+    if (WORKSPACE_ID or os.environ.get("ANTHROPIC_WORKSPACE_ID")) and "workspace" in str(error).lower():
         log.warning("ANTHROPIC_WORKSPACE_ID %s was refused; going on without it", WORKSPACE_ID)
         WORKSPACE_ID = ""
-        client = anthropic.Anthropic()
+        # The SDK can read the variable itself too: clear it before rebuilding.
+        os.environ.pop("ANTHROPIC_WORKSPACE_ID", None)
+        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         return True
     return False
 history = []
