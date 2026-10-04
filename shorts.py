@@ -54,7 +54,9 @@ IMAGES = os.environ.get("SHORTS_IMAGES", "").strip().lower() == "gemini"       #
 STYLE = (os.environ.get("SHORTS_STYLE") or "vector").strip().lower()      # vector (flat, cel-shaded) or ink (pencil)
 WRITER = os.environ.get("SHORTS_WRITER", "").strip().lower()                  # "claude" writes the scripts with Claude (paid)
 CLAUDE_WRITER = os.environ.get("SHORTS_CLAUDE_MODEL") or "claude-sonnet-5-5"
-ENGINE = os.environ.get("SHORTS_VOICE_ENGINE", "").strip().lower()            # "gemini" speaks with Gemini's voices (paid)
+ENGINE = os.environ.get("SHORTS_VOICE_ENGINE", "").strip().lower()            # "gemini" or "elevenlabs": paid, more human voices
+ELEVEN_VOICE = os.environ.get("SHORTS_ELEVEN_VOICE") or "JBFqnCBsd6RMkjVDRZzb"
+ELEVEN_MODEL = os.environ.get("SHORTS_ELEVEN_MODEL") or "eleven_multilingual_v2"
 GEMINI_VOICE = os.environ.get("SHORTS_GEMINI_VOICE") or "Charon"
 TTS_MODEL = os.environ.get("SHORTS_TTS_MODEL") or "gemini-2.5-flash-preview-tts"
 GRADES = shorts_hero.GRADES
@@ -78,12 +80,15 @@ PROPS = ("none", "note", "book", "key", "coffee", "map", "phone", "suitcase", "t
 
 SYSTEM = (
     "You write YouTube Shorts scripts for a faceless channel in a flat 2D vector, bold-outline "
-    "animation style: a blank-faced narrator-hero and the story shown on screen. 50-60 seconds "
-    "spoken (140 to 165 words in all). Build a real arc: a hook that lands in two seconds, the "
+    "animation style: a blank-faced narrator-hero and the story shown on screen. 40-50 seconds "
+    "spoken (115 to 140 words in all - short Shorts are watched to the end). Something must change "
+    "on screen at least every 3 seconds. Build a real arc: a hook that lands in two seconds, the "
     "setup, the rising problem, the twist or the key insight, the payoff, then one line the viewer "
     "can repeat. EXPLAIN FULLY: say what happened, WHY it happened and what it means - a stranger "
     "must understand the whole idea, with concrete names, places, numbers and cause and effect, "
-    "never vague claims. 8 to 10 scenes, each 1 or 2 flowing sentences of 14 to 26 words, and every "
+    "never vague claims. The very last line must lead straight back into the first line, so the "
+    "Short loops without a seam (a replay counts as another view). 8 to 9 scenes, each 1 or 2 "
+    "flowing sentences of 12 to 22 words, and every "
     "scene SHOWS something - never just a man talking. WRITING RULES: vary sentence length constantly (short fragments beside "
     "longer ones, never three sentences in a row with the same shape); never state an emotion, "
     "show it through an action or a detail; every money figure is oddly specific ($34, $1,847 - "
@@ -243,7 +248,7 @@ REFINE = ("You are the editor. Below is a draft Shorts script as JSON. Improve i
           "stranger understands it; add the missing cause-and-effect and concrete detail; (2) a hook that lands in two "
           "seconds, a clear arc, a closing line worth repeating; (3) specific figures, no banned words (delve, moreover, "
           "furthermore, game-changer, unlock, elevate, navigate, landscape, embark, tapestry); (4) every scene sentence "
-          "has something visual to show; (5) 140-165 words in total; (6) captions at most 4 words. Keep every field "
+          "has something visual to show; (5) 115-140 words in total, ending on a line that loops back to the opening; (6) captions at most 4 words. Keep every field "
           "(bg, show, pose, prop, cam, sfx, tier, friend) valid. Draft:\n")
 
 
@@ -292,8 +297,10 @@ def _lock_consistency(scenes, kind, world):
             s["friend"] = friend
         if kind not in WEALTH_KINDS:
             s["tier"], s["grade"] = tier, ""
-    if kind in WEALTH_KINDS and len(scenes) > 2:       # the anchor: the story ends where it began
+    if len(scenes) > 2:                                # the story ends where it began: a seamless loop
         scenes[-1]["bg"] = scenes[0]["bg"]
+        if kind in WEALTH_KINDS:
+            scenes[-1]["tier"] = scenes[0]["tier"] if not scenes[-1].get("newcomer") else 1
 
 
 # -- drawing -------------------------------------------------------------------------
@@ -738,7 +745,7 @@ def frame(scene, t, progress, title):
         cw, ch = W / z, H / z
         left = min(max(fx - cw / 2, 0), W - cw)
         top = min(max(fy - ch / 2, 0), H - ch)
-        return _caption(world.resize((W, H), Image.BILINEAR, box=(left * SS, top * SS, (left + cw) * SS, (top + ch) * SS)), scene, progress, title)
+        return _caption(world.resize((W, H), Image.BILINEAR, box=(left * SS, top * SS, (left + cw) * SS, (top + ch) * SS)), scene, progress, title, t)
     world = _background(pose, (int(W * SS), int(H * SS)))
     raw = ImageDraw.Draw(world)
     d = Pen(raw, SS, seed=int(t * 6))
@@ -788,7 +795,7 @@ def frame(scene, t, progress, title):
             pass
     if scene.get("grade") and STYLE == "vector":
         img = shorts_hero.grade(img, scene["grade"])
-    return _caption(img, scene, progress, title)
+    return _caption(img, scene, progress, title, t)
 
 
 def _stat(d, stat, arrow, near, t):
@@ -809,11 +816,12 @@ def _stat(d, stat, arrow, near, t):
                    (ax + 14, ay - sign * 60), (ax + 14, ay - sign * 22), (ax + 44, ay - sign * 22)], fill=col, outline=INK, width=6, wobble=0)
 
 
-def _caption(img, scene, progress, title):
+def _caption(img, scene, progress, title, age=9.0):
     from PIL import Image, ImageDraw
     # the caption sits on the screen, never zoomed: calm ink type, the spoken words dark
     d = ImageDraw.Draw(img)
-    big, small = _font(78), _font(34)
+    pop = 1 + 0.16 * max(0.0, 1 - age / 0.22)          # each new caption pops in, a beat the eye catches
+    big = _font(int(78 * pop))
     words = scene["caption"].split()
     lit = max(1, math.ceil(len(words) * min(1.0, progress * 1.1)))
     lines, cur = [], []
@@ -823,7 +831,7 @@ def _caption(img, scene, progress, title):
             cur = []
         cur.append(w)
     lines.append(cur)
-    y, n = 190, 0
+    y, n = 400, 0                                         # below the app's top bar, far above the bottom 20%
     rtl = LANG == "ar"
     widest = max(d.textlength(" ".join(line), font=big) for line in lines)
     card = Image.new("RGBA", img.size, (0, 0, 0, 0))
@@ -839,7 +847,6 @@ def _caption(img, scene, progress, title):
             d.text((x, y), w, font=big, fill=INK if n <= lit else (176, 174, 170))
             x += d.textlength(w + " ", font=big)
         y += 100
-    d.text((W / 2, 1850), title[:40], font=small, fill=(165, 163, 158), anchor="mm")
     return img
 
 
@@ -868,7 +875,27 @@ def _gemini_pcm(text, voice):
     raise RuntimeError("Gemini returned no audio")
 
 
+def _eleven_mp3(text):
+    """ElevenLabs text-to-speech: MP3 bytes. Tests replace this."""
+    import json as _json
+    import urllib.request
+    req = urllib.request.Request(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVEN_VOICE}?output_format=mp3_44100_128",
+        _json.dumps({"text": text, "model_id": ELEVEN_MODEL}).encode(),
+        {"xi-api-key": os.environ.get("ELEVENLABS_API_KEY", ""), "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=120) as r:  # noqa: S310 - fixed https host
+        return r.read()
+
+
 def speak(text, path, voice=VOICE):
+    if ENGINE == "elevenlabs" and os.environ.get("ELEVENLABS_API_KEY"):
+        try:
+            data = _eleven_mp3(text)
+            with open(path, "wb") as f:
+                f.write(data)
+            return
+        except Exception as e:  # noqa: BLE001 - the free voice is still there
+            log.info("ElevenLabs voice failed (%s); using the free voice", str(e)[:160])
     if ENGINE == "gemini" and os.environ.get("GEMINI_API_KEY"):
         try:
             import wave

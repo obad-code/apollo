@@ -96,3 +96,12 @@ def test_claude_writes_when_asked_and_gemini_voice_makes_a_wav(tmp_path, monkeyp
     shorts.speak("hello", out)
     with wave.open(out) as w:
         assert w.getframerate() == 24000 and w.getnframes() == 2400
+
+
+def test_elevenlabs_voice_is_written_and_falls_back(tmp_path, monkeypatch):
+    monkeypatch.setattr(shorts, "ENGINE", "elevenlabs")
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "k")
+    monkeypatch.setattr(shorts, "_eleven_mp3", lambda text: b"ID3fake")
+    out = tmp_path / "v.mp3"
+    shorts.speak("hi", str(out))
+    assert out.read_bytes() == b"ID3fake"
