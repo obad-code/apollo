@@ -37,7 +37,7 @@ log = logging.getLogger("apollo.shorts")
 NOWIN = {"creationflags": 0x08000000} if os.name == "nt" else {}
 
 W, H, FPS = 1080, 1920, 15
-LEAD, PAUSE = 0.45, 1.0      # a breath before each scene's words and after them: it is a story, not a rant
+LEAD, PAUSE = 0.12, 0.3      # a short breath around each scene's words: brisk, but never a rant
 LANG = (os.environ.get("SHORTS_LANG") or "en").lower()
 VOICE = os.environ.get("SHORTS_VOICE") or ("ar-SA-HamedNeural" if LANG == "ar" else "en-US-AndrewNeural")
 GLASSES = os.environ.get("SHORTS_GLASSES", "1").strip().lower() in ("1", "true", "yes", "on")
@@ -45,20 +45,28 @@ HOUR = int(os.environ.get("SHORTS_HOUR") or 13)
 
 POSES = ("stand", "wave", "point", "think", "shock", "run", "cheer", "sad", "shrug")
 CAMS = ("close", "push", "fisheye", "pull", "shake", "pan", "wide")
+import shorts_scenes
+BGS = ("none",) + shorts_scenes.NAMES
+SHOWS = ("man", "env")
+SFX = ("whoosh", "pop", "ding", "boom", "riser", "click")
 PROPS = ("none", "note", "question", "exclaim", "bulb", "money", "clock", "skull", "heart", "earth", "fire")
 
 SYSTEM = (
-    "You write YouTube Shorts scripts for a hand-drawn ink stick-man channel, told like a calm "
-    "story: a narrator who takes his time, never rushing and never rambling. 40-55 seconds "
-    "spoken. The first line is a hook that makes people stay. Each scene is ONE or TWO full "
-    "flowing sentences - give every idea room, with a breath between scenes. No music, nothing "
-    "indecent, nothing against Islam. Answer ONLY with JSON: "
+    "You write YouTube Shorts scripts for a hand-drawn ink channel: a stick-man narrator AND the "
+    "story shown on screen. 40-55 seconds spoken, brisk and gripping like a top Shorts channel: "
+    "the first line is a hook that lands in two seconds. Each scene is ONE sentence of 6 to 14 "
+    "words, 9 to 12 scenes, and every scene SHOWS something - never just a man talking. If the "
+    "story is about the sea, show the sea; about a city, the city; money, a chart. No music, "
+    "nothing indecent, nothing against Islam. Answer ONLY with JSON: "
     '{"title": "...", "description": "...", "hashtags": ["#..."], "scenes": [{"say": '
-    '"what the narrator says", "caption": "3-6 key words", "pose": one of '
-    + json.dumps(POSES) + ', "prop": one of ' + json.dumps(PROPS) + ', "cam": one of ' + json.dumps(CAMS)
-    + "}]} with 5 to 7 scenes. The camera drifts slowly: open on a close-up for the hook, never "
-    "the same cam twice in a row, fisheye and shake at most once. Use prop \"note\" (he writes at "
-    "his desk) for explaining, and a held prop only when it truly fits. Keep poses calm.")
+    '"what the narrator says", "caption": "2-5 key words", "bg": one of '
+    + json.dumps(BGS) + ', "show": "man" or "env" (env = just the place, no narrator, for big '
+    'establishing shots), "pose": one of ' + json.dumps(POSES) + ', "prop": one of ' + json.dumps(PROPS)
+    + ', "cam": one of ' + json.dumps(CAMS) + ', "sfx": one of ' + json.dumps(SFX)
+    + "}]}. Pick the bg that matches what is being told in that very scene and change it as the story "
+    "moves. sfx is the sound on the cut: boom for a shock, ding for a win or an idea, pop when an "
+    "object appears, riser before a reveal, whoosh otherwise. Keep the camera moving, never the "
+    "same cam twice in a row, fisheye and shake at most once.")
 
 
 def style_file():
@@ -110,6 +118,10 @@ def ask_script(kind, topic="", think=None):
         s["pose"] = s.get("pose") if s.get("pose") in POSES else "stand"
         s["prop"] = s.get("prop") if s.get("prop") in PROPS else "none"
         s["caption"] = str(s.get("caption") or s["say"])[:60]
+    for s in scenes:
+        s["bg"] = s.get("bg") if s.get("bg") in shorts_scenes.NAMES else ""
+        s["show"] = s.get("show") if s.get("show") in SHOWS and s["bg"] else "man"
+        s["sfx"] = s.get("sfx") if s.get("sfx") in SFX else ""
     for i, s in enumerate(scenes):
         if s.get("cam") not in CAMS or (i and s["cam"] == scenes[i - 1]["cam"]):
             s["cam"] = CAMS[i % len(CAMS)]
@@ -140,10 +152,17 @@ def _font(size):
 class Pen:
     """A pen that draws like a hand: every line wobbles a little, and the wobble
     changes a few times a second (the 'boil' of hand-drawn animation). Everything
-    is in plain 1080x1920 numbers; the picture itself is drawn k times bigger."""
+    is in plain 1080x1920 numbers; the picture itself is drawn k times bigger.
+    `place()` shrinks what is drawn next about a point, to put the man small in a scene."""
 
     def __init__(self, d, k, seed=0):
         self.d, self.k, self.seed, self.n = d, k, seed, 0
+        self.s, self.ax, self.ay, self.tx, self.ty = 1.0, 0.0, 0.0, 0.0, 0.0
+
+    def place(self, scale=1.0, anchor=(0, 0), to=None):
+        self.s, (self.ax, self.ay) = scale, anchor
+        self.tx, self.ty = to if to is not None else anchor
+        return self
 
     def _rand(self):
         self.n += 1
@@ -153,6 +172,12 @@ class Pen:
         if pts and isinstance(pts[0], (int, float)):
             pts = list(zip(pts[::2], pts[1::2]))
         return list(pts)
+
+    def _m(self, x, y):
+        return ((self.tx + (x - self.ax) * self.s) * self.k, (self.ty + (y - self.ay) * self.s) * self.k)
+
+    def _w(self, width):
+        return max(1, round(width * self.k * (self.s if self.s < 1 else 1)))
 
     def _wobble(self, pts, amount):
         rnd, out = self._rand(), []
@@ -166,20 +191,17 @@ class Pen:
 
     def line(self, pts, fill=INK, width=7, wobble=2.2):
         pts = self._wobble(self._pts(pts), wobble)
-        s = [(x * self.k, y * self.k) for x, y in pts]
-        w = max(1, round(width * self.k))
-        self.d.line(s, fill=fill, width=w, joint="curve")
+        sc = [self._m(x, y) for x, y in pts]
+        w = self._w(width)
+        self.d.line(sc, fill=fill, width=w, joint="curve")
         r = w / 2 - 0.5
-        for x, y in (s[0], s[-1]):
+        for x, y in (sc[0], sc[-1]):
             self.d.ellipse([x - r, y - r, x + r, y + r], fill=fill)
-
-    def curve(self, pts, **kw):
-        self.line(pts, **kw)
 
     def polygon(self, pts, fill=None, outline=INK, width=7, wobble=2.2):
         pts = self._pts(pts)
         if fill is not None:
-            self.d.polygon([(x * self.k, y * self.k) for x, y in pts], fill=fill)
+            self.d.polygon([self._m(x, y) for x, y in pts], fill=fill)
         if outline:
             self.line(pts + [pts[0]], fill=outline, width=width, wobble=wobble)
 
@@ -187,7 +209,8 @@ class Pen:
         x0, y0, x1, y1 = box
         cx, cy, rx, ry = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2
         if fill is not None:
-            self.d.ellipse([x0 * self.k, y0 * self.k, x1 * self.k, y1 * self.k], fill=fill)
+            (a, b), (c, e) = self._m(x0, y0), self._m(x1, y1)
+            self.d.ellipse([a, b, c, e], fill=fill)
         if outline:
             rnd = self._rand()
             start = rnd.uniform(0, 6.28)
@@ -196,7 +219,9 @@ class Pen:
             self.line(pts, fill=outline, width=width, wobble=wobble * 0.6)
 
     def dot(self, c, r, fill=INK):
-        self.d.ellipse([(c[0] - r) * self.k, (c[1] - r) * self.k, (c[0] + r) * self.k, (c[1] + r) * self.k], fill=fill)
+        x, y = self._m(*c)
+        rr = r * self.k * (self.s if self.s < 1 else 1)
+        self.d.ellipse([x - rr, y - rr, x + rr, y + rr], fill=fill)
 
     def arc(self, box, start, end, width=7):
         x0, y0, x1, y1 = box
@@ -219,9 +244,9 @@ class Pen:
             x += gap
 
     def text(self, xy, text, font=None, fill=INK, anchor=None):
-        x, y = xy[0] * self.k, xy[1] * self.k
+        x, y = self._m(*xy)
         if hasattr(font, "font_variant"):
-            font = font.font_variant(size=max(1, int(font.size * self.k)))
+            font = font.font_variant(size=max(1, int(font.size * self.k * (self.s if self.s < 1 else 1))))
         self.d.text((x, y), text, font=font, fill=fill, anchor=anchor)
 
 
@@ -487,11 +512,23 @@ def frame(scene, t, progress, title):
     world = _background(pose, (int(W * SS), int(H * SS)))
     raw = ImageDraw.Draw(world)
     d = Pen(raw, SS, seed=int(t * 6))
-    ground = 1500
-    cx = W / 2
-    head = draw_man(d, cx, ground, pose, t, talking=progress < 1, prop=scene["prop"])
+    ground, cx = 1500, W / 2
+    bg, show = scene.get("bg", ""), scene.get("show", "man")
+    if bg:
+        shorts_scenes.draw(d, bg, t)
+    k, mx = (0.7, W * 0.62) if bg else (1.0, cx)         # in a place he is smaller, off to one side
+    if show == "env":
+        head, body = (W / 2, 700), (W / 2, 900)
+    else:
+        d.place(k, (cx, ground), (mx, ground))
+        head = draw_man(d, cx, ground, pose, t, talking=progress < 1, prop=scene["prop"])
+        d.place()
+        head = (mx + (head[0] - cx) * k, ground + (head[1] - ground) * k)
+        body = (mx, ground + (1000 - ground) * k)
     # the camera: crop the big world to a window and scale it to the screen
-    z, fx, fy, bulge = camera(scene.get("cam", "wide"), t, progress, head, (cx, 1000))
+    z, fx, fy, bulge = camera(scene.get("cam", "wide"), t, progress, head, body)
+    if bg:
+        z = 1.0 + (z - 1.0) * 0.55                       # keep the place in view
     cw, ch = W / z, H / z
     left = min(max(fx - cw / 2, 0), W - cw)
     top = min(max(fy - ch / 2, 0), H - ch)
@@ -515,6 +552,12 @@ def frame(scene, t, progress, title):
     lines.append(cur)
     y, n = 190, 0
     rtl = LANG == "ar"
+    widest = max(d.textlength(" ".join(line), font=big) for line in lines)
+    card = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(card).rounded_rectangle([W / 2 - widest / 2 - 40, y - 24, W / 2 + widest / 2 + 40, y + 100 * len(lines) + 4],
+                                           radius=36, fill=PAPER + (238,))
+    img = Image.alpha_composite(img.convert("RGBA"), card).convert("RGB")
+    d = ImageDraw.Draw(img)
     for line in lines:
         text_w = d.textlength(" ".join(line), font=big)
         x = W / 2 - text_w / 2
@@ -537,7 +580,7 @@ def _ffmpeg():
 def speak(text, path, voice=VOICE):
     import asyncio
     import edge_tts
-    asyncio.run(edge_tts.Communicate(text, voice, rate="-8%").save(path))
+    asyncio.run(edge_tts.Communicate(text, voice, rate="+8%").save(path))
 
 
 def duration(path):
@@ -556,6 +599,22 @@ def _pad(audio, out):
     return out
 
 
+def _with_sound(padded, scene, first, work):
+    """The voice with the sound of the place and the accents on the cut; the bare voice if numpy is missing."""
+    try:
+        import shorts_sfx
+    except ImportError:
+        return padded
+    accent = scene.get("sfx") or ({"shock": "boom", "cheer": "ding"}.get(scene.get("pose"))
+                                  or ("pop" if scene.get("prop") not in (None, "none", "note") else ""))
+    cues = [(0.0, "riser" if first else "whoosh")] + ([(LEAD + 0.1, accent)] if accent else [])
+    try:
+        return shorts_sfx.mix(padded, work, scene.get("bg", ""), cues)
+    except Exception:  # noqa: BLE001 - a sound that fails never costs the video
+        log.info("sound mix failed", exc_info=True)
+        return padded
+
+
 def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
     """The whole video. Returns out_path."""
     work = work or tempfile.mkdtemp(prefix="short-")
@@ -568,6 +627,7 @@ def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
         secs = LEAD + spoken + PAUSE
         clip = os.path.join(work, f"s{i}.mp4")
         padded = _pad(audio, os.path.join(work, f"s{i}.wav"))
+        padded = _with_sound(padded, scene, first=(i == 0), work=os.path.join(work, f"s{i}m.wav"))
         cmd = [_ffmpeg(), "-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", str(FPS),
                "-i", "-", "-i", padded, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
                "-c:a", "aac", "-t", f"{secs:.2f}", clip]
