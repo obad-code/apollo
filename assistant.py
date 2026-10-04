@@ -93,7 +93,7 @@ HOTKEY = "ctrl+alt"         # hold this to talk
 LISTEN_TOGGLE = "ctrl+1"    # ...or press this once to stop having to hold it
 SAMPLE_RATE = 16000         # what Whisper expects
 WHISPER_SIZE = "small"      # multilingual (Arabic + English); a backup now - see WhisperBackup
-CLAUDE_MODEL = "claude-opus-5"
+CLAUDE_MODEL = os.environ.get("APOLLO_CLAUDE_MODEL") or "claude-opus-5-5"
 VOICE_RATE = 185            # words per minute for the spoken reply
 MIN_SECONDS = 0.4           # ignore accidental taps shorter than this
 # Turning mic RMS into the 0-1 number the orb blooms on. Measured on this
