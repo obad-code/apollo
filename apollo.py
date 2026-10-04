@@ -1181,6 +1181,18 @@ class Api:
         """Ping each brain the crew thinks with; what each said."""
         return crew.check()
 
+    # -- System Check: the whole of Apollo looked over, safe fixes made (syscheck.py) --
+    def system_check(self):
+        import syscheck
+        try:
+            return dict(syscheck.run(), ok_run=True)
+        except Exception as e:  # noqa: BLE001
+            return {"ok_run": False, "error": str(e)}
+
+    def system_check_last(self):
+        import syscheck
+        return syscheck.last()
+
     def fixes(self):
         import qfixes
         return qfixes.board()

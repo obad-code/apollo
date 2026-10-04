@@ -3686,19 +3686,19 @@ body.asleep.tv-idle #sleep-copy, body.asleep.tv-idle #idle-embers, body.asleep.t
 
 /* -- Q's fixes (fixes.js) -- */
 #clock-pills { display: flex; gap: 8px; }
-#fixes-btn { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 6px 12px 6px 8px;
+#fixes-btn, #syscheck-btn { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 6px 12px 6px 8px;
   border-radius: 999px; border: 1px solid rgba(255, 214, 150, .18); background: rgba(14, 14, 17, .55);
   color: var(--caption); font: 700 10px var(--hud); letter-spacing: .2em; text-transform: uppercase; cursor: pointer;
   position: relative; backdrop-filter: blur(10px); transition: color .3s, border-color .3s; }
-#fixes-btn svg { width: 18px; height: 18px; color: var(--amber); }
-#fixes-btn:hover { color: var(--cream); border-color: rgba(255, 214, 150, .45); }
-#fixes-btn .dg-dot { position: absolute; top: 3px; left: 20px; width: 7px; height: 7px; border-radius: 50%;
+#fixes-btn svg, #syscheck-btn svg { width: 18px; height: 18px; color: var(--amber); }
+#fixes-btn:hover, #syscheck-btn:hover { color: var(--cream); border-color: rgba(255, 214, 150, .45); }
+#fixes-btn .dg-dot, #syscheck-btn .dg-dot { position: absolute; top: 3px; left: 20px; width: 7px; height: 7px; border-radius: 50%;
   background: var(--amber-hot); box-shadow: 0 0 10px var(--amber-hot); opacity: 0; transition: .4s; }
-#fixes-btn.ready { color: var(--amber-bright); border-color: rgba(255, 176, 0, .5); }
-#fixes-btn.ready .dg-dot { opacity: 1; animation: dg-pulse 2.4s ease-in-out infinite; }
-#fixes { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 40px;
+#fixes-btn.ready, #syscheck-btn.ready { color: var(--amber-bright); border-color: rgba(255, 176, 0, .5); }
+#fixes-btn.ready .dg-dot, #syscheck-btn.ready .dg-dot { opacity: 1; animation: dg-pulse 2.4s ease-in-out infinite; }
+#fixes, #syscheck { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 40px;
   background: rgba(4, 4, 6, .62); backdrop-filter: blur(14px); opacity: 0; pointer-events: none; transition: opacity .35s; }
-#fixes.on { opacity: 1; pointer-events: auto; }
+#fixes.on, #syscheck.on { opacity: 1; pointer-events: auto; }
 .fx-sheet { width: min(980px, 100%); }
 .fx-btn, .fx-ask button { padding: 9px 16px; border-radius: 999px; border: 0; cursor: pointer; font: 700 11px var(--hud);
   letter-spacing: .12em; text-transform: uppercase; color: #160c00; background: var(--amber-bright); }
@@ -3725,6 +3725,22 @@ body.fx-picking, body.fx-picking * { cursor: crosshair !important; }
 .fx-ask textarea { resize: none; padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 240, 206, .14);
   background: rgba(255, 255, 255, .04); color: var(--cream); font: 400 14px var(--body, inherit); cursor: text; }
 .fx-ask div { display: flex; gap: 8px; }
+
+/* -- System Check (syscheck.js) -- */
+#syscheck-btn.ready { color: #ff8a80; border-color: rgba(255, 90, 80, .55); }
+#syscheck-btn.ready .dg-dot { background: #ff5a50; box-shadow: 0 0 10px #ff5a50; }
+.sc-sum { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: -6px 0 16px; font: 700 11px var(--hud); letter-spacing: .12em; text-transform: uppercase; }
+.sc-sum span { padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, .04); }
+.sc-sum .fail { color: #ff8a80; } .sc-sum .warn { color: var(--amber-bright); } .sc-sum .fixed { color: #7fc8ff; } .sc-sum .ok { color: var(--up); }
+.sc-sum i { color: var(--caption); font-style: normal; margin-left: auto; }
+.sc-row { display: grid; grid-template-columns: 92px 1fr; gap: 16px; align-items: center; padding: 12px 18px; margin-bottom: 8px;
+  border-radius: 14px; background: rgba(255, 255, 255, .03); border: 1px solid rgba(255, 240, 206, .06); }
+.sc-row b { font: 800 10px var(--hud); letter-spacing: .16em; color: var(--up); }
+.sc-row.warn b { color: var(--amber-bright); } .sc-row.fail b { color: #ff8a80; } .sc-row.fixed b { color: #7fc8ff; }
+.sc-row.fail { border-color: rgba(255, 90, 80, .35); }
+.sc-row em { font: 700 10px var(--hud); letter-spacing: .16em; text-transform: uppercase; color: var(--amber); font-style: normal; }
+.sc-row p { margin: 4px 0 0; color: var(--caption); font: 400 13px/1.45 var(--body, inherit); word-break: break-word; }
+.fx-sheet { max-height: calc(100vh - 80px); overflow: auto; }
 
 /* -- your projects -- */
 .deck-blank { display: grid; place-items: center; font: 800 54px var(--display, inherit); color: rgba(255, 240, 206, .25);

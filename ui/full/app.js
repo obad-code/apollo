@@ -32,6 +32,7 @@ import { IdleScenes } from './idlescenes.js';
 import { CrtTv } from './crttv.js';
 import { Digest } from './digest.js';
 import { Fixes } from './fixes.js';
+import { SystemCheck } from './syscheck.js';
 import { Board } from './board.js';
 import { IdeaView } from './ideaview.js';
 import { SummaryMode } from './summarymode.js';
@@ -1846,6 +1847,7 @@ const summaryMode = new SummaryMode($('summary-view'), {
     if (where === 'shorts') { reader.filter = 'LYLA'; openReader('ALL', 0); return; }
     if (where === 'results') { reader.filter = null; openReader('ALL', 0); return; }
     if (where === 'fixes') { fixes.open(); return; }
+    if (where === 'system' || where === 'syscheck') { syscheck.open(true); return; }
     if (where === 'idle') { const b = document.querySelector('[data-act="idle"]'); if (b) b.click(); }
   },
   open(kind, id) {
@@ -1862,6 +1864,7 @@ const summaryMode = new SummaryMode($('summary-view'), {
 });
 const digest = new Digest($('digest-btn'), $('digest'), bridge);
 const fixes = new Fixes($('fixes-btn'), $('fixes'), bridge);
+const syscheck = new SystemCheck($('syscheck-btn'), $('syscheck'), bridge);
 window.addEventListener('pywebviewready', () => { digest.check(); fixes.check(); });
 const rowFor = (symbol) =>
   [...$('watchlist').children].find((row) => row.dataset.symbol === symbol) || null;
