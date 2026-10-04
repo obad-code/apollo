@@ -14,3 +14,5 @@ Parked on 4 October 2026 at the user's request: no paid plans or new work for no
 
 When it resumes: the crew can run on a paid key (`GEMINI_CREW_KEY`) while Apollo's voice stays
 on the free `GEMINI_API_KEY`; the Claude API key check at start-up can be made optional.
+5. **context7 MCP** (suggested 4 Oct 2026) - live, current docs for Gemini and the other
+   libraries while Claude works, so retired models are caught early. The user said: later.
