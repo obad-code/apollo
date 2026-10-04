@@ -353,6 +353,9 @@ class MoneypennyDesk(CrewDesk):
                 step(f"TradingAgents failed ({e}); the built-in team takes it")
         if final is None:
             final, brain, notes = trading_team.debate(facts, ask, MONEYPENNY_SYSTEM, step)
+            if symbol:                       # said plainly, so it is never taken for TradingAgents' work
+                final += ("\n\nNote: this call is from MONEYPENNY's built-in team - TradingAgents "
+                          + ("failed on this stock." if trading_team.installed() else "is not installed (run update.bat)."))
         return final + trading_team.appendix(notes), brain
 
 

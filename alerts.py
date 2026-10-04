@@ -279,7 +279,7 @@ class Watcher:
         self.clock = clock
         self.moves = Moves()
         self.seen = self._load()
-        # What was told, kept across restarts so the weekly cap holds.
+        # What was told, kept across restarts so the hourly limit holds.
         self.sent = collections.deque(sorted(v for k, v in self.seen.items() if k.startswith("sent:")))
         self._stop = threading.Event()
         self._thread = None

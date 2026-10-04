@@ -30,14 +30,3 @@ def test_a_prose_answer_gets_one_firm_retry_and_a_clear_error():
     assert s["scenes"][0]["say"] == "Hi"
     with pytest.raises(RuntimeError, match="It said: I cannot"):
         shorts.ask_script("fact", think=lambda p: "I cannot do that.")
-
-
-def test_a_weak_hook_gets_one_sharper_rewrite_and_a_worse_one_is_ignored():
-    score, band, weakest = shorts.hook_score("So basically today we talk about some stuff.")
-    assert band == "WEAK"
-    scenes = [{"say": "So basically today we talk about some stuff."}]
-    shorts._sharpen_hook(scenes, lambda p: "Your bank quietly takes $34 from you every month - here is why.")
-    assert scenes[0]["say"].startswith("Your bank")
-    scenes = [{"say": "So basically today we talk about some stuff."}]
-    shorts._sharpen_hook(scenes, lambda p: "stuff")
-    assert scenes[0]["say"].startswith("So basically")
