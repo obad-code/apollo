@@ -2224,7 +2224,7 @@ navWheel = new OptionWheel($('nav-roller'), {
   items: NAV.map(([, label]) => label),
   onOpen: (i) => rollNav(true, NAV[i][0]),
   sound: (name) => sfx.play(name),
-  fontSize: 1.5, spacing: 1.9, tilt: 5, blur: 0.9, fade: 0.2, inset: 18,
+  fontSize: 1.25, spacing: 1.55, tilt: 4, blur: 0.5, fade: 0.14, inset: 18,
 });
 $('nav-roller').addEventListener('click', (event) => {
   const item = event.target.closest('.ow-item');

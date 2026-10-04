@@ -3397,3 +3397,17 @@ body.ultra #feed-wheel, body.ultra #crew-mini, body.ultra #room-crew { display: 
 body.ultra #headlines #feed { display: block; }
 body.osiris-map #crew-mini, body.osiris-map #room-crew { display: none !important; }
 body.viewing #crew-toggle, body.osiris-map #crew-toggle, body.roomless #crew-toggle { display: none; }
+/* the left roller: room to turn, not clipped into a box */
+body:not(.ultra):not(.viewing) #markets.rolled { overflow: visible; }
+body:not(.ultra):not(.viewing) #markets.rolled #nav-roll { height: 300px; overflow: visible; }
+body:not(.ultra):not(.viewing) #markets.rolled #nav-roller { height: 300px; overflow: visible;
+  -webkit-mask: linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent); }
+/* the roller fills the space between the clock and the crew tiles */
+body:not(.ultra):not(.viewing) #markets.rolled { align-self: stretch; padding-bottom: 150px; display: flex; flex-direction: column; }
+body:not(.ultra):not(.viewing) #markets.rolled #nav-roll { flex: 1; height: auto; min-height: 120px; }
+body:not(.ultra):not(.viewing) #markets.rolled #nav-roller { height: 100%; min-height: 120px; }
+/* crew tiles share the bottom-left cell with the status line, above it; the
+   roller gets the whole markets area again */
+body:not(.ultra):not(.viewing) #crew-mini { grid-area: status; align-self: start; margin-bottom: 72px; }
+body:not(.ultra):not(.viewing) #markets.rolled { padding-bottom: 0; }
+body:not(.ultra):not(.viewing) #markets.rolled #nav-roll { min-height: 220px; }
