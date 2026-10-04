@@ -1818,6 +1818,10 @@ def report_agent(ui, voice, job):
                            f"Read the user this, short, in their language: {job['summary']} "
                            f"When they answer, call post_short with the number.")
             try:
+                import autopost
+                import telegram_bot
+                if telegram_bot.ready():
+                    telegram_bot.offer_shorts(autopost.load().get("made", []), job["summary"])
                 import emailer
                 if emailer.ready():
                     emailer.send("LYLA: which Short should I post?", job["summary"] + "\n\n" + job["report"])

@@ -2383,6 +2383,8 @@ class Apollo:
             f"{r.get('result') or ('the Short upload failed: ' + r.get('error', ''))}",
             r.get("result") or r.get("error", ""))
         routines.start(self.stopping.is_set)
+        import telegram_bot
+        telegram_bot.start(self.stopping.is_set)
 
         # Big market news: emailed to you, and said out loud while Apollo
         # is up - after any turn in progress (alerts.py).
