@@ -42,7 +42,7 @@ log = logging.getLogger("apollo.alerts")
 
 CHECK_EVERY = int(os.environ.get("APOLLO_ALERT_EVERY") or 60)
 THRESHOLD = int(os.environ.get("APOLLO_ALERT_THRESHOLD") or 10)
-MOST_PER_HOUR = 2          # a flood guard, nothing more
+MOST_PER_HOUR = 4          # a flood guard, nothing more
 # You are told when something CHANGES: a stock's call moves (HOLD to STRONG
 # BUY, BUY to SELL...), or news is shocking (MAJOR: yes, CONFIDENCE: high).
 # The same call again is never sent twice.
@@ -76,6 +76,14 @@ STRONG = (
     "stock split", "buyback", "tariff", "export ban", "export curbs", "sanction",
     "rate cut", "rate hike", "fed cuts", "fed raises", "delist", "short seller",
     "investigation", "probe", "default", "dividend cut", "outage", "breach", "hack",
+)
+# Decisive news on its own: one of these and a big name is enough to be looked at -
+# a CEO thrown out, a trillion crossed, a takeover, a bankruptcy, a halt.
+CRITICAL = (
+    "ousted", "fires ceo", "fired ceo", "ceo fired", "ceo resigns", "ceo steps down", "ceo out",
+    "trillion", "billion deal", "billion acquisition", "to acquire", "takeover", "buyout",
+    "bankruptcy", "chapter 11", "fraud", "sec charges", "halted", "delist", "fda approves",
+    "fda rejects", "export ban", "guidance cut", "cuts guidance", "raises guidance", "profit warning",
 )
 SERIOUS = ("reuters", "bloomberg", "cnbc", "wall street journal", "wsj", "financial times",
            "associated press", "ap news", "marketwatch", "barron", "the information", "axios")
@@ -124,6 +132,10 @@ def score(story, watch=(), now=None):
     if hits:
         points += min(6, 3 * len(hits))
         why.append("says " + ", ".join(hits[:3]))
+    decisive = [w for w in CRITICAL if w in said]
+    if decisive and tickers:
+        points += 6
+        why.append("decisive: " + decisive[0])
     age = now - float(story.get("when") or 0)
     if story.get("when") and age < 15 * 60:
         points += 2
@@ -394,7 +406,9 @@ class Watcher:
             if ticker and call.get("action") in ("BUY", "SELL", "HOLD"):
                 self.note_call(ticker, call["action"], now)
             alert["changed_from"] = before if moved else None
-            if not (major(call) or moved):
+            sharp = (alert["kind"] == "move" and call.get("action") in ("BUY", "SELL")
+                     and call.get("confidence") in ("medium", "high"))
+            if not (major(call) or moved or sharp):
                 log.info("alert not told (%s): %s", alert["call"]["action"], alert["story"]["title"])
                 continue
             self.sent.append(now)
@@ -464,7 +478,9 @@ class Watcher:
         story = alert["story"]
         call = alert.get("call") or parse_call(alert.get("explained"))
         ticker = call["ticker"] or ", ".join(alert.get("tickers", [])[:2])
-        verb = {"BUY": "BUY", "SELL": "SELL - TAKE YOUR MONEY OUT", "HOLD": "HOLD"}.get(call["action"], call["action"])
+        loud = major(call) or alert.get("kind") == "move"
+        verb = {"BUY": "BUY!!" if loud else "BUY", "SELL": "PULL!!" if loud else "PULL - TAKE YOUR MONEY OUT",
+                "HOLD": "HOLD"}.get(call["action"], call["action"])
         head = f"{verb} {ticker}".strip()
         if alert.get("changed_from"):
             head += f" (was {alert['changed_from']})"

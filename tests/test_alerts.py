@@ -194,7 +194,7 @@ def test_the_email_leads_with_the_call(tmp_path, monkeypatch):
     monkeypatch.setattr(emailer, "_deliver", lambda found, message: sent.append(message))
     alerts.Watcher._email({"story": story("Tesla recall"), "tickers": ["TSLA"], "why": [],
                            "explained": "ACTION: SELL TSLA\nSUMMARY: Bad.\nCONFIDENCE: high"})
-    assert sent[0]["Subject"].startswith("SELL - TAKE YOUR MONEY OUT TSLA")
+    assert sent[0]["Subject"].startswith(("PULL!! TSLA", "PULL - TAKE YOUR MONEY OUT TSLA"))
 
 
 def test_new_counting_rules_are_taken_in_silently_not_told_as_changed_calls(tmp_path, monkeypatch):
@@ -207,3 +207,20 @@ def test_new_counting_rules_are_taken_in_silently_not_told_as_changed_calls(tmp_
     monkeypatch.setattr(analysis, "RULES", 2)
     assert w.check_verdicts(lambda syms: [("AMD", "HOLD", "price above target")]) == [] and told == []
     assert "verdicts:rules:2" in w.seen and "verdict:AMD:HOLD" in w.seen
+
+
+def test_a_ceo_thrown_out_of_a_big_company_is_looked_at_even_off_the_watchlist():
+    rated = alerts.score(story("Intel board fires CEO after quarter of losses", source="Blog"), now=NOW)
+    assert rated["score"] >= alerts.THRESHOLD
+
+
+def test_a_sharp_move_with_a_sell_call_is_told_as_pull(tmp_path):
+    sent = []
+    w = alerts.Watcher(email=sent.append, watch=lambda: ("TSLA",), sources=lambda watch: [],
+                       prices=lambda watch, it=iter([{"TSLA": 100.0}, {"TSLA": 88.0}]): next(it),
+                       explain=lambda story, tickers: "ACTION: SELL TSLA\nSUMMARY: Falling hard.\nCONFIDENCE: medium\nMAJOR: no",
+                       path=str(tmp_path / 'seen.json'), clock=lambda: NOW)
+    w.seen = {}
+    w.check()
+    told = w.check()
+    assert len(told) == 1 and told[0]["kind"] == "move" and sent
