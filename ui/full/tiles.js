@@ -293,8 +293,9 @@ export function summary(id, snapshot, extra = {}) {
                                  : 'Live intelligence map';
     case 'projects': {
       const p = isObject(s.projects) ? s.projects : {};
-      return [plural(list(p.sessions).length, 'session'), plural(list(p.folders).length, 'folder'),
-              plural(list(p.repos).length, 'repo')].join(' · ');
+      const mine = list(p.mine);
+      const notes = mine.filter((x) => x && x.theia && !x.theia.seen).length;
+      return [plural(mine.length, 'project'), ...(notes ? [`THEIA has notes on ${notes}`] : [])].join(' · ');
     }
     case 'ideas': {
       const i = isObject(s.ideas) ? s.ideas : {};

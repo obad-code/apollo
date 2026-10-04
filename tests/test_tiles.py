@@ -153,7 +153,7 @@ SNAPSHOT = """{
             watchlist: [{ symbol: 'AAPL', change_pct: -0.26 }, { symbol: 'NVDA', change_pct: 1.34 }] },
   system: { cpu: 16, gpu: 3, ram: 83 },
   usage: { tokens: 1839, cost: 0.02 },
-  projects: { sessions: [1, 2, 3], folders: [1, 2], repos: [1] },
+  projects: { mine: [{ theia: { seen: false } }, {}, {}] },
   ideas: { ideas: [1, 2, 3, 4], reminders: [1] },
   talks: [{ time: '14:05' }, { time: '13:10' }],
   weather: { temp: 32, text: 'clear' },
@@ -169,7 +169,7 @@ def test_minimized_each_display_still_says_what_matters(tmp_path):
         return Object.fromEntries(T.DISPLAYS.map((d) => [d, T.summary(d, s, extra)])); }})()""")
     assert "CPU 16%" in said["system"] and "RAM 83%" in said["system"] and "1,839" in said["system"]
     assert "S&P 500 +0.17%" in said["markets"] and "NVDA +1.34%" in said["markets"]
-    assert "3 sessions" in said["projects"] and "2 folders" in said["projects"]
+    assert "3 projects" in said["projects"] and "THEIA has notes on 1" in said["projects"]
     assert "4 ideas" in said["ideas"] and "1 reminder" in said["ideas"]
     assert "Wolverine sells out" in said["feed"] and "2 stories" in said["feed"]
     assert "11 layers" in said["osiris"]

@@ -51,7 +51,7 @@ class DataService:
         self.snapshot = {"market": {"indices": [], "watchlist": [], "status": ""},
                          "news": {}, "posts": [], "weather": {}, "system": {},
                          "usage": {}, "prayer": {}, "finds": [], "talks": [],
-                         "projects": {"sessions": [], "folders": [], "repos": []},
+                         "projects": {"mine": []},
                          "ideas": {"ideas": [], "reminders": []}, "insiders": {},
                          "trading": {},
                          # OSIRIS mode's own panel: the world's news and quakes.
@@ -247,7 +247,8 @@ class DataService:
         return True
 
     def _read_projects(self):
-        self.snapshot["projects"] = projects.snapshot()
+        import myprojects                  # your own projects; the old automatic list is retired
+        self.snapshot["projects"] = myprojects.snapshot()
         return True
 
     def _read_ideas(self):

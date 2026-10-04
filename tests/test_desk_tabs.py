@@ -149,8 +149,8 @@ def test_ideas_by_voice(own_ideas):
 # -- the display --------------------------------------------------------------------
 
 def test_the_display_is_given_all_three(monkeypatch, own_ideas):
-    monkeypatch.setattr(projects, "snapshot", lambda: {"sessions": [{"title": "x"}],
-                                                       "folders": [], "repos": []})
+    import myprojects
+    monkeypatch.setattr(myprojects, "snapshot", lambda: {"mine": [{"name": "x"}]})
     journal.said("hi")
     journal.answered("Hello.")
     ideas.add("a thing")
@@ -158,7 +158,7 @@ def test_the_display_is_given_all_three(monkeypatch, own_ideas):
     assert service._read_talks() and service._read_projects() and service._read_ideas()
     snap = service.snapshot
     assert snap["talks"][0]["you"] == "hi"
-    assert snap["projects"]["sessions"][0]["title"] == "x"
+    assert snap["projects"]["mine"][0]["name"] == "x"
     assert snap["ideas"]["ideas"][0]["text"] == "a thing"
     assert "reminders" in snap["ideas"]
 

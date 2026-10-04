@@ -876,6 +876,31 @@ def _save_idea(ctx, text=""):
             "note": "THEIA will analyse it in the background - no need to mention it unless asked."}
 
 
+@_tool("add_project", "adding the project",
+       "Add one of the user's own projects to their Projects list (e.g. Apollo, Nolock), with a line "
+       "about it if they gave one. Each project gets a planning board, and THEIA looks after it.",
+       _obj({"name": _str("The project's name"), "about": _str("What it is, in their words (optional)")}, ("name",)))
+def _add_project(ctx, name="", about=""):
+    import myprojects
+    try:
+        made = myprojects.add(name, about)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    ctx.refresh("projects")
+    return {"ok": True, "project": made["name"], "count": len(myprojects.all())}
+
+
+@_tool("list_projects", "reading your projects",
+       "The user's own projects, with THEIA's latest note on each. Use when they ask about their "
+       "projects or what THEIA thinks of one.",
+       _obj({}))
+def _list_projects(ctx):
+    import myprojects
+    return {"ok": True, "projects": [{"name": p["name"], "about": p.get("about", ""),
+                                      **({"theia": p["theia"]["notes"]} if p.get("theia") else {})}
+                                     for p in myprojects.all()]}
+
+
 @_tool("list_ideas", "reading your ideas",
        "The user's saved project ideas, newest first and numbered. Use this "
        "when they ask what ideas they have, or what they wanted to build.",
@@ -903,7 +928,7 @@ def _drop_idea(ctx, number=0):
 
 @_tool("panel_tab", "switching the panel",
        "Show one tab of the full display's side panel: stocks, talks (recent "
-       "conversations with Apollo), projects (Claude Code sessions, project "
+       "conversations with Apollo), projects (the user's own projects and their boards; formerly Claude Code sessions, project "
        "folders, GitHub repos) or ideas (saved ideas and reminders). Brings "
        "the display up if it is not.",
        _obj({"tab": _enum(("stocks", "talks", "projects", "ideas"), "Which tab")}, ("tab",)))

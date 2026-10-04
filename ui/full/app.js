@@ -32,6 +32,7 @@ import { IdleScenes } from './idlescenes.js';
 import { CrtTv } from './crttv.js';
 import { Digest } from './digest.js';
 import { Fixes } from './fixes.js';
+import { Board } from './board.js';
 import { Embers } from './embers.js';
 import * as CrewPage from './crewpage.js';
 import { Ambient } from './ambient.js';
@@ -2402,40 +2403,42 @@ function renderTalks(list) {
   if (chat) chat.scrollTop = chat.scrollHeight;
 }
 
-/* Projects: every project you have - Claude Code sessions, git folders on
- * this PC, GitHub repos - on a wheel down the left (optionwheel.js), the one
- * in front as a soft card beside it. Open it (click it again, or Enter) and
- * the wheel folds away while the card grows into the whole pane; back, and
- * the wheel comes round again. */
-const KIND_NAMES = { claude: 'Claude Code', pc: 'On this PC', github: 'GitHub' };
+/* Projects: the ones you add yourself, as a deck of cards - each with its
+ * board (board.js), a free canvas opened full screen, and THEIA's mark when
+ * she has looked at it and has something to say. */
+const THEIA_MARK = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="11" r="1.6" fill="currentColor"/><circle cx="15" cy="11" r="1.6" fill="currentColor"/></svg>';
+const board = new Board($('board'), () => window.pywebview && window.pywebview.api);
 
-function projectList(p) {
-  return [
-    ...(p.sessions || []).map((s) => ({ kind: 'claude', art: s.art || '', name: s.title || s.project, sub: s.project,
-      when: s.when, lines: [s.prompt && s.prompt !== s.title ? s.prompt : ''] })),
-    ...(p.folders || []).map((f, n) => ({ kind: 'pc', art: f.art || '', name: f.name, sub: f.branch ? `on ${f.branch}` : '',
-      when: f.when, lines: [f.last ? `Last commit: ${f.last}` : ''], folder: n })),
-    ...(p.repos || []).map((r, n) => ({ kind: 'github', art: r.art || '', name: r.name, sub: r.private ? 'private' : 'public',
-      when: r.when, lines: [r.about || ''], repo: n })),
-  ];
+function projectList(p) { return p.mine || []; }
+
+function projectDeckCard(item, i, n) {
+  const t = item.theia;
+  return `<button type="button" class="deck-card k-mine" data-i="${i}" style="--i:${i};--n:${n}">
+    <span class="deck-bar"><i></i><i></i><i></i><em>Project</em>
+      ${t ? `<span class="proj-theia${t.seen ? '' : ' new'}" title="THEIA has notes">${THEIA_MARK}</span>` : ''}</span>
+    ${item.preview ? `<img class="deck-art" src="${item.preview}" alt="">` : `<span class="deck-art deck-blank">${esc(item.name.slice(0, 1).toUpperCase())}</span>`}
+    <span class="deck-body"><b dir="auto">${esc(item.name)}</b>${item.about ? `<small dir="auto">${esc(item.about)}</small>` : ''}
+      ${t ? `<span class="deck-line" dir="auto">THEIA: ${esc(t.summary)}</span>` : ''}
+      <span class="deck-when">${esc(ago(item.touched))}</span></span>
+  </button>`;
 }
 
-function projectCard(item, open = false) {
-  if (!item) return '<p class="quiet">No projects found yet.</p>';
-  const action = item.folder !== undefined ? `<button class="proj-go link" data-folder="${item.folder}" type="button">Open the folder</button>`
-    : item.repo !== undefined ? `<button class="proj-go link" data-repo="${item.repo}" type="button">Open on GitHub</button>` : '';
-  return `<article class="proj-card k-${item.kind}${open ? ' open' : ''}">
-    <span class="proj-kind"><i></i>${esc(KIND_NAMES[item.kind])}</span>
-    <h3>${esc(item.name)}</h3>
-    ${item.sub ? `<p class="proj-sub">${esc(item.sub)}</p>` : ''}
-    ${item.lines.filter(Boolean).map((line) => `<p class="proj-line">${esc(line)}</p>`).join('')}
-    <footer><span>${esc(ago(item.when))}</span>${open ? action : '<em>Open ›</em>'}</footer>
+function projectOpenCard(item) {
+  const t = item.theia;
+  return `<article class="proj-card k-mine open" data-id="${esc(item.id)}">
+    <span class="proj-kind"><i></i>Project</span>
+    <h3 dir="auto" contenteditable="true" class="proj-name">${esc(item.name)}</h3>
+    <p class="proj-sub" dir="auto" contenteditable="true" data-placeholder="What is it? (click to write)">${esc(item.about || '')}</p>
+    ${item.preview ? `<img class="proj-preview" src="${item.preview}" alt="The board">` : '<p class="proj-line">The board is empty - open it and start planning.</p>'}
+    <div class="proj-acts"><button type="button" class="proj-board" data-act="board">Open the board</button>
+      <button type="button" class="ghost" data-act="remove">Remove</button></div>
+    ${t ? `<section class="proj-theia-notes"><h4>${THEIA_MARK} THEIA</h4><p dir="auto"><b>${esc(t.summary)}</b></p>
+      <details><summary>All her notes</summary><div dir="auto">${mdLite(t.notes)}</div></details></section>`
+      : '<p class="proj-line">THEIA looks at the board whenever you change it.</p>'}
+    <footer><span>${esc(ago(item.touched))}</span></footer>
   </article>`;
 }
 
-/* Projects as a deck of cards fanned back into the screen, like folders on
- * a desk: the newest in front, the rest stepping away up and to the right.
- * Hover one and it lifts out; click it and it opens across the pane. */
 function renderProjects(p) {
   state.projects = p;
   const items = projectList(p);
@@ -2449,18 +2452,28 @@ function renderProjects(p) {
   }
   const deck = pane.querySelector('.proj-deck');
   const shown = items.slice(0, 12);
-  deck.innerHTML = shown.length ? shown.map((item, i) => `
-    <button type="button" class="deck-card k-${item.kind}" data-i="${i}" style="--i:${i};--n:${shown.length}">
-      <span class="deck-bar"><i></i><i></i><i></i><em>${esc(KIND_NAMES[item.kind])}</em></span>
-      ${item.art ? `<img class="deck-art" src="${esc(item.art)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
-      <span class="deck-body"><b>${esc(item.name)}</b>${item.sub ? `<small>${esc(item.sub)}</small>` : ''}
-        ${item.lines.filter(Boolean).slice(0, 2).map((line) => `<span class="deck-line">${esc(line)}</span>`).join('')}
-        <span class="deck-when">${esc(ago(item.when))}</span></span>
-    </button>`).join('') : '<p class="quiet">No projects found yet.</p>';
+  deck.innerHTML = shown.map((item, i) => projectDeckCard(item, i, shown.length + 1)).join('')
+    + `<form class="deck-card deck-new" style="--i:${shown.length};--n:${shown.length + 1}">
+        <b>+ New project</b><input name="name" placeholder="Name - e.g. Nolock" dir="auto" autocomplete="off">
+        <input name="about" placeholder="What is it? (optional)" dir="auto" autocomplete="off"><button type="submit">Add</button></form>`;
+  const open = pane.querySelector('.proj-open:not([hidden]) .proj-card');
+  if (open) {                                   // keep an open project fresh (THEIA's notes arriving)
+    const item = items.find((x) => x.id === open.dataset.id);
+    if (item && !open.contains(document.activeElement)) pane.querySelector('.proj-body').innerHTML = projectOpenCard(item);
+  }
 }
 
+$('pane-projects').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.target.closest('.deck-new'); if (!form) return;
+  const api = window.pywebview && window.pywebview.api;
+  const name = form.name.value.trim(); if (!name || !api) return;
+  const r = await api.project_add(name, form.about.value.trim());
+  if (r && r.ok) { form.reset(); sfx.play('expand'); }
+});
+
 $('pane-projects').addEventListener('click', (event) => {
-  const card = event.target.closest('.deck-card');
+  const card = event.target.closest('.deck-card[data-i]');
   if (card) openProject(Number(card.dataset.i));
 });
 
@@ -2468,10 +2481,12 @@ function openProject(i) {
   const item = (state.projectItems || [])[i];
   if (!item) return;
   const proj = $('pane-projects').querySelector('.proj');
-  proj.querySelector('.proj-body').innerHTML = projectCard(item, true);
+  proj.querySelector('.proj-body').innerHTML = projectOpenCard(item);
   proj.querySelector('.proj-open').hidden = false;
   proj.classList.add('opened');
   sfx.play('expand');
+  const api = window.pywebview && window.pywebview.api;
+  if (item.theia && !item.theia.seen && api && api.project_seen) api.project_seen(item.id);
 }
 
 function closeProject() {
@@ -2482,20 +2497,26 @@ function closeProject() {
   sfx.play('collapse');
 }
 
-$('pane-projects').addEventListener('click', (event) => {
+$('pane-projects').addEventListener('click', async (event) => {
   if (event.target.closest('.proj-back')) { closeProject(); return; }
-  const row = event.target.closest('.link');
-  const p = state.projects || {};
+  const act = event.target.closest('[data-act]')?.dataset.act;
+  const card = event.target.closest('.proj-card[data-id]');
   const api = window.pywebview && window.pywebview.api;
-  if (!row || !api) return;
-  if (row.dataset.folder !== undefined && api.open_folder) {
-    const folder = (p.folders || [])[Number(row.dataset.folder)];
-    if (folder) api.open_folder(folder.path);
+  if (!act || !card || !api) return;
+  const item = (state.projectItems || []).find((x) => x.id === card.dataset.id);
+  if (act === 'board' && item) board.open(item);
+  if (act === 'remove') {
+    const b = event.target.closest('button');
+    if (!b.classList.contains('sure')) { b.classList.add('sure'); b.textContent = 'Remove it and its board?'; return; }
+    await api.project_remove(card.dataset.id); closeProject();
   }
-  if (row.dataset.repo !== undefined && api.open_link) {
-    const repo = (p.repos || [])[Number(row.dataset.repo)];
-    if (repo && repo.link) api.open_link(repo.link);
-  }
+});
+
+$('pane-projects').addEventListener('focusout', (event) => {
+  const card = event.target.closest('.proj-card[data-id]');
+  const api = window.pywebview && window.pywebview.api;
+  if (!card || !api || !event.target.matches('[contenteditable]')) return;
+  api.project_edit(card.dataset.id, card.querySelector('.proj-name').innerText.trim(), card.querySelector('.proj-sub').innerText.trim());
 });
 
 /* Ideas as a row of light bulbs: the newest burn brightest, older ones

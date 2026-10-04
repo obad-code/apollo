@@ -1196,6 +1196,69 @@ class Api:
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "error": str(e)}
 
+    # -- your projects and their boards (myprojects.py) --
+    def project_add(self, name, about=""):
+        import myprojects
+        try:
+            made = myprojects.add(name, about)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        self._poke("projects")
+        return {"ok": True, "project": made}
+
+    def project_edit(self, pid, name, about):
+        import myprojects
+        made = myprojects.update(str(pid), name=" ".join(str(name).split())[:80], about=str(about)[:400])
+        self._poke("projects")
+        return {"ok": made is not None}
+
+    def project_remove(self, pid):
+        import myprojects
+        done = myprojects.remove(str(pid))
+        self._poke("projects")
+        return done
+
+    def project_board(self, pid):
+        import myprojects
+        return myprojects.board(str(pid))
+
+    def project_save(self, pid, data, preview=""):
+        import myprojects
+        try:
+            myprojects.save_board(str(pid), data or {}, str(preview or ""))
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        self._poke("projects")
+        return {"ok": True}
+
+    def project_file(self, pid, name, data_url):
+        import myprojects
+        return myprojects.keep_file(str(pid), name, data_url)
+
+    def project_open_file(self, path):
+        import myprojects
+        path = os.path.abspath(str(path or ""))
+        if not path.startswith(os.path.abspath(myprojects.ROOT)) or not os.path.isfile(path):
+            return False
+        os.startfile(path)  # noqa: S606 - a file you put on your own board
+        return True
+
+    def project_theia(self, pid, picture=""):
+        """THEIA looks at the board now."""
+        import myprojects
+        try:
+            notes = myprojects.review(str(pid), str(picture or ""))
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": str(e)}
+        self._poke("projects")
+        return {"ok": True, "theia": notes}
+
+    def project_seen(self, pid):
+        import myprojects
+        myprojects.seen(str(pid))
+        self._poke("projects")
+        return True
+
     def ideas_seen(self):
         import ideas
         return ideas.mark_seen()
