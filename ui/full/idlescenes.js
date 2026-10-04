@@ -92,7 +92,7 @@ export function pushSparkle(list, next, max = MAX_SPARKS) {
 
 export const HORIZON = {
   diskColor: '#ff7a1a', streakColor: '#fff0ce', glowColor: '#ffe6b0', cloudColor: '#c7b4ea',
-  background: '#050307', center: [0.5, 0.47], holeSize: 0.055, angle: 13, inclination: 0.27,
+  background: '#000000', center: [0.5, 0.47], holeSize: 0.055, angle: 13, inclination: 0.27,
   diskRadius: 1.35, speed: 1, shear: 1, streakDensity: 150, crimson: 0.6, doppler: 0.35,
   flare: 1.1, lensing: 1, clouds: 1, cloudLines: 44, stars: 1, grain: 0.85, vignette: 0.55, exposure: 1.3,
 };
@@ -103,7 +103,7 @@ export const NEBULA = {
   stars: 1, twinkle: 1.4, starDrift: 1.2, sparkles: 9, seed: 11, spikeWidth: 1,
   planet: true, planetX: 0.74, planetY: 0.66, planetRadius: 0.075,
   parallax: 1, lens: 0.55, lensRadius: 170, lensPush: 0.3, rippleSpeed: 420, speed: 1, vignette: 0.5, grain: 0.035,
-  voidColor: '#050306', hazeColor: '#17132e', duskColor: '#34183f', wineColor: '#5a1f0b',
+  voidColor: '#000000', hazeColor: '#17132e', duskColor: '#34183f', wineColor: '#5a1f0b',
   crimsonColor: '#e0661a', hotColor: '#ffb000', starColor: '#fff0ce',
 };
 
@@ -236,11 +236,13 @@ void main(){
   col = 1.0 - exp(-col * uExposure);
   vec2 vq = uv / vec2(aspect, 1.0);
   col *= mix(1.0, smoothstep(0.95, 0.2, length(vq * vec2(1.25, 1.05))), uVignette);
+  col = max(col - 0.018, 0.0) / (1.0 - 0.018);   // the faintest glow drops to true black (OLED pixels off); the rest is untouched
   float f = floor(uClock * 24.0);
   float g1 = hash12(frag + f * vec2(37.1, 91.7)); float g2 = hash12(floor(frag / 2.0) + f * vec2(13.3, 7.9));
   float grain = (g1 - 0.5) * 0.8 + (g2 - 0.5) * 0.55;
   float luma = dot(col, vec3(0.299, 0.587, 0.114));
-  col += grain * uGrain * (0.045 + 0.4 * luma * (1.0 - luma));
+  // grain only where there is light: true black stays black (pixels off on an OLED)
+  col += grain * uGrain * (0.045 * smoothstep(0.004, 0.05, luma) + 0.4 * luma * (1.0 - luma));
   col += step(0.99965, hash12(floor(frag / 2.0) + f * 3.1)) * uGrain * 0.12;
   outColor = vec4(max(col, 0.0), 1.0);
 }`;
@@ -371,7 +373,9 @@ void main(){
   }
   vec2 vu = gl_FragCoord.xy / uRes - 0.5;
   col *= 1.0 - uVignette * smoothstep(0.35, 0.95, length(vu * vec2(uRes.x / uRes.y, 1.0) * 1.1));
-  col += (hash12(floor(css) + fract(uTime) * 91.0) - 0.5) * uGrain;
+  col = max(col - 0.018, vec3(0.0)) / (1.0 - 0.018);
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  col += (hash12(floor(css) + fract(uTime) * 91.0) - 0.5) * uGrain * smoothstep(0.004, 0.05, lum);
   frag = vec4(max(col, vec3(0.0)), 1.0);
 }`;
 

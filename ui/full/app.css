@@ -3491,3 +3491,20 @@ body.revealing #stage { animation: none; }
 
 .verdict-count { margin: 0 0 8px; font-size: 11px; letter-spacing: .08em; opacity: .6; }
 .verdict-held { margin: 0 0 8px; padding: 6px 10px; border-radius: 8px; background: rgba(245,184,61,.12); color: #F5B83D; font-size: 11.5px; }
+
+
+/* --- idle on an OLED -----------------------------------------------------------
+   The sky's void is true black now (idlescenes.js), so every lit thing floats in the dark:
+   the bright small things glow a little more, and embers drift over the sky. */
+#idle-embers { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: 0;
+               transition: opacity 2s ease-in-out .8s; mix-blend-mode: screen; }
+body.asleep #idle-embers { opacity: 1; }
+#sleep { text-shadow: 0 0 22px rgba(255, 170, 90, .42), 0 0 2px rgba(255, 220, 170, .5); }
+#sleep-tag { color: rgba(255, 246, 230, .8); }
+#sleep-wake { box-shadow: 0 0 60px rgba(255, 170, 90, .38); }
+@keyframes wake-breath {
+  0%, 100% { box-shadow: 0 0 40px rgba(255, 170, 90, .26); transform: translateY(0); }
+  50%      { box-shadow: 0 0 84px rgba(255, 170, 90, .5); transform: translateY(-2px); }
+}
+#idle-scenes.on, #idle-scenes button.on { box-shadow: 0 0 30px rgba(255, 176, 0, .7); }
+@media (prefers-reduced-motion: reduce) { #idle-embers { display: none; } }

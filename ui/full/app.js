@@ -29,6 +29,7 @@ import { Wheel } from './wheel.js';
 import { WidgetGrid } from './widgetgrid.js';
 import { OptionWheel } from './optionwheel.js';
 import { IdleScenes } from './idlescenes.js';
+import { Embers } from './embers.js';
 import * as CrewPage from './crewpage.js';
 import { Ambient } from './ambient.js';
 
@@ -191,7 +192,8 @@ shader.start();
  * comes - with room between the letters, and arriving scrambled. */
 const NAME = { font: '"Orbitron", "Segoe UI", sans-serif', weight: 900, stretch: 0.8,
                tracking: 0.3 };
-const sleepWord = new LedWord($('sleep-word'), { ...NAME, rows: 16, fill: 0.7 });
+const embers = new Embers($('idle-embers'));
+const sleepWord = new LedWord($('sleep-word'), { ...NAME, rows: 16, fill: 0.7, glow: 1.35 });   // brighter cells: they sit on true black
 // In the intro the name is lit in the boot screen's own green phosphor.
 const introWord = new LedWord($('intro-word'), { ...NAME, rows: 11, glow: 1.15,
                                                  colour: [168, 255, 192] });
@@ -3105,6 +3107,7 @@ function setSleep(on) {
   asleep.on = on;
   if (state.mode === 'full') sfx.play(on ? 'sleep' : 'wake');
   document.body.classList.toggle('asleep', on);
+  if (on) embers.start(); else embers.stop();
   $('sleep').setAttribute('aria-hidden', on ? 'false' : 'true');
   syncAmbient();
   shader.sleep(on);
