@@ -66,6 +66,16 @@ halt) or a sharp move (8% in 15 minutes) on a stock you watch reaches you by
 email headed **PULL!!** or **BUY!!**, and out loud if Apollo is up. Everyday
 news stays quiet.
 
+**Apollo improves himself.**
+- **MONEYPENNY learns from her misses** - every call is graded a week later; a wrong one gets an honest
+  post-mortem and a lesson she reads before every new call (`calls.py`).
+- **Q's Fixes** - the **Fixes** button by the clock: once a day Q looks at the display and suggests three
+  improvements in your style; *Send to Claude* files one as a GitHub issue, *Not my style* teaches him
+  what you dislike, and *Point at something* lets you click anything and say what is wrong (`qfixes.py`).
+- **THEIA reads your ideas** - every idea you save goes to her quietly; her analysis waits on the idea in
+  the Ideas tab, Apollo mentions it once a day, and each morning's summary carries her three things for
+  your day: an idea, a next step, or a question about your plans.
+
 **YouTube Shorts** - LYLA makes one only when you ask. When it is ready
 Apollo asks: post it, save it as a private draft, or keep the file. Nothing
 is made or posted on its own unless you turn that on (`SHORTS_AUTO`,
@@ -309,7 +319,8 @@ and `assistant.py` (`HOTKEY`, `CLAUDE_MODEL`…) are the rest.
 | `docs/shorts-playbook.md`, `docs/shorts-handoff.md` | How the Shorts are made, and the paid upgrades. |
 | `docs/design-notes.md` | The long-form design notes and history (archive). |
 | `digest.py` / `ui/full/digest.js` | Your summary: what goes on it, when it is made, and the page. |
-| `calls.py` | MONEYPENNY's record: every call kept and graded at a week and a month. |
+| `calls.py` | MONEYPENNY's record: every call kept, graded at a week and a month, and her lessons from the wrong ones. |
+| `qfixes.py` / `ui/full/fixes.js` | Q's fixes for the display: the daily look, your taste, and pointing at something. |
 | `start.bat` | Double-click launcher. Runs `pythonw.exe`, so there is no console window. |
 | `install-startup.bat` | Adds Apollo to Windows startup. `uninstall-startup.bat` removes it. |
 | `voices/` | A downloaded fallback voice, only used when the others are down. Delete it and it re-downloads. |

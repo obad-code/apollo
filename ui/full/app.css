@@ -3695,3 +3695,61 @@ body.asleep.tv-idle #sleep-copy, body.asleep.tv-idle #idle-embers, body.asleep.t
 .dg-loading { padding: 60px; text-align: center; }
 .dg-foot { margin-top: 18px; text-align: center; color: var(--caption); font: 500 11px var(--hud); letter-spacing: .08em; }
 @media (max-width: 900px) { .dg-grid { grid-template-columns: 1fr; } .dg-stats { grid-template-columns: repeat(2, 1fr); } }
+
+/* THEIA's read of an idea */
+.idea-theia { justify-self: start; margin-top: 6px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(255, 214, 150, .25); background: transparent; color: var(--amber); font: 700 10px var(--hud);
+  letter-spacing: .14em; text-transform: uppercase; }
+.idea-theia.new { color: #160c00; background: var(--amber-bright); box-shadow: 0 0 14px rgba(255, 176, 0, .5); }
+.idea-wait { color: var(--caption); font: 500 10px var(--hud); letter-spacing: .1em; }
+.idea-read { grid-column: 1 / -1; margin-top: 8px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, .04);
+  font: 400 13px/1.55 var(--body, inherit); max-height: 360px; overflow: auto; }
+.dg-sub { margin: 18px 0 8px; font: 700 10px var(--hud); letter-spacing: .16em; text-transform: uppercase; color: var(--caption); }
+.dg-lessons { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.dg-lessons li { display: grid; grid-template-columns: 58px 1fr; gap: 10px; font: 600 12px var(--hud); }
+.dg-lessons p { margin: 0; font: 400 13px/1.45 var(--body, inherit); color: var(--cream); }
+.dg-three { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.dg-three em { font: 700 10px var(--hud); letter-spacing: .16em; text-transform: uppercase; color: var(--amber); font-style: normal; }
+.dg-three p { margin: 6px 0 0; font: 400 15px/1.5 var(--body, inherit); }
+
+/* -- Q's fixes (fixes.js) -- */
+#clock-pills { display: flex; gap: 8px; }
+#fixes-btn { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 6px 12px 6px 8px;
+  border-radius: 999px; border: 1px solid rgba(255, 214, 150, .18); background: rgba(14, 14, 17, .55);
+  color: var(--caption); font: 700 10px var(--hud); letter-spacing: .2em; text-transform: uppercase; cursor: pointer;
+  position: relative; backdrop-filter: blur(10px); transition: color .3s, border-color .3s; }
+#fixes-btn svg { width: 18px; height: 18px; color: var(--amber); }
+#fixes-btn:hover { color: var(--cream); border-color: rgba(255, 214, 150, .45); }
+#fixes-btn .dg-dot { position: absolute; top: 3px; left: 20px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--amber-hot); box-shadow: 0 0 10px var(--amber-hot); opacity: 0; transition: .4s; }
+#fixes-btn.ready { color: var(--amber-bright); border-color: rgba(255, 176, 0, .5); }
+#fixes-btn.ready .dg-dot { opacity: 1; animation: dg-pulse 2.4s ease-in-out infinite; }
+#fixes { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 40px;
+  background: rgba(4, 4, 6, .62); backdrop-filter: blur(14px); opacity: 0; pointer-events: none; transition: opacity .35s; }
+#fixes.on { opacity: 1; pointer-events: auto; }
+.fx-sheet { width: min(980px, 100%); }
+.fx-btn, .fx-ask button { padding: 9px 16px; border-radius: 999px; border: 0; cursor: pointer; font: 700 11px var(--hud);
+  letter-spacing: .12em; text-transform: uppercase; color: #160c00; background: var(--amber-bright); }
+.fx-btn.ghost, .fx-acts .ghost, .fx-ask .ghost { color: var(--cream); background: transparent; border: 1px solid rgba(255, 240, 206, .18); }
+.fx-note { margin: -10px 0 16px; color: var(--amber-bright); font: 600 12px var(--hud); }
+.fx-item { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; padding: 18px 20px; margin-bottom: 12px;
+  border-radius: 16px; background: rgba(255, 255, 255, .035); border: 1px solid rgba(255, 240, 206, .06); }
+.fx-item.no { opacity: .45; } .fx-item.sent { border-color: rgba(95, 227, 154, .3); }
+.fx-item em { font: 700 10px var(--hud); letter-spacing: .16em; text-transform: uppercase; color: var(--amber); font-style: normal; }
+.fx-item h4 { margin: 6px 0 4px; font: 700 16px var(--body, inherit); color: var(--cream); }
+.fx-item p { margin: 0; color: var(--caption); font: 400 13px/1.5 var(--body, inherit); }
+.fx-acts { display: flex; flex-direction: column; gap: 8px; }
+.fx-acts button { padding: 8px 14px; border-radius: 999px; border: 0; cursor: pointer; font: 700 10px var(--hud);
+  letter-spacing: .12em; text-transform: uppercase; color: #160c00; background: var(--amber-bright); }
+.fx-acts a { color: var(--up); font: 700 11px var(--hud); }
+body.fx-picking, body.fx-picking * { cursor: crosshair !important; }
+.fx-ring { position: fixed; z-index: 90; pointer-events: none; border: 2px solid var(--amber-hot); border-radius: 6px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, .25), 0 0 18px rgba(255, 176, 0, .6); transition: all .08s; }
+.fx-tip { position: fixed; z-index: 91; top: 18px; left: 50%; transform: translateX(-50%); padding: 8px 16px; border-radius: 999px;
+  background: rgba(16, 15, 18, .92); color: var(--amber-bright); font: 700 11px var(--hud); letter-spacing: .12em; pointer-events: none; }
+.fx-ask { position: fixed; z-index: 92; width: 360px; padding: 16px; border-radius: 16px; background: rgba(16, 15, 18, .96);
+  border: 1px solid rgba(255, 214, 150, .25); box-shadow: 0 20px 60px rgba(0, 0, 0, .6); display: grid; gap: 10px; cursor: auto; }
+.fx-ask label { color: var(--amber); font: 700 11px var(--hud); letter-spacing: .14em; text-transform: uppercase; }
+.fx-ask textarea { resize: none; padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 240, 206, .14);
+  background: rgba(255, 255, 255, .04); color: var(--cream); font: 400 14px var(--body, inherit); cursor: text; }
+.fx-ask div { display: flex; gap: 8px; }

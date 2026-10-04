@@ -45,8 +45,10 @@ function accuracy(a) {
   };
   const recent = (a.recent || []).map((r) => `<li><span>${esc(r.symbol)}</span><em>${esc(r.verdict)}</em>
     <span class="${r.move >= 0 ? 'up' : 'down'}">${r.move >= 0 ? '+' : ''}${r.move}%</span><b>${r.right ? '✓' : '✗'}</b></li>`).join('');
+  const lessons = (a.lessons || []).map((l) => `<li><span>${esc(l.symbol)}</span><p>${esc(l.lesson)}</p></li>`).join('');
   return `<div class="dg-stats">${tile(7)}${tile(30)}<div class="dg-stat"><b>${a.open ?? 0}</b><span>calls waiting</span><small>graded a week after</small></div></div>
-    ${recent ? `<ul class="dg-recent">${recent}</ul>` : ''}`;
+    ${recent ? `<ul class="dg-recent">${recent}</ul>` : ''}
+    ${lessons ? `<h4 class="dg-sub">What she learned from her misses</h4><ul class="dg-lessons">${lessons}</ul>` : ''}`;
 }
 
 export function markup(d) {
@@ -74,6 +76,8 @@ export function markup(d) {
     <section class="dg-card dg-wide"><h3>Markets <small>${esc(d.status || '')}</small></h3><div class="dg-indices">${idx || '<p class="dg-empty">The market feed did not answer.</p>'}</div></section>
     <section class="dg-card"><h3>Your stocks <small>today · call</small></h3>${moves(d.stocks)}</section>
     <section class="dg-card"><h3>MONEYPENNY's record</h3>${accuracy(d.accuracy)}</section>
+    ${(d.theia || []).length ? `<section class="dg-card dg-wide dg-theia"><h3>THEIA · for today</h3><div class="dg-three">${d.theia.map((t) =>
+      `<div><em>${esc(t.kind)}</em><p dir="auto">${esc(t.text)}</p></div>`).join('')}</div></section>` : ''}
     <section class="dg-card dg-wide"><h3>News</h3><div class="dg-news">${news || '<p class="dg-empty">No headlines.</p>'}</div></section>
     ${earnings ? `<section class="dg-card"><h3>Earnings this week</h3><ul class="dg-list">${earnings}</ul></section>` : ''}
     ${rem ? `<section class="dg-card"><h3>Reminders</h3><ul class="dg-list">${rem}</ul></section>` : ''}

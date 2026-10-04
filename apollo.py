@@ -1165,6 +1165,41 @@ class Api:
         """Ping each brain the crew thinks with; what each said."""
         return crew.check()
 
+    def fixes(self):
+        import qfixes
+        return qfixes.board()
+
+    def fixes_look(self):
+        """Q looks at the display now (the page hides its panel first)."""
+        import qfixes
+        try:
+            qfixes.look()
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": str(e)}
+        return dict(qfixes.board(), ok=True)
+
+    def fixes_send(self, sid):
+        import qfixes
+        try:
+            return qfixes.send(str(sid))
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": str(e)}
+
+    def fixes_no(self, sid):
+        import qfixes
+        return qfixes.no(str(sid))
+
+    def fixes_report(self, note, element):
+        import qfixes
+        try:
+            return qfixes.report(note, element or {})
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": str(e)}
+
+    def ideas_seen(self):
+        import ideas
+        return ideas.mark_seen()
+
     def digest(self):
         """The last summary made, for the summary page."""
         import digest
@@ -2190,6 +2225,59 @@ class Apollo:
         self._digest_thread = threading.Thread(target=run, daemon=True, name="apollo-digest")
         self._digest_thread.start()
 
+    def check_fixes(self):
+        """Once a day, while the full display is up and you are using it, Q takes one look at it."""
+        import qfixes
+        now = time.monotonic()
+        if now - getattr(self, "_fixes_checked", -1e9) < 600:
+            return
+        self._fixes_checked = now
+        if (self.overlay.mode != Overlay.FULL or self.presence.asleep or self.turn_busy
+                or not os.environ.get("GEMINI_API_KEY") or not qfixes.due()):
+            return
+        if getattr(self, "_fixes_thread", None) is not None and self._fixes_thread.is_alive():
+            return
+
+        def run():
+            try:
+                new = qfixes.look()
+                ui = getattr(self, "ui", None)
+                if new and ui is not None:
+                    ui._call("fixesReady", len(new))
+            except Exception:  # noqa: BLE001 - tried again tomorrow
+                log.info("Q's look failed", exc_info=True)
+        self._fixes_thread = threading.Thread(target=run, daemon=True, name="apollo-fixes")
+        self._fixes_thread.start()
+
+    def check_ideas(self):
+        """THEIA's reads of your ideas: ideas she has not read yet go to her (a few a day),
+        and once a day, at a quiet moment, Apollo mentions that her reads are waiting."""
+        import ideas
+        now = time.monotonic()
+        if now - getattr(self, "_ideas_checked", -1e9) < 300:
+            return
+        self._ideas_checked = now
+        today = time.strftime("%Y-%m-%d")
+        if getattr(self, "_ideas_sent_day", "") != today:          # catch up on older ideas, 3 a day
+            self._ideas_sent_day = today
+            for idea in ideas.waiting()[:3]:
+                ideas.send_to_theia(idea)
+        ui = getattr(self, "ui", None)
+        if (ui is None or ui.quiet or self.voice is None or self.turn_busy
+                or getattr(self, "_ideas_told_day", "") == today):
+            return
+        fresh = ideas.unseen()
+        if not fresh:
+            return
+        self._ideas_told_day = today
+        n = len(fresh)
+        threading.Thread(target=assistant.announce, daemon=True, name="apollo-ideas", args=(
+            ui, self.voice,
+            f"THEIA has finished analysing {n} of the user's ideas ({', '.join(i['text'][:40] for i in fresh[:3])}). "
+            "Tell them in one short sentence, in their language, and ask if they want to see it now. If they say "
+            "yes, open the Ideas tab (panel_tab) and read the main points with list_ideas.",
+            f"THEIA has analysed {n} of your ideas - want to see?")).start()
+
     def check_prayer(self):
         """Fifteen minutes before each prayer, once.
 
@@ -2261,6 +2349,8 @@ class Apollo:
         self.check_briefing(idle)
         self.check_prayer()
         self.check_digest()
+        self.check_ideas()
+        self.check_fixes()
 
     def keep_clips(self, now, locked):
         """The replay buffer records while you are here to be recorded.

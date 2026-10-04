@@ -870,8 +870,10 @@ def _save_idea(ctx, text=""):
     if not str(text).strip():
         return {"ok": False, "error": "There was no idea in that."}
     idea = ideas.add(text)
+    ideas.send_to_theia(idea)            # THEIA analyses it quietly; it waits on the idea
     ctx.refresh("ideas")
-    return {"ok": True, "saved": idea["text"], "count": len(ideas.all())}
+    return {"ok": True, "saved": idea["text"], "count": len(ideas.all()),
+            "note": "THEIA will analyse it in the background - no need to mention it unless asked."}
 
 
 @_tool("list_ideas", "reading your ideas",
@@ -880,7 +882,9 @@ def _save_idea(ctx, text=""):
        _obj({}))
 def _list_ideas(ctx):
     kept = ideas.all()
-    return {"ok": True, "ideas": [{"number": n, "text": i["text"], "age": i["age"]}
+    ideas.mark_seen()
+    return {"ok": True, "ideas": [{"number": n, "text": i["text"], "age": i["age"],
+                                   **({"theia": i["theia"].get("summary", "")} if i.get("theia") else {})}
                                   for n, i in enumerate(kept, 1)]}
 
 

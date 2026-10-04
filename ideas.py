@@ -71,3 +71,59 @@ def remove(idea_id):
             return False
         _write(kept)
     return True
+
+
+# -- THEIA's read of each idea ----------------------------------------------------------------
+
+THEIA_TASK = ("Analyse this idea the user saved, properly: what it really is, how it could work, "
+              "what it needs, the risks, and the best way to do it - concrete first steps. Their idea: {text}")
+
+
+def send_to_theia(idea, take=None):
+    """Hand a new idea to THEIA, quietly: no announcement when she is done - it waits on the idea."""
+    try:
+        if take is None:
+            if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")):
+                return False                     # nothing for her to think with
+            import crew
+            take = crew.desk("THEIA").take
+        take(THEIA_TASK.format(text=idea["text"]), idea=idea["id"], routine=True)
+        return True
+    except Exception:  # noqa: BLE001 - the idea is kept either way
+        log.info("idea not sent to THEIA", exc_info=True)
+        return False
+
+
+def attach(idea_id, summary, report):
+    """THEIA's analysis, kept on the idea itself."""
+    with _lock:
+        items = _read()
+        for i in items:
+            if i.get("id") == idea_id:
+                i["theia"] = {"summary": str(summary)[:600], "report": str(report)[:12000],
+                              "at": time.time(), "seen": False}
+                _write(items)
+                return True
+    return False
+
+
+def unseen():
+    """Ideas THEIA has analysed that you have not looked at yet."""
+    with _lock:
+        return [i for i in _read() if (i.get("theia") or {}).get("seen") is False]
+
+
+def mark_seen():
+    with _lock:
+        items = _read()
+        for i in items:
+            if i.get("theia"):
+                i["theia"]["seen"] = True
+        _write(items)
+    return True
+
+
+def waiting():
+    """Ideas THEIA has not analysed yet (for a catch-up at start)."""
+    with _lock:
+        return [i for i in _read() if not i.get("theia")]

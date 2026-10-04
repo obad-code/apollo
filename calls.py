@@ -112,3 +112,54 @@ def scorecard(rows=None, path=PATH):
         out["recent"].append({"symbol": r["symbol"], "verdict": r["verdict"], "day": r["day"],
                               "move": move, "right": right(r, r["p7"])})
     return out
+
+
+# -- learning from the ones she got wrong ----------------------------------------------------
+
+REVIEW = (
+    "You are MONEYPENNY, reviewing one of your own stock calls that turned out wrong. Be honest "
+    "and specific - no excuses. Answer in exactly this shape:\n"
+    "WHAT HAPPENED: one sentence, with the numbers.\n"
+    "WHAT I MISSED: one or two sentences - the signal you over- or under-weighted.\n"
+    "LESSON: one rule, under 25 words, you will follow on future calls.")
+
+
+def review(think=None, path=PATH, most=3):
+    """A post-mortem on each wrong call not reviewed yet (a few at a time). Returns how many."""
+    rows = load(path)
+    todo = [r for r in rows if "p7" in r and not right(r, r["p7"]) and "lesson" not in r][:most]
+    if not todo:
+        return 0
+    if think is None:
+        import lyla
+        think = lambda prompt: lyla.ask_gemini(prompt, REVIEW)  # noqa: E731
+    import re
+    for r in todo:
+        move = round((r["p7"] - r["price"]) / r["price"] * 100, 1)
+        prompt = (f"Your call: {r['verdict']} on {r['symbol']} on {r['day']} at {r['price']}. "
+                  f"A week later it was {r['p7']} ({move:+}%). Look up what happened to {r['symbol']} that week.")
+        try:
+            text = think(prompt) or ""
+        except Exception:  # noqa: BLE001 - reviewed on a later day
+            continue
+        found = re.search(r"LESSON:\s*(.+)", text)
+        r["review"] = text.strip()[:1200]
+        r["lesson"] = (found.group(1).strip() if found else text.strip().splitlines()[-1])[:200]
+    save(rows, path)
+    return len(todo)
+
+
+def lessons(most=8, path=PATH):
+    """Her most recent lessons, newest first."""
+    rows = [r for r in load(path) if r.get("lesson")]
+    return [{"symbol": r["symbol"], "verdict": r["verdict"], "day": r["day"], "lesson": r["lesson"]}
+            for r in sorted(rows, key=lambda r: r["day"], reverse=True)[:most]]
+
+
+def lessons_prompt(path=PATH):
+    """What goes in front of her next call, so the same mistake is not made twice."""
+    got = lessons(path=path)
+    if not got:
+        return ""
+    return ("\n\nLessons from your own past calls that went wrong - apply them:\n"
+            + "\n".join(f"- ({g['symbol']} {g['verdict']}, {g['day']}) {g['lesson']}" for g in got))

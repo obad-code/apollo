@@ -31,6 +31,7 @@ import { OptionWheel } from './optionwheel.js';
 import { IdleScenes } from './idlescenes.js';
 import { CrtTv } from './crttv.js';
 import { Digest } from './digest.js';
+import { Fixes } from './fixes.js';
 import { Embers } from './embers.js';
 import * as CrewPage from './crewpage.js';
 import { Ambient } from './ambient.js';
@@ -1748,7 +1749,8 @@ const BIG_W = 600, BIG_H = 200, BIG_PAD = 14;
 
 const bridge = () => (window.pywebview && window.pywebview.api) || null;
 const digest = new Digest($('digest-btn'), $('digest'), bridge);
-window.addEventListener('pywebviewready', () => digest.check());
+const fixes = new Fixes($('fixes-btn'), $('fixes'), bridge);
+window.addEventListener('pywebviewready', () => { digest.check(); fixes.check(); });
 const rowFor = (symbol) =>
   [...$('watchlist').children].find((row) => row.dataset.symbol === symbol) || null;
 
@@ -2520,6 +2522,9 @@ function renderIdeas(data) {
       ${BULB}
       <p dir="auto">${esc(idea.text)}</p>
       <span>${esc(idea.age)}</span>
+      ${idea.theia ? `<button class="idea-theia${idea.theia.seen ? '' : ' new'}" data-theia="${i}" type="button">THEIA's read ›</button>
+        <div class="idea-read" hidden><p dir="auto"><b>${esc(idea.theia.summary)}</b></p>${mdLite(idea.theia.report)}</div>`
+        : '<span class="idea-wait">THEIA is reading it…</span>'}
       <button data-idea="${esc(idea.id)}" title="Remove">×</button>
     </div>`).join('');
   $('pane-ideas').innerHTML = `<h3>Ideas</h3>${list ? `<div class="bulbs">${list}</div>`
@@ -2540,6 +2545,15 @@ function renderIdeas(data) {
 
 /* Two clicks to take an idea off: the first asks, the second does it. */
 $('pane-ideas').addEventListener('click', (event) => {
+  const read = event.target.closest('[data-theia]');
+  if (read) {
+    const box = read.nextElementSibling;
+    box.hidden = !box.hidden;
+    read.classList.remove('new');
+    const api = window.pywebview && window.pywebview.api;
+    if (api && api.ideas_seen) api.ideas_seen();
+    return;
+  }
   const button = event.target.closest('[data-idea]');
   if (!button) return;
   if (!button.classList.contains('sure')) {
@@ -4973,6 +4987,7 @@ window.apollo = {
   data(snapshot) { render(snapshot); },
   // "Show my projects": one tab of the side panel.
   digestReady() { digest.ready(true); },
+  fixesReady(n) { fixes.ready(n); },
   tab(name) {
     const key = String(name || '');
     if (!ultraOn() && TABS.includes(key)) rollNav(true, key); else showTab(key);

@@ -180,6 +180,16 @@ class CrewDesk(lyla.Desk):
     def prompt_for(self, job, facts):
         return prompt_for(job, facts)
 
+    def run(self, job):
+        result = super().run(job)
+        if job.get("idea") and job.get("ok"):          # THEIA's read of an idea is kept on the idea
+            try:
+                import ideas
+                ideas.attach(job["idea"], job.get("summary", ""), job.get("report", ""))
+            except Exception:  # noqa: BLE001
+                log.info("idea analysis not kept", exc_info=True)
+        return result
+
 
 def q_think(prompt):
     """Q writes the ticket, then files it: what Apollo says is the ticket's
@@ -338,6 +348,10 @@ class MoneypennyDesk(CrewDesk):
             except Exception:  # noqa: BLE001
                 log.debug("call not kept", exc_info=True)
         return result
+
+    def prompt_for(self, job, facts):
+        import calls
+        return super().prompt_for(job, facts) + calls.lessons_prompt()
 
     def team_think(self, prompt):
         import trading_team
