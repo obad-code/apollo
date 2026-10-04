@@ -519,6 +519,16 @@ def duration(path):
     return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)) if m else 3.0
 
 
+def _pad(audio, out):
+    """The voice with a breath of silence before it and after it."""
+    subprocess.run([_ffmpeg(), "-y", "-loglevel", "error",
+                    "-f", "lavfi", "-t", str(LEAD), "-i", "anullsrc=r=24000:cl=mono", "-i", audio,
+                    "-f", "lavfi", "-t", str(PAUSE), "-i", "anullsrc=r=24000:cl=mono",
+                    "-filter_complex", "[1:a]aresample=24000,aformat=channel_layouts=mono[v];[0:a][v][2:a]concat=n=3:v=0:a=1[out]",
+                    "-map", "[out]", out], check=True, capture_output=True)
+    return out
+
+
 def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
     """The whole video. Returns out_path."""
     work = work or tempfile.mkdtemp(prefix="short-")
@@ -530,17 +540,22 @@ def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
         spoken = duration(audio)
         secs = LEAD + spoken + PAUSE
         clip = os.path.join(work, f"s{i}.mp4")
+        padded = _pad(audio, os.path.join(work, f"s{i}.wav"))
         cmd = [_ffmpeg(), "-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", str(FPS),
-               "-i", "-", "-i", audio, "-af", f"adelay={int(LEAD * 1000)}:all=1,apad", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-               "-preset", "veryfast", "-c:a", "aac", "-shortest", clip]
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-        count = int(secs * FPS)
-        for f in range(count):
-            t = f / FPS
-            frame(scene, t, max(0.0, t - LEAD) / max(0.1, spoken), script.get("title", "")).save(proc.stdin, "PNG", compress_level=1)
-        proc.stdin.close()
+               "-i", "-", "-i", padded, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
+               "-c:a", "aac", "-t", f"{secs:.2f}", clip]
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            for f in range(int(secs * FPS)):
+                t = f / FPS
+                frame(scene, t, max(0.0, t - LEAD) / max(0.1, spoken), script.get("title", "")).save(
+                    proc.stdin, "PNG", compress_level=1)
+            proc.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass            # FFmpeg stopped early: its own message says why, below
+        err = proc.stderr.read().decode("utf-8", "replace").strip()
         if proc.wait() != 0:
-            raise RuntimeError("FFmpeg could not make a scene.")
+            raise RuntimeError("FFmpeg could not make a scene: " + (err[-400:] or "no message"))
         parts.append(clip)
     listing = os.path.join(work, "list.txt")
     with open(listing, "w", encoding="utf-8") as f:
