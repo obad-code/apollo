@@ -156,17 +156,40 @@ export class CrtTv {
               <span class="tv-btn tv-power"><i></i></span>
             </div>
             <div class="tv-jacks"><span></span><span></span><span class="tv-jack-empty"></span></div>
+            <div class="tv-glare"></div>
           </div>
+          <div class="tv-cable tv-cable-a"></div><div class="tv-cable tv-cable-b"></div>
         </div>
-        <div class="tv-cable tv-cable-a"></div><div class="tv-cable tv-cable-b"></div>
         <div class="tv-floor"></div>
       </div>`;
+    // The floating-card tilt: the set leans toward the pointer in 3D, its parts
+    // standing off the case at different depths, and settles back when it leaves.
+    this.tv = root.querySelector('.tv');
+    this.room = root.querySelector('.tv-room');
+    root.addEventListener('mousemove', (e) => this.tilt(e));
+    root.addEventListener('mouseleave', () => this.untilt());
     this.canvas = root.querySelector('canvas');
     this.ctx = this.canvas.getContext('2d');
     this.ch = root.querySelector('.tv-ch');
     this.clock = root.querySelector('.tv-clock');
     this.t0 = performance.now();
     this.frame = this.frame.bind(this);
+  }
+
+  tilt(e) {
+    const { left, top, width, height } = this.room.getBoundingClientRect();
+    const x = e.clientX - left, y = e.clientY - top;
+    const rotateX = ((y - height / 2) / height) * 15;
+    const rotateY = ((x - width / 2) / width) * -15;
+    this.tv.classList.add('tilting');
+    this.tv.style.transform = `rotateX(${3 + rotateX}deg) rotateY(${-8 + rotateY}deg) scale(1.02)`;
+    this.tv.style.setProperty('--gx', `${Math.max(0, Math.min(100, x / width * 100))}%`);
+    this.tv.style.setProperty('--gy', `${Math.max(0, Math.min(100, y / height * 100))}%`);
+  }
+
+  untilt() {
+    this.tv.style.transform = 'rotateX(3deg) rotateY(-8deg) scale(1)';
+    this.tv.classList.remove('tilting');
   }
 
   start() {
