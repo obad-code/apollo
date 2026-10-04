@@ -317,7 +317,39 @@ class LylaDesk(lyla.Desk):
 
 
 THEIA_DESK = _desk(THEIA, THEIA_SYSTEM, theia_facts, deep=True)
-MONEYPENNY_DESK = _desk(MONEYPENNY, MONEYPENNY_SYSTEM, moneypenny_facts)
+TEAM = os.environ.get("MONEYPENNY_TEAM", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+class MoneypennyDesk(CrewDesk):
+    """MONEYPENNY runs an analyst team (trading_team.py, after TradingAgents):
+    four analysts, a bull/bear debate, a research manager, a trader and a risk
+    team - and she makes the final call. MONEYPENNY_TEAM=0 has her work alone."""
+
+    _job = None
+
+    def run(self, job):
+        self._job = job
+        return super().run(job)
+
+    def team_think(self, prompt):
+        import trading_team
+        deep = prompt.startswith(DEEP_MARK)
+        facts = prompt[len(DEEP_MARK):] if deep else prompt
+
+        def ask(text, system):
+            return thinker(system, deep)((DEEP_MARK + text) if deep else text)
+
+        def step(text):
+            if self._job is not None:
+                self._tell(self._job, stage="step", text=text)
+
+        final, brain, notes = trading_team.debate(facts, ask, MONEYPENNY_SYSTEM, step)
+        return final + trading_team.appendix(notes), brain
+
+
+MONEYPENNY_DESK = MoneypennyDesk(think=None, facts=moneypenny_facts, name=MONEYPENNY,
+                                 path=os.path.join(_HERE, f"{MONEYPENNY.lower()}_reports.json"))
+MONEYPENNY_DESK.think = MONEYPENNY_DESK.team_think if TEAM else thinker(MONEYPENNY_SYSTEM)
 Q_DESK = _desk(Q, Q_SYSTEM, q_facts, think=q_think)
 
 lyla.DESK = LylaDesk(think=lyla_think)

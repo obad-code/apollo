@@ -3551,3 +3551,71 @@ body.asleep #idle-embers { opacity: 1; }
 .rd-analysis { max-width: 760px; }
 @media (max-width: 900px) { .rd-body { grid-template-columns: 1fr; } .rd-list { max-height: 160px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.07); } }
 @media (prefers-reduced-motion: reduce) { .rd-panel { transition: none; } }
+
+/* -- the idle screen's old television (crttv.js) ------------------------------------ */
+#idle-tv { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; opacity: 0;
+           pointer-events: none; transition: opacity 1.4s ease-in-out .3s; background: #000; }
+body.asleep #idle-tv.on { opacity: 1; }
+body.asleep.tv-idle #sleep-copy, body.asleep.tv-idle #idle-embers, body.asleep.tv-idle #sleep-wake { opacity: 0 !important; }
+.tv-room { position: relative; width: min(1060px, 86vw); aspect-ratio: 1.36; perspective: 1700px; }
+.tv { position: absolute; inset: 0; transform-style: preserve-3d; animation: tv-drift 26s ease-in-out infinite alternate;
+      transform: rotateX(4deg) rotateY(-11deg); }
+@keyframes tv-drift { from { transform: rotateX(5deg) rotateY(-13deg) translateZ(0); }
+                      to { transform: rotateX(2deg) rotateY(-5deg) translateZ(30px); } }
+.tv-face { position: absolute; inset: 0; border-radius: 6.5% / 9%;
+  background: radial-gradient(120% 90% at 30% 10%, #ffffff 0%, #f3f1ec 38%, #dcd9d2 78%, #c9c5bd 100%);
+  box-shadow: inset 0 3px 2px rgba(255,255,255,.9), inset 0 -10px 24px rgba(0,0,0,.18), inset -14px 0 30px rgba(0,0,0,.08),
+              0 50px 90px rgba(0,0,0,.85), 0 0 0 1px rgba(0,0,0,.25); }
+/* its depth: the side and top of the case, seen past the face */
+.tv::before { content: ""; position: absolute; inset: 1% -2.4% 1% auto; width: 6%; border-radius: 0 40px 40px 0;
+  background: linear-gradient(90deg, #bdb9b1, #8f8b84); transform: translateZ(-60px) rotateY(90deg); transform-origin: left; }
+.tv-top { position: absolute; left: 3%; right: 3%; top: -3.2%; height: 6%; border-radius: 30px 30px 0 0;
+  background: linear-gradient(#fbfaf7, #d8d5ce); transform: rotateX(70deg); transform-origin: bottom; }
+.tv-bezel { position: absolute; left: 5.2%; right: 5.2%; top: 5%; height: 62%; border-radius: 4.5% / 7%;
+  background: linear-gradient(#e9e6e0, #f7f5f1 30%, #dad6cf); padding: 2.6%;
+  box-shadow: inset 0 6px 14px rgba(0,0,0,.28), inset 0 -2px 2px rgba(255,255,255,.9), 0 1px 0 #fff; }
+.tv-tube { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 6% / 10%;
+  background: #031407; box-shadow: inset 0 0 50px 14px rgba(0,0,0,.95), 0 0 0 3px #1b1b1b, 0 0 0 5px #9d9a93; }
+.tv-tube canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated;
+  filter: drop-shadow(0 0 3px rgba(110,255,150,.75)) drop-shadow(0 0 10px rgba(80,255,130,.35)) blur(.35px);
+  animation: tv-flick 4s steps(30) infinite; transform: scale(1.04); }
+@keyframes tv-flick { 0%, 100% { opacity: 1; } 47% { opacity: .94; } 48% { opacity: 1; } 75% { opacity: .97; } }
+.tv-lines { position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,.42) 0 1px, transparent 1px 3px); mix-blend-mode: multiply; }
+.tv-glass { position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(130% 120% at 50% 50%, transparent 55%, rgba(0,0,0,.75) 100%),
+              radial-gradient(60% 40% at 28% 12%, rgba(255,255,255,.10), transparent 70%),
+              radial-gradient(80% 70% at 50% 50%, rgba(60,255,120,.10), transparent 70%); }
+.tv-hud { position: absolute; left: 7%; right: 7%; top: 6%; display: flex; justify-content: space-between; z-index: 1;
+  font: 700 clamp(9px, 1.15vw, 15px) "Courier New", monospace; letter-spacing: .14em; color: rgba(110,255,150,.75);
+  text-shadow: 0 0 6px rgba(110,255,150,.8); }
+.tv-hud u { text-underline-offset: 4px; color: rgba(150,255,180,.95); }
+.tv-badge { position: absolute; left: 50%; top: 63.5%; transform: translateX(-50%); padding: .5% 2.2%; border-radius: 8px;
+  background: linear-gradient(#ffffff, #e7e4de); box-shadow: 0 3px 6px rgba(0,0,0,.25), inset 0 -2px 2px rgba(0,0,0,.08);
+  font: italic 900 clamp(13px, 2.1vw, 28px) system-ui, sans-serif; letter-spacing: .01em; }
+.tv-badge b { color: #1a1a1a; } .tv-badge i { color: #1faa55; }
+.tv-panel { position: absolute; left: 5%; right: 5%; top: 72%; height: 15%; display: flex; align-items: center;
+  justify-content: space-between; padding: 0 2%; border-top: 1px solid rgba(0,0,0,.08); }
+.tv-knob { position: relative; width: 9.5%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #ebe8e2 55%, #cfcbc4);
+  box-shadow: 0 6px 10px rgba(0,0,0,.28), inset 0 -3px 4px rgba(0,0,0,.12);
+  outline: 2px dotted rgba(40,200,100,.65); outline-offset: 7px; }
+.tv-knob i { position: absolute; left: 50%; top: 14%; width: 3px; height: 26%; margin-left: -1.5px; border-radius: 2px;
+  background: #1faa55; transform-origin: 50% 138%; transform: rotate(var(--r)); }
+.tv-knob em { position: absolute; top: -34%; left: 50%; transform: translateX(-50%); font: 600 9px system-ui; color: #555; font-style: normal; letter-spacing: .1em; }
+.tv-knob small { position: absolute; bottom: -42%; left: 50%; transform: translateX(-50%); padding: 1px 8px; border-radius: 3px;
+  background: #111; color: #6eff96; font: 700 9px "Courier New", monospace; }
+.tv-btn { width: 6.5%; aspect-ratio: 1; border-radius: 18%; background: linear-gradient(#fff, #e3e0da);
+  box-shadow: 0 5px 8px rgba(0,0,0,.25), inset 0 -2px 3px rgba(0,0,0,.1); display: grid; place-items: center; }
+.tv-btn i { width: 34%; height: 34%; border-radius: 50%; border: 2px solid #777; }
+.tv-power i { border-color: #1faa55; box-shadow: 0 0 8px #3dff7f; }
+.tv-jacks { position: absolute; left: 9%; top: 89%; display: flex; gap: 3.2%; width: 30%; }
+.tv-jacks span { width: 13%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(#1faa55 30%, #11733a 60%, #0a3d1f);
+  box-shadow: 0 4px 6px rgba(0,0,0,.4); }
+.tv-jacks .tv-jack-empty { background: radial-gradient(#000 35%, #333 45%, #aaa 60%, #ddd); }
+.tv-cable { position: absolute; width: 1.1%; height: 22%; top: 96%; background: linear-gradient(90deg, #111, #333, #111);
+  border-radius: 6px; transform-origin: top; }
+.tv-cable-a { left: 11%; transform: rotate(14deg); } .tv-cable-b { left: 15.6%; transform: rotate(8deg); }
+.tv-floor { position: absolute; left: -10%; right: -10%; bottom: -16%; height: 22%;
+  background: radial-gradient(50% 50% at 50% 30%, rgba(60,255,120,.10), transparent 70%); filter: blur(6px); }
+@media (prefers-reduced-motion: reduce) { .tv { animation: none; } .tv-tube canvas { animation: none; } }

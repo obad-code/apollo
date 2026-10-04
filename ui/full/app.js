@@ -29,6 +29,7 @@ import { Wheel } from './wheel.js';
 import { WidgetGrid } from './widgetgrid.js';
 import { OptionWheel } from './optionwheel.js';
 import { IdleScenes } from './idlescenes.js';
+import { CrtTv } from './crttv.js';
 import { Embers } from './embers.js';
 import * as CrewPage from './crewpage.js';
 import { Ambient } from './ambient.js';
@@ -3176,21 +3177,38 @@ function tickSleep() {
   $('sleep-tag').textContent = `${clock(now)} · ${now.toLocaleDateString('en-GB', { weekday: 'short' })}`;
 }
 
-/* The idle screen's sky: the scene last chosen, kept for next time. */
+/* The idle screen's sky: the scene last chosen, kept for next time. The old
+ * television is a scene of its own, over true black, and the first choice. */
+let idleChoice = (() => {
+  try { return localStorage.getItem('idle-choice') || 'tv'; } catch { return 'tv'; }
+})();
 const idleScenes = new IdleScenes($('idle-scene'), { scene: (() => {
   try { return localStorage.getItem('idle-scene') || 'horizon'; } catch { return 'horizon'; }
 })() });
+const crtTv = new CrtTv($('idle-tv'));
+function showIdleChoice() {
+  const tv = idleChoice === 'tv';
+  document.body.classList.toggle('tv-idle', tv);
+  if (!asleep.on) return;
+  if (tv) { idleScenes.stop(); $('idle-scene').classList.remove('on'); embers.stop(); crtTv.start(); }
+  else { crtTv.stop(); embers.start(); if (idleScenes.start()) $('idle-scene').classList.add('on'); }
+}
 function markIdleScene() {
   document.querySelectorAll('#idle-scenes [data-scene]').forEach((b) =>
-    b.classList.toggle('on', b.dataset.scene === idleScenes.scene));
+    b.classList.toggle('on', b.dataset.scene === idleChoice));
 }
 markIdleScene();
 $('idle-scenes').addEventListener('click', (event) => {
   const button = event.target.closest('[data-scene]');
-  if (!button || button.dataset.scene === idleScenes.scene) return;
-  idleScenes.setScene(button.dataset.scene);
-  try { localStorage.setItem('idle-scene', idleScenes.scene); } catch { /* private */ }
+  if (!button || button.dataset.scene === idleChoice) return;
+  idleChoice = button.dataset.scene;
+  if (idleChoice !== 'tv') {
+    idleScenes.setScene(idleChoice);
+    try { localStorage.setItem('idle-scene', idleScenes.scene); } catch { /* private */ }
+  }
+  try { localStorage.setItem('idle-choice', idleChoice); } catch { /* private */ }
   markIdleScene();
+  showIdleChoice();
   sfx.play('swap');
 });
 // Only Back leaves the idle screen: a mouse moved past it, or a key, does not.
@@ -3206,7 +3224,7 @@ function setSleep(on) {
   asleep.on = on;
   if (state.mode === 'full') sfx.play(on ? 'sleep' : 'wake');
   document.body.classList.toggle('asleep', on);
-  if (on) embers.start(); else embers.stop();
+  if (on && idleChoice !== 'tv') embers.start(); else embers.stop();
   $('sleep').setAttribute('aria-hidden', on ? 'false' : 'true');
   syncAmbient();
   shader.sleep(on);
@@ -3223,9 +3241,10 @@ function setSleep(on) {
     tickSleep();
     nextFact();
     asleep.timer = setInterval(nextFact, FACT_EVERY);
-    if (idleScenes.start()) $('idle-scene').classList.add('on');
+    showIdleChoice();
   } else {
     sleepWord.stop();
+    crtTv.stop();
     idleScenes.stop();
     $('idle-scene').classList.remove('on');
   }
