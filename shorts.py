@@ -287,6 +287,7 @@ def ask_script(kind, topic="", think=None, world=""):
         if s.get("cam") not in CAMS or (i and s["cam"] == scenes[i - 1]["cam"]):
             s["cam"] = CAMS[i % len(CAMS)]
     _lock_consistency(scenes, kind, world)
+    _sharpen_hook(scenes, think)
     data["scenes"] = scenes
     data["tags"] = trim_tags(data.get("tags") or [])
     if kind in WEALTH_KINDS and "disclaimer" not in str(data.get("description", "")).lower():
@@ -331,6 +332,40 @@ def trim_tags(tags, limit=480):
             out.append(t)
             size += len(t) + 2
     return out
+
+
+def hook_score(line):
+    """(0-100, band, weakest property, tip) for an opening line, from the yt-script skill's scorer
+    (vendor/yt/hookscore.py, MIT). English only; a heuristic, not a predictor."""
+    from vendor.yt import hookscore as hs
+    parts, verdict, _name, _hits = hs.score(line)
+    weakest = min(parts, key=parts.get)
+    return verdict, hs.band(verdict), weakest
+
+
+TIPS = {"SPECIFICITY": "put in one exact number, name or place", "ADDRESS": "speak to the viewer as 'you'",
+        "STAKES": "say what they lose or risk", "CURIOSITY": "open a question the line does not answer",
+        "BREVITY": "cut it to under 14 words"}
+
+
+def _sharpen_hook(scenes, think):
+    """Score the opening line; a WEAK one gets one rewrite aimed at its weakest property, kept only if it scores higher."""
+    if LANG != "en" or not scenes:
+        return
+    try:
+        first = scenes[0]["say"]
+        score, band, weakest = hook_score(first)
+        if band != "WEAK":
+            return
+        ask = (f"Rewrite this YouTube Shorts opening line so it stops the scroll. Its weakest point is "
+               f"{weakest.lower()}: {TIPS.get(weakest.upper(), 'make it sharper')}. Keep the same story and fact, "
+               f"under 16 words. Answer with the line only.\nLine: {first}")
+        better = (think(ask) if think is not None else _write(ask, "You write the first line of YouTube Shorts.")).strip().strip('"')
+        if better and "{" not in better and hook_score(better)[0] > score:
+            scenes[0]["say"] = better
+            log.info("hook sharpened: %d -> %d", score, hook_score(better)[0])
+    except Exception:  # noqa: BLE001 - a hook check never costs the Short
+        log.info("hook check skipped", exc_info=True)
 
 
 def _lock_consistency(scenes, kind, world):
