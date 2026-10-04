@@ -1,41 +1,88 @@
 # Apollo
 
-ai assistant - a voice assistant for your Windows PC.
+A voice assistant for your Windows PC - with a crew of agents that research,
+analyse stocks, make YouTube Shorts and file work for Claude, all reported back
+in one voice.
 
-
-Hold `Ctrl+Alt` and speak — or press `Ctrl+1` once and just talk. Your voice
-streams to Gemini Live and Apollo answers out loud in Puck's voice.
+Hold `Ctrl+Alt` and speak - or press `Ctrl+1` once and just talk. Your voice
+streams to Gemini Live and Apollo answers out loud. Speak Arabic and he answers
+in Arabic.
 
 ```
-  [Ctrl+Alt held]  ->  mic  ->  Gemini Live (audio in, audio out)  ->  Puck
-   or always-on                  |        |        \
-                                 |     tools     Google Search
-                                 |   (tools.py: apps, sites, keys, media,
-                                 |    volume, windows, reminders, markets)
-                                 |
+  [Ctrl+Alt held]  ->  mic  ->  Gemini Live (audio in, audio out)  ->  Apollo's voice
+   or always-on                  |
+                                 |  tools (apps, sites, keys, media, volume,
+                                 |  windows, reminders, markets, screen)
                                  |
                        Apollo decides who does what - your word wins
                                  |
-          LYLA (research, your accounts, downloads) · THEIA (any idea: analysis,
-          critique, best way) · MONEYPENNY (stocks: verdicts, red flags) ·
-          Q (files a GitHub ticket for Claude to build)
+     LYLA (research, accounts, downloads, YouTube Shorts) · THEIA (any idea:
+     analysis, critique, best way) · MONEYPENNY (stocks, with the TradingAgents
+     analyst team under her) · Q (files a GitHub ticket for Claude to build)
                                  |
                   each reports back - and Apollo says it, in his voice
 ```
 
-**One assistant, one voice.** Everything you say is answered by Apollo, in
-one voice. His crew - LYLA, THEIA, MONEYPENNY and Q - work in the background
-and never speak; when one is done, Apollo tells you. See
-[Apollo's crew](#apollos-crew) and [Setting up the new parts](#setting-up-the-new-parts).
+---
 
-Your *audio* goes to Google while you speak, and an agent's reply text goes to
-Anthropic and to Fish Audio. A local Whisper is kept only as a backup
-transcriber.
+## Quick start
 
-It does more than answer questions, and it does it in the same voice: ask it
-to open Chrome and it opens Chrome; ask how Nvidia did this week and it draws
-the chart; ask what's new with GTA 6 and it searches. Speak Arabic and it
-answers in Arabic. See [What it can do](#what-it-can-do).
+| What | How |
+|---|---|
+| **Update Apollo** (and install what it needs) | Double-click **`update.bat`**, then close Apollo and open it again. |
+| **Start Apollo** | Double-click **`start.bat`** (no console window). `install-startup.bat` starts it with Windows. |
+| **Make one YouTube Short** | Double-click **`make-short.bat`**, or say "ليلى سوي مقطع". |
+| **First time only** | An Anthropic API key - see [Step 1](#step-1--get-an-anthropic-api-key) below. |
+
+Keys and passwords only ever go into Windows environment variables (`setx`),
+never into a file in this folder.
+
+---
+
+## What Apollo does
+
+**Mini Apollo** - a small bar at the top of the screen. At rest it shows his
+mark; while you talk it shows what he says, a chart, a stock card. Start-up
+status ("Starting up…", "System online") shows here too. It draws at your
+screen's real resolution (`APOLLO_MINI_SCALE` forces a scale).
+
+**The full display** (`` Ctrl+` ``) - modes: normal, clear, trading, agents,
+expanded, OSIRIS; plus idle, edit, sound, away and hands-free.
+- **Normal** - a HUD you arrange: the left roller (markets, projects, talks,
+  reminders), news as picture stories, the crew's four tiles with health bars,
+  LYLA's room.
+- **Trading** - insiders, Congress, filings, market news, social chatter, and
+  the counted verdict on each stock.
+- **Agents** - four cards under Apollo. Open one to see its live steps; every
+  result opens in a full-page **reader**: the whole report, a stock's full
+  analysis, a Short's preview with Play.
+- **Idle** - a retro green-tube TV where Apollo and the crew play little
+  scenes (sofa, meeting, trading floor, LYLA's studio, campfire), or the two
+  skies (event horizon, ember nebula). Back returns to Apollo.
+
+**Market alerts** - news and price moves watched every minute. Decisive news
+(a CEO thrown out, a trillion crossed, a takeover, a bankruptcy, a trading
+halt) or a sharp move (8% in 15 minutes) on a stock you watch reaches you by
+email headed **PULL!!** or **BUY!!**, and out loud if Apollo is up. Everyday
+news stays quiet.
+
+**YouTube Shorts** - LYLA makes one only when you ask. When it is ready
+Apollo asks: post it, save it as a private draft, or keep the file. Nothing
+is made or posted on its own unless you turn that on (`SHORTS_AUTO`,
+`SHORTS_AUTOPOST`). Telegram can drive it from your phone (`telegram_bot.py`).
+See `docs/shorts-playbook.md`.
+
+### Apollo's crew
+
+| Agent | Does | Ask like |
+|---|---|---|
+| **LYLA** | Research, sources, your connected accounts, YouTube downloads, **YouTube Shorts** | "ليلى سوي مقطع", "LYLA, any new mail from Ahmed?" |
+| **THEIA** | The professor: any idea, in three passes - analysis, a hard critique, the best way - with a verdict | "ثيا حللي هالفكرة" |
+| **MONEYPENNY** | Markets. On one stock she runs **[TradingAgents](https://github.com/TauricResearch/TradingAgents)** (Apache-2.0) - four analysts, a bull/bear debate, a trader and a risk team - and makes the final call over them. The whole team's notes are in the report. Without it installed, a built-in team in its shape runs and the report says so. `MONEYPENNY_TEAM=0` has her work alone. | "موني بيني وش رايك في انفيديا", "وش اسحب من اسهمي" |
+| **Q** | Files what you want added or fixed as a GitHub issue for Claude to build | "قل لكلاود يضيف…" |
+
+Apollo decides who does what, and your word wins: "انت حلل" means he does it
+himself. Every result is also kept as a file in `Documents\Apollo\Crew`.
 
 ---
 
@@ -47,34 +94,17 @@ terminal (`setx` only reaches terminals opened after it):
 
 | For | Set | Where it comes from |
 |---|---|---|
-| Market alerts by **email**, and "send an email" | `setx APOLLO_SMTP_USER "you@gmail.com"` and `setx APOLLO_SMTP_PASSWORD "xxxx xxxx xxxx xxxx"` | A Gmail **app password**: turn on 2-Step Verification, then <https://myaccount.google.com/apppasswords>. Optional: `APOLLO_ALERT_TO` (another address for alerts). |
-| Market alerts' **news** | `FINNHUB_API_KEY` (the live prices already use it) | <https://finnhub.io> - free. Google News is used too, with no key. |
-| **Q** filing requests for Claude | `setx GITHUB_TOKEN "github_pat_..."` | GitHub → Settings → Developer settings → Fine-grained token, repository `obad-code/apollo`, **Issues: Read and write**. Install the Claude GitHub app on the repo and Claude picks the ticket up by itself. |
+| Alerts by **email**, and "send an email" | `setx APOLLO_SMTP_USER "you@gmail.com"` and `setx APOLLO_SMTP_PASSWORD "xxxx xxxx xxxx xxxx"` | A Gmail **app password**: turn on 2-Step Verification, then <https://myaccount.google.com/apppasswords>. Optional: `APOLLO_ALERT_TO` (another address for alerts). |
+| Alerts' **news** | `FINNHUB_API_KEY` (the live prices already use it) | <https://finnhub.io> - free. Google News is used too, with no key. |
+| **Q** filing requests for Claude | `setx GITHUB_TOKEN "github_pat_..."` | GitHub → Settings → Developer settings → Fine-grained token, repository `obad-code/apollo`, **Issues: Read and write**. |
+| **MONEYPENNY's TradingAgents** | `update.bat` installs it (needs Python 3.11+) | Uses your `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`). `TRADINGAGENTS_*` variables override its models. |
+| **YouTube posting** | `Documents\Apollo\youtube_client.json` (an OAuth "Desktop app" client) | See `youtube_upload.py`. The first post opens your browser once. |
+| **Telegram** | `APOLLO_TELEGRAM_TOKEN` and `APOLLO_TELEGRAM_CHAT` | From @BotFather. See `telegram_bot.py`. |
 | **LYLA's downloads** | `.venv\Scripts\pip install yt-dlp`, and ffmpeg on PATH (`winget install ffmpeg`) | Without ffmpeg it still works, at a single-file quality. |
-| **LYLA's connectors** (email, messages, calendar…) | `%LOCALAPPDATA%\Apollo\connectors.json` listing remote MCP servers, and each server's token in its own variable | See `connectors.py`. Uses Claude (`ANTHROPIC_API_KEY`). |
-| **THEIA's deep analysis** | `ANTHROPIC_API_KEY` (already set up above) | Without it, deep runs on Gemini Pro. Everyday analysis is Gemini Flash either way - the cheap one. |
+| **LYLA's connectors** (email, messages, calendar…) | `%LOCALAPPDATA%\Apollo\connectors.json` listing remote MCP servers | See `connectors.py`. Uses Claude (`ANTHROPIC_API_KEY`). |
+| **THEIA's deep analysis** | `ANTHROPIC_API_KEY` | Without it, deep runs on Gemini Pro. |
 | Pictures and screen reading | `GEMINI_API_KEY` (Apollo already has it) | - |
-| The voice | `APOLLO_VOICE` (a Gemini voice name; Puck by default), `APOLLO_EXPRESSIVE=0` to turn off the expressive voice, `APOLLO_BARGE_IN` (0..1, how loud you must be to talk over him in hands-free; 0 with headphones) | - |
-
-### Apollo's crew
-
-| Agent | Does | Ask like |
-|---|---|---|
-| **LYLA** | Research, sources, your connected accounts, YouTube downloads | "ليلى نزلي هالمقطع", "LYLA, any new mail from Ahmed?" |
-| **THEIA** | The professor: any idea, in three passes - analysis, a hard critique, the best way - with a verdict | "THEIA, حللي هالفكرة", "deep analysis of this plan" |
-| **MONEYPENNY** | Markets: a stock's verdict (strong buy … sell), the reasons, the red flags; or the whole watchlist and what to pull money out of first | "Moneypenny, how's Nvidia", "وش اسحب من اسهمي" |
-| **Q** | Files what you want added or fixed as a GitHub issue for Claude to build | "قل لكلاود يضيف…", "Q, add a button for…" |
-
-Apollo decides who does what, and your word wins: "انت حلل" means he does it
-himself. Every job shows on the display's **Agents** mode - the crew's wheel,
-each agent's live pipeline, a workflow map of all of them, and a dashboard you
-arrange by dragging - and Apollo says what came back.
-
-Other things he does now: remembers what you tell him to (and the day's talk,
-across reconnects); writes files and a problem log in `Documents\Apollo`;
-looks at your screen when you ask; draws pictures and lays out explanations in
-the box in the middle of the display while he talks, small in the corner;
-emails you and tells you out loud when big market news breaks.
+| The voice | `APOLLO_VOICE` (a Gemini voice name), `APOLLO_EXPRESSIVE=0`, `APOLLO_BARGE_IN` (0..1) | - |
 
 ---
 
@@ -981,9 +1011,9 @@ The only thing left is your API key.
 | `youtube.py` | LYLA's downloads, through yt-dlp. |
 | `memory.py` / `files.py` | What Apollo was told to remember and the day's talk; his own folder and the problem log. |
 | `images.py` / `screen.py` | Pictures he draws; one screenshot, read when you ask about your screen. |
-| `ui/full/explain.js` | The explanation box, and Apollo going small into the corner while he talks. |
-| `ui/full/crewview.js`, `wheel.js`, `widgetgrid.js`, `tiler.js` | Agents mode: the crew's wheel, focus and workflow map; the draggable dashboard and its tiler (`tests/test_crew_board.py`). |
-| `ui/full/optionwheel.js` | The Projects tab's wheel. |
+| `ui/full/explain.js` | The markup for visuals Apollo shows with an answer (charts, cards). |
+| `ui/full/crewview.js`, `crewpage.js`, `wheel.js`, `widgetgrid.js`, `tiler.js` | Agents mode: the cards, each agent's live steps, and the parts of the dashboard (`tests/test_crew_board.py`). |
+| `ui/full/optionwheel.js` | The left roller: the normal display's main menu. |
 | `tools.py` | Every tool Apollo has, declared once for both Gemini and Claude, and the only place tool errors are caught. Also the confirmation rule for power actions. |
 | `pc_control.py` | The Windows side of the tools: apps, sites, files, keyboard, media, volume, windows, power. Talks to Windows, never to a model. |
 | `market.py` | Live prices, history, NYSE hours and TradingView links, from Yahoo Finance's public feed. |
@@ -993,7 +1023,7 @@ The only thing left is your API key.
 | `usage.py` | The day's token ledger and an estimated cost. |
 | `briefing.py` | What the recap contains, and whether today's has happened. |
 | `dataservice.py` | The one background thread that keeps all of it fresh. |
-| `clips.py` | The replay buffer: the last minute of the screen and system audio, in memory, and the MP4 a save writes. |
+| `clips.py` | Clip saving helpers. Recording itself is left to NVIDIA or the Xbox Game Bar. |
 | `turnview.py` | What the overlay shows for the turn in progress, as your words, the reply and any chart arrive from different threads. |
 | `presence.py` | When the full display is open (Ctrl+` is sticky), when Apollo is asleep on the idle screen and what wakes it (input, a voice, a conversation), and what a phase change does to the overlay. |
 | `reminders.py` | Reminder storage and the watcher that fires them. |
@@ -1026,6 +1056,17 @@ The only thing left is your API key.
 | `ui/legacy/index.html` | The old generated design, frozen. Nothing in the run reads it. |
 | `build_ui.py` | Builds `ui/legacy/index.html` from the Claude Design export. **Not part of the run.** |
 | `ADD A CITY.dc.html` | The old design source, as exported from the canvas. |
+| `trading_team.py` | MONEYPENNY's analyst team: the real TradingAgents when installed, and a built-in team in its shape otherwise (`tests/test_trading_team.py`). |
+| `analysis.py` | A stock's counted verdict (STRONG BUY … AVOID), the green and red flags, and why a call was held back. |
+| `shorts.py` and `shorts_*.py` | LYLA's Shorts: the script, the hero and scenes, sound, optional Gemini pictures and objects, the render. |
+| `autopost.py` / `youtube_upload.py` / `telegram_bot.py` | What happens to a finished Short (post, private draft, keep), the upload, and the phone remote. |
+| `niche.py` | LYLA's niche research for the channel. |
+| `watch.py` | A contact sheet and report of any video or link, for sending to Claude. |
+| `ui/full/crttv.js` | The idle screen's retro TV and its scenes. |
+| `ui/full/idlescenes.js`, `embers.js` | The idle screen's two skies, and the embers over them. |
+| `update.bat` / `make-short.bat` | One double-click to update; one to make a Short. |
+| `docs/design-refs/` | The reference pictures and sketches the designs were built from. |
+| `docs/shorts-playbook.md`, `docs/shorts-handoff.md` | How the Shorts are made, and the paid upgrades. |
 | `start.bat` | Double-click launcher. Runs `pythonw.exe`, so there is no console window. |
 | `install-startup.bat` | Adds Apollo to Windows startup. `uninstall-startup.bat` removes it. |
 | `voices/` | The downloaded Piper *fallback* voice (~63MB). Only used when VoiceBox is down. Delete it and it re-downloads. |
