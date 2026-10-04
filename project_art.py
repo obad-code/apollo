@@ -23,6 +23,7 @@ STYLE = ("A minimal, calm illustration for a software project card: one simple "
          "accent colour, no text, no letters, no logos. The project: ")
 
 _queue = []
+_blocked_until = 0.0      # after a quota error, no drawing for a day
 _lock = threading.Lock()
 _busy = False
 
@@ -48,7 +49,8 @@ def src(name):
 
 def want(name, about=""):
     """Ask for a picture of `name` if it has none; drawn in the background."""
-    if not os.environ.get("GEMINI_API_KEY") or path_of(name):
+    import time
+    if not os.environ.get("GEMINI_API_KEY") or path_of(name) or time.time() < _blocked_until:
         return
     global _busy
     with _lock:
@@ -74,7 +76,15 @@ def _drain():
             ext = os.path.splitext(made["path"])[1] or ".png"
             os.replace(made["path"], os.path.join(ART, slug(name) + ext))
         except Exception as e:  # noqa: BLE001 - a card without a picture is fine
-            log.info("no picture for %s: %s", name, e)
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                import time
+                global _blocked_until
+                _blocked_until = time.time() + 24 * 3600
+                with _lock:
+                    _queue.clear()
+                log.info("project pictures paused for a day: the image model's quota is used up")
+                continue
+            log.info("no picture for %s: %s", name, str(e)[:160])
 
 
 def decorate(snapshot):
