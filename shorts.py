@@ -24,6 +24,7 @@ import functools
 import json
 import logging
 import math
+import random
 import os
 import re
 import subprocess
@@ -33,6 +34,7 @@ import threading
 log = logging.getLogger("apollo.shorts")
 
 W, H, FPS = 1080, 1920, 15
+LEAD, PAUSE = 0.45, 1.0      # a breath before each scene's words and after them: it is a story, not a rant
 LANG = (os.environ.get("SHORTS_LANG") or "en").lower()
 VOICE = os.environ.get("SHORTS_VOICE") or ("ar-SA-HamedNeural" if LANG == "ar" else "en-US-AndrewNeural")
 GLASSES = os.environ.get("SHORTS_GLASSES", "1").strip().lower() in ("1", "true", "yes", "on")
@@ -43,15 +45,17 @@ CAMS = ("close", "push", "fisheye", "pull", "shake", "pan", "wide")
 PROPS = ("none", "note", "question", "exclaim", "bulb", "money", "clock", "skull", "heart", "earth", "fire")
 
 SYSTEM = (
-    "You write YouTube Shorts scripts for a stick-man animation channel. 35-50 seconds "
-    "spoken. The first line is a hook that stops the scroll. Short punchy sentences. No "
-    "music, nothing indecent, nothing against Islam. Answer ONLY with JSON: "
+    "You write YouTube Shorts scripts for a hand-drawn ink stick-man channel, told like a calm "
+    "story: a narrator who takes his time, never rushing and never rambling. 40-55 seconds "
+    "spoken. The first line is a hook that makes people stay. Each scene is ONE or TWO full "
+    "flowing sentences - give every idea room, with a breath between scenes. No music, nothing "
+    "indecent, nothing against Islam. Answer ONLY with JSON: "
     '{"title": "...", "description": "...", "hashtags": ["#..."], "scenes": [{"say": '
     '"what the narrator says", "caption": "3-6 key words", "pose": one of '
     + json.dumps(POSES) + ', "prop": one of ' + json.dumps(PROPS) + ', "cam": one of ' + json.dumps(CAMS)
-    + "}]} with 6 to 9 scenes. The camera must keep moving: open on a close-up or fisheye "
-    "for the hook, never the same cam twice in a row, shake for shocks. Use prop \"note\" "
-    "(he writes on a pad) for facts and explanations.")
+    + "}]} with 5 to 7 scenes. The camera drifts slowly: open on a close-up for the hook, never "
+    "the same cam twice in a row, fisheye and shake at most once. Use prop \"note\" (he writes at "
+    "his desk) for explaining, and a held prop only when it truly fits. Keep poses calm.")
 
 
 def kind_for(day):
@@ -89,22 +93,8 @@ def ask_script(kind, topic="", think=None):
 # -- drawing -------------------------------------------------------------------------
 
 SS = 1.25         # the world is drawn this much bigger, so a close-up stays sharp
-INK = (38, 36, 42)
-CREAM = (252, 249, 241)
-SHADE = (236, 233, 226)
-OL = 13           # the outline: thick and even, like a sticker
-# soft backgrounds (top, bottom, ray), by mood - pale, so the cream character and the colourful props pop
-LOOKS = {
-    "shock": ((255, 255, 255), (255, 224, 214), (255, 238, 228)),
-    "cheer": ((255, 255, 255), (255, 240, 190), (255, 247, 215)),
-    "sad": ((255, 255, 255), (214, 224, 244), (232, 238, 250)),
-    "think": ((255, 255, 255), (230, 222, 250), (240, 234, 252)),
-    "run": ((255, 255, 255), (214, 242, 236), (232, 248, 244)),
-    "point": ((255, 255, 255), (216, 234, 255), (232, 242, 255)),
-    "wave": ((255, 255, 255), (220, 246, 228), (236, 250, 240)),
-    "shrug": ((255, 255, 255), (252, 226, 236), (254, 238, 244)),
-    "stand": ((255, 255, 255), (232, 238, 248), (242, 246, 252)),
-}
+PAPER = (248, 247, 242)
+INK = (30, 29, 33)
 _cache = {}
 
 
@@ -121,72 +111,108 @@ def _font(size):
 
 
 class Pen:
-    """An ImageDraw that scales everything by k, so the drawing code stays in
-    plain 1080x1920 numbers while the picture is drawn bigger."""
+    """A pen that draws like a hand: every line wobbles a little, and the wobble
+    changes a few times a second (the 'boil' of hand-drawn animation). Everything
+    is in plain 1080x1920 numbers; the picture itself is drawn k times bigger."""
 
-    def __init__(self, d, k):
-        self.d, self.k = d, k
+    def __init__(self, d, k, seed=0):
+        self.d, self.k, self.seed, self.n = d, k, seed, 0
 
-    def _p(self, pts):
+    def _rand(self):
+        self.n += 1
+        return random.Random(self.seed * 7919 + self.n)
+
+    def _pts(self, pts):
         if pts and isinstance(pts[0], (int, float)):
             pts = list(zip(pts[::2], pts[1::2]))
-        return [(x * self.k, y * self.k) for x, y in pts]
+        return list(pts)
 
-    def _w(self, width):
-        return max(1, round(width * self.k))
+    def _wobble(self, pts, amount):
+        rnd, out = self._rand(), []
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+            steps = max(1, int(math.hypot(x1 - x0, y1 - y0) / 45))
+            for i in range(steps):
+                f = i / steps
+                out.append((x0 + (x1 - x0) * f + rnd.uniform(-amount, amount), y0 + (y1 - y0) * f + rnd.uniform(-amount, amount)))
+        out.append((pts[-1][0] + rnd.uniform(-amount, amount), pts[-1][1] + rnd.uniform(-amount, amount)))
+        return out
 
-    def line(self, pts, fill=None, width=1):
-        pts = self._p(pts)
-        w = self._w(width)
-        self.d.line(pts, fill=fill, width=w)
-        r = w / 2 - 0.5    # round caps: every limb is a sausage, not a plank
-        for x, y in pts:
+    def line(self, pts, fill=INK, width=7, wobble=2.2):
+        pts = self._wobble(self._pts(pts), wobble)
+        s = [(x * self.k, y * self.k) for x, y in pts]
+        w = max(1, round(width * self.k))
+        self.d.line(s, fill=fill, width=w, joint="curve")
+        r = w / 2 - 0.5
+        for x, y in (s[0], s[-1]):
             self.d.ellipse([x - r, y - r, x + r, y + r], fill=fill)
 
-    def ellipse(self, box, fill=None, outline=None, width=1):
-        (x0, y0), (x1, y1) = self._p([(box[0], box[1]), (box[2], box[3])])
-        self.d.ellipse([x0, y0, x1, y1], fill=fill, outline=outline, width=self._w(width))
+    def curve(self, pts, **kw):
+        self.line(pts, **kw)
 
-    def rounded(self, box, radius, fill=None, outline=None, width=1):
-        (x0, y0), (x1, y1) = self._p([(box[0], box[1]), (box[2], box[3])])
-        self.d.rounded_rectangle([x0, y0, x1, y1], radius * self.k, fill=fill, outline=outline, width=self._w(width))
-
-    def arc(self, box, start, end, fill=None, width=1):
-        (x0, y0), (x1, y1) = self._p([(box[0], box[1]), (box[2], box[3])])
-        self.d.arc([x0, y0, x1, y1], start, end, fill=fill, width=self._w(width))
-
-    def polygon(self, pts, fill=None, outline=None, width=1):
-        pts = self._p(pts)
-        self.d.polygon(pts, fill=fill)
+    def polygon(self, pts, fill=None, outline=INK, width=7, wobble=2.2):
+        pts = self._pts(pts)
+        if fill is not None:
+            self.d.polygon([(x * self.k, y * self.k) for x, y in pts], fill=fill)
         if outline:
-            self.line(list(pts_back(pts, self.k)) + [pts_back(pts, self.k)[0]], fill=outline, width=width)
+            self.line(pts + [pts[0]], fill=outline, width=width, wobble=wobble)
 
-    def text(self, xy, text, font=None, fill=None, anchor=None):
-        (x, y), = self._p([xy])
+    def ellipse(self, box, fill=None, outline=INK, width=7, wobble=2.2):
+        x0, y0, x1, y1 = box
+        cx, cy, rx, ry = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2
+        if fill is not None:
+            self.d.ellipse([x0 * self.k, y0 * self.k, x1 * self.k, y1 * self.k], fill=fill)
+        if outline:
+            rnd = self._rand()
+            start = rnd.uniform(0, 6.28)
+            n = max(14, int((rx + ry) / 6))
+            pts = [(cx + rx * math.cos(start + 6.5 * i / n), cy + ry * math.sin(start + 6.5 * i / n)) for i in range(n + 1)]
+            self.line(pts, fill=outline, width=width, wobble=wobble * 0.6)
+
+    def dot(self, c, r, fill=INK):
+        self.d.ellipse([(c[0] - r) * self.k, (c[1] - r) * self.k, (c[0] + r) * self.k, (c[1] + r) * self.k], fill=fill)
+
+    def arc(self, box, start, end, width=7):
+        x0, y0, x1, y1 = box
+        cx, cy, rx, ry = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2
+        n = 14
+        pts = [(cx + rx * math.cos(math.radians(start + (end - start) * i / n)),
+                cy + ry * math.sin(math.radians(start + (end - start) * i / n))) for i in range(n + 1)]
+        self.line(pts, width=width, wobble=1.0)
+
+    def hatch(self, x0, y0, x1, y1, gap=15, slant=0.55, width=4):
+        """Diagonal shading strokes inside a box - the shadow of a pencil drawing."""
+        h = y1 - y0
+        x = x0 - slant * h
+        while x < x1:
+            a, b = x, x + slant * h          # from the bottom-left up to the top-right
+            lo, hi = max(a, x0), min(b, x1)
+            if hi > lo:
+                f0, f1 = (lo - a) / (b - a), (hi - a) / (b - a)
+                self.line([(lo, y1 - h * f0), (hi, y1 - h * f1)], width=width, wobble=1.2)
+            x += gap
+
+    def text(self, xy, text, font=None, fill=INK, anchor=None):
+        x, y = xy[0] * self.k, xy[1] * self.k
         if hasattr(font, "font_variant"):
             font = font.font_variant(size=max(1, int(font.size * self.k)))
         self.d.text((x, y), text, font=font, fill=fill, anchor=anchor)
 
 
-def pts_back(pts, k):
-    return [(x / k, y / k) for x, y in pts]
-
-
 def limbs(pose, t):
     """Angles (degrees from straight down) of the +x arm, the -x arm, the +x leg,
-    the -x leg, and a small hop in px, for `pose` at time `t` seconds."""
-    s = math.sin(t * 5.0)
+    the -x leg, and a small hop in px, for `pose` at time `t` seconds. Calm: it is a story."""
+    s = math.sin(t * 2.4)
     table = {
-        "stand": (22 + 4 * s, -22 - 4 * s, 5, -5, 0),
-        "wave": (22, -140 + 26 * math.sin(t * 8), 5, -5, 0),
-        "point": (22, -100 + 4 * s, 5, -5, 0),
-        "think": (22, -150, 5, -5, 0),
-        "shock": (125 + 6 * s, -125 - 6 * s, 12, -12, abs(math.sin(t * 7)) * 14),
-        "run": (45 * s, -45 * s, 28 * s, -28 * s, abs(s) * 8),
-        "cheer": (150 + 8 * s, -150 - 8 * s, 10, -10, abs(math.sin(t * 6)) * 14),
-        "sad": (8, -8, 3, -3, 0),
-        "pleased": (22, -22, 5, -5, 0),
-        "shrug": (70 + 4 * s, -70 - 4 * s, 5, -5, 0),
+        "stand": (16 + 2 * s, -16 - 2 * s, 5, -5, 0),
+        "wave": (16, -140 + 16 * math.sin(t * 5), 5, -5, 0),
+        "point": (16, -100 + 3 * s, 5, -5, 0),
+        "think": (16, -150, 5, -5, 0),
+        "shock": (118 + 4 * s, -118 - 4 * s, 10, -10, abs(math.sin(t * 5)) * 8),
+        "run": (38 * s, -38 * s, 24 * s, -24 * s, abs(s) * 6),
+        "cheer": (145 + 5 * s, -145 - 5 * s, 9, -9, abs(math.sin(t * 4)) * 8),
+        "sad": (7, -7, 3, -3, 0),
+        "pleased": (16, -16, 5, -5, 0),
+        "shrug": (65 + 3 * s, -65 - 3 * s, 5, -5, 0),
     }
     return table.get(pose, table["stand"])
 
@@ -196,183 +222,175 @@ def _tip(a, length, angle):
     return (a[0] + length * math.sin(rad), a[1] + length * math.cos(rad))
 
 
-def _limb(d, pts, width):
-    """An outlined, filled limb through `pts` - the outline first, so joints merge."""
-    d.line(pts, fill=INK, width=width + 2 * OL)
-    d.line(pts, fill=CREAM, width=width)
+def _hand(d, c):
+    d.ellipse([c[0] - 20, c[1] - 20, c[0] + 20, c[1] + 20], fill=PAPER, width=6)
 
 
-def _ball(d, c, r):
-    d.ellipse([c[0] - r - OL, c[1] - r - OL, c[0] + r + OL, c[1] + r + OL], fill=INK)
-    d.ellipse([c[0] - r, c[1] - r, c[0] + r, c[1] + r], fill=CREAM)
-
-
-def draw_man(d, cx, ground, pose, t, talking=False, prop="none", glasses=GLASSES):
+def draw_man(d, cx, ground, pose, t, talking=False, prop="none", glasses=None):
+    glasses = GLASSES if glasses is None else glasses
+    if prop == "note":
+        return _desk_scene(d, cx, pose, t, glasses)
     la, ra, ll, rl, jump = limbs(pose, t)
-    breathe = math.sin(t * 2.2) * 4
-    hip_y = ground - 215 - jump
-    sh_y = hip_y - 300 + breathe                       # shoulder line
-    # soft shadow on the floor
-    d.ellipse([cx - 230, ground - 22, cx + 230, ground + 26], fill=SHADE)
-    # legs and shoes
+    hip_y = ground - 300 - jump
+    sh_y = hip_y - 330 + math.sin(t * 1.8) * 3
+    head_c = (cx + math.sin(t * 1.3) * 4, sh_y - 128 + (10 if pose == "sad" else 0))
+    # the shadow on the floor, hatched
+    d.line([(cx - 190, ground + 8), (cx + 190, ground + 8)], width=5)
+    d.hatch(cx - 160, ground + 12, cx + 160, ground + 44, gap=16, width=3)
+    # legs and feet
     for side, ang in ((1, ll), (-1, rl)):
-        hip = (cx + side * 62, hip_y)
-        foot = _tip(hip, 190, ang)
-        _limb(d, [hip, foot], 54)
-        d.ellipse([foot[0] - 70 + side * 14 - OL, foot[1] - 22 - OL, foot[0] + 70 + side * 14 + OL, foot[1] + 38 + OL], fill=INK)
-        d.ellipse([foot[0] - 70 + side * 14, foot[1] - 22, foot[0] + 70 + side * 14, foot[1] + 38], fill=CREAM)
-    # the torso
-    d.rounded([cx - 125 - OL, sh_y - OL, cx + 125 + OL, hip_y + 40 + OL], 80, fill=INK)
-    d.rounded([cx - 125, sh_y, cx + 125, hip_y + 40], 80, fill=CREAM)
-    # the head: big, flat cream, a soft shade where it sits on the body
-    head_c = (cx + math.sin(t * 1.6) * 6, sh_y - 128 + (14 if pose == "sad" else 0))
-    d.ellipse([cx - 120, sh_y - 30, cx + 120, sh_y + 40], fill=SHADE)
-    r = 165
-    d.ellipse([head_c[0] - r - OL, head_c[1] - r - OL, head_c[0] + r + OL, head_c[1] + r + OL], fill=INK)
-    d.ellipse([head_c[0] - r, head_c[1] - r, head_c[0] + r, head_c[1] + r], fill=CREAM)
-    _face(d, head_c, pose, t, talking, glasses)
-    # arms in front, hands as fists; the prop is held in them
+        hip = (cx + side * 52, hip_y)
+        knee = _tip(hip, 160, ang)
+        foot = _tip(knee, 150, ang * 0.6)
+        d.line([hip, knee, foot], width=8)
+        d.line([foot, (foot[0] + side * 56, foot[1] + 6)], width=8)
+    # the body: a shirt, with a hatched tie
+    d.polygon([(cx - 118, sh_y), (cx + 118, sh_y), (cx + 86, hip_y), (cx - 86, hip_y)], fill=PAPER, width=8)
+    d.polygon([(cx - 16, sh_y + 4), (cx + 16, sh_y + 4), (cx + 24, sh_y + 190), (cx, sh_y + 230), (cx - 24, sh_y + 190)], fill=PAPER, width=6, wobble=1.2)
+    d.hatch(cx - 20, sh_y + 20, cx + 20, sh_y + 190, gap=9, width=3)
+    d.hatch(cx + 40, sh_y + 30, cx + 82, hip_y - 20, gap=17, width=3)
+    # the head
+    d.line([(head_c[0], head_c[1] + 100), (cx, sh_y)], width=8)
+    r = 110
+    d.ellipse([head_c[0] - r, head_c[1] - r, head_c[0] + r, head_c[1] + r], fill=PAPER, width=8)
+    for hx in (-14, 8, 30):                                   # a few hairs
+        d.line([(head_c[0] + hx, head_c[1] - r + 4), (head_c[0] + hx + 8, head_c[1] - r - 26)], width=6, wobble=1.0)
+    _face(d, head_c, pose, t, glasses)
+    # arms, and what he holds
     hands = {}
     for side, ang in ((1, la), (-1, ra)):
-        sh = (cx + side * 118, sh_y + 55)
-        elbow = _tip(sh, 105, ang)
-        hand = _tip(elbow, 95, ang * 0.85 + (-side * 25 if pose in ("stand", "think", "point") else 0))
+        sh = (cx + side * 112, sh_y + 20)
+        elbow = _tip(sh, 120, ang)
+        hand = _tip(elbow, 110, ang * 0.85 + (-side * 22 if pose in ("stand", "think", "point") else 0))
         hands[side] = hand
-    # items first, so a fist closes over them
+        d.line([sh, elbow, hand], width=8)
     _hold(d, prop, hands, t)
-    for side, ang in ((1, la), (-1, ra)):
-        sh = (cx + side * 118, sh_y + 55)
-        elbow = _tip(sh, 105, ang)
-        _limb(d, [sh, elbow, hands[side]], 46)
-        _ball(d, hands[side], 33)
+    for hand in hands.values():
+        _hand(d, hand)
     return head_c
 
 
-def _face(d, head_c, pose, t, talking=False, glasses=GLASSES):
+def _face(d, head_c, pose, t, glasses):
     x, y = head_c
-    shut = (t % 3.3) < 0.12
+    shut = (t % 3.6) < 0.12
     big = pose == "shock"
-    look = math.sin(t * 0.9) * 5
+    look = math.sin(t * 0.7) * 4
     for side in (-1, 1):
-        ex, ey = x + side * 58, y - 6
+        ex, ey = x + side * 40, y - 4
         if shut:
-            d.line([ex - 18, ey, ex + 18, ey], fill=INK, width=8)
+            d.line([(ex - 10, ey), (ex + 10, ey)], width=5, wobble=0.5)
         else:
-            w, h = (17, 30) if big else (13, 22)
-            d.ellipse([ex + look - w, ey - h, ex + look + w, ey + h], fill=INK)
-        lift = {"shock": -26, "sad": 0, "think": -10 if side > 0 else 6, "cheer": -14}.get(pose, 0)
-        slant = {"sad": -14, "shock": 0, "cheer": 0}.get(pose, 0 if pose == "pleased" else 16) * side * -1   # angry-ish by default, like the reference
-        d.line([ex - 26, ey - 52 + lift + slant, ex + 26, ey - 52 + lift - slant], fill=INK, width=10)
+            d.dot((ex + look, ey), 11 if big else 8)
+        if pose in ("shock", "think", "sad"):
+            lift = {"shock": -24, "think": -16 if side > 0 else -4, "sad": -14}[pose]
+            slant = 12 * side if pose == "sad" else 0
+            d.line([(ex - 20, ey - 30 + lift + slant), (ex + 20, ey - 30 + lift - slant)], width=5, wobble=0.8)
     if glasses:
         for side in (-1, 1):
-            gx, gy = x + side * 58, y - 6
-            d.ellipse([gx - 50, gy - 46, gx + 50, gy + 46], outline=INK, width=11, fill=None)
-            d.line([gx - 38, gy - 30, gx - 18, gy - 40], fill=(255, 255, 255), width=6)    # a glint
-        d.line([x - 10, y - 8, x + 10, y - 8], fill=INK, width=9)
-        d.line([x - 108, y - 14, x - 164, y - 30], fill=INK, width=9)
-        d.line([x + 108, y - 14, x + 164, y - 30], fill=INK, width=9)
-    mx, my = x, y + 62
-    open_ = abs(math.sin(t * 13)) if talking else 0
-    if big or (talking and open_ > 0.45):
-        h = 18 + 28 * (open_ if talking else 1)
-        d.ellipse([mx - 24, my - 8, mx + 24, my - 8 + h], fill=INK)
-    elif pose in ("cheer", "wave", "pleased"):
-        d.arc([mx - 44, my - 40, mx + 44, my + 22], 20, 160, fill=INK, width=9)
+            gx = x + side * 40
+            d.ellipse([gx - 36, y - 40, gx + 36, y + 32], fill=None, width=6, wobble=1.4)
+        d.line([(x - 5, y - 6), (x + 5, y - 6)], width=5, wobble=0.4)
+        d.line([(x - 76, y - 12), (x - 108, y - 22)], width=5, wobble=0.6)
+        d.line([(x + 76, y - 12), (x + 108, y - 22)], width=5, wobble=0.6)
+    mx, my = x, y + 50
+    if big:
+        d.ellipse([mx - 15, my - 6, mx + 15, my + 28], fill=INK, width=4)
     elif pose == "sad":
-        d.arc([mx - 38, my + 4, mx + 38, my + 50], 200, 340, fill=INK, width=9)
+        d.arc([mx - 28, my + 4, mx + 28, my + 40], 200, 340, width=6)
     else:
-        d.arc([mx - 30, my - 4, mx + 30, my + 30], 200, 340, fill=INK, width=9)    # the little frown
+        d.arc([mx - 34, my - 22, mx + 34, my + 14], 25, 155, width=6)        # the small smile
 
 
-def _outlined(d, shape, *args, fill, width=OL - 3):
-    getattr(d, shape)(*args, fill=INK)
+def _desk_scene(d, cx, pose, t, glasses):
+    """Behind a desk, writing: the picture the channel is built on."""
+    desk = 1250
+    sh_y = desk - 250
+    head_c = (cx + math.sin(t * 1.1) * 4, sh_y - 128)
+    d.polygon([(cx - 118, sh_y), (cx + 118, sh_y), (cx + 140, desk), (cx - 140, desk)], fill=PAPER, width=8)
+    d.polygon([(cx - 16, sh_y + 4), (cx + 16, sh_y + 4), (cx + 24, sh_y + 170), (cx, sh_y + 205), (cx - 24, sh_y + 170)], fill=PAPER, width=6, wobble=1.2)
+    d.hatch(cx - 20, sh_y + 20, cx + 20, sh_y + 170, gap=9, width=3)
+    d.hatch(cx + 50, sh_y + 30, cx + 120, desk - 6, gap=17, width=3)
+    d.line([(head_c[0], head_c[1] + 100), (cx, sh_y)], width=8)
+    r = 110
+    d.ellipse([head_c[0] - r, head_c[1] - r, head_c[0] + r, head_c[1] + r], fill=PAPER, width=8)
+    for hx in (-14, 8, 30):
+        d.line([(head_c[0] + hx, head_c[1] - r + 4), (head_c[0] + hx + 8, head_c[1] - r - 26)], width=6, wobble=1.0)
+    _face(d, head_c, "pleased", t, glasses)
+    # the desk, with its grain
+    d.line([(40, desk), (1040, desk + 6)], width=7, wobble=3)
+    for i, (a, b) in enumerate(((60, 330), (150, 480), (700, 1000), (800, 1030))):
+        d.line([(a, desk + 22 + i * 15), (b, desk + 22 + i * 15 + 3)], width=3, wobble=2)
+    # the pad, and a hand that writes
+    pad = [(cx - 250, desk + 110), (cx - 60, desk + 40), (cx + 170, desk + 55), (cx + 130, desk + 190)]
+    d.polygon([pad[0], pad[1], pad[2], pad[3]], fill=PAPER, width=7)
+    for i in range(4):
+        d.line([(cx - 170 + i * 16, desk + 105 + i * 20), (cx + 60 + i * 12, desk + 72 + i * 20)], width=3, wobble=1.5)
+    wx, wy = cx - 60 + math.sin(t * 2.5) * 20, desk + 92 + math.sin(t * 4) * 4
+    d.line([(cx - 115, sh_y + 30), (cx - 175, desk - 60), (wx, wy)], width=8)
+    d.line([(cx + 115, sh_y + 30), (cx + 200, desk - 50), (cx + 120, desk + 80)], width=8)
+    d.line([(wx, wy), (wx - 22, wy - 85)], width=9, wobble=0.8)               # the pencil
+    _hand(d, (wx - 6, wy - 12))
+    _hand(d, (cx + 120, desk + 80))
+    return head_c
 
 
 def _hold(d, prop, hands, t):
-    """What he is holding or showing, drawn at his hands."""
-    if prop == "none":
+    """What he holds or shows, drawn at his hand."""
+    if prop in ("none", "note"):
         return
     hx, hy = hands[1]
-    ox, oy = hands[-1]
+    cx, cy = hx + 10, hy - 100 + math.sin(t * 2) * 5
     f = _font(110)
-    bob = math.sin(t * 3) * 6
-    if prop == "note":                                   # a pencil and a pad, like the picture
-        pad = [(hx - 50, hy - 150), (hx + 95, hy - 135), (hx + 70, hy + 40), (hx - 70, hy + 25)]
-        d.polygon(pad, fill=(255, 239, 196), outline=INK, width=OL - 3)
-        a, b = (ox - 70, oy - 150), (ox + 55, oy + 25)
-        d.line([a, b], fill=INK, width=44 + 2 * (OL - 4))
-        d.line([a, b], fill=(246, 190, 40), width=44)
-        d.ellipse([a[0] - 26, a[1] - 26, a[0] + 26, a[1] + 26], fill=(238, 140, 120), outline=INK, width=OL - 4)
-        d.polygon([(b[0] - 20, b[1] - 4), (b[0] + 20, b[1] - 8), (b[0] + 18, b[1] + 44)], fill=(244, 214, 160), outline=INK, width=OL - 5)
-        return
-    cx, cy = hx + 10, hy - 95 + bob
     if prop in ("question", "exclaim"):
-        col = (232, 70, 70) if prop == "exclaim" else (60, 120, 230)
-        d.ellipse([cx - 78, cy - 78, cx + 78, cy + 78], fill=(255, 255, 255), outline=INK, width=OL - 3)
-        d.text((cx, cy + 4), "?" if prop == "question" else "!", font=f, fill=col, anchor="mm")
+        d.ellipse([cx - 70, cy - 70, cx + 70, cy + 70], fill=PAPER, width=7)
+        d.text((cx, cy + 4), "?" if prop == "question" else "!", font=f, anchor="mm")
     elif prop == "bulb":
-        d.ellipse([cx - 66, cy - 80, cx + 66, cy + 52], fill=(255, 214, 60), outline=INK, width=OL - 3)
-        d.rounded([cx - 34, cy + 44, cx + 34, cy + 90], 14, fill=(190, 190, 200), outline=INK, width=OL - 5)
-        for ang in (-60, -20, 20, 60, 100, 140, 180, 220):
+        d.ellipse([cx - 56, cy - 70, cx + 56, cy + 44], fill=PAPER, width=7)
+        d.polygon([(cx - 26, cy + 40), (cx + 26, cy + 40), (cx + 22, cy + 80), (cx - 22, cy + 80)], fill=PAPER, width=6)
+        d.line([(cx - 20, cy + 58), (cx + 20, cy + 58)], width=4, wobble=1)
+        for ang in (-50, -10, 30, 70, 110, 150, 190):
             a = math.radians(ang - 90)
-            d.line([cx + math.cos(a) * 95, cy - 14 + math.sin(a) * 95, cx + math.cos(a) * 125, cy - 14 + math.sin(a) * 125], fill=(245, 170, 20), width=9)
+            d.line([(cx + math.cos(a) * 80, cy - 12 + math.sin(a) * 80), (cx + math.cos(a) * 110, cy - 12 + math.sin(a) * 110)], width=5, wobble=1)
     elif prop == "money":
-        d.rounded([cx - 100, cy - 58, cx + 100, cy + 58], 16, fill=(140, 208, 130), outline=INK, width=OL - 3)
-        d.ellipse([cx - 38, cy - 38, cx + 38, cy + 38], fill=(190, 232, 176), outline=INK, width=7)
-        d.text((cx, cy + 2), "$", font=f, fill=(40, 120, 60), anchor="mm")
+        d.polygon([(cx - 95, cy - 55), (cx + 95, cy - 60), (cx + 92, cy + 55), (cx - 98, cy + 58)], fill=PAPER, width=7)
+        d.ellipse([cx - 34, cy - 34, cx + 34, cy + 34], fill=None, width=5)
+        d.text((cx, cy + 2), "$", font=_font(70), anchor="mm")
     elif prop == "heart":
-        col = (236, 70, 100)
-        d.ellipse([cx - 78, cy - 66, cx + 6, cy + 20], fill=col, outline=INK, width=OL - 4)
-        d.ellipse([cx - 6, cy - 66, cx + 78, cy + 20], fill=col, outline=INK, width=OL - 4)
-        d.polygon([(cx - 76, cy - 10), (cx + 76, cy - 10), (cx, cy + 80)], fill=col, outline=INK, width=OL - 4)
-        d.polygon([(cx - 66, cy - 14), (cx + 66, cy - 14), (cx, cy + 68)], fill=col)
+        pts = [(cx, cy + 70), (cx - 78, cy - 5), (cx - 66, cy - 55), (cx - 28, cy - 62), (cx, cy - 32),
+               (cx + 28, cy - 62), (cx + 66, cy - 55), (cx + 78, cy - 5)]
+        d.polygon(pts, fill=PAPER, width=7, wobble=1.5)
+        d.hatch(cx + 10, cy - 20, cx + 60, cy + 30, gap=11, width=3)
     elif prop == "clock":
-        d.ellipse([cx - 78, cy - 78, cx + 78, cy + 78], fill=(255, 255, 255), outline=INK, width=OL - 3)
-        a = t * 2
-        d.line([cx, cy, cx + math.sin(a) * 52, cy - math.cos(a) * 52], fill=INK, width=9)
-        d.line([cx, cy, cx + math.sin(a / 12) * 36, cy - math.cos(a / 12) * 36], fill=INK, width=11)
+        d.ellipse([cx - 72, cy - 72, cx + 72, cy + 72], fill=PAPER, width=7)
+        a = t * 1.2
+        d.line([(cx, cy), (cx + math.sin(a) * 48, cy - math.cos(a) * 48)], width=6, wobble=0.5)
+        d.line([(cx, cy), (cx + math.sin(a / 12) * 32, cy - math.cos(a / 12) * 32)], width=8, wobble=0.5)
     elif prop == "earth":
-        d.ellipse([cx - 80, cy - 80, cx + 80, cy + 80], fill=(100, 176, 240), outline=INK, width=OL - 3)
-        d.ellipse([cx - 52, cy - 44, cx + 4, cy + 12], fill=(120, 200, 120))
-        d.ellipse([cx + 8, cy + 6, cx + 56, cy + 52], fill=(120, 200, 120))
+        d.ellipse([cx - 74, cy - 74, cx + 74, cy + 74], fill=PAPER, width=7)
+        d.arc([cx - 40, cy - 74, cx + 40, cy + 74], 90, 270, width=4)
+        d.line([(cx - 74, cy), (cx + 74, cy)], width=4, wobble=1)
+        d.hatch(cx - 60, cy + 10, cx - 10, cy + 55, gap=12, width=3)
     elif prop == "fire":
-        sway = math.sin(t * 9) * 8
-        d.polygon([(cx - 70, cy + 60), (cx - 50 + sway, cy - 20), (cx - 8, cy - 60), (cx + sway, cy - 110), (cx + 36, cy - 40), (cx + 70, cy - 10), (cx + 66, cy + 60)],
-                  fill=(250, 130, 40), outline=INK, width=OL - 4)
-        d.ellipse([cx - 32, cy - 10, cx + 32, cy + 60], fill=(255, 214, 70))
+        sway = math.sin(t * 6) * 6
+        d.polygon([(cx - 60, cy + 56), (cx - 44 + sway, cy - 14), (cx - 6, cy - 48), (cx + sway, cy - 98),
+                   (cx + 30, cy - 36), (cx + 62, cy - 8), (cx + 58, cy + 56)], fill=PAPER, width=7, wobble=1.5)
+        d.hatch(cx - 24, cy + 10, cx + 28, cy + 52, gap=10, width=3)
     elif prop == "skull":
-        d.ellipse([cx - 70, cy - 76, cx + 70, cy + 40], fill=(250, 250, 250), outline=INK, width=OL - 3)
-        d.rounded([cx - 38, cy + 20, cx + 38, cy + 76], 12, fill=(250, 250, 250), outline=INK, width=OL - 5)
+        d.ellipse([cx - 62, cy - 68, cx + 62, cy + 36], fill=PAPER, width=7)
+        d.polygon([(cx - 34, cy + 28), (cx + 34, cy + 28), (cx + 30, cy + 70), (cx - 30, cy + 70)], fill=PAPER, width=6)
         for s in (-1, 1):
-            d.ellipse([cx + s * 30 - 17, cy - 22, cx + s * 30 + 17, cy + 14], fill=INK)
+            d.ellipse([cx + s * 26 - 15, cy - 22, cx + s * 26 + 15, cy + 10], fill=INK, width=3)
 
 
 def draw_prop(*_):
     """Kept for old callers: props are held by the man now (see draw_man)."""
 
 
-def avatar(path, size=1024, pose="pleased", prop="note", glasses=True):
-    """A portrait of the character on white, in the channel's style - a profile picture."""
-    from PIL import Image, ImageDraw
-    k = 2.0
-    big = Image.new("RGB", (int(W * k), int(H * k)), "white")
-    d = Pen(ImageDraw.Draw(big), k)
-    draw_man(d, W / 2, 1500, pose, 0.4, prop=prop, glasses=glasses)
-    box = tuple(int(v * k) for v in (W / 2 - 330, 640, W / 2 + 330, 1560))
-    art = big.crop(box)
-    side = max(art.size)
-    canvas = Image.new("RGB", (side, side), "white")
-    canvas.paste(art, ((side - art.width) // 2, (side - art.height) // 2))
-    canvas.resize((size, size), Image.LANCZOS).save(path)
-    return path
-
-
 def _background(pose, size):
-    key = (pose, size)
+    key = ("paper", size)
     if key not in _cache:
-        from PIL import Image, ImageOps
-        top, bottom, _ = LOOKS.get(pose, LOOKS["stand"])
-        _cache[key] = ImageOps.colorize(Image.linear_gradient("L").resize(size), top, bottom)
+        from PIL import Image
+        _cache[key] = Image.new("RGB", size, PAPER)
     return _cache[key].copy()
 
 
@@ -383,18 +401,18 @@ def _ease(x):
 
 def camera(cam, t, p, head, body):
     """Where the camera looks: (zoom, focus x, focus y, bulge), in 1080x1920 numbers."""
-    punch = 1 + 0.30 * _ease(1 - t / 0.28) if t < 0.28 else 1      # every cut starts with a punch-in
+    punch = 1
     bulge = 0.0
     if cam == "close":
-        z, f = 1.7 + 0.3 * _ease(p), (head[0], head[1] + 40)
+        z, f = 1.5 + 0.25 * _ease(p), (head[0], head[1] + 60)
     elif cam == "push":
-        z, f = 1.35 + 0.55 * _ease(p), (body[0], body[1] + (head[1] - body[1]) * _ease(p))
+        z, f = 1.25 + 0.4 * _ease(p), (body[0], body[1] + (head[1] - body[1]) * _ease(p))
     elif cam == "pull":
-        z, f = 2.1 - 0.75 * _ease(p), (head[0], head[1] + 140 * _ease(p))
+        z, f = 1.8 - 0.55 * _ease(p), (head[0], head[1] + 140 * _ease(p))
     elif cam == "fisheye":
-        z, f, bulge = 1.5 + 0.1 * math.sin(t * 2), (body[0], body[1] - 40), 0.35 + 0.1 * math.sin(t * 3)
+        z, f, bulge = 1.5 + 0.1 * math.sin(t * 2), (body[0], body[1] - 40), 0.2
     elif cam == "shake":
-        z, f = 1.55, (body[0] + math.sin(t * 47) * 16, body[1] + math.cos(t * 39) * 16)
+        z, f = 1.55, (body[0] + math.sin(t * 23) * 6, body[1] + math.cos(t * 19) * 6)
     elif cam == "pan":
         z, f = 1.6, (W * (0.3 + 0.4 * _ease(p)), body[1])
     else:
@@ -425,17 +443,9 @@ def frame(scene, t, progress, title):
     pose = scene["pose"]
     world = _background(pose, (int(W * SS), int(H * SS)))
     raw = ImageDraw.Draw(world)
-    # light rays behind him when the mood is loud
-    if pose in ("shock", "cheer") or scene["prop"] in ("fire", "money"):
-        ray = LOOKS.get(pose, LOOKS["stand"])[2]
-        ox, oy = W / 2 * SS, 760 * SS
-        for i in range(14):
-            a0 = t * 0.35 + i * (math.pi * 2 / 14)
-            a1 = a0 + math.pi / 14
-            raw.polygon([(ox, oy)] + [(ox + math.cos(a) * 2600 * SS, oy + math.sin(a) * 2600 * SS) for a in (a0, a1)], fill=ray)
-    d = Pen(raw, SS)
+    d = Pen(raw, SS, seed=int(t * 6))
     ground = 1500
-    cx = W / 2 + math.sin(t * 0.7) * 14
+    cx = W / 2
     head = draw_man(d, cx, ground, pose, t, talking=progress < 1, prop=scene["prop"])
     # the camera: crop the big world to a window and scale it to the screen
     z, fx, fy, bulge = camera(scene.get("cam", "wide"), t, progress, head, (cx, 1000))
@@ -448,30 +458,29 @@ def frame(scene, t, progress, title):
             img = _bulge(img, bulge)
         except ImportError:
             pass
-    # the caption sits on the screen, never zoomed: big, outlined, spoken words in yellow
+    # the caption sits on the screen, never zoomed: calm ink type, the spoken words dark
     d = ImageDraw.Draw(img)
-    big, small = _font(100), _font(38)
+    big, small = _font(78), _font(34)
     words = scene["caption"].split()
-    lit = max(1, math.ceil(len(words) * min(1.0, progress * 1.15)))
+    lit = max(1, math.ceil(len(words) * min(1.0, progress * 1.1)))
     lines, cur = [], []
     for w in words:
-        if len(" ".join(cur + [w])) > 15 and cur:
+        if len(" ".join(cur + [w])) > 18 and cur:
             lines.append(cur)
             cur = []
         cur.append(w)
     lines.append(cur)
-    y, n = 170, 0
+    y, n = 190, 0
     rtl = LANG == "ar"
     for line in lines:
         text_w = d.textlength(" ".join(line), font=big)
         x = W / 2 - text_w / 2
         for w in (reversed(line) if rtl else line):
             n += 1
-            colour = (255, 221, 40) if n <= lit else (255, 255, 255)
-            d.text((x, y), w, font=big, fill=colour, stroke_width=9, stroke_fill=(15, 15, 20))
+            d.text((x, y), w, font=big, fill=INK if n <= lit else (176, 174, 170))
             x += d.textlength(w + " ", font=big)
-        y += 120
-    d.text((W / 2, 1850), title[:40], font=small, fill=(150, 150, 165), anchor="mm")
+        y += 100
+    d.text((W / 2, 1850), title[:40], font=small, fill=(165, 163, 158), anchor="mm")
     return img
 
 
@@ -485,7 +494,7 @@ def _ffmpeg():
 def speak(text, path, voice=VOICE):
     import asyncio
     import edge_tts
-    asyncio.run(edge_tts.Communicate(text, voice).save(path))
+    asyncio.run(edge_tts.Communicate(text, voice, rate="-8%").save(path))
 
 
 def duration(path):
@@ -502,16 +511,17 @@ def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
         step(f"Scene {i + 1} of {len(script['scenes'])}: voice and drawing")
         audio = os.path.join(work, f"s{i}.mp3")
         speak_fn(scene["say"], audio)
-        secs = duration(audio) + 0.25
+        spoken = duration(audio)
+        secs = LEAD + spoken + PAUSE
         clip = os.path.join(work, f"s{i}.mp4")
         cmd = [_ffmpeg(), "-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", str(FPS),
-               "-i", "-", "-i", audio, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
-               "-c:a", "aac", "-shortest", clip]
+               "-i", "-", "-i", audio, "-af", f"adelay={int(LEAD * 1000)}:all=1,apad", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+               "-preset", "veryfast", "-c:a", "aac", "-shortest", clip]
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
         count = int(secs * FPS)
         for f in range(count):
             t = f / FPS
-            frame(scene, t, t / max(0.1, secs - 0.25), script.get("title", "")).save(proc.stdin, "PNG", compress_level=1)
+            frame(scene, t, max(0.0, t - LEAD) / max(0.1, spoken), script.get("title", "")).save(proc.stdin, "PNG", compress_level=1)
         proc.stdin.close()
         if proc.wait() != 0:
             raise RuntimeError("FFmpeg could not make a scene.")
