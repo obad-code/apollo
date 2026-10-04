@@ -21,7 +21,12 @@ MODULES = ("assetProfile,price,financialData,summaryDetail,defaultKeyStatistics,
 TTL = 900
 _cache = {}
 
-VERDICTS = [(4, "STRONG BUY", "BUY"), (2, "BUY", "BUY"), (-1, "HOLD", "HOLD")]
+# A STRONG BUY has to be rare: strong on the business, on price and on trend all at once.
+# (The first version gave it from +4, and over half of the big names got it - analysts' own
+# optimism and a few easy greens were enough. Now it takes +6, and a price already above the
+# analysts' target can never be better than HOLD.)
+VERDICTS = [(6, "STRONG BUY", "BUY"), (3, "BUY", "BUY"), (0, "HOLD", "HOLD")]
+ORDER = ["AVOID", "HOLD", "BUY", "STRONG BUY"]
 
 
 def call(score):
@@ -30,6 +35,25 @@ def call(score):
         if score >= floor:
             return words, tone
     return "AVOID", "SELL"
+
+
+def verdict(score, n):
+    """The call after the limits that no score can buy past: (words, tone, why it was held back)."""
+    words, tone = call(score)
+    notes = []
+
+    def cap(top, why):
+        nonlocal words, tone
+        if ORDER.index(words) > ORDER.index(top):
+            words, tone = top, ("HOLD" if top == "HOLD" else "BUY")
+            notes.append(f"Held at {top}: {why}")
+
+    if (n.get("upside") is not None) and n["upside"] < 0:
+        cap("HOLD", "the price is already above the analysts' target")
+    pe, fpe = n.get("pe"), n.get("forward_pe")
+    if (pe is not None and pe > 100) or (fpe is not None and fpe > 60):
+        cap("BUY", "the price assumes years of perfect growth")
+    return words, tone, notes
 
 
 def _pct(x):
@@ -64,17 +88,37 @@ def flags(n):
     rule(n.get("debt_equity"), lambda v: v < 50, lambda v: v > 200,
          lambda v: f"Little debt (debt/equity {v:.0f}%)",
          lambda v: f"Heavy debt (debt/equity {v:.0f}%)")
-    rule(n.get("upside"), lambda v: v >= 15, lambda v: v < 0,
-         lambda v: f"Analysts' target is {v:.0f}% above the price",
-         lambda v: f"Price is already {abs(v):.0f}% above the analysts' target")
-    rule(n.get("rating"), lambda v: v <= 2.0, lambda v: v >= 3.0,
-         lambda v: f"Analysts say buy ({v:.1f} of 5, 1 = strong buy)",
-         lambda v: f"Analysts are cool on it ({v:.1f} of 5)")
+    # The analysts count ONCE, however many of their numbers agree: their ratings and targets lean
+    # bullish as a rule, so they must not be allowed to carry a call by themselves.
+    up, rating = n.get("upside"), n.get("rating")
+    if up is not None and up < 0:
+        red.append(f"Price is already {abs(up):.0f}% above the analysts' target")
+    elif rating is not None and rating >= 3.0:
+        red.append(f"Analysts are cool on it ({rating:.1f} of 5)")
+    elif (up is not None and up >= 15) or (rating is not None and rating <= 2.0):
+        said = []
+        if rating is not None and rating <= 2.0:
+            said.append(f"rating {rating:.1f} of 5, 1 = strong buy")
+        if up is not None and up >= 15:
+            said.append(f"target {up:.0f}% above the price")
+        green.append("Analysts lean positive (" + ", ".join(said) + ")")
+    price, a200 = n.get("price"), n.get("avg200")
+    if price and a200:
+        gap = (price - a200) / a200
+        if gap > 0:
+            green.append(f"Trending up: {gap * 100:.0f}% above its 200-day average")
+        elif gap < -0.05:
+            red.append(f"Downtrend: {abs(gap) * 100:.0f}% below its 200-day average")
+    beta = n.get("beta")
+    if beta is not None and beta > 1.8:
+        red.append(f"Very jumpy: beta {beta:.1f} (swings {beta:.1f}x the market)")
     pe, fpe = n.get("pe"), n.get("forward_pe")
     if pe is not None and pe > 60:
         red.append(f"Expensive: P/E {pe:.0f}")
     elif pe is not None and 0 < pe < 20:
         green.append(f"Cheap for its profits: P/E {pe:.0f}")
+    if fpe is not None and fpe > 35 and not (pe is not None and pe > 60):
+        red.append(f"Priced for perfection: forward P/E {fpe:.0f}")
     if pe and fpe and 0 < fpe < pe * .85:
         green.append(f"Earnings expected to grow (forward P/E {fpe:.0f} < {pe:.0f})")
     return green, red
@@ -97,6 +141,9 @@ def _numbers(block, price):
         "pe": raw(summ, "trailingPE", 2),
         "forward_pe": raw(summ, "forwardPE", 2),
         "cap": raw(summ, "marketCap"),
+        "price": price,
+        "avg200": raw(summ, "twoHundredDayAverage", 2),
+        "beta": raw(summ, "beta", 2),
     }
 
 
@@ -129,13 +176,13 @@ def analyse(symbol):
     name = price_block.get("shortName") or price_block.get("longName") or symbol
     n = _numbers(block, price)
     green, red = flags(n)
-    words, tone = call(len(green) - len(red))
+    words, tone, held = verdict(len(green) - len(red), n)
     about = str(profile.get("longBusinessSummary") or "")
     result = {"ok": True, "symbol": symbol, "name": name, "price": price,
               "sector": profile.get("sector") or "", "industry": profile.get("industry") or "",
               "about": about[:600] + ("…" if len(about) > 600 else ""),
               "numbers": n, "verdict": words, "tone": tone,
-              "score": len(green) - len(red), "green": green, "red": red,
+              "score": len(green) - len(red), "green": green, "red": red, "held": held,
               "news": news(name, symbol)}
     _cache[symbol] = (time.monotonic() + TTL, result)
     return result

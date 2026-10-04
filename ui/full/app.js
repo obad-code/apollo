@@ -1913,11 +1913,13 @@ function analysisMarkup(a, full = false) {
   return `
     <div class="verdict-call t-${esc(a.tone)}"><b>${esc(a.verdict)}</b>
       <span>${esc([a.sector, a.industry].filter(Boolean).join(' · '))}</span></div>
+    <p class="verdict-count">${(a.green || []).length} green · ${(a.red || []).length} red · score ${a.score >= 0 ? '+' : ''}${a.score ?? 0}</p>
+    ${(a.held || []).map((h) => `<p class="verdict-held">${esc(h)}</p>`).join('')}
     ${more}
     <div class="flag-cols"><div><h4>Green flags</h4>${list(a.green || [], 'green')}</div>
       <div><h4>Red flags</h4>${list(a.red || [], 'red')}</div></div>
     ${news}
-    <p class="fine">Counted from the numbers, not advice.</p>`;
+    <p class="fine">A checklist counted from the numbers - not a forecast, not advice. Analysts' ratings lean bullish, so they count once.</p>`;
 }
 
 async function fillAnalysis(el, symbol, full = false) {
