@@ -33,6 +33,9 @@ import threading
 
 log = logging.getLogger("apollo.shorts")
 
+# FFmpeg is run many times per Short; without this each run flashes a black console window on Windows
+NOWIN = {"creationflags": 0x08000000} if os.name == "nt" else {}
+
 W, H, FPS = 1080, 1920, 15
 LEAD, PAUSE = 0.45, 1.0      # a breath before each scene's words and after them: it is a story, not a rant
 LANG = (os.environ.get("SHORTS_LANG") or "en").lower()
@@ -514,7 +517,7 @@ def speak(text, path, voice=VOICE):
 
 
 def duration(path):
-    out = subprocess.run([_ffmpeg(), "-i", path], capture_output=True, text=True).stderr
+    out = subprocess.run([_ffmpeg(), "-i", path], capture_output=True, text=True, **NOWIN).stderr
     m = re.search(r"Duration: (\d+):(\d+):([\d.]+)", out)
     return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)) if m else 3.0
 
@@ -525,7 +528,7 @@ def _pad(audio, out):
                     "-f", "lavfi", "-t", str(LEAD), "-i", "anullsrc=r=24000:cl=mono", "-i", audio,
                     "-f", "lavfi", "-t", str(PAUSE), "-i", "anullsrc=r=24000:cl=mono",
                     "-filter_complex", "[1:a]aresample=24000,aformat=channel_layouts=mono[v];[0:a][v][2:a]concat=n=3:v=0:a=1[out]",
-                    "-map", "[out]", out], check=True, capture_output=True)
+                    "-map", "[out]", out], check=True, capture_output=True, **NOWIN)
     return out
 
 
@@ -544,7 +547,7 @@ def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
         cmd = [_ffmpeg(), "-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", str(FPS),
                "-i", "-", "-i", padded, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
                "-c:a", "aac", "-t", f"{secs:.2f}", clip]
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE, **NOWIN)
         try:
             for f in range(int(secs * FPS)):
                 t = f / FPS
@@ -561,7 +564,7 @@ def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
     with open(listing, "w", encoding="utf-8") as f:
         f.writelines(f"file '{p}'\n" for p in parts)
     subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", listing,
-                    "-c", "copy", out_path], check=True)
+                    "-c", "copy", out_path], check=True, **NOWIN)
     return out_path
 
 
