@@ -104,6 +104,14 @@ def stock_facts(symbol, step=lambda text: None):
             facts["price"]["month_high"], facts["price"]["month_low"] = max(closes), min(closes)
     facts["valuation"] = _attempt(lambda: market.fundamentals(symbol), sources, "valuation")
 
+    try:
+        import analysis
+        counted = analysis.analyse(symbol)
+        if counted.get("ok"):
+            facts["counted_verdict"] = {k: counted[k] for k in ("verdict", "green", "red", "numbers", "about")}
+    except Exception:  # noqa: BLE001
+        pass
+
     step(f"Reading {symbol}: the trading desk")
     board = _attempt(trading.board, sources, "desk")
     if board:
@@ -368,7 +376,11 @@ class Desk:
         try:
             if job["stock"]:
                 self._tell(job, stage="step", text=f"Finding the ticker for {job['stock']}")
-                job["symbol"] = self.resolve(job["stock"])
+                try:
+                    job["symbol"] = self.resolve(job["stock"]) or ""
+                except Exception as e:  # noqa: BLE001 - read it by name instead
+                    log.info("%s: no ticker for %r (%s)", self.name, job["stock"], e)
+                    job["symbol"] = ""
             facts = self.facts(job, lambda text: self._tell(job, stage="step", text=text))
             self._tell(job, stage="asking", text="Writing it up")
             answer, brain = self.think(self.prompt_for(job, facts))

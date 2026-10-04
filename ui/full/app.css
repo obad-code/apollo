@@ -3411,3 +3411,9 @@ body:not(.ultra):not(.viewing) #markets.rolled #nav-roller { height: 100%; min-h
 body:not(.ultra):not(.viewing) #crew-mini { grid-area: status; align-self: start; margin-bottom: 72px; }
 body:not(.ultra):not(.viewing) #markets.rolled { padding-bottom: 0; }
 body:not(.ultra):not(.viewing) #markets.rolled #nav-roll { min-height: 220px; }
+
+/* crew report viewer */
+#crew-report { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: rgba(0,0,0,.55); }
+#crew-report .cr-card { position: relative; width: min(760px, 92vw); max-height: 80vh; overflow: auto; padding: 28px; border-radius: 14px; background: #14161c; color: #e8eaf0; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+#crew-report pre { white-space: pre-wrap; font: 14px/1.6 system-ui, sans-serif; margin: 0; }
+#crew-report .cr-x { position: absolute; top: 8px; right: 12px; background: none; border: 0; color: inherit; font-size: 24px; cursor: pointer; }

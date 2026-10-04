@@ -222,11 +222,12 @@ def duration(path):
     return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)) if m else 3.0
 
 
-def render(script, out_path, speak_fn=speak, work=None):
+def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
     """The whole video. Returns out_path."""
     work = work or tempfile.mkdtemp(prefix="short-")
     parts = []
     for i, scene in enumerate(script["scenes"]):
+        step(f"Scene {i + 1} of {len(script['scenes'])}: voice and drawing")
         audio = os.path.join(work, f"s{i}.mp3")
         speak_fn(scene["say"], audio)
         secs = duration(audio) + 0.25
@@ -258,14 +259,21 @@ def folder():
     return path
 
 
-def make(kind=None, topic="", think=None, speak_fn=speak, now=None):
+def make(kind=None, topic="", think=None, speak_fn=speak, now=None, step=lambda t: None):
     """Write, voice, draw and join one Short. Returns {path, title, notes}."""
     now = now or dt.datetime.now()
     kind = kind or kind_for(now.date())
+    for need in ("PIL", "edge_tts", "imageio_ffmpeg"):
+        try:
+            __import__(need)
+        except ImportError as e:
+            raise RuntimeError("Missing a library: run  python -m pip install pillow edge-tts imageio-ffmpeg") from e
+    step(f"Writing the script ({kind})")
     script = ask_script(kind, topic, think)
     slug = re.sub(r"[^\w\- ]+", "", script.get("title", "short"))[:50].strip() or "short"
     base = os.path.join(folder(), f"{now:%Y-%m-%d %H%M} {slug}")
-    render(script, base + ".mp4", speak_fn)
+    render(script, base + ".mp4", speak_fn, step=step)
+    step("Joining the scenes")
     notes = (f"{script.get('title', '')}\n\n{script.get('description', '')}\n\n"
              + " ".join(script.get("hashtags", []) + ["#shorts"]))
     with open(base + ".txt", "w", encoding="utf-8") as f:
@@ -275,7 +283,17 @@ def make(kind=None, topic="", think=None, speak_fn=speak, now=None):
 
 
 def make_in_background(kind=None, topic="", done=None):
-    """Make one on a thread; `done(result_or_error)` hears how it went."""
+    """Hand it to LYLA's desk: her card shows it, Apollo tells you when done."""
+    try:
+        import crew
+        what = f"Make a YouTube Short{(' about ' + topic) if topic else ''}"
+        return crew.desk("LYLA").take(what, short=True, kind=kind, topic=topic)
+    except Exception:  # noqa: BLE001 - no desk: make it on a thread of its own
+        log.debug("no LYLA desk for the short", exc_info=True)
+    return _make_on_thread(kind, topic, done)
+
+
+def _make_on_thread(kind=None, topic="", done=None):
     def run():
         try:
             result = make(kind, topic)

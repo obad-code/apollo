@@ -49,6 +49,7 @@ FAST_MODELS = tuple(filter(None, (os.environ.get("CREW_MODEL"),
 DEEP_GEMINI = tuple(filter(None, (os.environ.get("CREW_DEEP_MODEL"),
                                   "gemini-pro-latest", "gemini-2.5-pro"))) + FAST_MODELS
 DEEP_CLAUDE = os.environ.get("THEIA_CLAUDE_MODEL") or "claude-opus-5-5"
+FAST_CLAUDE = os.environ.get("CREW_CLAUDE_MODEL") or "claude-sonnet-5-5"
 
 SUMMARY_RULE = (
     "Answer in exactly this shape. The first line is `SUMMARY:` and two short "
@@ -139,9 +140,9 @@ def q_facts(job, step):
 
 # -- how each one thinks -----------------------------------------------------------
 
-def _claude(prompt, system):
+def _claude(prompt, system, model=None):
     import assistant
-    return assistant.ask_once(system, prompt, max_tokens=4000, model=DEEP_CLAUDE)
+    return assistant.ask_once(system, prompt, max_tokens=4000, model=model or DEEP_CLAUDE)
 
 
 def thinker(system, deep_capable=False):
@@ -156,6 +157,11 @@ def thinker(system, deep_capable=False):
                 except Exception as e:  # noqa: BLE001 - Gemini is still there
                     log.info("THEIA: Claude did not answer (%s); asking Gemini", e)
             return lyla.ask_gemini(prompt, system, DEEP_GEMINI), "Gemini Pro"
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            try:
+                return _claude(prompt, system, FAST_CLAUDE), "Claude"
+            except Exception as e:  # noqa: BLE001 - Gemini is still there
+                log.info("Claude did not answer (%s); asking Gemini", e)
         return lyla.think(prompt, system, FAST_MODELS)
     return think
 
@@ -209,7 +215,39 @@ CONNECT_MARK = "[[connectors]]\n"
 
 
 class LylaDesk(lyla.Desk):
-    """LYLA's desk: a connectors job goes straight to them, with no reading."""
+    """LYLA's desk: a connectors job goes straight to them, with no reading;
+    a Short is made here, step by step, so its card shows how it is going."""
+
+    def run(self, job):
+        if not job.get("short"):
+            return super().run(job)
+        import time as _t
+        import shorts
+        started = _t.monotonic()
+        self._tell(job, stage="received", text=job["task"], by="Apollo")
+        try:
+            made = shorts.make(job.get("kind") or None, job.get("topic", ""),
+                               step=lambda text: self._tell(job, stage="step", text=text))
+            job.update(ok=True, brain="Gemini", sources={},
+                       summary=f"Short ready: {made['title']}",
+                       report=f"Saved to {made['path']}\n\nTitle, description and hashtags: {made['notes']}")
+        except Exception as e:  # noqa: BLE001
+            log.warning("short failed: %s", e)
+            job.update(ok=False, summary="", report="", error=str(e) or type(e).__name__)
+        job["took"] = int((_t.monotonic() - started) * 1000)
+        job["done"] = _t.time()
+        if job["ok"]:
+            self._tell(job, stage="done", text=job["summary"], report=job["report"], ms=job["took"], brain="Gemini")
+            lyla.keep_file(job)
+            self.reports.insert(0, {k: job.get(k, "") for k in ("task", "symbol", "summary", "report",
+                                                                 "brain", "asked", "done", "took", "file", "link")})
+            del self.reports[lyla.KEEP:]
+            lyla._save_reports(self.reports, self.path)
+        else:
+            self.last_error = {"when": job["done"], "why": job["error"], "task": job["task"]}
+            self.failures = (self.failures + [job["done"]])[-50:]
+            self._tell(job, stage="error", text=job["error"])
+        self._pass_on(job)
 
     def prompt_for(self, job, facts):
         if job.get("connectors"):
@@ -286,7 +324,7 @@ def board(now=None, journal_day=None, spend=None, problems=None, alerts_state=No
             jobs.append({"agent": name, "task": report.get("task", ""),
                          "summary": report.get("summary", ""), "took": report.get("took", 0),
                          "brain": report.get("brain", ""), "done": done,
-                         "file": report.get("file", ""), "link": report.get("link", "")})
+                         "file": report.get("file", ""), "link": report.get("link", ""), "report": (report.get("report", "") or "")[:6000]})
             if done >= start:
                 agents[name]["done_today"] += 1
                 hours[name][dt.datetime.fromtimestamp(done).hour] += 1

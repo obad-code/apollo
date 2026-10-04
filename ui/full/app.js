@@ -467,7 +467,12 @@ $('crew-page').addEventListener('click', (event) => {
   const open = event.target.closest('.cp-open');
   if (open) {
     if (api && open.dataset.link && api.open_link) api.open_link(open.dataset.link);
-    else if (api && open.dataset.file && api.open_crew_file) api.open_crew_file(open.dataset.file);
+    else {
+      const show = () => showCrewReport(open.dataset.report);
+      if (api && open.dataset.file && api.open_crew_file) {
+        Promise.resolve(api.open_crew_file(open.dataset.file)).then((ok) => { if (!ok) show(); }, show);
+      } else show();
+    }
     return;
   }
   const lane = event.target.closest('.cp-lane, .cc-card');
@@ -477,6 +482,17 @@ $('crew-page').addEventListener('click', (event) => {
     drawCrewPage();
   }
 });
+function showCrewReport(text) {
+  let box = document.getElementById('crew-report');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'crew-report';
+    box.innerHTML = '<div class="cr-card"><button type="button" class="cr-x">×</button><pre></pre></div>';
+    box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('.cr-x')) box.remove(); });
+    document.body.appendChild(box);
+  }
+  box.querySelector('pre').textContent = text || 'No report text was saved for this job.';
+}
 window.addEventListener('resize', () => { if (state.view === 'agents') drawCrewPage(); });
 
 function refreshCrew() {

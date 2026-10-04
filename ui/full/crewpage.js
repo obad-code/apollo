@@ -37,7 +37,7 @@ function lane(key, a, open, now) {
     : h.state === 'failing'
       ? `<b>${esc(short((a.error || {}).task, 60))}</b><span class="cp-state cp-s-failing">FAILED · ${esc(short((a.error || {}).why, 40))}</span>`
       : last
-        ? `<b>${esc(short(last.summary || last.task, 60))}</b><button type="button" class="cp-open" data-file="${esc(last.file || '')}" data-link="${esc(last.link || '')}">${last.link ? 'Open on GitHub ›' : 'Open report ›'}</button>`
+        ? `<b>${esc(short(last.summary || last.task, 60))}</b><button type="button" class="cp-open" data-file="${esc(last.file || '')}" data-link="${esc(last.link || '')}" data-report="${esc(last.report || last.summary || '')}">${last.link ? 'Open on GitHub ›' : 'Open report ›'}</button>`
         : '<b class="cp-quiet">Nothing yet</b>';
   const steps = (a.steps || []).filter(() => a.working);
   const results = (a.results || []).slice(0, 6);
@@ -50,7 +50,7 @@ function lane(key, a, open, now) {
       <div><h4>TAKES</h4><p>${esc(IO[key][0])}</p></div>
       <div><h4>${a.working ? 'LIVE' : 'RESULTS'}</h4>${a.working
         ? `<ul>${steps.map((s) => `<li>· ${esc(short(s.text || s.stage, 80))}</li>`).join('') || '<li>Starting…</li>'}</ul>`
-        : results.length ? `<ul>${results.map((r) => `<li><button type="button" class="cp-open" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}">${esc(short(r.summary || r.task, 80))} ›</button></li>`).join('')}</ul>`
+        : results.length ? `<ul>${results.map((r) => `<li><button type="button" class="cp-open" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}" data-report="${esc(r.report || r.summary || '')}">${esc(short(r.summary || r.task, 80))} ›</button></li>`).join('')}</ul>`
           : '<p>No results yet.</p>'}</div>
       <div><h4>GIVES</h4><p>${esc(IO[key][1])}</p><p class="cp-where">Saved in Documents\\Apollo\\Crew\\${key}</p></div>
     </div>` : ''}
@@ -117,7 +117,7 @@ function card(key, a, open, now) {
       ? `<p class="cc-now"><i class="cc-dot s-failing"></i>Last job failed</p><small>${esc(short((a.error || {}).why, 80))}</small>`
       : last
         ? `<p class="cc-now"><i class="cc-dot s-idle"></i>${esc(short(last.summary || last.task, 70))}</p>
-           <button type="button" class="cp-open" data-file="${esc(last.file || '')}" data-link="${esc(last.link || '')}">${last.link ? 'Open on GitHub ›' : 'Open report ›'}</button>`
+           <button type="button" class="cp-open" data-file="${esc(last.file || '')}" data-link="${esc(last.link || '')}" data-report="${esc(last.report || last.summary || '')}">${last.link ? 'Open on GitHub ›' : 'Open report ›'}</button>`
         : '<p class="cc-now"><i class="cc-dot s-idle"></i>Ready · nothing yet</p>';
   const steps = a.working ? (a.steps || []) : [];
   const results = (a.results || []).slice(0, 6);
@@ -132,7 +132,7 @@ function card(key, a, open, now) {
       <h4>HOW IT WORKS</h4>${flowMarkup(key, a.working ? Math.min(stageOf(a), 3) : -1)}
       <h4>${a.working ? 'LIVE' : 'RESULTS'}</h4>
       ${a.working ? `<ul>${steps.map((x) => `<li>· ${esc(short(x.text || x.stage, 70))}</li>`).join('') || '<li>Starting…</li>'}</ul>`
-        : results.length ? `<ul>${results.map((r) => `<li><button type="button" class="cp-open" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}">${esc(short(r.summary || r.task, 60))} ›</button></li>`).join('')}</ul>`
+        : results.length ? `<ul>${results.map((r) => `<li><button type="button" class="cp-open" data-file="${esc(r.file || '')}" data-link="${esc(r.link || '')}" data-report="${esc(r.report || r.summary || '')}">${esc(short(r.summary || r.task, 60))} ›</button></li>`).join('')}</ul>`
           : '<p>No results yet.</p>'}
     </div>` : ''}
   </article>`;

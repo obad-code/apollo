@@ -28,7 +28,6 @@ STATE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
 ROUTINES = {
     "MONEYPENNY": (15, True),
     "THEIA": (20, False),
-    "LYLA": (10, False),
     "SHORTS": (int(os.environ.get("SHORTS_HOUR") or 13), False),   # a Short a day at the peak hour
 }
 
