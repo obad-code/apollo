@@ -36,3 +36,15 @@ def test_nothing_posts_by_itself_unless_asked(tmp_path, monkeypatch):
     autopost.offer([{"title": "A", "path": "a.mp4", "notes": ""}], now, path)
     monkeypatch.setattr(autopost, "AUTOPOST", False)
     assert autopost.tick(now + dt.timedelta(hours=9), path, upload=lambda v, n: 1 / 0) is None
+
+
+def test_a_single_short_waits_for_your_word_and_can_be_a_private_draft(tmp_path):
+    path = str(tmp_path / "p.json")
+    made = [{"title": "A", "path": "a.mp4", "notes": "n"}]
+    autopost.offer(made, dt.datetime(2026, 1, 1), path)
+    assert "private draft" in autopost.question(made)
+    seen = []
+    r = autopost.choose(1, path, upload=lambda v, n, privacy=None: seen.append(privacy) or "L", privacy="private")
+    assert seen == ["private"] and "private draft" in r["result"]
+    autopost.offer(made, dt.datetime(2026, 1, 1), path)
+    assert autopost.choose(0, path)["result"].startswith("Kept as a file")

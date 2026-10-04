@@ -275,9 +275,11 @@ class LylaDesk(lyla.Desk):
                            summary=autopost.question(made),
                            report="\n".join(f"{i + 1}. {m['title']}  -  {m['path']}" for i, m in enumerate(made)))
             else:
+                import autopost
                 made = shorts.make(job.get("kind") or None, job.get("topic", ""), step=step)
-                job.update(ok=True, brain="Gemini", sources={},
-                           summary=f"Short ready: {made['title']}",
+                autopost.offer([made])                  # waits for your word: post, private draft, or keep the file
+                job.update(ok=True, brain="Gemini", sources={}, ask_pick=True,
+                           summary=autopost.question([made]),
                            report=f"Saved to {made['path']}\n\nTitle, description and hashtags: {made['notes']}")
         except Exception as e:  # noqa: BLE001
             log.warning("short failed: %s", e)

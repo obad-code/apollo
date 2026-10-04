@@ -1329,7 +1329,7 @@ def _download_video(ctx, what, audio_only=False):
 def _make_short(ctx, topic="", kind=None):
     import shorts
     shorts.make_in_background(kind or None, topic)
-    return {"ok": True, "result": "LYLA is making it - a few minutes. It lands in Documents\\Apollo\\Shorts."}
+    return {"ok": True, "result": "LYLA is making it - a few minutes. When it is ready I will ask whether to post it, save it as a private draft on YouTube, or just keep the file. Nothing is posted without that."}
 
 
 @_tool("short_style", "LYLA's Shorts style",
@@ -1364,15 +1364,22 @@ def _pick_niche(ctx, number):
     return niche.choose(int(number))
 
 
-@_tool("post_short", "posting the Short",
-       "Post one of today's Shorts that LYLA made to YouTube, after she asked which one. "
-       "number is 1, 2, 3...; 0 means post none today; all=true posts every one waiting. Use it for "
-       "\"نزل رقم ٢\", \"post the second one\", \"نزل الكل\", \"لا تنزل شي\".",
-       _obj({"number": {"type": "integer", "description": "Which Short, 1-based; 0 for none"},
-             "all": {"type": "boolean", "description": "Post every Short waiting"}}, ()))
-def _post_short(ctx, number=0, all=False):  # noqa: A002 - the tool's own word
+@_tool("post_short", "deciding about the Short",
+       "What to do with the Short LYLA just made (or today's Shorts), after she asked. mode 'public' = "
+       "post it on YouTube; 'private' = save it on YouTube as a private draft; 'keep' = do nothing, "
+       "keep the file only. number is which one (1, 2, ...; default 1); all=true applies to every one "
+       "waiting. Use it for \"نزله\", \"انشره\", \"خله درافت\", \"خله مسودة\", \"لا تنزله\", "
+       "\"post it\", \"keep it as a draft\", \"نزل رقم ٢\".",
+       _obj({"mode": _enum(["public", "private", "keep"], "post / private draft / keep the file"),
+             "number": {"type": "integer", "description": "Which Short, 1-based (default 1)"},
+             "all": {"type": "boolean", "description": "Every Short waiting"}}, ("mode",)))
+def _post_short(ctx, mode="keep", number=1, all=False):  # noqa: A002 - the tool's own word
     import autopost
-    return autopost.choose_all() if all else autopost.choose(int(number))
+    if mode == "keep":
+        return autopost.choose(0)
+    if all:
+        return autopost.choose_all()
+    return autopost.choose(int(number or 1), privacy="private" if mode == "private" else None)
 
 
 @_tool("crew_findings", "reading the crew's reports",

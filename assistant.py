@@ -1821,9 +1821,10 @@ def report_agent(ui, voice, job):
             except Exception:  # noqa: BLE001
                 logging.getLogger("apollo").info("niche to telegram failed", exc_info=True)
         if job.get("ask_pick"):
-            instruction = (f"LYLA made today's YouTube Shorts and asks which one to post. "
-                           f"Read the user this, short, in their language: {job['summary']} "
-                           f"When they answer, call post_short with the number.")
+            instruction = (f"LYLA finished the YouTube Short the user asked for and needs their decision. "
+                           f"Tell them, short, in their language: {job['summary']} "
+                           f"When they answer, call post_short: mode 'public' to post it, 'private' to save it on "
+                           f"YouTube as a private draft, 'keep' to only keep the file (number if there are several).")
             try:
                 import autopost
                 import telegram_bot

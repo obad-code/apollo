@@ -113,6 +113,9 @@ def offer(made, now=None, path=STATE):
 
 
 def question(made):
+    if len(made) == 1:                      # a Short you asked for: you decide what happens to it
+        return (f"Your Short is ready: {made[0]['title']}. Do you want it posted, saved on YouTube as a private draft, "
+                "or just kept as a file?")
     lines = [f"{i + 1}. {m['title']}" for i, m in enumerate(made)]
     if POST_ALL:
         return ("Today's Shorts are ready: " + " | ".join(lines)
@@ -121,19 +124,20 @@ def question(made):
             + f". If you don't answer in {WAIT_HOURS:g} hours I'll post number 1.")
 
 
-def choose(number, path=STATE, upload=None):
-    """Post the Short you picked (1-based). 0 = post nothing today."""
+def choose(number, path=STATE, upload=None, privacy=None):
+    """Post the Short you picked (1-based) - `privacy` "private" saves it on YouTube as a private draft.
+    0 = keep it as a file only."""
     data = load(path)
     if data.get("status") != "waiting":
         return {"ok": False, "error": "No Shorts are waiting for a pick."}
     if number == 0:
         data["status"] = "skipped"
         save(data, path)
-        return {"ok": True, "result": "Nothing posted today."}
+        return {"ok": True, "result": "Kept as a file only - nothing was posted."}
     made = data.get("made", [])
     if not 1 <= number <= len(made):
         return {"ok": False, "error": f"Pick 1 to {len(made)}."}
-    return _post(data, made[number - 1], path, upload)
+    return _post(data, made[number - 1], path, upload, privacy)
 
 
 def choose_all(path=STATE, upload=None):
@@ -151,12 +155,12 @@ def choose_all(path=STATE, upload=None):
             "link": ", ".join(links), **({"error": "; ".join(errors)} if errors and not links else {})}
 
 
-def _post(data, item, path, upload):
+def _post(data, item, path, upload, privacy=None):
     if upload is None:
         import youtube_upload
         upload = youtube_upload.upload
     try:
-        link = upload(item["path"], item.get("notes", ""))
+        link = upload(item["path"], item.get("notes", "")) if not privacy else upload(item["path"], item.get("notes", ""), privacy)
     except Exception as e:  # noqa: BLE001
         data["status"] = "failed"
         data["error"] = str(e) or type(e).__name__
@@ -165,7 +169,8 @@ def _post(data, item, path, upload):
         return {"ok": False, "error": data["error"]}
     data.update(status="posted", posted=item["title"], link=link)
     save(data, path)
-    return {"ok": True, "result": f"Posted: {item['title']}", "link": link}
+    return {"ok": True, "result": (f"Saved as a private draft on YouTube: {item['title']}" if privacy == "private"
+                                    else f"Posted: {item['title']}"), "link": link}
 
 
 def tick(now=None, path=STATE, upload=None):

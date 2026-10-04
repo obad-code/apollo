@@ -71,7 +71,7 @@ def _credentials():
     return creds
 
 
-def upload(video_path, notes_path=""):
+def upload(video_path, notes_path="", privacy=None):
     """Upload; returns the watch link."""
     try:
         from googleapiclient.discovery import build
@@ -81,7 +81,7 @@ def upload(video_path, notes_path=""):
     title, description, tags = read_notes(notes_path)
     youtube = build("youtube", "v3", credentials=_credentials(), cache_discovery=False)
     body = {"snippet": {"title": title, "description": description, "tags": tags, "categoryId": "24"},
-            "status": {"privacyStatus": PRIVACY, "selfDeclaredMadeForKids": False}}
+            "status": {"privacyStatus": privacy or PRIVACY, "selfDeclaredMadeForKids": False}}
     request = youtube.videos().insert(part="snippet,status", body=body,
                                       media_body=MediaFileUpload(video_path, chunksize=-1, resumable=True))
     response = None

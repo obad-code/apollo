@@ -4,7 +4,7 @@ import telegram_bot as tb
 def run(text):
     calls = []
     out = tb.handle(text, make_short=lambda t: calls.append(("short", t)), make_batch=lambda: calls.append(("batch",)),
-                    choose=lambda n: calls.append(("choose", n)) or {"result": "ok"}, status=lambda: "s")
+                    choose=lambda n, privacy=None: calls.append(("choose", n) if not privacy else ("draft", n)) or {"result": "ok"}, status=lambda: "s")
     return out, calls
 
 
@@ -15,6 +15,9 @@ def test_commands():
     assert run("post 1")[1] == [("choose", 1)]
     assert run("لا تنزل شي")[1] == [("choose", 0)]
     assert run("today")[1] == [("batch",)]
+    assert run("post")[1] == [("choose", 1)] and run("نزله")[1] == [("choose", 1)]
+    assert run("خله درافت")[1] == [("draft", 1)] and run("draft")[1] == [("draft", 1)]
+    assert run("لا")[1] == [("choose", 0)]
     assert run("hello")[0] == tb.HELP
 
 

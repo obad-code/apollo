@@ -29,7 +29,7 @@ import uuid
 log = logging.getLogger("apollo.telegram")
 
 HELP = ("short about <topic> - one Short\ntoday - today's Shorts from the trends\n"
-        "post <number> - post that one (post all - both)\nskip - post nothing today\nstyle <instructions> - how every Short should be told\nstatus")
+        "post - post the Short that is ready (post 2 for a number, post all)\ndraft - save it on YouTube as a private draft\nskip - post nothing today\nstyle <instructions> - how every Short should be told\nstatus")
 DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 
 
@@ -109,11 +109,17 @@ def handle(text, make_short=None, make_batch=None, choose=None, status=None, set
     if re.match(r"^/?(post all|نزل الكل|نزل الاثنين|انشر الكل|انشر الاثنين)", low):
         r = choose_all()
         return r.get("result") or r.get("error") or "Done."
+    if re.match(r"^/?(post|نزله|نزل|انشره|انشر)\s*$", low):
+        r = choose(1)
+        return r.get("result") or r.get("error") or "Done."
+    if re.match(r"^/?(draft|private|درافت|مسودة|خله درافت|خله مسودة)", low):
+        r = choose(1, privacy="private")
+        return r.get("result") or r.get("error") or "Done."
     m = re.match(r"^/?(?:post|نزل|انشر)\s*(?:رقم\s*|number\s*|#)?(\d)\b", low)
     if m:
         r = choose(int(m.group(1)))
         return r.get("result") or r.get("error") or "Done."
-    if re.match(r"^/?(skip|لا تنزل|لا تنشر)", low):
+    if re.match(r"^/?(skip|keep|لا|لا تنزل|لا تنشر|لا تنزله)", low):
         return (choose(0).get("result") or "Nothing posted today.")
     if re.match(r"^/?(today|trends?|ترند|اليوم)\b", low):
         make_batch()
