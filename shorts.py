@@ -1102,6 +1102,17 @@ def folder():
     return path
 
 
+def _preview(video, out):
+    """One picture of the whole Short - a frame every few seconds - so it can be looked at (or sent) without playing it."""
+    try:
+        rate = 16 / max(2.0, duration(video))                 # sixteen frames, spread over the whole Short
+        subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-i", video, "-vf",
+                        f"fps={rate:.4f},scale=240:-1,tile=8x2:padding=6:color=white", "-frames:v", "1", out],
+                       check=True, capture_output=True, **NOWIN)
+    except Exception:  # noqa: BLE001 - a preview is a convenience
+        log.info("no preview sheet", exc_info=True)
+
+
 def make(kind=None, topic="", think=None, speak_fn=speak, now=None, step=lambda t: None, world=""):
     """Write, voice, draw and join one Short. Returns {path, title, notes}."""
     now = now or dt.datetime.now()
@@ -1116,6 +1127,8 @@ def make(kind=None, topic="", think=None, speak_fn=speak, now=None, step=lambda 
     slug = re.sub(r"[^\w\- ]+", "", script.get("title", "short"))[:50].strip() or "short"
     base = os.path.join(folder(), f"{now:%Y-%m-%d %H%M} {slug}")
     render(script, base + ".mp4", speak_fn, step=step)
+    step("Making the preview sheet")
+    _preview(base + ".mp4", base + " preview.png")
     step("Joining the scenes")
     notes = (f"{script.get('title', '')}\n\n{script.get('description', '')}\n\n"
              + " ".join(script.get("hashtags", []) + ["#shorts"])
