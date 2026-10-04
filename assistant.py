@@ -1813,6 +1813,16 @@ def report_agent(ui, voice, job):
             f"about a stock, say it is a read, not advice. The full report is "
             f"there if they ask for more (crew_findings).")
         fallback = f"{who} is done: {job['summary']}"
+        if job.get("ask_pick"):
+            instruction = (f"LYLA made today's YouTube Shorts and asks which one to post. "
+                           f"Read the user this, short, in their language: {job['summary']} "
+                           f"When they answer, call post_short with the number.")
+            try:
+                import emailer
+                if emailer.ready():
+                    emailer.send("LYLA: which Short should I post?", job["summary"] + "\n\n" + job["report"])
+            except Exception:  # noqa: BLE001
+                logging.getLogger("apollo").info("shorts email failed", exc_info=True)
     else:
         instruction = (
             f"{who}, one of your agents, could not finish the job you handed it: "

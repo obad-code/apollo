@@ -1,0 +1,28 @@
+import datetime as dt
+import autopost
+
+
+def test_pick_topics_pads_and_cleans():
+    out = autopost.pick_topics(3, found=["x"], think=lambda p: '[{"kind":"story","topic":"Moon"}]')
+    assert out[0] == {"kind": "story", "topic": "Moon"} and len(out) == 3
+
+
+def test_choose_and_deadline(tmp_path):
+    path = str(tmp_path / "p.json")
+    made = [{"title": "A", "path": "a.mp4", "notes": ""}, {"title": "B", "path": "b.mp4", "notes": ""}]
+    now = dt.datetime(2026, 1, 1, 13)
+    autopost.offer(made, now, path)
+    assert autopost.tick(now, path, upload=lambda v, n: "L") is None
+    r = autopost.tick(now + dt.timedelta(hours=5), path, upload=lambda v, n: "L/" + v)
+    assert r["ok"] and r["link"] == "L/a.mp4"
+    assert not autopost.choose(2, path, upload=lambda v, n: "x")["ok"]   # already posted
+    autopost.offer(made, now, path)
+    assert autopost.choose(2, path, upload=lambda v, n: v)["link"] == "b.mp4"
+    autopost.offer(made, now, path)
+    assert autopost.choose(0, path)["ok"] and autopost.load(path)["status"] == "skipped"
+
+
+def test_due_every():
+    assert autopost.due_today(dt.date(2026, 1, 2), "")
+    assert autopost.due_today(dt.date(2026, 1, 2), "2026-01-01")
+    assert not autopost.due_today(dt.date(2026, 1, 1), "2026-01-01")

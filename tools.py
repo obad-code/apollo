@@ -1332,6 +1332,16 @@ def _make_short(ctx, topic="", kind=None):
     return {"ok": True, "result": "LYLA is making it - a few minutes. It lands in Documents\\Apollo\\Shorts."}
 
 
+@_tool("post_short", "posting the Short",
+       "Post one of today's Shorts that LYLA made to YouTube, after she asked which one. "
+       "number is 1, 2, 3...; 0 means post none today. Use it for \"نزل رقم ٢\", "
+       "\"post the second one\", \"لا تنزل شي\".",
+       _obj({"number": {"type": "integer", "description": "Which Short, 1-based; 0 for none"}}, ("number",)))
+def _post_short(ctx, number):
+    import autopost
+    return autopost.choose(int(number))
+
+
 @_tool("crew_findings", "reading the crew's reports",
        "What one of your agents (LYLA, THEIA, MONEYPENNY or Q) found or did "
        "lately: what it is working on, its recent jobs with their summaries, and "

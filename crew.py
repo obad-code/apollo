@@ -226,11 +226,28 @@ class LylaDesk(lyla.Desk):
         started = _t.monotonic()
         self._tell(job, stage="received", text=job["task"], by="Apollo")
         try:
-            made = shorts.make(job.get("kind") or None, job.get("topic", ""),
-                               step=lambda text: self._tell(job, stage="step", text=text))
-            job.update(ok=True, brain="Gemini", sources={},
-                       summary=f"Short ready: {made['title']}",
-                       report=f"Saved to {made['path']}\n\nTitle, description and hashtags: {made['notes']}")
+            step = lambda text: self._tell(job, stage="step", text=text)  # noqa: E731
+            if job.get("batch"):
+                import autopost
+                step("Reading today's trends")
+                made = []
+                for n, pick in enumerate(autopost.pick_topics(job["batch"]), 1):
+                    step(f"Short {n}: {pick['topic'] or pick['kind']}")
+                    try:
+                        made.append(shorts.make(pick["kind"], pick["topic"], step=step))
+                    except Exception as e:  # noqa: BLE001 - one bad Short never costs the rest
+                        log.warning("short %d failed: %s", n, e)
+                        if n == job["batch"] and not made:
+                            raise
+                autopost.offer(made)
+                job.update(ok=True, brain="Gemini", sources={}, ask_pick=True,
+                           summary=autopost.question(made),
+                           report="\n".join(f"{i + 1}. {m['title']}  -  {m['path']}" for i, m in enumerate(made)))
+            else:
+                made = shorts.make(job.get("kind") or None, job.get("topic", ""), step=step)
+                job.update(ok=True, brain="Gemini", sources={},
+                           summary=f"Short ready: {made['title']}",
+                           report=f"Saved to {made['path']}\n\nTitle, description and hashtags: {made['notes']}")
         except Exception as e:  # noqa: BLE001
             log.warning("short failed: %s", e)
             job.update(ok=False, summary="", report="", error=str(e) or type(e).__name__)

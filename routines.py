@@ -32,6 +32,9 @@ ROUTINES = {
 }
 
 
+ON_POSTED = None    # Apollo says it when a Short goes up on its own
+
+
 def enabled():
     return os.environ.get("APOLLO_ROUTINES", "1").strip().lower() not in ("0", "false", "no", "off")
 
@@ -101,9 +104,11 @@ def start_job(agent):
                 "voice assistant project could earn from."))
         return crew.THEIA_DESK.take(task, routine=True)
     if agent == "SHORTS":
-        import shorts
-        shorts.make_in_background()
-        return {"job": "short"}
+        import autopost
+        if not autopost.due_today(dt.date.today(), autopost.load().get("asked", "")[:10]):
+            return None
+        return crew.desk("LYLA").take("Make today's Shorts from the trends", short=True,
+                                      batch=autopost.COUNT)
     if agent == "LYLA":
         likes = _interests_text()
         return crew.desk("LYLA").take(
@@ -129,6 +134,13 @@ def tick(now=None, path=STATE):
         last[agent] = now.date().isoformat()
     if started or last:
         _save(last, path)
+    try:
+        import autopost
+        posted = autopost.tick(now)
+        if posted and ON_POSTED:
+            ON_POSTED(posted)
+    except Exception:  # noqa: BLE001
+        log.warning("short auto-post failed", exc_info=True)
     return started
 
 

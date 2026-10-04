@@ -2378,6 +2378,10 @@ class Apollo:
 
         # The crew's standing jobs, on their own every day (routines.py).
         import routines
+        routines.ON_POSTED = lambda r: assistant.announce(
+            ui, self.voice, f"Tell the user in one short sentence, in their language: "
+            f"{r.get('result') or ('the Short upload failed: ' + r.get('error', ''))}",
+            r.get("result") or r.get("error", ""))
         routines.start(self.stopping.is_set)
 
         # Big market news: emailed to you, and said out loud while Apollo
