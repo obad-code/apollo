@@ -45,28 +45,39 @@ HOUR = int(os.environ.get("SHORTS_HOUR") or 13)
 
 POSES = ("stand", "wave", "point", "think", "shock", "run", "cheer", "sad", "shrug")
 CAMS = ("close", "push", "fisheye", "pull", "shake", "pan", "wide")
+import shorts_hero
 import shorts_scenes
 BGS = ("none",) + shorts_scenes.NAMES
+STYLE = (os.environ.get("SHORTS_STYLE") or "vector").strip().lower()      # vector (flat, cel-shaded) or ink (pencil)
+GRADES = shorts_hero.GRADES
+SIDES = ("none",) + shorts_hero.SIDES
 SHOWS = ("man", "env")
 SFX = ("whoosh", "pop", "ding", "boom", "riser", "click")
 PROPS = ("none", "note", "question", "exclaim", "bulb", "money", "clock", "skull", "heart", "earth", "fire")
 
 SYSTEM = (
-    "You write YouTube Shorts scripts for a hand-drawn ink channel: a stick-man narrator AND the "
-    "story shown on screen. 40-55 seconds spoken, brisk and gripping like a top Shorts channel: "
-    "the first line is a hook that lands in two seconds. Each scene is ONE sentence of 6 to 14 "
-    "words, 9 to 12 scenes, and every scene SHOWS something - never just a man talking. If the "
-    "story is about the sea, show the sea; about a city, the city; money, a chart. No music, "
-    "nothing indecent, nothing against Islam. Answer ONLY with JSON: "
+    "You write YouTube Shorts scripts for a faceless channel in a flat 2D vector, bold-outline "
+    "animation style: a blank-faced narrator-hero and the story shown on screen. 40-55 seconds "
+    "spoken, brisk and gripping: the first line is a hook that lands in two seconds. Each scene "
+    "is ONE sentence of 6 to 14 words, 9 to 12 scenes, and every scene SHOWS something - never "
+    "just a man talking. WRITING RULES: vary sentence length constantly (short fragments beside "
+    "longer ones, never three sentences in a row with the same shape); never state an emotion, "
+    "show it through an action or a detail; every money figure is oddly specific ($34, $1,847 - "
+    "never $1,000); banned words: delve, moreover, furthermore, game-changer, unlock, elevate, "
+    "navigate, landscape, embark, tapestry, 'in today's world'. No music, nothing indecent, "
+    "nothing against Islam. Answer ONLY with JSON: "
     '{"title": "...", "description": "...", "hashtags": ["#..."], "scenes": [{"say": '
-    '"what the narrator says", "caption": "2-5 key words", "bg": one of '
-    + json.dumps(BGS) + ', "show": "man" or "env" (env = just the place, no narrator, for big '
-    'establishing shots), "pose": one of ' + json.dumps(POSES) + ', "prop": one of ' + json.dumps(PROPS)
-    + ', "cam": one of ' + json.dumps(CAMS) + ', "sfx": one of ' + json.dumps(SFX)
-    + "}]}. Pick the bg that matches what is being told in that very scene and change it as the story "
-    "moves. sfx is the sound on the cut: boom for a shock, ding for a win or an idea, pop when an "
-    "object appears, riser before a reveal, whoosh otherwise. Keep the camera moving, never the "
-    "same cam twice in a row, fisheye and shake at most once.")
+    '"what the narrator says", "caption": "at most ONE short text: a number or 2-4 words", "bg": one of '
+    + json.dumps(BGS) + ', "show": "man" or "env" (env = just the place, no narrator), "pose": one of '
+    + json.dumps(POSES) + ', "prop": one of ' + json.dumps(PROPS) + ', "cam": one of ' + json.dumps(CAMS)
+    + ', "sfx": one of ' + json.dumps(SFX) + ', "grade": one of ' + json.dumps(GRADES)
+    + ', "tier": 1 broke / 2 stable / 3 established / 4 elite (his clothes), "friend": one of '
+    + json.dumps(SIDES) + " (a side character with a real face, when one is in the beat)}]}. "
+    "Pick the bg that matches what is told in that very scene and change it as the story moves. "
+    "grade is the mood: warm = comfort or progress, cool = stress or hardship, neutral = facts, "
+    "night = high stakes or late at night. sfx: boom for a shock, ding for a win or an idea, pop "
+    "when an object appears, riser before a reveal, whoosh otherwise. Keep the camera moving, "
+    "never the same cam twice in a row, fisheye and shake at most once.")
 
 
 def style_file():
@@ -94,12 +105,23 @@ def set_style(text, add=True):
 
 def kind_for(day):
     """A fact one day, a story the next."""
-    return "fact" if day.toordinal() % 2 == 0 else "story"
+    return ("fact", "story", "ladder")[day.toordinal() % 3]
+
+
+KINDS = {
+    "fact": "one amazing true fact, explained",
+    "story": "a gripping short story with a twist (fiction is fine)",
+    "ladder": ("a POV wealth ladder: second person, present tense, flat and deadpan. Six levels from broke to "
+               "elite, each opening with an oddly specific dollar figure (never round: $34, $1,847, $9,412), "
+               "one hyper-granular money detail, a side character beat, and a closing one-line rule worded "
+               "differently each time. Open and close on the same hyper-mundane moment (an exact time, a tiny "
+               "detail). End with a one-sentence takeaway and a question for the comments. Illustrative figures."),
+}
 
 
 def ask_script(kind, topic="", think=None):
     language = "Arabic (clear Gulf-friendly Fusha)" if LANG == "ar" else "English"
-    prompt = (f"Language: {language}. Kind: {'one amazing true fact, explained' if kind == 'fact' else 'a gripping short story with a twist (fiction is fine)'}. "
+    prompt = (f"Language: {language}. Kind: {KINDS.get(kind, KINDS['fact'])}. "
               f"Topic: {topic or 'your choice - something people would share'}.")
     if think is None:
         import lyla
@@ -122,6 +144,10 @@ def ask_script(kind, topic="", think=None):
         s["bg"] = s.get("bg") if s.get("bg") in shorts_scenes.NAMES else ""
         s["show"] = s.get("show") if s.get("show") in SHOWS and s["bg"] else "man"
         s["sfx"] = s.get("sfx") if s.get("sfx") in SFX else ""
+        s["grade"] = s.get("grade") if s.get("grade") in GRADES else ""
+        s["friend"] = s.get("friend") if s.get("friend") in shorts_hero.SIDES else ""
+        s["tier"] = s.get("tier") if s.get("tier") in (1, 2, 3, 4) else 2
+        s["caption"] = " ".join(s["caption"].split()[:6])
     for i, s in enumerate(scenes):
         if s.get("cam") not in CAMS or (i and s["cam"] == scenes[i - 1]["cam"]):
             s["cam"] = CAMS[i % len(CAMS)]
@@ -180,6 +206,8 @@ class Pen:
         return max(1, round(width * self.k * (self.s if self.s < 1 else 1)))
 
     def _wobble(self, pts, amount):
+        if STYLE == "vector":
+            amount = 0
         rnd, out = self._rand(), []
         for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
             steps = max(1, int(math.hypot(x1 - x0, y1 - y0) / 45))
@@ -233,6 +261,8 @@ class Pen:
 
     def hatch(self, x0, y0, x1, y1, gap=15, slant=0.55, width=4):
         """Diagonal shading strokes inside a box - the shadow of a pencil drawing."""
+        if STYLE == "vector":
+            return
         h = y1 - y0
         x = x0 - slant * h
         while x < x1:
@@ -278,8 +308,11 @@ def _hand(d, c):
     d.ellipse([c[0] - 20, c[1] - 20, c[0] + 20, c[1] + 20], fill=PAPER, width=6)
 
 
-def draw_man(d, cx, ground, pose, t, talking=False, prop="none", glasses=None):
+def draw_man(d, cx, ground, pose, t, talking=False, prop="none", glasses=None, hero=None, tier=2):
     glasses = GLASSES if glasses is None else glasses
+    if STYLE == "vector":
+        return shorts_hero.draw_hero(d, cx, ground, pose, t, prop, hero or shorts_hero.hero_for("apollo"), tier,
+                                     limbs(pose, t), _hold, glasses)
     if prop == "note":
         return _desk_scene(d, cx, pose, t, glasses)
     la, ra, ll, rl, jump = limbs(pose, t)
@@ -388,9 +421,18 @@ def _desk_scene(d, cx, pose, t, glasses):
 
 def _hold(d, prop, hands, t):
     """What he holds or shows, drawn at his hand."""
-    if prop in ("none", "note"):
+    if prop == "none" or (prop == "note" and STYLE != "vector"):
         return
     hx, hy = hands[1]
+    if prop == "note":                                       # a pad in one hand, a pencil in the other
+        pad = [(hx - 40, hy - 150), (hx + 100, hy - 138), (hx + 78, hy + 40), (hx - 56, hy + 28)]
+        d.polygon(pad, fill=(255, 239, 196), outline=INK, width=8)
+        ox, oy = hands[-1]
+        a, b2 = (ox - 66, oy - 150), (ox + 50, oy + 24)
+        d.line([a, b2], fill=INK, width=40)
+        d.line([a, b2], fill=(246, 190, 40), width=26)
+        d.polygon([(b2[0] - 14, b2[1] - 2), (b2[0] + 16, b2[1] - 6), (b2[0] + 14, b2[1] + 40)], fill=(244, 214, 160), outline=INK, width=5)
+        return
     cx, cy = hx + 10, hy - 100 + math.sin(t * 2) * 5
     f = _font(110)
     if prop in ("question", "exclaim"):
@@ -452,7 +494,7 @@ def avatar(path, size=1024, pose="pleased", prop="none", glasses=True):
     k = 2.0
     big = Image.new("RGB", (int(W * k), int(H * k)), PAPER)
     d = Pen(ImageDraw.Draw(big), k, seed=3)
-    draw_man(d, W / 2, 1500, pose, 0.4, prop=prop, glasses=glasses)
+    draw_man(d, W / 2, 1500, pose, 0.4, prop=prop, glasses=glasses, hero=shorts_hero.hero_for("avatar"), tier=3)
     box = tuple(int(v * k) for v in (W / 2 - 330, 560, W / 2 + 330, 1560))
     art = big.crop(box)
     side = max(art.size)
@@ -521,8 +563,14 @@ def frame(scene, t, progress, title):
         head, body = (W / 2, 700), (W / 2, 900)
     else:
         d.place(k, (cx, ground), (mx, ground))
-        head = draw_man(d, cx, ground, pose, t, talking=progress < 1, prop=scene["prop"])
+        head = draw_man(d, cx, ground, pose, t, talking=progress < 1, prop=scene["prop"],
+                        hero=scene.get("_hero"), tier=scene.get("tier", 2))
         d.place()
+        if scene.get("friend") and STYLE == "vector":
+            side = scene["friend"]
+            d.place(0.6, (W * 0.27, ground), (W * 0.27, ground))
+            shorts_hero.draw_side(d, side, W * 0.27, ground, t, "angry" if pose == "shock" else ("sad" if pose == "sad" else "calm"))
+            d.place()
         head = (mx + (head[0] - cx) * k, ground + (head[1] - ground) * k)
         body = (mx, ground + (1000 - ground) * k)
     # the camera: crop the big world to a window and scale it to the screen
@@ -538,6 +586,8 @@ def frame(scene, t, progress, title):
             img = _bulge(img, bulge)
         except ImportError:
             pass
+    if scene.get("grade") and STYLE == "vector":
+        img = shorts_hero.grade(img, scene["grade"])
     # the caption sits on the screen, never zoomed: calm ink type, the spoken words dark
     d = ImageDraw.Draw(img)
     big, small = _font(78), _font(34)
@@ -619,7 +669,9 @@ def render(script, out_path, speak_fn=speak, work=None, step=lambda t: None):
     """The whole video. Returns out_path."""
     work = work or tempfile.mkdtemp(prefix="short-")
     parts = []
+    hero = shorts_hero.hero_for(script.get("title", "") or work)          # picked once, locked for the whole video
     for i, scene in enumerate(script["scenes"]):
+        scene["_hero"] = hero
         step(f"Scene {i + 1} of {len(script['scenes'])}: voice and drawing")
         audio = os.path.join(work, f"s{i}.mp3")
         speak_fn(scene["say"], audio)

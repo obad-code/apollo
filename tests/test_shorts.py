@@ -8,7 +8,8 @@ import shorts
 
 def test_fact_one_day_story_the_next():
     a, b = dt.date(2026, 10, 4), dt.date(2026, 10, 5)
-    assert {shorts.kind_for(a), shorts.kind_for(b)} == {"fact", "story"}
+    assert shorts.kind_for(a) != shorts.kind_for(b)
+    assert {shorts.kind_for(dt.date(2026, 10, d)) for d in (4, 5, 6)} == {"fact", "story", "ladder"}
 
 
 def test_a_script_is_cleaned_up():

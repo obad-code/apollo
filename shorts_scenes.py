@@ -252,9 +252,33 @@ def chart(d, t):
         d.text((cx, cy + 2), "$", font=None, fill=INK, anchor="mm") if False else d.line([(cx, cy - 18), (cx, cy + 18)], width=5, wobble=0.5)
 
 
+def office(d, t):
+    _rect(d, 0, 0, W, 1380, (236, 238, 242))
+    _rect(d, 120, 300, 960, 900, SKY)                                              # a big window onto the city
+    for i, (x, w, h) in enumerate(((150, 120, 360), (290, 150, 260), (460, 130, 420), (620, 170, 300), (810, 120, 380))):
+        _building(d, x, w, h, 900, i + 9)
+    d.line([(120, 300), (960, 300), (960, 900), (120, 900), (120, 300)], width=10, wobble=1)
+    d.line([(540, 300), (540, 900)], width=7, wobble=1)
+    _rect(d, 0, 1380, W, H, (210, 196, 176))
+    d.line([(0, 1380), (W, 1384)], width=7, wobble=2)
+    d.polygon([(70, 1230), (330, 1230), (330, 1380), (70, 1380)], fill=(190, 170, 140), width=7)      # a cabinet
+
+
+def bank(d, t):
+    _rect(d, 0, 0, W, 1380, SKY)
+    d.polygon([(100, 700), (540, 420), (980, 700)], fill=STONE, width=8, wobble=1)                    # a pediment
+    d.polygon([(100, 700), (980, 700), (980, 760), (100, 760)], fill=PAPER, width=8, wobble=1)
+    for x in range(160, 960, 150):
+        d.polygon([(x, 760), (x + 70, 760), (x + 70, 1330), (x, 1330)], fill=STONE, width=7, wobble=1)
+        d.hatch(x + 46, 770, x + 66, 1320, gap=12, width=3)
+    d.polygon([(70, 1330), (1010, 1330), (1010, 1390), (70, 1390)], fill=PAPER, width=8, wobble=1)
+    _rect(d, 0, 1390, W, H, GREY)
+    d.ellipse([500, 560, 580, 640], fill=(255, 226, 140), width=6)
+
+
 PLACES = {"sea": sea, "beach": beach, "desert": desert, "city": city, "space": space, "night": night,
           "forest": forest, "mountains": mountains, "rain": rain, "underwater": underwater,
-          "room": room, "chart": chart}
+          "room": room, "chart": chart, "office": office, "bank": bank}
 NAMES = tuple(PLACES)
 
 
