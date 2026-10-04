@@ -6,7 +6,7 @@ Parked on 4 October 2026 at the user's request: no paid plans or new work for no
    sound, explanation). Planned: an n8n-style pipeline session, and LYLA thinking with **Gemini Pro**.
 2. **Dropshipping** - not started; to be scoped with the user.
 3. **LYLA overall** - work better and post better Shorts, through Gemini Pro.
-4. **System Check button** (asked 4 Oct 2026) - one button that checks the whole system: keys,
+4. **System Check button** (asked 4 Oct 2026) - a button inside Apollo (on its display) that checks the whole of Apollo: keys,
    Gemini quota per model, every agent (MONEYPENNY, THEIA, Q, LYLA, TradingAgents, digest,
    alerts, Telegram), files and network - says plainly what is broken and fixes what is safe to
    fix by itself (like a security system). Build on `diagnostics.py`, which already runs the
