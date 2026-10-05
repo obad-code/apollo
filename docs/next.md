@@ -8,3 +8,6 @@ Parked on 4 October 2026 at the user's request: no paid plans or new work for no
 3. **LYLA overall** - work better and post better Shorts, through Gemini Pro.
 4. **context7 MCP** (suggested 4 Oct 2026) - live, current docs for Gemini and the other
    libraries while Claude works, so retired models are caught early. The user said: later.
+5. **Hermes** (Nous Research's free open-source agent, already wired in `lyla.py` via
+   `HERMES_URL` / `HERMES_KEY`) - only worth adding together with LYLA on Gemini Pro or a paid
+   key: on the free Gemini key it shares the same daily quota. Decide with item 3.
